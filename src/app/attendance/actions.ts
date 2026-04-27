@@ -77,7 +77,7 @@ export async function recordClockIn(staffId: string, staffName: string) {
       date: dateStr,
       clock_in: now.toISOString(),
       clock_out: null, 
-      break_minutes: 0,
+      break_minutes: 60,
       status: "normal",
       created_at: serverTimestamp()
     };
@@ -170,6 +170,21 @@ export async function handleQRScan(staffId: string) {
     }
   } catch (error: any) {
     console.error("QR Scan Error:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateAttendanceRecord(id: string, data: Partial<AttendanceRecord>) {
+  try {
+    const docRef = doc(db, ATTENDANCE_COLLECTION, id);
+    const updatePayload = {
+      ...data,
+      updated_at: serverTimestamp()
+    };
+    await updateDoc(docRef, updatePayload);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating attendance:", error);
     return { success: false, error: error.message };
   }
 }

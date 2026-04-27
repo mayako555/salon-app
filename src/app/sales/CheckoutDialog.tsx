@@ -260,7 +260,7 @@ export default function CheckoutDialog({
                         type="text" 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder={`${activeItemType === 'menu' ? '通常メニュー' : activeItemType === 'coupon' ? 'クーポン' : 'メッセージクーポン'}を検索...`}
+                        placeholder={`${activeItemType === 'menu' ? 'メニュー名' : activeItemType === 'coupon' ? 'クーポン名' : 'メッセージ'}を検索...`}
                         className="w-full pl-9 pr-4 py-2 border-none bg-slate-50 rounded-md text-sm focus:ring-0"
                       />
                     </div>
@@ -286,7 +286,7 @@ export default function CheckoutDialog({
                     ))}
                     {filteredItems.length === 0 && (
                       <div className="text-center py-10 text-slate-400 text-sm italic">
-                        マスタ情報がありません
+                        登録データがありません（設定画面から追加してください）
                       </div>
                     )}
                   </div>

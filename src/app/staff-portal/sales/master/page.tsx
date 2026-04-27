@@ -142,9 +142,9 @@ export default function MasterManagementPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-6">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900 flex items-center gap-2">
-            <Database className="text-blue-600" /> マスタ管理
+            <Database className="text-blue-600" /> メニュー・商品設定
           </h1>
-          <p className="text-slate-500 font-medium">メニュー、クーポン、オプションデータの統合管理</p>
+          <p className="text-slate-500 font-medium">メニュー、クーポン、店販品の管理</p>
         </div>
         <div className="flex gap-3">
           <Dialog>
@@ -155,7 +155,7 @@ export default function MasterManagementPage() {
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>マスタデータ一括インポート</DialogTitle>
+                <DialogTitle>メニュー・商品データの一括読み込み</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <p className="text-xs text-slate-500">区分|施術名|価格|所要時間|HPBクーポン名|制約|その他の形式で入力してください。</p>
@@ -228,7 +228,7 @@ export default function MasterManagementPage() {
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-              <p className="text-slate-400 font-bold animate-pulse">Loading Master Data...</p>
+              <p className="text-slate-400 font-bold animate-pulse">データを読み込み中...</p>
             </div>
           ) : filteredItems.length === 0 ? (
             <div className="bg-white rounded-3xl p-20 text-center border-2 border-dashed border-slate-100">

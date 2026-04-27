@@ -19,17 +19,40 @@ import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 
 import { useAuth } from "@/lib/auth-context";
+import { getMonthlySales } from "@/app/sales/actions";
+import { getDailyAttendance, recordClockIn, recordClockOut } from "@/app/attendance/actions";
+import { toast } from "sonner";
 
 export default function StaffDashboardPage() {
   const { profile } = useAuth();
   const [recentCustomers, setRecentCustomers] = useState<Customer[]>([]);
+  const [stats, setStats] = useState({ todaySales: 0, todayCount: 0 });
+  const [attendance, setAttendance] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
-      const data = await getAllCustomers();
+      const today = format(new Date(), "yyyy-MM-dd");
+      const [customers, sales, attRecords] = await Promise.all([
+        getAllCustomers(),
+        getMonthlySales(new Date().getFullYear(), new Date().getMonth() + 1),
+        getDailyAttendance(today)
+      ]);
+      
+      const todaySalesData = sales.filter(s => s.date === today);
+      const total = todaySalesData.reduce((acc, s) => acc + (s.tech_sales || 0) + (s.product_sales || 0), 0);
+      
+      setStats({
+        todaySales: total,
+        todayCount: todaySalesData.length
+      });
+
+      if (profile?.id) {
+        setAttendance(attRecords.find(a => a.staff_id === profile.id && a.clock_out === null));
+      }
+
       // Sort by created_at desc and take top 5
-      const sorted = data.sort((a, b) => {
+      const sorted = customers.sort((a, b) => {
         const dateA = a.created_at?.toDate?.() || new Date(0);
         const dateB = b.created_at?.toDate?.() || new Date(0);
         return dateB.getTime() - dateA.getTime();
@@ -50,33 +73,93 @@ export default function StaffDashboardPage() {
             <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">
               Welcome back, {profile?.name || "Staff"}
             </p>
-            <h1 className="text-2xl font-bold">Staff Dashboard</h1>
+            <h1 className="text-2xl font-bold">Timecard</h1>
           </div>
-          <div className="bg-white/10 p-2 rounded-xl backdrop-blur-md">
-            <Clock size={20} className="text-slate-300" />
+          <div className="text-right">
+            <p className="text-xl font-black text-white">{format(new Date(), "HH:mm")}</p>
+            <p className="text-[10px] text-slate-400 font-bold">{format(new Date(), "MM/dd (E)", { locale: ja })}</p>
           </div>
         </div>
 
+        {/* Timecard Section */}
+        <div className="bg-white/10 p-5 rounded-3xl backdrop-blur-xl border border-white/20 shadow-2xl mb-8">
+           {!attendance ? (
+             <div className="flex flex-col gap-4">
+               <div className="flex items-center gap-4">
+                 <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-900/40">
+                   <Clock size={24} />
+                 </div>
+                 <div>
+                   <h3 className="font-black text-white">未出勤</h3>
+                   <p className="text-[10px] text-slate-400 font-bold">今日も一日頑張りましょう！</p>
+                 </div>
+               </div>
+               <Button 
+                 onClick={async () => {
+                   if (!profile?.id) return;
+                   const res = await recordClockIn(profile.id, profile.name);
+                   if (res.success) {
+                     toast.success("出勤を記録しました");
+                     window.location.reload();
+                   }
+                 }}
+                 className="w-full h-14 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-lg font-black text-white shadow-xl shadow-emerald-900/20"
+               >
+                 出勤する
+               </Button>
+             </div>
+           ) : (
+             <div className="flex flex-col gap-4">
+               <div className="flex items-center gap-4">
+                 <div className="w-12 h-12 rounded-2xl bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-900/40 animate-pulse">
+                   <Clock size={24} />
+                 </div>
+                 <div>
+                   <h3 className="font-black text-white">勤務中</h3>
+                   <p className="text-[10px] text-slate-400 font-bold">
+                     出勤時刻: {format(new Date(attendance.clock_in), "HH:mm")}
+                   </p>
+                 </div>
+               </div>
+               <Button 
+                 onClick={async () => {
+                   if (!profile?.id) return;
+                   const res = await recordClockOut(profile.id);
+                   if (res.success) {
+                     toast.success("退勤を記録しました。お疲れ様でした！");
+                     window.location.reload();
+                   }
+                 }}
+                 className="w-full h-14 rounded-2xl bg-white text-slate-900 hover:bg-slate-100 text-lg font-black shadow-xl shadow-white/10"
+               >
+                 退勤する
+               </Button>
+             </div>
+           )}
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
-          <Link href="/staff-portal/customers" className="bg-amber-500 hover:bg-amber-600 p-4 rounded-2xl shadow-lg shadow-amber-900/20 transition-all active:scale-95">
-            <Users className="mb-2" size={24} />
+          <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-md border border-white/10">
+            <div className="text-amber-400 text-[10px] font-black uppercase tracking-widest mb-1">Today's Sales</div>
+            <div className="text-xl font-black">¥{stats.todaySales.toLocaleString()}</div>
+            <div className="text-[10px] text-white/50 font-bold">{stats.todayCount} 件の会計</div>
+          </div>
+          <Link href="/staff-portal/sales" className="bg-emerald-500 hover:bg-emerald-600 p-4 rounded-2xl shadow-lg shadow-emerald-900/20 transition-all active:scale-95 flex flex-col justify-between">
+            <ReceiptText size={20} />
+            <div>
+              <div className="font-bold text-sm">売上入力</div>
+              <div className="text-[10px] opacity-80">本日の方の会計</div>
+            </div>
+          </Link>
+          <Link href="/staff-portal/customers" className="bg-slate-700 hover:bg-slate-600 p-4 rounded-2xl shadow-lg transition-all active:scale-95">
+            <Users className="mb-2" size={20} />
             <div className="font-bold text-sm">顧客管理</div>
             <div className="text-[10px] opacity-80">名簿・カルテ</div>
           </Link>
-          <Link href="/staff-portal/sales" className="bg-emerald-500 hover:bg-emerald-600 p-4 rounded-2xl shadow-lg shadow-emerald-900/20 transition-all active:scale-95">
-            <ReceiptText className="mb-2" size={24} />
-            <div className="font-bold text-sm">売上入力</div>
-            <div className="text-[10px] opacity-80">本日の方の会計</div>
-          </Link>
           <Link href="/staff-portal/qr" className="bg-blue-500 hover:bg-blue-600 p-4 rounded-2xl shadow-lg shadow-blue-900/20 transition-all active:scale-95 text-left">
-            <QrCode className="mb-2" size={24} />
+            <QrCode className="mb-2" size={20} />
             <div className="font-bold text-sm">QR表示</div>
             <div className="text-[10px] opacity-80">お客様入力用</div>
-          </Link>
-          <Link href="/staff-portal/holidays" className="bg-rose-500 hover:bg-rose-600 p-4 rounded-2xl shadow-lg shadow-rose-900/20 transition-all active:scale-95">
-            <CalendarHeart className="mb-2" size={24} />
-            <div className="font-bold text-sm">シフト提出</div>
-            <div className="text-[10px] opacity-80">希望休の入力</div>
           </Link>
         </div>
       </div>

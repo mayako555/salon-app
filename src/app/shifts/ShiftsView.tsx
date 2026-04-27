@@ -106,7 +106,7 @@ export default function ShiftsView({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">シフト管理</h1>
-          <p className="text-slate-500 mt-1 text-sm">スタッフの勤務シフトを作成・調整します。 <span className="text-rose-600 font-medium">※ 希望休の提出期限は前々月の20日までです。</span></p>
+          <p className="text-slate-500 mt-1 text-sm">スタッフの勤務シフトを作成・調整します。 <span className="text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded">青色ストライプはスタッフの「希望休」です。</span></p>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="flex bg-slate-100 p-1 rounded-lg">
@@ -221,16 +221,16 @@ export default function ShiftsView({
                           className={`text-[10px] flex flex-col rounded border shadow-sm leading-none overflow-hidden cursor-pointer hover:ring-2 hover:ring-slate-400 transition-all
                             ${shift.type === 'holiday' ? 'bg-slate-100 border-slate-200 text-slate-600' :
                               shift.type === 'paid_leave' ? 'bg-amber-50 border-amber-200 text-amber-700' : 
-                              shift.type === 'requested_holiday' ? 'bg-blue-50 border-blue-200 text-blue-700 repeating-stripes' :
+                              shift.type === 'requested_holiday' ? 'bg-blue-100 border-blue-400 text-blue-900 shadow-md ring-2 ring-blue-200' :
                               'bg-white border-slate-200 text-slate-800'}
                           `}
                         >
                           <div className={`px-1.5 py-1.5 flex justify-between font-bold ${shift.type === 'work' ? 'bg-slate-50 border-b border-slate-100' : ''}`}>
                              <span className="truncate">{shift.staff_name}</span>
-                             <span>{
+                             <span className={shift.type === 'requested_holiday' ? 'bg-blue-600 text-white px-1.5 py-0.5 rounded-sm animate-pulse' : ''}>{
                                shift.type === 'holiday' ? '休' : 
                                shift.type === 'paid_leave' ? '有休' : 
-                               shift.type === 'requested_holiday' ? '希望休' : ''
+                               shift.type === 'requested_holiday' ? '★希望休' : ''
                              }</span>
                           </div>
                           {shift.type === 'work' && shift.segments && shift.segments.map((seg, idx) => (

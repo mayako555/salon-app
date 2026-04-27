@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { SalesMasterItem, seedSalesMasterData } from "./seeds";
 import { addAuditLog } from "../audit/actions";
+import { revalidatePath } from "next/cache";
 
 export type SalesSource = "checkout" | "hotpepper" | "manual";
 
@@ -201,6 +202,10 @@ export async function addCheckout(formData: FormData) {
       actor: "POS端末"
     });
 
+    revalidatePath("/staff-portal");
+    revalidatePath("/staff-portal/sales");
+    revalidatePath("/payroll");
+    revalidatePath("/audit");
     return { success: true };
   } catch (error: any) {
     console.error("Error adding checkout to Firestore:", error);
@@ -269,6 +274,8 @@ export async function importHotPepperCsv(formData: FormData) {
     });
 
     await batch.commit();
+    revalidatePath("/staff-portal");
+    revalidatePath("/staff-portal/sales");
     return { success: true, count: importCount };
   } catch (error: any) {
     console.error("Error importing CSV to Firestore:", error);
@@ -311,6 +318,8 @@ export async function closeDailySales(date: string) {
       )
     ]);
 
+    revalidatePath("/staff-portal");
+    revalidatePath("/staff-portal/sales");
     return res as any;
   } catch (error: any) {
     console.error("Error closing sales in Firestore:", error);

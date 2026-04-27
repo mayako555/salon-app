@@ -45,7 +45,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
     { name: "会計入力", href: "/staff-portal/sales", icon: Receipt },
     ...(isAdminOrManager ? [
       { name: "シフト管理", href: "/staff-portal/shifts", icon: Calendar },
-      { name: "マスタ", href: "/staff-portal/sales/master", icon: Database },
+      { name: "メニュー・商品設定", href: "/staff-portal/sales/master", icon: Database },
     ] : []),
     { name: "交通費申請", href: "/staff-portal/transportation", icon: Train },
   ];
@@ -53,7 +53,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
       {/* Sidebar for Desktop */}
-      <aside className="hidden md:flex w-64 bg-slate-900 text-white flex-col sticky top-0 h-screen">
+      <aside className="hidden lg:flex w-64 bg-slate-900 text-white flex-col sticky top-0 h-screen">
         <div className="p-8">
           <div className="flex items-center gap-3 mb-8">
             <div className="bg-blue-600 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20">
@@ -100,7 +100,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
       </aside>
 
       {/* Mobile Header */}
-      <header className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-40">
+      <header className="lg:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-40">
         <div className="flex items-center gap-2">
           <div className="bg-blue-600 w-8 h-8 rounded-lg flex items-center justify-center">
             <span className="text-sm font-black italic">S</span>
@@ -114,12 +114,12 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 min-w-0 pb-20 md:pb-0">
+      <main className="flex-1 min-w-0 pb-20 lg:pb-0">
         {children}
       </main>
 
       {/* Mobile Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex justify-around p-2 z-40 pb-safe">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex justify-around p-2 z-40 pb-safe">
         {navItems.map((item) => (
           <Link 
             key={item.href} 
