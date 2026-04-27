@@ -4,12 +4,15 @@ import { db } from "@/lib/firebase";
 import { 
   collection, 
   getDocs, 
-  addDoc, 
+  addDoc,
+  deleteDoc,
+  doc,
   query, 
   orderBy, 
   serverTimestamp
 } from "firebase/firestore";
 import { addAuditLog } from "../audit/actions";
+import { revalidatePath } from "next/cache";
 
 export type StaffRole = "admin" | "manager" | "staff";
 
@@ -124,5 +127,39 @@ export async function addStaff(formData: FormData) {
   } catch (error: any) {
     console.error("Error in addStaff:", error);
     return { success: false, error: error.message || "予期せぬエラーが発生しました" };
+  }
+}
+
+export async function deleteStaff(id: string, uid?: string) {
+  try {
+    // 1. Delete from Firebase Auth if uid exists
+    if (uid) {
+      try {
+        await adminAuth.deleteUser(uid);
+      } catch (authError) {
+        console.error("Error deleting from Firebase Auth:", authError);
+        // Continue even if auth delete fails (maybe user doesn't exist anymore)
+      }
+    }
+
+    // 2. Delete from Firestore
+    const docRef = doc(db, STAFF_COLLECTION, id);
+    await deleteDoc(docRef);
+
+    // 3. Audit log
+    await addAuditLog({
+      table_name: STAFF_COLLECTION,
+      record_id: id,
+      action: "DELETE",
+      old_data: { id, uid },
+      new_data: null,
+      actor: "管理者"
+    });
+
+    revalidatePath("/staff");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting staff:", error);
+    return { success: false, error: error.message || "削除に失敗しました" };
   }
 }

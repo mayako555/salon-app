@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Plus, Edit2, FileText } from "lucide-react";
 import StaffFormDialog from "./StaffFormDialog";
+import DeleteStaffButton from "./DeleteStaffButton";
 import Link from "next/link";
 import { format } from "date-fns";
 import AuthGuard from "@/components/AuthGuard";
@@ -79,6 +80,7 @@ export default async function StaffPage() {
                       <Edit2 size={16} />
                       <span className="sr-only">編集</span>
                     </Button>
+                    <DeleteStaffButton id={staff.id} uid={staff.uid} name={staff.name} />
                   </TableCell>
                 </TableRow>
               ))}
