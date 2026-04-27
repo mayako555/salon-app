@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { getAuditLogs } from "./actions";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";

@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { getMonthlyStatements } from "./actions";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";

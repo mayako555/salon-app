@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { getMonthlyShifts } from "./actions";
 import { getStaffList } from "@/app/staff/actions";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns";
