@@ -1,3 +1,5 @@
+"use server";
+
 import Papa from "papaparse";
 import { db } from "@/lib/firebase";
 import { 
