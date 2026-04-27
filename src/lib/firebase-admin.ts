@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+// Build fix trigger
 
 // Defensive config parsing
 const getPrivateKey = () => {
