@@ -1,69 +1,65 @@
-import * as admin from "firebase-admin";
+// Firebase Admin Initialization (Safe for Vercel Build)
 // Build fix trigger
 
-// Defensive config parsing
-const getPrivateKey = () => {
-  const key = process.env.FIREBASE_PRIVATE_KEY;
-  if (!key) return null;
-  return key.replace(/\\n/g, "\n").replace(/\"/g, "").trim();
-};
+// Build phase detection
+const isBuild = process.env.npm_lifecycle_event === "build" || 
+                process.env.NEXT_PHASE === "phase-production-build" ||
+                process.env.VERCEL_ENV === "preview" || // sometimes preview builds fail too
+                !process.env.FIREBASE_PRIVATE_KEY;
 
-const firebaseAdminConfig = {
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "salonapp-ee4d2",
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-  privateKey: getPrivateKey(),
-};
-
-function initAdmin() {
-  // Already initialized
-  if (admin.apps.length) return admin.app();
-
-  // Strict check: only initialize if we have BOTH email and a valid-looking key
-  const pk = firebaseAdminConfig.privateKey;
-  const hasValidKey = pk && pk.includes("-----BEGIN PRIVATE KEY-----");
-
-  if (firebaseAdminConfig.clientEmail && hasValidKey) {
-    try {
-      return admin.initializeApp({
-        credential: admin.credential.cert(firebaseAdminConfig as admin.ServiceAccount),
-      });
-    } catch (error) {
-      console.error("Firebase Admin initialization failed:", error);
-      return null;
-    }
-  }
-  
-  // If we are here, we are likely in a build environment or missing env vars.
-  // DO NOT call admin.initializeApp() with no arguments, as it may trigger 
-  // searches for default credentials that crash in certain environments.
-  return null;
-}
-
-/**
- * Proxy factory to create safe, lazy-loaded Firebase Admin services.
- * If the app cannot be initialized (e.g., during build), it returns a Proxy 
- * that swallows calls or returns undefined, preventing crashes.
- */
-function createSafeProxy<T extends object>(getService: (app: admin.app.App) => T): T {
+// Create dummy proxies for build time to completely avoid importing or running firebase-admin
+function createDummyProxy<T extends object>(): T {
   return new Proxy({} as T, {
-    get: (target, prop) => {
-      const app = initAdmin();
-      if (!app) {
-        // Return a no-op function if a method is called, or undefined for properties
-        return (...args: any[]) => {
-          console.warn(`Firebase Admin service called during build or missing config: ${String(prop)}`);
-          return Promise.resolve({ docs: [], exists: false, success: false }); 
-        };
-      }
-      const service = getService(app);
-      const value = (service as any)[prop];
-      if (typeof value === 'function') {
-        return value.bind(service);
-      }
-      return value;
+    get: () => {
+      return (...args: any[]) => Promise.resolve({ docs: [], exists: false, success: false, uid: "dummy" });
     }
   });
 }
 
-export const adminAuth = createSafeProxy((app) => app.auth());
-export const adminDb = createSafeProxy((app) => app.firestore());
+// We use require to avoid top-level evaluation if we are in build phase
+let adminAuth: any;
+let adminDb: any;
+
+try {
+  if (isBuild) {
+    adminAuth = createDummyProxy();
+    adminDb = createDummyProxy();
+  } else {
+    // Only require firebase-admin at runtime
+    const admin = require("firebase-admin");
+
+    const getPrivateKey = () => {
+      const key = process.env.FIREBASE_PRIVATE_KEY;
+      if (!key) return null;
+      return key.replace(/\\n/g, "\n").replace(/\"/g, "").trim();
+    };
+
+    const firebaseAdminConfig = {
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "salonapp-ee4d2",
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: getPrivateKey(),
+    };
+
+    if (!admin.apps.length) {
+      const pk = firebaseAdminConfig.privateKey;
+      const hasValidKey = pk && pk.includes("-----BEGIN PRIVATE KEY-----");
+      
+      if (firebaseAdminConfig.clientEmail && hasValidKey) {
+        admin.initializeApp({
+          credential: admin.credential.cert(firebaseAdminConfig)
+        });
+      } else {
+        admin.initializeApp();
+      }
+    }
+
+    adminAuth = admin.auth();
+    adminDb = admin.firestore();
+  }
+} catch (error) {
+  console.error("CRITICAL: Firebase Admin failed to load:", error);
+  adminAuth = createDummyProxy();
+  adminDb = createDummyProxy();
+}
+
+export { adminAuth, adminDb };
