@@ -252,7 +252,6 @@ export default function AttendanceKioskPage() {
             Designed for JASMINE LASH STORE TERMINAL
           </p>
         </div>
-        </div>
       </div>
 
       {/* QR Scanner Modal */}

@@ -71,7 +71,7 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
                 <select 
                   name="employment_type" 
                   value={employmentType}
-                  onChange={(e) => setEmploymentType(e.target.value)}
+                  onChange={(e) => setEmploymentType(e.target.value as any)}
                   className="w-full h-10 px-3 border border-slate-300 rounded-md shadow-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none bg-white"
                 >
                   <option value="outsourcing">業務委託</option>

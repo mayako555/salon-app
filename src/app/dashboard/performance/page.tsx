@@ -25,9 +25,9 @@ export default function PerformancePage() {
   useEffect(() => {
     async function load() {
       const res = await getStaffPerformanceStats(now.getFullYear(), now.getMonth() + 1);
-      if (res.success) {
+      if (res.success && res.data) {
         setStats(res.data);
-      } else {
+      } else if (!res.success) {
         toast.error("データの取得に失敗しました");
       }
       setLoading(false);

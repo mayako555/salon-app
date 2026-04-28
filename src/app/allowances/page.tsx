@@ -5,7 +5,7 @@ import { getMonthlyAllowances, AllowanceType, AllowanceRecord } from "./actions"
 import { getStaffList } from "@/app/staff/actions";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Download, ChevronLeft, ChevronRight, MessageSquare, Edit3, Megaphone, HelpCircle, Train } from "lucide-react";
+import { Plus, Download, ChevronLeft, ChevronRight, MessageSquare, Edit3, Megaphone, HelpCircle, Train, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import AllowanceTaskDialog from "./AllowanceTaskDialog";
 import AuthGuard from "@/components/AuthGuard";

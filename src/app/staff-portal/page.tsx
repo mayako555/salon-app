@@ -48,7 +48,7 @@ export default function StaffDashboardPage() {
   useEffect(() => {
     async function load() {
       const today = format(new Date(), "yyyy-MM-dd");
-      const [customers, sales, attRecords, tRecords] = await Promise.all([
+      const [customers, sales, attRecords, tRecords, dashboardRes] = await Promise.all([
         getAllCustomers(),
         getMonthlySales(new Date().getFullYear(), new Date().getMonth() + 1),
         getDailyAttendance(today),
@@ -57,7 +57,7 @@ export default function StaffDashboardPage() {
       ]);
       
       setTasks(tRecords);
-      if (dashboardRes.success) {
+      if (dashboardRes.success && dashboardRes.data) {
         setStoreStats(dashboardRes.data.storeStats);
       }
       const todaySalesData = sales.filter(s => s.date === today);

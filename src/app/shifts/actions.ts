@@ -33,6 +33,8 @@ export type ShiftRecord = {
   type: ShiftType;
   segments?: ShiftSegment[];
   request_id?: string; // Link to holiday_request if any
+  created_at?: any;
+  updated_at?: any;
 };
 
 const SHIFTS_COLLECTION = "shifts";
