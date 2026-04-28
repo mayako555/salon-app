@@ -76,10 +76,7 @@ export default async function StaffPage() {
                       <FileText size={14} />
                       <span className="hidden sm:inline">契約情報</span>
                     </Link>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 px-0 text-slate-500 hover:text-rose-600">
-                      <Edit2 size={16} />
-                      <span className="sr-only">編集</span>
-                    </Button>
+                    <StaffFormDialog staff={staff} />
                     <DeleteStaffButton id={staff.id} uid={staff.uid} name={staff.name} />
                   </TableCell>
                 </TableRow>

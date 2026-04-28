@@ -22,6 +22,7 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
   const [contractType, setContractType] = useState<StaffContract["contract_type"]>(
     contract?.contract_type || "outsourcing"
   );
+  const [saveMode, setSaveMode] = useState<"add_history" | "overwrite">("add_history");
 
   // Auto-fill states
   const [grade, setGrade] = useState(contract?.grade || "");
@@ -120,7 +121,7 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
         custom_allowances: customAllowances,
       };
 
-      const res = await upsertContract(data);
+      const res = await upsertContract(data, saveMode);
       if (res.success) {
         onClose();
         window.location.reload();
@@ -379,6 +380,28 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
               <input name="valid_to" type="date" defaultValue={contract?.valid_to || ""} className="w-full h-10 px-3 border border-slate-300 rounded-md outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
             </div>
           </div>
+
+          {contract && (
+            <div className="bg-amber-50/50 border border-amber-200 rounded-lg p-4 space-y-3">
+              <h4 className="font-bold text-sm text-amber-900">保存方法の選択</h4>
+              <div className="flex flex-col gap-2">
+                <label className={`flex items-start gap-3 p-3 border rounded-md cursor-pointer transition-colors ${saveMode === 'add_history' ? 'bg-white border-emerald-500 ring-1 ring-emerald-500' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
+                  <input type="radio" name="save_mode" value="add_history" checked={saveMode === 'add_history'} onChange={() => setSaveMode('add_history')} className="mt-0.5 w-4 h-4 text-emerald-600 border-slate-300 focus:ring-emerald-500" />
+                  <div>
+                    <span className="block text-sm font-bold text-slate-800">新しい履歴として追加する（推奨）</span>
+                    <span className="block text-[10px] text-slate-500 mt-1">昇給や条件変更など。現在の契約の適用終了日を自動で前日に設定し、キャリアマップに履歴を残します。</span>
+                  </div>
+                </label>
+                <label className={`flex items-start gap-3 p-3 border rounded-md cursor-pointer transition-colors ${saveMode === 'overwrite' ? 'bg-white border-emerald-500 ring-1 ring-emerald-500' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
+                  <input type="radio" name="save_mode" value="overwrite" checked={saveMode === 'overwrite'} onChange={() => setSaveMode('overwrite')} className="mt-0.5 w-4 h-4 text-emerald-600 border-slate-300 focus:ring-emerald-500" />
+                  <div>
+                    <span className="block text-sm font-bold text-slate-800">現在のデータを修正する</span>
+                    <span className="block text-[10px] text-slate-500 mt-1">単なる入力ミスの修正など。履歴を残さずに元のデータを上書きします。</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+          )}
 
           <div className="pt-4 flex justify-end gap-3 sticky bottom-0 bg-white pb-2 border-t border-slate-100 pt-6">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>

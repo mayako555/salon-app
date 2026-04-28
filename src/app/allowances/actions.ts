@@ -9,9 +9,12 @@ import {
   orderBy, 
   deleteDoc,
   doc,
+  setDoc,
+  writeBatch,
   serverTimestamp 
 } from "firebase/firestore";
 import { addAuditLog } from "@/app/audit/actions";
+import { getStaffList } from "@/app/staff/actions";
 
 export type AllowanceType = "review" | "blog" | "sns" | "treatment" | "transport" | "other";
 
@@ -62,16 +65,173 @@ export async function getMonthlyAllowances(year: number, month: number): Promise
   
   try {
     const colRef = collection(db, ALLOWANCES_COLLECTION);
-    const q = query(colRef, where("target_month", "==", targetPrefix), orderBy("created_at", "desc"));
+    const q = query(colRef, where("target_month", "==", targetPrefix));
     const snapshot = await getDocs(q);
     
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as AllowanceRecord[];
+    const records = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || new Date().toISOString())
+      };
+    }) as any[];
+
+    // メモリ上でソート
+    records.sort((a, b) => {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    return records as AllowanceRecord[];
   } catch (error) {
     console.error("Error fetching allowances:", error);
     return [];
+  }
+}
+
+const ALLOWANCE_CHECKS_COLLECTION = "allowance_checks";
+
+export type AllowanceTaskStatus = {
+  staff_id: string;
+  staff_name: string;
+  target_month: string;
+  is_checked: boolean;
+  total_amount: number;
+  allowances: AllowanceRecord[];
+};
+
+export async function getMonthlyAllowanceTasks(year: number, month: number): Promise<AllowanceTaskStatus[]> {
+  const targetPrefix = `${year}-${String(month).padStart(2, '0')}`;
+  
+  try {
+    // 1. 全在籍スタッフ取得
+    const staffList = await getStaffList();
+    
+    // 2. その月の全手当取得
+    const colRef = collection(db, ALLOWANCES_COLLECTION);
+    const q = query(colRef, where("target_month", "==", targetPrefix));
+    const snapshot = await getDocs(q);
+    const allAllowances = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || new Date().toISOString())
+      };
+    }) as AllowanceRecord[];
+
+    // 3. その月のチェック完了状態を取得
+    const checksRef = collection(db, ALLOWANCE_CHECKS_COLLECTION);
+    const checksQ = query(checksRef, where("target_month", "==", targetPrefix));
+    const checksSnapshot = await getDocs(checksQ);
+    const checkedStaffIds = new Set(checksSnapshot.docs.map(d => d.data().staff_id));
+
+    // 4. スタッフごとに集計
+    const tasks: AllowanceTaskStatus[] = staffList.map(staff => {
+      // 古いデータは staff_id が staff-名前 だったりするので名前でもマッチさせる
+      const staffAllowances = allAllowances.filter(a => a.staff_id === staff.id || a.staff_name === staff.name);
+      const totalAmount = staffAllowances.reduce((sum, a) => sum + a.amount, 0);
+      
+      // staffAllowancesをメモリ上でソート
+      staffAllowances.sort((a, b) => {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+
+      return {
+        staff_id: staff.id,
+        staff_name: staff.name,
+        target_month: targetPrefix,
+        is_checked: checkedStaffIds.has(staff.id),
+        total_amount: totalAmount,
+        allowances: staffAllowances
+      };
+    });
+
+    return tasks;
+  } catch (error) {
+    console.error("Error fetching allowance tasks:", error);
+    return [];
+  }
+}
+
+export async function markAllowanceChecked(staff_id: string, target_month: string) {
+  try {
+    const checkId = `${staff_id}_${target_month}`;
+    const checkRef = doc(db, ALLOWANCE_CHECKS_COLLECTION, checkId);
+    await setDoc(checkRef, {
+      staff_id,
+      target_month,
+      updated_at: serverTimestamp()
+    }, { merge: true });
+
+    return { success: true };
+  } catch(error: any) {
+    console.error("Error marking checked:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function unmarkAllowanceChecked(staff_id: string, target_month: string) {
+  try {
+    const checkId = `${staff_id}_${target_month}`;
+    await deleteDoc(doc(db, ALLOWANCE_CHECKS_COLLECTION, checkId));
+    return { success: true };
+  } catch(error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function saveStaffAllowanceTask(data: {
+  staff_id: string;
+  staff_name: string;
+  target_month: string;
+  allowances: { type: AllowanceType, amount: number, target_details?: any }[];
+}) {
+  try {
+    const batch = writeBatch(db);
+    let addedCount = 0;
+    
+    // Create new allowances
+    for (const item of data.allowances) {
+       if (item.amount > 0) {
+         const docRef = doc(collection(db, ALLOWANCES_COLLECTION));
+         batch.set(docRef, {
+           staff_id: data.staff_id,
+           staff_name: data.staff_name,
+           target_month: data.target_month,
+           type: item.type,
+           amount: item.amount,
+           target_details: item.target_details || {},
+           created_at: serverTimestamp()
+         });
+         addedCount++;
+       }
+    }
+
+    // Mark as checked
+    const checkId = `${data.staff_id}_${data.target_month}`;
+    const checkRef = doc(db, ALLOWANCE_CHECKS_COLLECTION, checkId);
+    batch.set(checkRef, {
+      staff_id: data.staff_id,
+      target_month: data.target_month,
+      updated_at: serverTimestamp()
+    }, { merge: true });
+
+    await batch.commit();
+
+    await addAuditLog({
+      table_name: ALLOWANCE_CHECKS_COLLECTION,
+      record_id: checkId,
+      action: "UPDATE",
+      old_data: null,
+      new_data: { staff_name: data.staff_name, target_month: data.target_month, items_added: addedCount },
+      actor: "Admin"
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error saving task:", error);
+    return { success: false, error: error.message };
   }
 }
 

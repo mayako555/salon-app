@@ -11,14 +11,84 @@ import {
   Clock, 
   Calendar,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  MessageSquare,
+  X,
+  TrendingUp
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import Link from "next/link";
 import AuthGuard from "@/components/AuthGuard";
+import { useEffect, useState } from "react";
+import { getDashboardStats } from "./actions";
+import { toast } from "sonner";
+import { getAllPendingTasks, TaskRecord, generateBookingReply, sendReplyAndCompleteTask } from "@/app/tasks/actions";
+import { updateStoreTarget } from "@/app/stores/actions";
+import { Progress } from "@/components/ui/progress";
+import { Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { motion } from "framer-motion";
+import { format } from "date-fns";
 
 export default function DashboardPage() {
   const { profile, isAdmin, isManager } = useAuth();
+  const [stats, setStats] = useState<any>(null);
+  const [tasks, setTasks] = useState<TaskRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedTask, setSelectedTask] = useState<TaskRecord | null>(null);
+  const [generatedReply, setGeneratedReply] = useState("");
+  const [isEditingTargets, setIsEditingTargets] = useState(false);
+  const [editingTargetData, setEditingTargetData] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    async function load() {
+      if (isAdmin || isManager) {
+        const res = await getDashboardStats();
+        if (res.success) {
+          setStats(res.data);
+        }
+      }
+      const tRes = await getAllPendingTasks();
+      setTasks(tRes);
+      setLoading(false);
+    }
+    load();
+  }, [isAdmin, isManager, profile?.id]);
+
+  const handleGenerateReply = async (task: TaskRecord) => {
+    // For demo: pretend we picked these slots
+    const slots = ["5月10日 10:00〜", "5月10日 14:00〜", "5月12日 11:30〜"];
+    const res = await generateBookingReply(task.customer_name, slots);
+    if (res.success) {
+      setGeneratedReply(res.reply);
+      setSelectedTask(task);
+    }
+  };
+
+  const handleSendAndComplete = async () => {
+    if (selectedTask) {
+      const res = await sendReplyAndCompleteTask(selectedTask.id, selectedTask.customer_id, generatedReply);
+      if (res.success) {
+        toast.success("LINEメッセージを送信し、タスクを完了しました");
+        setTasks(prev => prev.filter(t => t.id !== selectedTask.id));
+        setSelectedTask(null);
+      } else {
+        toast.error(res.error || "送信に失敗しました");
+      }
+    }
+  };
+
+  const handleUpdateStoreTargets = async () => {
+    const currentMonth = format(new Date(), "yyyy-MM");
+    const promises = Object.entries(editingTargetData).map(([name, target]) => 
+      updateStoreTarget(name, currentMonth, target)
+    );
+    
+    await Promise.all(promises);
+    toast.success("店舗目標を更新しました");
+    setIsEditingTargets(false);
+    window.location.reload();
+  };
 
   return (
     <AuthGuard requireRole="staff">
@@ -45,7 +115,7 @@ export default function DashboardPage() {
               <CardContent className="flex flex-col items-center gap-6">
                 <div className="bg-white p-4 rounded-2xl shadow-inner border border-slate-100">
                   <QRCodeSVG 
-                    value={`salon-auth:${profile?.id}`} 
+                    value={profile?.id || "unknown"} 
                     size={200}
                     level="H"
                     includeMargin={true}
@@ -54,7 +124,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="text-center">
                   <p className="text-sm font-bold text-slate-700">{profile?.name}</p>
-                  <p className="text-[10px] text-slate-400 uppercase tracking-widest">{profile?.id.substring(0, 8)}</p>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-widest">{profile?.id?.substring(0, 8)}</p>
                 </div>
               </CardContent>
             </Card>
@@ -90,27 +160,115 @@ export default function DashboardPage() {
                 </Link>
               </div>
 
-              <Card className="bg-white border-none shadow-sm">
+               <Card className="bg-white border-none shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
                     <Calendar size={18} className="text-blue-500" />
-                    お知らせ・連絡事項
+                    重要タスク・通知
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4 text-sm text-slate-600">
-                    <div className="p-3 bg-slate-50 rounded-lg border-l-4 border-l-blue-500">
-                      <p className="font-bold text-slate-800">【重要】来月の希望休について</p>
-                      <p className="text-xs mt-1">25日までにポータルから提出をお願いします。</p>
+                  <div className="space-y-4">
+                    {/* Team Support Message */}
+                    <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-2xl border border-blue-100 mb-2">
+                      <MessageSquare size={18} className="text-blue-500 mt-0.5 shrink-0" />
+                      <p className="text-[11px] font-bold text-blue-700 leading-relaxed">
+                        担当スタッフがお休みや接客中で返信できない場合は、ぜひ助け合って対応しましょう！✨
+                      </p>
                     </div>
-                    <div className="p-3 bg-slate-50 rounded-lg border-l-4 border-l-slate-300">
-                      <p className="font-bold text-slate-800">店舗ミーティングのお知らせ</p>
-                      <p className="text-xs mt-1">来週月曜 9:00〜 全員参加です。</p>
+
+                    {tasks.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic py-4">現在対応が必要なタスクはありません</p>
+                    ) : (
+                      tasks.map(task => {
+                        const isMyTask = task.staff_id === profile?.id;
+                        
+                        return (
+                          <div key={task.id} className={`p-4 rounded-2xl border ${isMyTask ? 'bg-rose-50 border-rose-100 shadow-sm' : 'bg-slate-50 border-slate-100 opacity-80'}`}>
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex flex-col gap-1">
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest self-start ${isMyTask ? 'bg-rose-500 text-white' : 'bg-slate-400 text-white'}`}>
+                                  {task.type === 'booking_change_request' ? '予約変更依頼' : 'お問い合わせ'}
+                                </span>
+                                {!isMyTask && (
+                                  <div className="flex items-center gap-1.5 mt-1">
+                                    <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500">
+                                      {task.staff_name[0]}
+                                    </div>
+                                    <span className="text-[10px] font-bold text-slate-400">担当: {task.staff_name}</span>
+                                  </div>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-slate-300 font-bold">LINE経由</span>
+                            </div>
+                            
+                            <p className="text-sm font-black text-slate-800 mb-1">{task.customer_name}様</p>
+                            <p className="text-xs text-slate-600 line-clamp-2 mb-4 bg-white/50 p-2 rounded-lg italic border border-slate-100/50">
+                              「{task.content}」
+                            </p>
+                            
+                            <Button 
+                              size="sm" 
+                              className={`w-full h-10 rounded-xl font-bold gap-2 shadow-sm ${isMyTask ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+                              onClick={() => handleGenerateReply(task)}
+                            >
+                              <Sparkles size={14} className={isMyTask ? "text-amber-400" : "text-amber-500"} />
+                              {isMyTask ? '返信案を作成する' : '代わりに返信案を作る'}
+                            </Button>
+                          </div>
+                        );
+                      })
+                    )}
+                    
+                    <div className="p-3 bg-white border border-slate-100 rounded-2xl">
+                      <p className="font-bold text-slate-800 text-xs">【重要】来月の希望休について</p>
+                      <p className="text-[10px] text-slate-400 mt-1">25日までにポータルから提出をお願いします。</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
+          </div>
+        )}
+
+        {/* Reply Generator Modal */}
+        {selectedTask && (
+          <div className="fixed inset-0 z-[60] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white rounded-[2rem] w-full max-w-lg p-8 shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-black text-slate-900">AI自動返信案</h3>
+                <Button variant="ghost" size="icon" onClick={() => setSelectedTask(null)}><X /></Button>
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-2xl mb-6 border border-slate-100">
+                <p className="text-[10px] font-black text-slate-400 uppercase mb-2">送信予定のメッセージ</p>
+                <textarea 
+                  value={generatedReply} 
+                  onChange={(e) => setGeneratedReply(e.target.value)}
+                  className="w-full h-64 bg-transparent border-none text-sm text-slate-700 leading-relaxed focus:ring-0 resize-none p-0"
+                />
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <Button 
+                  className="w-full h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-lg shadow-emerald-900/20"
+                  onClick={handleSendAndComplete}
+                >
+                  この内容をLINEで送信する
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  className="w-full h-14 rounded-2xl text-slate-400 font-bold"
+                  onClick={() => setSelectedTask(null)}
+                >
+                  修正する
+                </Button>
+              </div>
+            </motion.div>
           </div>
         )}
 
@@ -124,7 +282,7 @@ export default function DashboardPage() {
                   <Users className="h-4 w-4 text-emerald-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-slate-900">12 人</div>
+                  <div className="text-2xl font-bold text-slate-900">{stats?.staffCount ?? '...'} 人</div>
                   <p className="text-xs text-slate-500 mt-1">稼働中の全スタッフ</p>
                 </CardContent>
               </Card>
@@ -135,19 +293,19 @@ export default function DashboardPage() {
                   <FileText className="h-4 w-4 text-rose-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-slate-900">3 件</div>
+                  <div className="text-2xl font-bold text-slate-900">{stats?.unprocessedAttendanceCount ?? '...'} 件</div>
                   <p className="text-xs text-slate-500 mt-1">打刻漏れ等の確認が必要</p>
                 </CardContent>
               </Card>
 
               <Card className="bg-white border-none shadow-sm hover:shadow-md transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-slate-600">今月の売上予測</CardTitle>
+                  <CardTitle className="text-sm font-medium text-slate-600">今月の売上</CardTitle>
                   <Database className="h-4 w-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-slate-900">¥4,280,000</div>
-                  <p className="text-xs text-emerald-600 mt-1">前月同期比 +8.5%</p>
+                  <div className="text-2xl font-bold text-slate-900">¥{(stats?.monthlyTotal ?? 0).toLocaleString()}</div>
+                  <p className="text-xs text-emerald-600 mt-1">当月の確定済み売上</p>
                 </CardContent>
               </Card>
 
@@ -161,28 +319,64 @@ export default function DashboardPage() {
                   <p className="text-xs text-slate-500 mt-1">セキュリティ保護済み</p>
                 </CardContent>
               </Card>
+
+              <Link href="/dashboard/performance" className="col-span-full md:col-span-1">
+                <Card className="bg-emerald-900 text-white border-none shadow-xl hover:bg-emerald-800 transition-all group cursor-pointer h-full relative overflow-hidden">
+                  <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+                    <TrendingUp size={120} />
+                  </div>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-black uppercase tracking-widest text-emerald-300">目標達成分析</CardTitle>
+                    <ArrowRight className="h-4 w-4 text-emerald-300 group-hover:translate-x-1 transition-transform" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-xl font-black">スタッフ分析</div>
+                    <p className="text-[10px] text-emerald-300/70 mt-1 font-bold">目標までの必要売上を確認</p>
+                  </CardContent>
+                </Card>
+              </Link>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
               <Card className="col-span-1 bg-white border-none shadow-sm">
-                <CardHeader>
-                  <CardTitle className="text-lg text-slate-800">店舗別売上サマリ (本日)</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg font-bold text-slate-800">店舗別売上進捗 (今月)</CardTitle>
+                  {(isAdmin || isManager) && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => {
+                        const targets: any = {};
+                        stats.storeStats.forEach((s: any) => targets[s.name] = s.target);
+                        setEditingTargetData(targets);
+                        setIsEditingTargets(true);
+                      }}
+                      className="text-slate-400 hover:text-slate-900"
+                    >
+                      <Settings size={18} />
+                    </Button>
+                  )}
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-600">六甲店</span>
-                      <span className="font-bold">¥125,000</span>
+                <CardContent className="space-y-6">
+                  {stats?.storeStats?.map((store: any) => (
+                    <div key={store.name} className="space-y-2">
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-sm font-black text-slate-700">{store.name}店</span>
+                        <div className="text-right">
+                          <span className="text-sm font-black text-slate-900">¥{store.current.toLocaleString()}</span>
+                          <span className="text-[10px] text-slate-400 font-bold ml-1">/ ¥{store.target.toLocaleString()}</span>
+                        </div>
+                      </div>
+                      <div className="relative pt-1">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                            {store.progress.toFixed(1)}% 達成
+                          </span>
+                        </div>
+                        <Progress value={store.progress} className="h-2 rounded-full" />
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-600">神戸店</span>
-                      <span className="font-bold">¥98,000</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-600">元町店</span>
-                      <span className="font-bold">¥112,000</span>
-                    </div>
-                  </div>
+                  ))}
                 </CardContent>
               </Card>
 
@@ -210,3 +404,4 @@ export default function DashboardPage() {
     </AuthGuard>
   );
 }
+

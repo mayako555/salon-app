@@ -48,6 +48,7 @@ export type SalesRecord = {
   source: SalesSource;
   next_booking_date?: string; // 次回予約日
   next_booking_time?: string; // 次回予約時間
+  next_booking_line_reminder?: boolean; // 2日前のリマインダー送付
   customer_id?: string;
   created_at: any; // Firestore Timestamp
 };
@@ -144,6 +145,7 @@ export async function addCheckout(formData: FormData) {
     // Next Booking Fields
     const nextBookingDate = formData.get("next_booking_date") as string || "";
     const nextBookingTime = formData.get("next_booking_time") as string || "";
+    const nextBookingLineReminder = formData.get("next_booking_line_reminder") === "true";
 
     if (!staffName || !date) {
       return { success: false, error: "必須項目が入力されていません。" };
@@ -174,6 +176,7 @@ export async function addCheckout(formData: FormData) {
       cancel_fee: cancelFee,
       next_booking_date: nextBookingDate,
       next_booking_time: nextBookingTime,
+      next_booking_line_reminder: nextBookingLineReminder,
       status: "draft",
       source: "checkout" as SalesSource,
       created_at: serverTimestamp()

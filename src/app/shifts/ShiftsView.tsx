@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Download, Plus, LayoutGrid, Users, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Plus, LayoutGrid, Users, Building2, X } from "lucide-react";
 import { format, isSameMonth, isToday } from "date-fns";
 import { ja } from "date-fns/locale";
 import Link from "next/link";
+import { useAuth } from "@/lib/auth-context";
 import { ShiftRecord, ShiftSegment, StoreLocation } from "./actions";
 import { StaffProfile } from "@/app/staff/actions";
 import ShiftEditDialog from "./ShiftEditDialog";
@@ -15,7 +16,7 @@ type ShiftsViewProps = {
   shifts: ShiftRecord[];
   staffList: StaffProfile[];
   targetDate: Date;
-  viewMode: "calendar" | "staff";
+  viewMode: "calendar" | "staff" | "store";
   days: Date[];
   actualMonthDays: Date[];
   uniqueStaff: { id: string; name: string }[];
@@ -35,6 +36,9 @@ export default function ShiftsView({
   const [selectedShift, setSelectedShift] = useState<ShiftRecord | undefined>(undefined);
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
 
+  const { profile } = useAuth();
+  const isReadOnly = profile?.role !== "admin" && profile?.role !== "manager";
+
   const getStoreBadgeClasses = (store: string) => {
     switch (store) {
       case "六甲": return "bg-blue-100 text-blue-800 border-blue-200";
@@ -53,12 +57,14 @@ export default function ShiftsView({
   };
 
   const handleAddShift = (date?: string) => {
+    if (isReadOnly) return;
     setSelectedShift(undefined);
     setSelectedDate(date);
     setIsDialogOpen(true);
   };
 
   const handleEditShift = (shift: ShiftRecord) => {
+    if (isReadOnly) return;
     setSelectedShift(shift);
     setSelectedDate(shift.date);
     setIsDialogOpen(true);
@@ -77,6 +83,8 @@ export default function ShiftsView({
           <div className="text-amber-600 font-bold bg-amber-50 p-1 rounded h-full flex flex-col justify-center">有休</div>
         ) : shift.type === 'requested_holiday' ? (
           <div className="text-blue-600 font-bold bg-blue-50 p-1 rounded h-full flex flex-col justify-center repeating-stripes">希望休</div>
+        ) : shift.type === 'requested_paid_leave' ? (
+          <div className="text-emerald-600 font-bold bg-emerald-50 p-1 rounded h-full flex flex-col justify-center repeating-stripes">有給申請</div>
         ) : (
           shift.segments?.map((seg: any, idx: number) => (
             <div key={idx} className={`p-0.5 rounded border text-[10px] leading-tight ${getStoreBadgeClasses(seg.store)}`}>
@@ -122,26 +130,36 @@ export default function ShiftsView({
             >
               <Users size={16} /> スタッフ別
             </Link>
+            <Link 
+              href={`?month=${format(targetDate, "yyyy-MM")}&view=store`}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'store' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <Building2 size={16} /> 店舗別
+            </Link>
           </div>
-          <Button variant="outline" size="sm" className="hidden sm:flex gap-1 h-9 ml-2">
-            <Download size={16} />
-            <span>出力</span>
-          </Button>
-          <Button 
-            onClick={() => setIsBulkDialogOpen(true)}
-            variant="outline"
-            className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 py-2 border-slate-200"
-          >
-            <Users size={16} />
-            <span>一括入力</span>
-          </Button>
-          <Button 
-            onClick={() => handleAddShift()}
-            className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 py-2 bg-slate-900"
-          >
-            <Plus size={16} />
-            <span>シフト追加</span>
-          </Button>
+          {!isReadOnly && (
+            <>
+              <Button variant="outline" size="sm" className="hidden sm:flex gap-1 h-9 ml-2">
+                <Download size={16} />
+                <span>出力</span>
+              </Button>
+              <Button 
+                onClick={() => setIsBulkDialogOpen(true)}
+                variant="outline"
+                className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 py-2 border-slate-200"
+              >
+                <Users size={16} />
+                <span>一括入力</span>
+              </Button>
+              <Button 
+                onClick={() => handleAddShift()}
+                className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 py-2 bg-slate-900"
+              >
+                <Plus size={16} />
+                <span>シフト追加</span>
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -203,14 +221,16 @@ export default function ShiftsView({
                       }`}>
                         {format(day, "d")}
                       </span>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => handleAddShift(dateStr)}
-                        className="h-5 w-5 opacity-0 group-hover:opacity-100 hover:bg-slate-100 text-slate-400"
-                      >
-                        <Plus size={12} />
-                      </Button>
+                      {!isReadOnly && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleAddShift(dateStr)}
+                          className="h-5 w-5 opacity-0 group-hover:opacity-100 hover:bg-slate-100 text-slate-400"
+                        >
+                          <Plus size={12} />
+                        </Button>
+                      )}
                     </div>
                     
                     <div className="flex flex-col gap-1.5 pr-1">
@@ -218,20 +238,20 @@ export default function ShiftsView({
                         <div 
                           key={shift.id} 
                           onClick={() => handleEditShift(shift)}
-                          className={`shrink-0 text-[10px] flex flex-col rounded border shadow-sm leading-none overflow-hidden cursor-pointer hover:ring-2 hover:ring-slate-400 transition-all
+                          className={`shrink-0 text-[10px] flex flex-col rounded border shadow-sm leading-none overflow-hidden transition-all
+                            ${isReadOnly ? '' : 'cursor-pointer hover:ring-2 hover:ring-slate-400'}
                             ${shift.type === 'holiday' ? 'bg-slate-100 border-slate-200 text-slate-600' :
                               shift.type === 'paid_leave' ? 'bg-amber-50 border-amber-200 text-amber-700' : 
                               shift.type === 'requested_holiday' ? 'bg-blue-100 border-blue-400 text-blue-900 shadow-md ring-2 ring-blue-200' :
-                              'bg-white border-slate-200 text-slate-800'}
-                          `}
+                              shift.type === 'requested_paid_leave' ? 'bg-emerald-100 border-emerald-400 text-emerald-900 shadow-md ring-2 ring-emerald-200' :
+                              'bg-white border-slate-200 text-slate-700'}`}
                         >
                           <div className={`px-1.5 py-1.5 flex justify-between font-bold ${shift.type === 'work' ? 'bg-slate-50 border-b border-slate-100' : ''}`}>
                              <span className="truncate">{shift.staff_name}</span>
-                             <span className={shift.type === 'requested_holiday' ? 'bg-blue-600 text-white px-1.5 py-0.5 rounded-sm animate-pulse' : ''}>{
-                               shift.type === 'holiday' ? '休' : 
-                               shift.type === 'paid_leave' ? '有休' : 
-                               shift.type === 'requested_holiday' ? '★希望休' : ''
-                             }</span>
+                             {shift.type === 'holiday' && <span className="opacity-70 flex-shrink-0 text-[9px] mt-0.5">休</span>}
+                             {shift.type === 'paid_leave' && <span className="opacity-70 flex-shrink-0 text-[9px] mt-0.5 text-amber-600">有休</span>}
+                             {shift.type === 'requested_holiday' && <span className="bg-blue-500 text-white px-1 py-0.5 rounded text-[8px] flex-shrink-0 mt-0.5 font-bold shadow-sm">★希望休</span>}
+                             {shift.type === 'requested_paid_leave' && <span className="bg-emerald-500 text-white px-1 py-0.5 rounded text-[8px] flex-shrink-0 mt-0.5 font-bold shadow-sm">★有給申請</span>}
                           </div>
                           {shift.type === 'work' && shift.segments && shift.segments.map((seg, idx) => (
                             <div key={idx} className="px-1.5 py-1 border-t border-dashed border-slate-100 first:border-t-0 flex flex-col gap-1">
@@ -251,7 +271,7 @@ export default function ShiftsView({
               })}
             </div>
           </div>
-        ) : (
+        ) : viewMode === "staff" ? (
           <div className="overflow-x-auto">
             <table className="w-full text-center border-collapse text-xs">
               <thead>
@@ -291,12 +311,98 @@ export default function ShiftsView({
                         <td 
                           key={dateStr} 
                           className="border-b border-r border-slate-200 p-1 align-middle min-h-[60px] max-w-[65px]"
-                          onClick={() => shift ? handleEditShift(shift) : handleAddShift(dateStr)}
+                          onClick={() => !isReadOnly && (shift ? handleEditShift(shift) : handleAddShift(dateStr))}
                         >
                           <div className="h-full min-h-[50px] flex items-center justify-center">
                             {renderCompactShift(shift)}
-                            {!shift && (
+                            {!shift && !isReadOnly && (
                               <div className="w-full h-full opacity-0 hover:opacity-100 flex items-center justify-center text-slate-300">
+                                <Plus size={14} />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-center border-collapse text-xs">
+              <thead>
+                <tr>
+                  <th className="sticky left-0 bg-slate-100 p-3 border-y border-r border-slate-200 z-10 min-w-[120px] text-left text-slate-600">
+                    店舗
+                  </th>
+                  {actualMonthDays.map((day) => {
+                    const dayOfWeek = day.getDay();
+                    return (
+                      <th 
+                        key={day.toString()} 
+                        className={`p-2 border-y border-r border-slate-200 min-w-[85px] font-medium
+                          ${dayOfWeek === 0 ? "text-rose-600 bg-rose-50/30" : 
+                            dayOfWeek === 6 ? "text-blue-600 bg-blue-50/30" : "text-slate-600 bg-slate-50"}
+                        `}
+                      >
+                        <div className="flex flex-col items-center">
+                          <span className="text-sm font-bold">{format(day, "d")}</span>
+                          <span className="text-[10px] opacity-70">{format(day, "E", { locale: ja })}</span>
+                        </div>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {["神戸", "元町", "六甲"].map((store) => (
+                  <tr key={store} className="hover:bg-slate-50/50">
+                    <td className="sticky left-0 bg-white p-3 border-b border-r border-slate-200 font-bold text-slate-800 z-10 text-left shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                      {store}
+                    </td>
+                    {actualMonthDays.map((day) => {
+                      const dateStr = format(day, "yyyy-MM-dd");
+                      const dayShifts = getShiftsForDate(dateStr);
+                      // Find all staff who have a work segment at this store on this day
+                      const storeShifts = dayShifts.filter(shift => 
+                        shift.type === "work" && 
+                        shift.segments?.some(seg => seg.store === store)
+                      );
+
+                      return (
+                        <td 
+                          key={dateStr} 
+                          className="border-b border-r border-slate-200 p-1 align-top min-h-[60px] max-w-[85px]"
+                        >
+                          <div className="h-full min-h-[50px] flex flex-col gap-1 p-0.5">
+                            {storeShifts.map(shift => {
+                              // Find specifically the segments for this store
+                              const segments = shift.segments?.filter(seg => seg.store === store) || [];
+                              return (
+                                <div 
+                                  key={shift.id} 
+                                  className={`p-1 rounded border text-[9px] leading-tight transition-all text-left bg-white
+                                    ${isReadOnly ? '' : 'cursor-pointer hover:ring-1 hover:ring-slate-400'}
+                                    ${getStoreBadgeClasses(store).replace('bg-', 'border-').replace('100', '200')}
+                                  `}
+                                  onClick={() => handleEditShift(shift)}
+                                >
+                                  <div className="font-bold truncate text-[10px] mb-0.5 text-slate-700">{shift.staff_name}</div>
+                                  {segments.map((seg, idx) => (
+                                    <div key={idx} className="text-slate-500 font-mono">
+                                      {seg.start_time}-{seg.end_time}
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })}
+                            {storeShifts.length === 0 && !isReadOnly && (
+                              <div 
+                                className="w-full h-full min-h-[40px] opacity-0 hover:opacity-100 flex items-center justify-center text-slate-300 cursor-pointer rounded hover:bg-slate-50"
+                                onClick={() => handleAddShift(dateStr)}
+                              >
                                 <Plus size={14} />
                               </div>
                             )}

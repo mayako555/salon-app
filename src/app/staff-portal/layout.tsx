@@ -43,8 +43,8 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
     { name: "ホーム", href: "/staff-portal", icon: LayoutDashboard },
     { name: "顧客管理", href: "/staff-portal/customers", icon: Users },
     { name: "会計入力", href: "/staff-portal/sales", icon: Receipt },
+    { name: "シフト確認", href: "/staff-portal/shifts", icon: Calendar },
     ...(isAdminOrManager ? [
-      { name: "シフト管理", href: "/staff-portal/shifts", icon: Calendar },
       { name: "メニュー・商品設定", href: "/staff-portal/sales/master", icon: Database },
     ] : []),
     { name: "交通費申請", href: "/staff-portal/transportation", icon: Train },

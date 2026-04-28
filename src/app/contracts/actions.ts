@@ -58,7 +58,7 @@ export async function getContractsList(): Promise<StaffContract[]> {
   }
 }
 
-export async function upsertContract(data: Partial<StaffContract>) {
+export async function upsertContract(data: Partial<StaffContract>, saveMode: "add_history" | "overwrite" = "overwrite") {
   try {
     const colRef = collection(db, CONTRACTS_COLLECTION);
     
@@ -95,10 +95,30 @@ export async function upsertContract(data: Partial<StaffContract>) {
 
     const upsertPromise = async () => {
       if (data.id) {
-        actionType = "UPDATE";
-        recordId = data.id;
-        const docRef = doc(db, CONTRACTS_COLLECTION, data.id);
-        await updateDoc(docRef, contractData);
+        if (saveMode === "add_history") {
+          // 1. Calculate the day before the new valid_from date
+          const newValidFromDate = new Date(contractData.valid_from);
+          newValidFromDate.setDate(newValidFromDate.getDate() - 1);
+          const prevValidTo = newValidFromDate.toISOString().split('T')[0];
+
+          // 2. Close the old contract
+          const oldDocRef = doc(db, CONTRACTS_COLLECTION, data.id);
+          await updateDoc(oldDocRef, { valid_to: prevValidTo, updated_at: serverTimestamp() });
+
+          // 3. Insert the new contract
+          actionType = "INSERT";
+          const newDocRef = await addDoc(colRef, {
+            ...contractData,
+            created_at: serverTimestamp()
+          });
+          recordId = newDocRef.id;
+        } else {
+          // Overwrite mode
+          actionType = "UPDATE";
+          recordId = data.id;
+          const docRef = doc(db, CONTRACTS_COLLECTION, data.id);
+          await updateDoc(docRef, contractData);
+        }
       } else {
         actionType = "INSERT";
         const docRef = await addDoc(colRef, {

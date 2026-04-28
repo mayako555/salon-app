@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getCustomerById, Customer } from "@/lib/customers";
-import { addKarteRecord } from "@/lib/karte";
+import { editKarteRecord } from "@/lib/karte";
 import { getStaffList, StaffProfile } from "@/app/staff/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,24 +11,21 @@ import { Card } from "@/components/ui/card";
 import { 
   ChevronLeft, 
   Save, 
-  Scissors, 
   User, 
   Calendar,
   Sparkles,
-  Info,
-  Clock,
   Camera,
   Trash2,
-  MoveHorizontal,
-  ArrowRight,
   X
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 // --- Drawing Canvas Component ---
-const EyeDiagramCanvas = ({ onSave }: { onSave: (url: string) => void }) => {
+const EyeDiagramCanvas = ({ initialDataUrl, onSave }: { initialDataUrl?: string, onSave: (url: string) => void }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const bgImage = "/assets/eye_template.png";
@@ -40,7 +37,7 @@ const EyeDiagramCanvas = ({ onSave }: { onSave: (url: string) => void }) => {
     if (!ctx) return;
 
     const img = new Image();
-    img.src = bgImage;
+    img.src = initialDataUrl || bgImage;
     img.onload = () => {
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     };
@@ -48,7 +45,7 @@ const EyeDiagramCanvas = ({ onSave }: { onSave: (url: string) => void }) => {
     ctx.lineWidth = 3;
     ctx.lineCap = "round";
     ctx.strokeStyle = "#e11d48";
-  }, []);
+  }, [initialDataUrl]);
 
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
     setIsDrawing(true);
@@ -122,9 +119,8 @@ const EyeDiagramCanvas = ({ onSave }: { onSave: (url: string) => void }) => {
   );
 };
 
-// --- Main Page Component ---
-export default function NewKartePage() {
-  const { id } = useParams();
+export default function EditKartePage() {
+  const { id, karteId } = useParams();
   const router = useRouter();
   const { profile } = useAuth();
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -152,7 +148,6 @@ export default function NewKartePage() {
       perm_solution_1_time: 0,
       perm_solution_2_time: 0,
       hair_material: "セーブル",
-      // Detailed counts
       left_remaining: 0,
       right_remaining: 0,
       left_added: 0,
@@ -170,38 +165,72 @@ export default function NewKartePage() {
 
   useEffect(() => {
     async function load() {
-      if (typeof id !== 'string') return;
+      if (typeof id !== 'string' || typeof karteId !== 'string') return;
+      
       const [cData, sData] = await Promise.all([
         getCustomerById(id),
         getStaffList()
       ]);
       setCustomer(cData);
       setStaffList(sData);
-      
-      // Auto-fill from profile if available
-      if (profile) {
-        setFormData(prev => ({ 
-          ...prev, 
-          staff_id: profile.id, 
-          staff_name: profile.name 
-        }));
-      } else if (sData.length > 0) {
-        setFormData(prev => ({ 
-          ...prev, 
-          staff_id: sData[0].id, 
-          staff_name: sData[0].name 
-        }));
+
+      // Fetch existing karte record
+      const docRef = doc(db, "karte_records", karteId);
+      const snapshot = await getDoc(docRef);
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        let dateStr = new Date().toISOString().split('T')[0];
+        if (data.date) {
+          dateStr = data.date.toMillis ? new Date(data.date.toMillis()).toISOString().split('T')[0] : new Date(data.date).toISOString().split('T')[0];
+        }
+
+        setFormData({
+          staff_id: data.staff_id || "",
+          staff_name: data.staff_name || "",
+          date: dateStr,
+          service_type: data.service_type || "eyelash_ext",
+          visit_type: data.visit_type || "repeat",
+          design: {
+            curl: data.design?.curl || "C",
+            thickness: data.design?.thickness || "0.15",
+            length: data.design?.length || "10-12mm",
+            count: data.design?.count || 120,
+            style: data.design?.style || "Natural",
+            shape: data.design?.shape || "",
+            wax_type: data.design?.wax_type || "Hard",
+            thinning: data.design?.thinning || false,
+            brow_perm: data.design?.brow_perm || false,
+            stencil: data.design?.stencil || false,
+            perm_solution_1_time: data.design?.perm_solution_1_time || 0,
+            perm_solution_2_time: data.design?.perm_solution_2_time || 0,
+            hair_material: data.design?.hair_material || "セーブル",
+            left_remaining: data.design?.left_remaining || 0,
+            right_remaining: data.design?.right_remaining || 0,
+            left_added: data.design?.left_added || 0,
+            right_added: data.design?.right_added || 0,
+            left_total: data.design?.left_total || 0,
+            right_total: data.design?.right_total || 0
+          },
+          eye_diagram_url: data.eye_diagram_url || "",
+          photos: data.photos || [],
+          treatment_photos: data.treatment_photos || [],
+          notes: data.notes || ""
+        });
+
+        // Determine if we should show split view for new visit
+        if (data.visit_type === 'new' && (data.design?.left_total > 0 || data.design?.right_total > 0)) {
+          setSplitLeftRight(true);
+        }
       }
+      
       setLoading(false);
     }
     load();
-  }, [id, profile]);
+  }, [id, karteId]);
 
   const updateDesign = (key: string, value: any) => {
     setFormData(prev => {
       const newDesign = { ...prev.design, [key]: value };
-      
-      // Auto-calculate totals if parts change
       if (['left_remaining', 'left_added', 'right_remaining', 'right_added', 'left_total', 'right_total'].includes(key)) {
         if (['left_remaining', 'left_added'].includes(key)) {
           newDesign.left_total = (newDesign.left_remaining || 0) + (newDesign.left_added || 0);
@@ -209,10 +238,8 @@ export default function NewKartePage() {
         if (['right_remaining', 'right_added'].includes(key)) {
           newDesign.right_total = (newDesign.right_remaining || 0) + (newDesign.right_added || 0);
         }
-        // Sync global count
         newDesign.count = (newDesign.left_total || 0) + (newDesign.right_total || 0);
       }
-
       return { ...prev, design: newDesign };
     });
   };
@@ -240,27 +267,32 @@ export default function NewKartePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (typeof id !== 'string') return;
+    if (typeof karteId !== 'string' || !profile) return;
     setSaving(true);
     try {
-      const res = await addKarteRecord({
-        customer_id: id,
-        staff_id: formData.staff_id,
-        staff_name: formData.staff_name,
-        date: new Date(formData.date),
-        service_type: formData.service_type,
-        visit_type: formData.visit_type,
-        design: formData.design as any,
-        eye_diagram_url: formData.eye_diagram_url,
-        photos: formData.photos,
-        treatment_photos: formData.treatment_photos,
-        notes: formData.notes
-      });
+      const res = await editKarteRecord(
+        karteId,
+        {
+          staff_id: formData.staff_id,
+          staff_name: formData.staff_name,
+          date: new Date(formData.date),
+          service_type: formData.service_type,
+          visit_type: formData.visit_type,
+          design: formData.design as any,
+          eye_diagram_url: formData.eye_diagram_url,
+          photos: formData.photos,
+          treatment_photos: formData.treatment_photos,
+          notes: formData.notes
+        },
+        profile.id,
+        profile.name
+      );
+
       if (res.success) {
-        toast.success("カルテを保存しました");
-        router.push(`/staff-portal/customers/${id}`);
+        toast.success("カルテを更新しました");
+        router.back();
       } else {
-        toast.error("保存に失敗しました");
+        toast.error("更新に失敗しました: " + res.error);
       }
     } catch (error) {
       toast.error("エラーが発生しました");
@@ -279,7 +311,7 @@ export default function NewKartePage() {
         <div className="flex items-center gap-4">
           <div className="bg-amber-500 p-3 rounded-2xl text-white shadow-xl"><Sparkles size={24} /></div>
           <div>
-            <h1 className="text-2xl font-black tracking-tight">施術カルテ作成</h1>
+            <h1 className="text-2xl font-black tracking-tight">施術カルテ編集</h1>
             <p className="text-white/50 text-xs font-bold tracking-widest uppercase">{customer.name} 様</p>
           </div>
         </div>
@@ -329,7 +361,6 @@ export default function NewKartePage() {
               <h3 className="uppercase tracking-tighter text-sm">Design Specification</h3>
             </div>
 
-            {/* まつ毛共通スペック */}
             {(formData.service_type === 'eyelash_ext' || formData.service_type === 'and_healthy') && (
               <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
@@ -347,7 +378,6 @@ export default function NewKartePage() {
                   </div>
                 </div>
 
-                {/* 左右別の本数管理 (付け足し対応) */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -436,7 +466,6 @@ export default function NewKartePage() {
                 )}
                 
                 {(!(!splitLeftRight && formData.visit_type === 'new')) && (
-
                   <div className="bg-slate-900 rounded-2xl p-4 flex items-center justify-between text-white shadow-lg mt-4">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
@@ -451,14 +480,12 @@ export default function NewKartePage() {
           </Card>
         </motion.div>
 
-        {/* Step 3: Hand-drawn Design Map (Moved Below Spec) */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
           <Card className="rounded-3xl p-6 border-none shadow-xl">
-            <EyeDiagramCanvas onSave={(url) => setFormData({...formData, eye_diagram_url: url})} />
+            <EyeDiagramCanvas initialDataUrl={formData.eye_diagram_url} onSave={(url) => setFormData({...formData, eye_diagram_url: url})} />
           </Card>
         </motion.div>
 
-        {/* Step 4: Photos Card */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
           <Card className="rounded-3xl p-6 border-none shadow-xl space-y-6">
             <div className="flex items-center justify-between mb-4">
@@ -537,8 +564,8 @@ export default function NewKartePage() {
           </Card>
         </motion.div>
 
-        <Button className="w-full h-20 rounded-3xl text-xl font-black shadow-2xl bg-slate-900 hover:bg-slate-800 text-white gap-3 transition-all border-b-8 border-slate-950 mt-4" disabled={saving} type="submit">
-          {saving ? "SAVING..." : <><Save size={24} /> SAVE KARTE</>}
+        <Button className="w-full h-20 rounded-3xl text-xl font-black shadow-2xl bg-amber-500 hover:bg-amber-600 text-white gap-3 transition-all border-b-8 border-amber-700 mt-4" disabled={saving} type="submit">
+          {saving ? "UPDATING..." : <><Save size={24} /> UPDATE KARTE</>}
         </Button>
       </form>
     </div>

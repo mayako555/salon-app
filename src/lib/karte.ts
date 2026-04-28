@@ -54,6 +54,14 @@ export type KarteRecord = {
   
   before_photo_url?: string;
   after_photo_url?: string;
+  photos?: { url: string; description: string }[];
+  treatment_photos?: { url: string; description: string }[];
+  edit_history?: {
+    edited_at: any;
+    edited_by_id: string;
+    edited_by_name: string;
+    previous_data: any;
+  }[];
   eye_diagram_url?: string; // 手書きの目のマーク・デザインマップ
   notes?: string;
   created_at: any;
@@ -61,12 +69,13 @@ export type KarteRecord = {
 
 const KARTE_COLLECTION = "karte_records";
 
-export async function addKarteRecord(data: Omit<KarteRecord, 'id' | 'created_at'>) {
+export async function addKarteRecord(data: Omit<KarteRecord, 'id' | 'created_at' | 'edit_history'>) {
   try {
     const colRef = collection(db, KARTE_COLLECTION);
     const docRef = await addDoc(colRef, {
       ...data,
       created_at: serverTimestamp(),
+      edit_history: []
     });
     return { success: true, id: docRef.id };
   } catch (error: any) {
@@ -75,12 +84,60 @@ export async function addKarteRecord(data: Omit<KarteRecord, 'id' | 'created_at'
   }
 }
 
+export async function editKarteRecord(karteId: string, newData: Partial<KarteRecord>, editorId: string, editorName: string) {
+  try {
+    const { doc, getDoc, updateDoc } = await import("firebase/firestore");
+    const docRef = doc(db, KARTE_COLLECTION, karteId);
+    const snapshot = await getDoc(docRef);
+    
+    if (!snapshot.exists()) {
+      return { success: false, error: "Karte not found" };
+    }
+    
+    const oldData = snapshot.data() as KarteRecord;
+    const historyEntry = {
+      edited_at: new Date().toISOString(),
+      edited_by_id: editorId,
+      edited_by_name: editorName,
+      previous_data: { ...oldData }
+    };
+    
+    const updatedHistory = [...(oldData.edit_history || []), historyEntry];
+    
+    // Clean up newData so we don't accidentally overwrite id or created_at
+    const cleanData = { ...newData };
+    delete cleanData.id;
+    delete cleanData.created_at;
+    delete cleanData.edit_history;
+
+    await updateDoc(docRef, {
+      ...cleanData,
+      edit_history: updatedHistory
+    });
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error editing karte record:", error);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function getKarteByCustomer(customerId: string): Promise<KarteRecord[]> {
   try {
     const colRef = collection(db, KARTE_COLLECTION);
-    const q = query(colRef, where("customer_id", "==", customerId), orderBy("date", "desc"));
+    const q = query(colRef, where("customer_id", "==", customerId));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as KarteRecord[];
+    
+    const records = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as KarteRecord[];
+    
+    // Sort in-memory by date descending to avoid composite index requirement
+    records.sort((a, b) => {
+      const timeA = a.date?.toMillis ? a.date.toMillis() : new Date(a.date).getTime();
+      const timeB = b.date?.toMillis ? b.date.toMillis() : new Date(b.date).getTime();
+      return (timeB || 0) - (timeA || 0);
+    });
+    
+    return records;
   } catch (error) {
     console.error("Error fetching karte records:", error);
     return [];

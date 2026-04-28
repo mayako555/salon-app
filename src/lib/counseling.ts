@@ -81,9 +81,19 @@ export async function addCounselingResponse(data: Omit<CounselingResponse, 'id' 
 export async function getCounselingByCustomer(customerId: string): Promise<CounselingResponse[]> {
   try {
     const colRef = collection(db, COUNSELING_COLLECTION);
-    const q = query(colRef, where("customer_id", "==", customerId), orderBy("created_at", "desc"));
+    const q = query(colRef, where("customer_id", "==", customerId));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as CounselingResponse[];
+    
+    const records = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as CounselingResponse[];
+    
+    // In-memory sort by created_at descending
+    records.sort((a, b) => {
+      const timeA = a.created_at?.toMillis ? a.created_at.toMillis() : new Date(a.created_at).getTime();
+      const timeB = b.created_at?.toMillis ? b.created_at.toMillis() : new Date(b.created_at).getTime();
+      return (timeB || 0) - (timeA || 0);
+    });
+    
+    return records;
   } catch (error) {
     console.error("Error fetching counseling responses:", error);
     return [];

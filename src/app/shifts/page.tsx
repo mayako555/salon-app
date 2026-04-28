@@ -11,7 +11,7 @@ export default async function ShiftsPage({
 }) {
   const params = await searchParams;
   const monthParam = params.month;
-  const viewMode = params.view === "staff" ? "staff" : "calendar";
+  const viewMode = params.view === "staff" ? "staff" : params.view === "store" ? "store" : "calendar";
   
   // Parse target month from query or use current month
   const targetDate = monthParam ? new Date(monthParam) : new Date();

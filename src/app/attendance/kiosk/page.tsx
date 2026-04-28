@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { recordClockIn, recordClockOut, getDailyAttendance } from "../actions";
+import { recordClockIn, recordClockOut, getDailyAttendance, handleQRScan } from "../actions";
+import Scanner from "react-qr-scanner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
@@ -20,6 +21,7 @@ import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { QrCode, X } from "lucide-react";
 
 export default function AttendanceKioskPage() {
   const [staffList, setStaffList] = useState<any[]>([]);
@@ -27,6 +29,8 @@ export default function AttendanceKioskPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [showScanner, setShowScanner] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -83,6 +87,36 @@ export default function AttendanceKioskPage() {
     }
   };
 
+  const onScan = async (data: any) => {
+    if (data && !isScanning) {
+      setIsScanning(true);
+      const staffId = data.text;
+      try {
+        const res = await handleQRScan(staffId);
+        if (res.success) {
+          if (res.action === "IN") {
+            toast.success(`${res.name}さん、おはようございます！ (QR)`);
+          } else {
+            toast.success(`${res.name}さん、お疲れ様でした！ (QR)`);
+          }
+          setShowScanner(false);
+          await loadData();
+        } else {
+          toast.error(res.error || "スキャンに失敗しました");
+        }
+      } catch (error) {
+        toast.error("スキャン処理中にエラーが発生しました");
+      } finally {
+        setTimeout(() => setIsScanning(false), 2000); // Prevent double scans
+      }
+    }
+  };
+
+  const onError = (err: any) => {
+    console.error(err);
+    toast.error("カメラの起動に失敗しました");
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white">
@@ -120,6 +154,14 @@ export default function AttendanceKioskPage() {
             <div className="text-emerald-400 font-black tracking-wider">
               {format(currentTime, "yyyy.MM.dd (E)", { locale: ja })}
             </div>
+            
+            <Button 
+              onClick={() => setShowScanner(true)}
+              className="mt-4 bg-white text-slate-900 rounded-2xl h-14 px-8 font-black flex items-center gap-2 shadow-2xl hover:bg-slate-100 transition-all active:scale-95"
+            >
+              <QrCode size={20} className="text-blue-500" />
+              QRコードで打刻
+            </Button>
           </div>
         </div>
 
@@ -210,7 +252,60 @@ export default function AttendanceKioskPage() {
             Designed for JASMINE LASH STORE TERMINAL
           </p>
         </div>
+        </div>
       </div>
+
+      {/* QR Scanner Modal */}
+      <AnimatePresence>
+        {showScanner && (
+          <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center p-6">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-md bg-white/5 border border-white/10 rounded-[3rem] p-8 flex flex-col items-center gap-8 backdrop-blur-3xl"
+            >
+              <div className="text-center">
+                <h3 className="text-2xl font-black text-white mb-2">QR SCANNER</h3>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">個人端末のQRコードをかざしてください</p>
+              </div>
+
+              <div className="relative w-full aspect-square bg-black rounded-[2rem] overflow-hidden border-4 border-emerald-500/30">
+                <Scanner
+                  delay={300}
+                  onError={onError}
+                  onScan={onScan}
+                  style={{ width: '100%', height: '100%' }}
+                />
+                <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none" />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-48 h-48 border-2 border-emerald-500 rounded-3xl relative">
+                    <div className="absolute inset-x-0 top-0 h-0.5 bg-emerald-500 animate-scan" />
+                  </div>
+                </div>
+              </div>
+
+              <Button 
+                onClick={() => setShowScanner(false)}
+                variant="ghost"
+                className="w-full h-14 rounded-2xl text-white hover:bg-white/10 font-black"
+              >
+                キャンセル
+              </Button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <style jsx global>{`
+        @keyframes scan {
+          0% { top: 0; }
+          100% { top: 100%; }
+        }
+        .animate-scan {
+          animation: scan 2s linear infinite;
+        }
+      `}</style>
     </div>
   );
 }

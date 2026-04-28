@@ -33,7 +33,13 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList }: BulkShif
   const [segments, setSegments] = useState<ShiftSegment[]>([
     { start_time: "10:00", end_time: "19:00", store: "神戸" }
   ]);
-  const [excludeWeekends, setExcludeWeekends] = useState(false);
+  const [activeDaysOfWeek, setActiveDaysOfWeek] = useState<number[]>([1, 2, 3, 4, 5]); // Default Mon-Fri
+
+  const toggleDayOfWeek = (day: number) => {
+    setActiveDaysOfWeek(prev => 
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
+    );
+  };
 
   const toggleStaff = (id: string) => {
     setSelectedStaffIds(prev => 
@@ -75,7 +81,7 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList }: BulkShif
         dateRange,
         type,
         segments,
-        excludeWeekends
+        activeDaysOfWeek
       });
       
       if (result.success) {
@@ -159,18 +165,36 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList }: BulkShif
             </div>
           </div>
 
-          {/* Options */}
-          <div className="flex items-center gap-2">
-            <input 
-              type="checkbox" 
-              id="excludeWeekends"
-              checked={excludeWeekends}
-              onChange={(e) => setExcludeWeekends(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-            />
-            <label htmlFor="excludeWeekends" className="text-sm text-slate-600">
-              土日を除外する
-            </label>
+          {/* Days of Week */}
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700">対象曜日</label>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: "月", value: 1 },
+                { label: "火", value: 2 },
+                { label: "水", value: 3 },
+                { label: "木", value: 4 },
+                { label: "金", value: 5 },
+                { label: "土", value: 6, color: "text-blue-600" },
+                { label: "日", value: 0, color: "text-rose-600" }
+              ].map((day) => (
+                <button
+                  key={day.value}
+                  type="button"
+                  onClick={() => toggleDayOfWeek(day.value)}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all border ${
+                    activeDaysOfWeek.includes(day.value) 
+                      ? "bg-slate-900 text-white border-slate-900 shadow-sm" 
+                      : `bg-white border-slate-200 hover:border-slate-400 ${day.color || "text-slate-600"}`
+                  }`}
+                >
+                  {day.label}
+                </button>
+              ))}
+            </div>
+            {activeDaysOfWeek.length === 0 && (
+              <p className="text-xs text-rose-500 font-bold mt-1">※少なくとも1つの曜日を選択してください</p>
+            )}
           </div>
 
           {/* Shift Type */}
@@ -264,7 +288,7 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList }: BulkShif
             <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
               キャンセル
             </Button>
-            <Button type="submit" disabled={loading} className="px-8 bg-slate-900">
+            <Button type="submit" disabled={loading || activeDaysOfWeek.length === 0} className="px-8 bg-slate-900">
               {loading ? "登録中..." : "一括登録を実行"}
             </Button>
           </DialogFooter>

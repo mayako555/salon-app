@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, X, Search, Sparkles, Tag, MessageSquare, Calendar } from "lucide-react";
 import { addCheckout, getStoreMasterData } from "./actions";
+import { format } from "date-fns";
 import { SalesMasterItem } from "./seeds";
 import { getStaffList, StaffProfile } from "../staff/actions";
 import { getAllCustomers, Customer } from "@/lib/customers";
@@ -54,12 +55,16 @@ export default function CheckoutDialog({
         }
       });
       getAllCustomers().then(setAllCustomers);
+      
+      // Reset form states when opened
+      setNoNextBooking(false);
     }
   }, [isOpen, selectedStore, defaultStaffName, selectedStaff]); 
   
   // Menu and Option states to trigger price changes
   const [menuCourse, setMenuCourse] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [noNextBooking, setNoNextBooking] = useState(false);
 
   // Filtering items by type and search term
   const filteredItems = storeMasterData.filter(item => 
@@ -144,7 +149,7 @@ export default function CheckoutDialog({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">対象日</label>
-                  <input required type="date" name="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full h-9 px-3 border border-slate-300 rounded-md text-sm" />
+                  <input required type="date" name="date" defaultValue={format(new Date(), "yyyy-MM-dd")} className="w-full h-9 px-3 border border-slate-300 rounded-md text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">時間</label>
@@ -387,18 +392,44 @@ export default function CheckoutDialog({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-100 pt-4 bg-blue-50/30 -mx-6 px-6 py-4">
-                <div className="flex items-center gap-2 col-span-2 mb-1">
-                   <Calendar size={16} className="text-blue-600" />
-                   <h4 className="text-sm font-bold text-blue-900">店頭次回予約</h4>
-                   <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">Auto LINE</span>
+                <div className="flex items-center justify-between col-span-2 mb-1">
+                   <div className="flex items-center gap-2">
+                     <Calendar size={16} className="text-blue-600" />
+                     <h4 className="text-sm font-bold text-blue-900">店頭次回予約</h4>
+                     <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">Auto LINE</span>
+                   </div>
+                   <label className="flex items-center gap-2 cursor-pointer">
+                     <input 
+                       type="checkbox" 
+                       checked={noNextBooking}
+                       onChange={(e) => setNoNextBooking(e.target.checked)}
+                       className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500" 
+                     />
+                     <span className="text-sm font-bold text-slate-700">次回予約なし</span>
+                   </label>
                 </div>
-                <div>
+                <div className={`transition-opacity ${noNextBooking ? 'opacity-40 pointer-events-none' : ''}`}>
                   <label className="block text-xs font-medium text-slate-500 mb-1">次回予約日</label>
-                  <input type="date" name="next_booking_date" className="w-full h-9 px-3 border border-blue-200 rounded-md text-sm font-bold text-blue-800 bg-white" />
+                  <input type="date" name="next_booking_date" disabled={noNextBooking} className="w-full h-9 px-3 border border-blue-200 rounded-md text-sm font-bold text-blue-800 bg-white disabled:bg-slate-100" />
                 </div>
-                <div>
+                <div className={`transition-opacity ${noNextBooking ? 'opacity-40 pointer-events-none' : ''}`}>
                   <label className="block text-xs font-medium text-slate-500 mb-1">次回予約時間</label>
-                  <input type="time" name="next_booking_time" defaultValue="10:00" className="w-full h-9 px-3 border border-blue-200 rounded-md text-sm font-bold text-blue-800 bg-white" />
+                  <input type="time" name="next_booking_time" defaultValue="10:00" disabled={noNextBooking} className="w-full h-9 px-3 border border-blue-200 rounded-md text-sm font-bold text-blue-800 bg-white disabled:bg-slate-100" />
+                </div>
+                <div className={`col-span-2 pt-1 transition-opacity ${noNextBooking ? 'opacity-40 pointer-events-none' : ''}`}>
+                   <label className="flex items-center gap-2 cursor-pointer bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
+                     <input 
+                       type="checkbox" 
+                       name="next_booking_line_reminder" 
+                       value="true"
+                       defaultChecked={true}
+                       className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500" 
+                     />
+                     <div>
+                       <span className="text-sm font-black text-slate-700 block">2日前にLINEでリマインドを送る</span>
+                       <span className="text-[10px] text-slate-400 font-medium">※公式LINEから自動メッセージが送信されます</span>
+                     </div>
+                   </label>
                 </div>
                 <p className="col-span-2 text-[10px] text-blue-500 font-medium">※入力をするとお客様に自動でLINE予約確定メッセージが送信されます。</p>
               </div>

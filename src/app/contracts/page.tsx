@@ -8,13 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Plus, Edit2, AlertCircle, Settings } from "lucide-react";
 import { format } from "date-fns";
 import ContractFormDialog from "./ContractFormDialog";
+import ContractHistoryDialog from "./ContractHistoryDialog";
 import Link from "next/link";
 import AuthGuard from "@/components/AuthGuard";
 
 export default function ContractsPage() {
   const [contracts, setContracts] = useState<StaffContract[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<StaffContract | undefined>();
+  const [historyStaffId, setHistoryStaffId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -37,6 +40,21 @@ export default function ContractsPage() {
     setSelectedContract(contract);
     setIsDialogOpen(true);
   };
+
+  const handleOpenHistory = (staffId: string) => {
+    setHistoryStaffId(staffId);
+    setIsHistoryDialogOpen(true);
+  };
+
+  // Group contracts by staff and get the latest
+  const latestContractsMap = new Map<string, StaffContract>();
+  contracts.forEach(contract => {
+    const existing = latestContractsMap.get(contract.staff_id);
+    if (!existing || new Date(contract.valid_from).getTime() > new Date(existing.valid_from).getTime()) {
+      latestContractsMap.set(contract.staff_id, contract);
+    }
+  });
+  const displayContracts = Array.from(latestContractsMap.values());
 
   return (
     <AuthGuard requireRole="admin">
@@ -75,7 +93,7 @@ export default function ContractsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {contracts.map((contract) => (
+              {displayContracts.map((contract) => (
                 <TableRow key={contract.id}>
                   <TableCell className="font-bold text-slate-900">{contract.staff_name}</TableCell>
                   <TableCell>
@@ -120,19 +138,29 @@ export default function ContractsPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-8 gap-1 text-slate-500 hover:text-emerald-600"
-                      onClick={() => handleOpenEdit(contract)}
-                    >
-                      <Edit2 size={16} />
-                      <span>編集</span>
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 px-2 text-slate-500 hover:text-blue-600 bg-slate-50 hover:bg-blue-50"
+                        onClick={() => handleOpenHistory(contract.staff_id)}
+                      >
+                        履歴
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 gap-1 text-slate-500 hover:text-emerald-600 bg-slate-50 hover:bg-emerald-50"
+                        onClick={() => handleOpenEdit(contract)}
+                      >
+                        <Edit2 size={14} />
+                        <span>編集</span>
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
-              {contracts.length === 0 && !isLoading && (
+              {displayContracts.length === 0 && !isLoading && (
                 <TableRow>
                   <TableCell colSpan={8} className="h-24 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
@@ -154,10 +182,20 @@ export default function ContractsPage() {
         </div>
 
         <ContractFormDialog 
+          key={selectedContract?.id || "new"}
           isOpen={isDialogOpen} 
           contract={selectedContract} 
           onClose={() => setIsDialogOpen(false)} 
         />
+
+        {historyStaffId && (
+          <ContractHistoryDialog
+            isOpen={isHistoryDialogOpen}
+            onClose={() => setIsHistoryDialogOpen(false)}
+            staffName={contracts.find(c => c.staff_id === historyStaffId)?.staff_name || ""}
+            contracts={contracts.filter(c => c.staff_id === historyStaffId)}
+          />
+        )}
       </div>
     </AuthGuard>
   );

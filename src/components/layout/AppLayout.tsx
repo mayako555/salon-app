@@ -16,6 +16,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return <div className="min-h-screen bg-slate-950">{children}</div>;
   }
 
+  if (pathname.startsWith("/staff-portal") || pathname.startsWith("/customers/intake")) {
+    return <div className="min-h-screen bg-slate-50">{children}</div>;
+  }
+
   const handleLogout = () => {
     signOut(auth);
   };

@@ -23,7 +23,9 @@ import {
   ShieldCheck,
   Camera,
   Mail,
-  Home
+  Home,
+  Edit2,
+  History
 } from "lucide-react";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -36,6 +38,9 @@ export default function CustomerDetailPage() {
   const [counseling, setCounseling] = useState<CounselingResponse[]>([]);
   const [karteRecords, setKarteRecords] = useState<KarteRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // State for History Modal
+  const [selectedHistoryKarte, setSelectedHistoryKarte] = useState<KarteRecord | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -187,11 +192,18 @@ export default function CustomerDetailPage() {
             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
               <Sparkles className="text-amber-500" size={24} /> 施術カルテ履歴
             </h2>
-            <Link href={`/staff-portal/customers/${id}/karte/new`}>
-              <Button size="sm" className="bg-slate-900 text-white rounded-full px-4 font-bold text-xs">
-                新規作成
-              </Button>
-            </Link>
+            <div className="flex gap-2">
+              <Link href={`/staff-portal/customers/${id}/treatment-results`}>
+                <Button size="sm" variant="outline" className="rounded-full px-4 font-bold text-xs border-amber-200 text-amber-700 hover:bg-amber-50">
+                  <Sparkles size={14} className="mr-1" /> トリートメント経過
+                </Button>
+              </Link>
+              <Link href={`/staff-portal/customers/${id}/karte/new`}>
+                <Button size="sm" className="bg-slate-900 text-white rounded-full px-4 font-bold text-xs">
+                  新規作成
+                </Button>
+              </Link>
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -217,6 +229,18 @@ export default function CustomerDetailPage() {
                           <Clock size={10} /> 担当: {record.staff_name}
                         </div>
                       </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {record.edit_history && record.edit_history.length > 0 && (
+                        <Button variant="outline" size="sm" onClick={() => setSelectedHistoryKarte(record)} className="h-8 px-2 text-xs font-bold text-slate-500">
+                          <History size={14} className="mr-1" /> 履歴
+                        </Button>
+                      )}
+                      <Link href={`/staff-portal/customers/${id}/karte/${record.id}/edit`}>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-slate-700 bg-slate-50">
+                          <Edit2 size={14} />
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                   
@@ -263,24 +287,35 @@ export default function CustomerDetailPage() {
                     </div>
                   )}
 
-                  {(record.before_photo_url || record.after_photo_url) && (
-                    <div className="flex gap-3">
-                      {record.before_photo_url && (
-                        <div className="flex-1 space-y-1">
-                          <p className="text-[8px] font-black text-slate-300 uppercase text-center">Before</p>
-                          <div className="aspect-square bg-slate-100 rounded-2xl overflow-hidden border border-slate-100 shadow-inner">
-                            <img src={record.before_photo_url} className="w-full h-full object-cover" />
+                  {record.photos && record.photos.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><Camera size={12}/> 施術写真</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {record.photos.map((photo, i) => (
+                          <div key={i} className="space-y-1">
+                            <div className="aspect-square bg-slate-100 rounded-2xl overflow-hidden border border-slate-100 shadow-inner">
+                              <img src={photo.url} className="w-full h-full object-cover" />
+                            </div>
+                            {photo.description && <p className="text-[10px] text-slate-500 font-bold px-1">{photo.description}</p>}
                           </div>
-                        </div>
-                      )}
-                      {record.after_photo_url && (
-                        <div className="flex-1 space-y-1">
-                          <p className="text-[8px] font-black text-slate-300 uppercase text-center">After</p>
-                          <div className="aspect-square bg-slate-100 rounded-2xl overflow-hidden border border-emerald-100 shadow-inner">
-                            <img src={record.after_photo_url} className="w-full h-full object-cover" />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {record.treatment_photos && record.treatment_photos.length > 0 && (
+                    <div className="space-y-2 pt-2">
+                      <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-1"><Sparkles size={12}/> 経過写真</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {record.treatment_photos.map((photo, i) => (
+                          <div key={i} className="space-y-1">
+                            <div className="aspect-square bg-emerald-50/50 rounded-2xl overflow-hidden border border-emerald-100 shadow-inner">
+                              <img src={photo.url} className="w-full h-full object-cover" />
+                            </div>
+                            {photo.description && <p className="text-[10px] text-slate-500 font-bold px-1">{photo.description}</p>}
                           </div>
-                        </div>
-                      )}
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -343,6 +378,40 @@ export default function CustomerDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit History Modal */}
+      {selectedHistoryKarte && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 className="font-black text-slate-800 flex items-center gap-2">
+                <History className="text-blue-500" size={18} /> 編集履歴
+              </h3>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedHistoryKarte(null)} className="h-8 w-8 p-0 rounded-full">
+                X
+              </Button>
+            </div>
+            <div className="overflow-y-auto p-4 space-y-4">
+              {[...selectedHistoryKarte.edit_history || []].reverse().map((hist, index) => (
+                <div key={index} className="border-l-2 border-slate-200 pl-4 py-1 relative">
+                  <div className="absolute w-2 h-2 bg-blue-500 rounded-full -left-[5px] top-2" />
+                  <p className="text-xs font-black text-slate-500 mb-1">
+                    {format(new Date(hist.edited_at), "yyyy/MM/dd HH:mm")} 
+                    <span className="font-normal text-slate-400 ml-2">by {hist.edited_by_name}</span>
+                  </p>
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-600 font-medium">
+                    {/* Render a brief summary of what the previous state was, since showing the entire karte map is too big */}
+                    <p><span className="font-bold">担当:</span> {hist.previous_data.staff_name}</p>
+                    <p><span className="font-bold">総仕上がり:</span> {hist.previous_data.design?.count}本</p>
+                    {hist.previous_data.notes && <p className="mt-1 text-slate-500 italic">"{hist.previous_data.notes}"</p>}
+                    <p className="text-[10px] text-slate-400 mt-2">※ 編集前のデータのスナップショットが保存されています</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

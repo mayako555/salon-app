@@ -5,6 +5,7 @@ import {
   collection, 
   getDocs, 
   addDoc,
+  updateDoc,
   deleteDoc,
   doc,
   query, 
@@ -26,6 +27,7 @@ export type StaffProfile = {
   max_holiday_requests: number;
   is_invoice_registered?: boolean;
   is_active: boolean;
+  monthly_sales_target?: number;
   created_at?: any;
 };
 
@@ -71,6 +73,7 @@ export async function addStaff(formData: FormData) {
     const is_invoice_registered = formData.get("is_invoice_registered") === "true";
     const max_holiday_requests = parseInt(formData.get("max_holiday_requests") as string || "3", 10);
     const role = (formData.get("role") as StaffRole) || "staff";
+    const monthly_sales_target = parseInt(formData.get("monthly_sales_target") as string || "0", 10);
 
     if (!name || !email || !password) {
       return { success: false, error: "名前、メールアドレス、パスワードは必須です" };
@@ -102,6 +105,7 @@ export async function addStaff(formData: FormData) {
       is_invoice_registered,
       max_holiday_requests,
       is_active: true,
+      monthly_sales_target,
       created_at: serverTimestamp()
     };
     
@@ -127,6 +131,51 @@ export async function addStaff(formData: FormData) {
     return { success: true };
   } catch (error: any) {
     console.error("Error in addStaff:", error);
+    return { success: false, error: error.message || "予期せぬエラーが発生しました" };
+  }
+}
+
+export async function editStaff(id: string, formData: FormData) {
+  try {
+    const name = formData.get("name") as string;
+    const email = formData.get("email") as string;
+    const employment_type = formData.get("employment_type") as "employee" | "outsourcing" | "part_time";
+    const is_invoice_registered = formData.get("is_invoice_registered") === "true";
+    const max_holiday_requests = parseInt(formData.get("max_holiday_requests") as string || "3", 10);
+    const role = (formData.get("role") as StaffRole) || "staff";
+    const monthly_sales_target = parseInt(formData.get("monthly_sales_target") as string || "0", 10);
+
+    if (!name || !email) {
+      return { success: false, error: "名前、メールアドレスは必須です" };
+    }
+
+    const colRef = doc(db, STAFF_COLLECTION, id);
+    const staffData = {
+      name,
+      email,
+      role,
+      employment_type,
+      is_invoice_registered,
+      max_holiday_requests,
+      monthly_sales_target,
+      updated_at: serverTimestamp()
+    };
+
+    await updateDoc(colRef, staffData);
+
+    await addAuditLog({
+      table_name: STAFF_COLLECTION,
+      record_id: id,
+      action: "UPDATE",
+      old_data: null,
+      new_data: { ...staffData, updated_at: "now" },
+      actor: "管理者"
+    });
+
+    revalidatePath("/staff");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error in editStaff:", error);
     return { success: false, error: error.message || "予期せぬエラーが発生しました" };
   }
 }

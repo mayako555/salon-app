@@ -194,7 +194,7 @@ export default function ShiftEditDialog({
           <div className="space-y-2">
             <label className="text-sm font-medium">種類</label>
             <div className="flex flex-wrap gap-2">
-              {(["work", "holiday", "paid_leave", "requested_holiday"] as ShiftType[]).map((type) => (
+              {(["work", "holiday", "paid_leave", "requested_holiday", "requested_paid_leave"] as ShiftType[]).map((type) => (
                 <button
                   key={type}
                   type="button"
@@ -205,7 +205,7 @@ export default function ShiftEditDialog({
                       : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
                   }`}
                 >
-                  {type === 'work' ? '勤務' : type === 'holiday' ? '公休' : type === 'paid_leave' ? '有休' : '希望休'}
+                  {type === 'work' ? '勤務' : type === 'holiday' ? '公休' : type === 'paid_leave' ? '有休' : type === 'requested_holiday' ? '希望休' : '有給申請'}
                 </button>
               ))}
             </div>
@@ -282,7 +282,7 @@ export default function ShiftEditDialog({
           )}
 
           <DialogFooter className="pt-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-            {formData.type === "requested_holiday" && formData.request_id ? (
+            {(formData.type === "requested_holiday" || formData.type === "requested_paid_leave") && formData.request_id ? (
               <div className="flex gap-2 w-full sm:w-auto">
                 <Button 
                   type="button" 
@@ -318,7 +318,7 @@ export default function ShiftEditDialog({
               <Button type="button" variant="outline" onClick={onClose} disabled={loading} className="flex-1 sm:flex-none">
                 キャンセル
               </Button>
-              {(!formData.request_id || formData.type !== "requested_holiday") && (
+              {(!formData.request_id || (formData.type !== "requested_holiday" && formData.type !== "requested_paid_leave")) && (
                 <Button type="submit" disabled={loading} className="flex-1 sm:flex-none">
                   {loading ? "保存中..." : "保存"}
                 </Button>

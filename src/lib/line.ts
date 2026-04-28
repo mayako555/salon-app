@@ -49,7 +49,27 @@ export async function sendLineMessage(lineUserId: string, message: string) {
  * 次回予約確定メッセージを送信する
  */
 export async function sendBookingConfirmation(customerName: string, lineUserId: string, date: string, time: string) {
-  const message = `${customerName}様、本日はご来店ありがとうございました！\n\n次回のご予約を以下の通り承りました。\n\n【日時】\n${date} ${time}\n\nご来店を心よりお待ちしております。`;
+  // Convert YYYY-MM-DD to M／D（曜日）
+  const dateObj = new Date(date);
+  const dayOfWeek = ["日", "月", "火", "水", "木", "金", "土"][dateObj.getDay()];
+  const formattedDate = `${dateObj.getMonth() + 1}／${dateObj.getDate()}（${dayOfWeek}）`;
+
+  const message = `ご来店ありがとうございました🤍
+────────────────
+【 次回予約日時 】
+
+${formattedDate} ${time}〜
+
+🌿 Jasmine Lash 六甲道店 🕊
+────────────────
+日時のご確認をお願いいたします。
+ご変更がある場合はお気軽にお問い合わせください。
+
+《 次回ご予約の注意事項 》
+
+●当日の予約変更・キャンセルはキャンセル料が発生します。必ず前日までにご連絡ください。
+※前日の変更・キャンセルをする場合、前日であっても１８時を過ぎてからのご連絡は当日変更・キャンセルに該当しますのでご注意ください。`;
+
   return await sendLineMessage(lineUserId, message);
 }
 
@@ -57,6 +77,21 @@ export async function sendBookingConfirmation(customerName: string, lineUserId: 
  * リマインダーメッセージを送信する
  */
 export async function sendBookingReminder(customerName: string, lineUserId: string, date: string, time: string) {
-  const message = `${customerName}様、こんにちは！\n\nご予約の2日前となりましたのでご連絡いたしました。\n\n【日時】\n${date} ${time}\n\n当日のご来店をお待ちしております。変更がある場合はお早めにご連絡ください。`;
+  const dateObj = new Date(date);
+  const dayOfWeek = ["日", "月", "火", "水", "木", "金", "土"][dateObj.getDay()];
+  const formattedDate = `${dateObj.getMonth() + 1}／${dateObj.getDate()}（${dayOfWeek}）`;
+
+  const message = `こんにちは🕊
+明後日のご予約のリマインドです。
+
+【 次回予約日時 】
+
+${formattedDate} ${time}〜
+
+🌿 Jasmine Lash 六甲道店 🕊
+
+日時のご確認をお願いいたします。
+当日お気をつけてお越しくださいませ🤍`;
+
   return await sendLineMessage(lineUserId, message);
 }

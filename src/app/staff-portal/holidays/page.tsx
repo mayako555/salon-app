@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Info } from "lucide-react";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, addMonths, isBefore, isAfter } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, addMonths } from "date-fns";
 import { ja } from "date-fns/locale";
+import { useAuth } from "@/lib/auth-context";
+import { submitHolidayRequest } from "@/app/shifts/actions";
 
 export default function StaffPortalHolidaysPage() {
   const [currentDate] = useState(new Date());
+  const { profile } = useAuth();
   
   const targetMonthOffset = currentDate.getDate() <= 20 ? 2 : 3;
   const targetMonthDate = addMonths(currentDate, targetMonthOffset);
@@ -51,12 +54,40 @@ export default function StaffPortalHolidaysPage() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (!profile) return;
     setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
+    
+    try {
+      const promises = [];
+      
+      for (const date of requestedDays) {
+        promises.push(submitHolidayRequest({
+          staff_id: profile.id,
+          staff_name: profile.name,
+          date,
+        }));
+      }
+      
+      for (const date of paidLeaveDays) {
+        promises.push(submitHolidayRequest({
+          staff_id: profile.id,
+          staff_name: profile.name,
+          date,
+          reason: "有給休暇"
+        }));
+      }
+      
+      await Promise.all(promises);
+      
       alert("希望休を提出しました！");
-    }, 1500);
+      setRequestedDays([]);
+      setPaidLeaveDays([]);
+    } catch (error) {
+      alert("エラーが発生しました。もう一度やり直してください。");
+    } finally {
+      setSubmitted(false);
+    }
   };
 
   return (

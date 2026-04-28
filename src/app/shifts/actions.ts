@@ -17,7 +17,7 @@ import { addAuditLog } from "@/app/audit/actions";
 import { getStaffList } from "@/app/staff/actions";
 
 export type StoreLocation = "六甲" | "元町" | "神戸";
-export type ShiftType = "work" | "holiday" | "paid_leave" | "requested_holiday";
+export type ShiftType = "work" | "holiday" | "paid_leave" | "requested_holiday" | "requested_paid_leave";
 
 export type ShiftSegment = {
   start_time: string;
@@ -50,10 +50,15 @@ export async function getMonthlyShifts(year: number, month: number): Promise<Shi
     );
     const snapshot = await getDocs(q);
     
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as ShiftRecord[];
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null),
+        updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : (data.updated_at || null)
+      };
+    }) as ShiftRecord[];
   } catch (error) {
     console.error("Error fetching monthly shifts:", error);
     return [];
@@ -129,10 +134,10 @@ export async function bulkSaveShifts(params: {
   dateRange: { start: string; end: string };
   type: ShiftType;
   segments?: ShiftSegment[];
-  excludeWeekends: boolean;
+  activeDaysOfWeek: number[];
 }) {
   try {
-    const { staffIds, dateRange, type, segments, excludeWeekends } = params;
+    const { staffIds, dateRange, type, segments, activeDaysOfWeek } = params;
     const start = new Date(dateRange.start);
     const end = new Date(dateRange.end);
     const batch = writeBatch(db);
@@ -143,8 +148,7 @@ export async function bulkSaveShifts(params: {
     let curr = new Date(start);
     while (curr <= end) {
       const day = curr.getDay();
-      const isWeekend = day === 0 || day === 6;
-      if (!excludeWeekends || !isWeekend) {
+      if (activeDaysOfWeek.includes(day)) {
         dates.push(curr.toISOString().split("T")[0]);
       }
       curr.setDate(curr.getDate() + 1);
@@ -226,7 +230,7 @@ export async function submitHolidayRequest(data: Omit<HolidayRequest, "id" | "st
       staff_id: data.staff_id,
       staff_name: data.staff_name,
       date: data.date,
-      type: "requested_holiday",
+      type: data.reason === "有給休暇" ? "requested_paid_leave" : "requested_holiday",
       segments: [],
       request_id: holidayDocRef.id // Store the link to the request
     };
@@ -265,7 +269,14 @@ export async function getStaffHolidayRequests(staffId: string): Promise<HolidayR
     const colRef = collection(db, HOLIDAY_REQUESTS_COLLECTION);
     const q = query(colRef, where("staff_id", "==", staffId), orderBy("date", "desc"));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as HolidayRequest[];
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null)
+      };
+    }) as HolidayRequest[];
   } catch (error) {
     console.error("Error fetching staff holiday requests:", error);
     return [];
@@ -283,7 +294,14 @@ export async function getAllHolidayRequests(year: number, month: number): Promis
       orderBy("date", "asc")
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as HolidayRequest[];
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null)
+      };
+    }) as HolidayRequest[];
   } catch (error) {
     console.error("Error fetching all holiday requests:", error);
     return [];
@@ -313,9 +331,18 @@ export async function updateHolidayRequestStatus(id: string, status: "approved" 
       const shiftDocRef = doc(db, SHIFTS_COLLECTION, holidayData.shift_id);
       
       if (status === "approved") {
-        // Change from 'requested_holiday' to 'holiday'
+        // Change from 'requested_holiday' to 'holiday', or 'requested_paid_leave' to 'paid_leave'
+        const shiftSnap = await getDoc(shiftDocRef);
+        let newType: ShiftType = "holiday";
+        if (shiftSnap.exists()) {
+          const currentType = shiftSnap.data().type;
+          if (currentType === "requested_paid_leave") {
+            newType = "paid_leave";
+          }
+        }
+        
         batch.update(shiftDocRef, {
-          type: "holiday",
+          type: newType,
           updated_at: serverTimestamp()
         });
       } else {
