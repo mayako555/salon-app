@@ -31,12 +31,42 @@ try {
     const getPrivateKey = () => {
       const key = process.env.FIREBASE_PRIVATE_KEY;
       if (!key) return null;
+      
+      // If user pasted the entire JSON file contents by mistake
+      if (key.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(key);
+          if (parsed.private_key) {
+            return parsed.private_key.replace(/\\n/g, "\n");
+          }
+        } catch (e) {
+          console.error("Failed to parse FIREBASE_PRIVATE_KEY as JSON");
+        }
+      }
+      
       return key.replace(/\\n/g, "\n").replace(/\"/g, "").trim();
+    };
+
+    const getClientEmail = () => {
+      const email = process.env.FIREBASE_CLIENT_EMAIL;
+      if (email) return email;
+      
+      // Fallback: try to extract from JSON in FIREBASE_PRIVATE_KEY
+      const key = process.env.FIREBASE_PRIVATE_KEY;
+      if (key && key.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(key);
+          if (parsed.client_email) {
+            return parsed.client_email;
+          }
+        } catch (e) {}
+      }
+      return undefined;
     };
 
     const firebaseAdminConfig = {
       projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "salonapp-ee4d2",
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      clientEmail: getClientEmail(),
       privateKey: getPrivateKey(),
     };
 

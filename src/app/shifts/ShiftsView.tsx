@@ -213,12 +213,12 @@ export default function ShiftsView({
                       </Button>
                     </div>
                     
-                    <div className="flex flex-col gap-1.5 overflow-y-auto max-h-[110px] pr-1">
+                    <div className="flex flex-col gap-1.5 pr-1">
                       {dayShifts.map((shift) => (
                         <div 
                           key={shift.id} 
                           onClick={() => handleEditShift(shift)}
-                          className={`text-[10px] flex flex-col rounded border shadow-sm leading-none overflow-hidden cursor-pointer hover:ring-2 hover:ring-slate-400 transition-all
+                          className={`shrink-0 text-[10px] flex flex-col rounded border shadow-sm leading-none overflow-hidden cursor-pointer hover:ring-2 hover:ring-slate-400 transition-all
                             ${shift.type === 'holiday' ? 'bg-slate-100 border-slate-200 text-slate-600' :
                               shift.type === 'paid_leave' ? 'bg-amber-50 border-amber-200 text-amber-700' : 
                               shift.type === 'requested_holiday' ? 'bg-blue-100 border-blue-400 text-blue-900 shadow-md ring-2 ring-blue-200' :

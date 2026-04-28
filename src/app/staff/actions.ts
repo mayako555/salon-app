@@ -76,8 +76,8 @@ export async function addStaff(formData: FormData) {
       return { success: false, error: "名前、メールアドレス、パスワードは必須です" };
     }
 
-    // 1. Create Firebase Auth User
-    let uid: string;
+    // 1. Create Firebase Auth User (Optional)
+    let uid: string | undefined;
     try {
       const userRecord = await adminAuth.createUser({
         email,
@@ -86,14 +86,15 @@ export async function addStaff(formData: FormData) {
       });
       uid = userRecord.uid;
     } catch (authError: any) {
-      console.error("Auth creation error:", authError);
-      return { success: false, error: `認証ユーザーの作成に失敗しました: ${authError.message}` };
+      console.warn("Auth creation skipped or failed:", authError);
+      // We do not fail the whole process. The staff will be saved to Firestore,
+      // but they won't be able to log in until an Auth account is manually created.
     }
 
     // 2. Save Staff Profile to Firestore
     const colRef = collection(db, STAFF_COLLECTION);
     const staffData = {
-      uid,
+      uid: uid || null,
       name,
       email,
       role,
