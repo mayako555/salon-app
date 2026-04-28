@@ -318,7 +318,7 @@ export default function ShiftEditDialog({
               <Button type="button" variant="outline" onClick={onClose} disabled={loading} className="flex-1 sm:flex-none">
                 キャンセル
               </Button>
-              {formData.type !== "requested_holiday" && (
+              {(!formData.request_id || formData.type !== "requested_holiday") && (
                 <Button type="submit" disabled={loading} className="flex-1 sm:flex-none">
                   {loading ? "保存中..." : "保存"}
                 </Button>
