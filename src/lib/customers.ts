@@ -63,7 +63,15 @@ export async function getAllCustomers(): Promise<Customer[]> {
     const colRef = collection(db, CUSTOMERS_COLLECTION);
     const q = query(colRef, orderBy("name_kana", "asc"));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Customer[];
+    return snapshot.docs.map(d => {
+      const data = d.data();
+      return { 
+        id: d.id, 
+        ...data,
+        created_at: data.created_at?.toMillis?.() || data.created_at || null,
+        updated_at: data.updated_at?.toMillis?.() || data.updated_at || null
+      };
+    }) as Customer[];
   } catch (error) {
     console.error("Error fetching customers:", error);
     return [];
@@ -75,7 +83,13 @@ export async function getCustomerById(id: string): Promise<Customer | null> {
     const docRef = doc(db, CUSTOMERS_COLLECTION, id);
     const snapshot = await getDoc(docRef);
     if (!snapshot.exists()) return null;
-    return { id: snapshot.id, ...snapshot.data() } as Customer;
+    const data = snapshot.data();
+    return { 
+      id: snapshot.id, 
+      ...data,
+      created_at: data.created_at?.toMillis?.() || data.created_at || null,
+      updated_at: data.updated_at?.toMillis?.() || data.updated_at || null
+    } as Customer;
   } catch (error) {
     console.error("Error fetching customer by ID:", error);
     return null;

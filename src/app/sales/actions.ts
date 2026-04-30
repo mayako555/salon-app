@@ -105,10 +105,14 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
     ]);
 
     const snapshot = await getDocsWithTimeout as any;
-    return snapshot.docs.map((d: any) => ({
-      id: d.id,
-      ...d.data()
-    })) as SalesRecord[];
+    return snapshot.docs.map((d: any) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        created_at: data.created_at?.toMillis?.() || data.created_at || null
+      };
+    }) as SalesRecord[];
   } catch (error: any) {
     console.error("Error fetching sales from Firestore:", error);
     return [];

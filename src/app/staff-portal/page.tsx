@@ -76,7 +76,7 @@ export default function StaffDashboardPage() {
         });
       setTodayShifts(tShifts);
       const todaySalesData = sales.filter(s => s.date === today);
-      const total = todaySalesData.reduce((acc, s) => acc + (s.tech_sales || 0) + (s.product_sales || 0), 0);
+      const total = todaySalesData.reduce((acc, s) => acc + (s.tech_sales || 0) + (s.product_sales || 0) - (s.discount || 0), 0);
       
       setStats({
         todaySales: total,
@@ -486,7 +486,7 @@ export default function StaffDashboardPage() {
 
             <div className="bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100">
               <QRCodeSVG 
-                value={profile.id} 
+                value={`salon-auth:${profile.id}`} 
                 size={220}
                 level="H"
                 includeMargin={true}

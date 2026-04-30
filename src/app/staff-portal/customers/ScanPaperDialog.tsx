@@ -25,7 +25,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Customer } from "@/lib/customers";
-import { registerScannedCustomer, performOCR } from "./actions";
+import { registerScannedCustomer, performOCR, parseExtractedText } from "./actions";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -82,19 +82,49 @@ export default function ScanPaperDialog({ isOpen, onClose, onExtracted }: ScanPa
 
       const text = res.text || "";
       
-      // Simple parsing logic (can be improved)
-      const phoneMatch = text.match(/\d{2,4}[-ー]\d{2,4}[-ー]\d{3,4}/) || text.match(/0\d{9,10}/);
-      const nameMatch = text.split("\n").find((line: string) => line.includes("様") || line.includes("名前"))?.replace(/様|名前|:|：/g, "").trim();
+      // Use Gemini to intelligently parse the text
+      const parseRes = await parseExtractedText(text);
       
-      if (!extractedData.name) {
-        setExtractedData({
-          name: nameMatch || "読み取り不可(手動入力)",
-          phone: phoneMatch ? phoneMatch[0] : "",
-          // Other fields might be hard to parse without LLM, so we put everything in history/notes
-        });
-        setVisitHistory(text); // Put everything in history for now so the user can see it
+      if (parseRes.success && parseRes.data) {
+        const d = parseRes.data;
+        setExtractedData(prev => ({
+          ...prev,
+          customer_no: d.customer_no || "",
+          name: d.name || "",
+          name_kana: d.name_kana || "",
+          phone: d.phone || "",
+          postal_code: d.postal_code || "",
+          address: d.address || "",
+          birthday: d.birthday || "",
+          gender: d.gender || "female",
+          occupation: d.occupation || "",
+          allergies: d.allergies || [],
+          risk_flags: d.risk_flags || [],
+        }));
+        setVisitHistory(d.visit_history || text);
       } else {
-        setVisitHistory(prev => prev + "\n\n--- 追加スキャン ---\n" + text);
+        // Fallback to simple parsing if Gemini fails
+        const phoneMatch = text.match(/\d{2,4}[-ー]\d{2,4}[-ー]\d{3,4}/) || text.match(/0\d{9,10}/);
+        
+        // Improved regex to ignore common labels like "お名前"
+        const lines = text.split("\n");
+        let foundName = "";
+        for (const line of lines) {
+          if (line.includes("様") || line.includes("名前")) {
+            const cleaned = line.replace(/お名前|名前|様|:|：/g, "").trim();
+            if (cleaned.length > 1) { // Ignore single characters like 'お'
+              foundName = cleaned;
+              break;
+            }
+          }
+        }
+        
+        setExtractedData(prev => ({
+          ...prev,
+          name: foundName || "読み取り不可(手動入力)",
+          phone: phoneMatch ? phoneMatch[0] : "",
+        }));
+        setVisitHistory(text);
       }
       
       setStep("result");
@@ -249,6 +279,15 @@ export default function ScanPaperDialog({ isOpen, onClose, onExtracted }: ScanPa
                   <div className="space-y-4">
                     <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-1">基本情報</h4>
                     <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500">会員No</label>
+                        <Input 
+                          value={extractedData.customer_no || ""} 
+                          onChange={e => setExtractedData({...extractedData, customer_no: e.target.value})}
+                          className="h-9 text-sm font-mono bg-white"
+                        />
+                      </div>
+                      <div className="col-span-1"></div>
                       <div className="col-span-2">
                         <label className="text-[10px] font-bold text-slate-500">お名前</label>
                         <Input 

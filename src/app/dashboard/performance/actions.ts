@@ -19,7 +19,7 @@ export async function getStaffPerformanceStats(year: number, month: number) {
     const stats = staffList.map(staff => {
       // 1. Current Sales
       const staffSales = sales.filter(s => s.staff_id === staff.id);
-      const currentTotal = staffSales.reduce((acc, s) => acc + (s.tech_sales || 0) + (s.product_sales || 0), 0);
+      const currentTotal = staffSales.reduce((acc, s) => acc + (s.tech_sales || 0) + (s.product_sales || 0) - (s.discount || 0), 0);
       
       // 2. Target
       const target = staff.monthly_sales_target || 0;

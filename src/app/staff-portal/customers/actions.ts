@@ -6,7 +6,90 @@ import { Customer, addCustomer } from "@/lib/customers";
 import { addCounselingResponse } from "@/lib/counseling";
 import { revalidatePath } from "next/cache";
 
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 const VISION_API_URL = `https://vision.googleapis.com/v1/images:annotate?key=${process.env.GOOGLE_CLOUD_VISION_API_KEY}`;
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_CLOUD_VISION_API_KEY || "");
+
+export async function parseExtractedText(rawText: string) {
+  try {
+    if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_CLOUD_VISION_API_KEY) {
+      throw new Error("API Key is not configured.");
+    }
+
+    const prompt = `
+以下のテキストは、美容サロンの紙の顧客カルテ（カウンセリングシート）をOCRで読み取ったものです。
+このテキストから、顧客情報を抽出してJSON形式で返してください。
+
+【ルール】
+1. 氏名、フリガナ、電話番号、住所、郵便番号、生年月日、職業、アレルギー、リスク（注意点）を抽出してください。
+2. 「会員No」や「顧客No」があれば customer_no フィールドに入れてください。
+3. 性別が判断できれば gender ("male" / "female") を入れてください。
+4. それ以外の「過去の施術履歴」や「メモ」と思われる部分は、 visit_history フィールドにまとめてください。
+5. 日本語で出力してください。
+6. JSON以外の余計な解説は含めないでください。
+
+【期待するJSON構造】
+{
+  "customer_no": "会員番号",
+  "name": "名前",
+  "name_kana": "ふりがな",
+  "phone": "電話番号",
+  "postal_code": "郵便番号",
+  "address": "住所",
+  "birthday": "YYYY-MM-DD",
+  "occupation": "職業",
+  "gender": "female",
+  "allergies": ["アレルギー1", "アレルギー2"],
+  "risk_flags": ["注意点1", "注意点2"],
+  "visit_history": "過去の施術履歴やメモの内容"
+}
+
+【OCRテキスト】
+${rawText}
+`;
+
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_CLOUD_VISION_API_KEY;
+    const modelId = "gemini-1.5-flash";
+    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${apiKey}`;
+
+    console.log(`Attempting Gemini parsing via direct REST API (v1) with model: ${modelId}...`);
+    
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          response_mime_type: "application/json",
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Gemini API Error (${response.status}): ${JSON.stringify(errorData)}`);
+    }
+
+    const result = await response.json();
+    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!text) {
+      throw new Error("Gemini returned empty response.");
+    }
+
+    console.log(`Success with direct API! Raw Response:`, text);
+    
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : text;
+    const data = JSON.parse(jsonStr);
+    console.log("Parsed AI Data:", data);
+    return { success: true, data };
+  } catch (error: any) {
+    console.error("Gemini Parsing Error (Direct API):", error);
+    return { success: false, error: error.message };
+  }
+}
 
 export async function performOCR(base64Image: string) {
   try {
