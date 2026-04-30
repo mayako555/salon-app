@@ -50,9 +50,8 @@ ${rawText}
 `;
 
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_CLOUD_VISION_API_KEY;
-    // Trying 'gemini-1.5-flash' again but with v1 to see if it's available there
-    // Or 'gemini-flash-latest' which is often the alias for the free one
-    const modelId = "gemini-1.5-flash";
+    // Using 'gemini-flash-latest' which is the alias for the latest free model in this project
+    const modelId = "gemini-flash-latest";
     const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${apiKey}`;
 
     console.log(`Attempting Gemini parsing via direct REST API (v1) with model: ${modelId}...`);
