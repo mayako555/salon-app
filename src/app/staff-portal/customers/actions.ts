@@ -50,11 +50,12 @@ ${rawText}
 `;
 
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_CLOUD_VISION_API_KEY;
-    const modelId = "gemini-2.0-flash";
-    // Using v1beta for better model compatibility
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+    // Trying 'gemini-1.5-flash' again but with v1 to see if it's available there
+    // Or 'gemini-flash-latest' which is often the alias for the free one
+    const modelId = "gemini-1.5-flash";
+    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${apiKey}`;
 
-    console.log(`Attempting Gemini parsing via direct REST API (v1beta) with model: ${modelId}...`);
+    console.log(`Attempting Gemini parsing via direct REST API (v1) with model: ${modelId}...`);
     
     const response = await fetch(apiUrl, {
       method: "POST",
