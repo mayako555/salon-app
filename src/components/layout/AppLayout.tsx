@@ -16,7 +16,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return <div className="min-h-screen bg-slate-950">{children}</div>;
   }
 
-  if (pathname.startsWith("/staff-portal") || pathname.startsWith("/customers/intake")) {
+  if (
+    pathname.startsWith("/staff-portal") || 
+    pathname.startsWith("/customers/intake") || 
+    pathname === "/entry" || 
+    pathname.startsWith("/attendance/kiosk") ||
+    pathname.startsWith("/staff/login")
+  ) {
     return <div className="min-h-screen bg-slate-50">{children}</div>;
   }
 

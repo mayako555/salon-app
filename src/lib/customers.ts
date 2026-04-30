@@ -29,6 +29,7 @@ export type Customer = {
   occupation?: string;
   dm_allowed?: boolean; // DM 可/不可
   line_user_id?: string; // LINE ユーザーID
+  is_minimo?: boolean; // ミニモからの集客かどうか
   
   // 来店きっかけ
   referral_source?: string[]; // 複数選択可

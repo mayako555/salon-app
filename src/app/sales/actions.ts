@@ -50,6 +50,7 @@ export type SalesRecord = {
   next_booking_time?: string; // 次回予約時間
   next_booking_line_reminder?: boolean; // 2日前のリマインダー送付
   customer_id?: string;
+  is_minimo?: boolean;
   created_at: any; // Firestore Timestamp
 };
 
@@ -146,6 +147,7 @@ export async function addCheckout(formData: FormData) {
     const nextBookingDate = formData.get("next_booking_date") as string || "";
     const nextBookingTime = formData.get("next_booking_time") as string || "";
     const nextBookingLineReminder = formData.get("next_booking_line_reminder") === "true";
+    const isMinimo = formData.get("is_minimo") === "true" || reservationRoute.includes("ミニモ");
 
     if (!staffName || !date) {
       return { success: false, error: "必須項目が入力されていません。" };
@@ -177,6 +179,7 @@ export async function addCheckout(formData: FormData) {
       next_booking_date: nextBookingDate,
       next_booking_time: nextBookingTime,
       next_booking_line_reminder: nextBookingLineReminder,
+      is_minimo: isMinimo,
       status: "draft",
       source: "checkout" as SalesSource,
       created_at: serverTimestamp()

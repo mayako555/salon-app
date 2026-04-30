@@ -138,6 +138,7 @@ export default function CustomerEntryPage() {
     // Answers (will be populated dynamically)
     answers: {},
     signature: "",
+    is_minimo: false,
   });
 
   useEffect(() => {
@@ -210,6 +211,7 @@ export default function CustomerEntryPage() {
         photo_permission: formData.photo_permission,
         sns_permission: formData.sns_permission,
         sns_permission_scope: formData.sns_permission_scope,
+        is_minimo: formData.is_minimo,
         allergies: formData.answers.allergies || [],
         has_allergy: (formData.answers.allergies || []).length > 0 || formData.answers.allergies_present === 'yes',
         risk_level: riskLevel,
@@ -504,10 +506,26 @@ export default function CustomerEntryPage() {
                 {/* 共通の来店きっかけ */}
                 <CheckboxGroup 
                   label="来店きっかけ（複数選択可）"
-                  options={['ホームページ', 'Instagram', 'SNS', '紹介', 'ちらし', 'ホットペッパー', '看板', 'その他']}
+                  options={['ホームページ', 'Instagram', 'SNS', '紹介', 'ちらし', 'ホットペッパー', '看板', 'ミニモ', 'その他']}
                   selected={formData.referral_source}
-                  onChange={(val: any) => setFormData({...formData, referral_source: val})}
+                  onChange={(val: any) => {
+                    const isMinimo = val.includes("ミニモ");
+                    setFormData({...formData, referral_source: val, is_minimo: isMinimo});
+                  }}
                 />
+
+                <div className="flex items-center gap-3 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                  <input 
+                    type="checkbox" 
+                    id="is_minimo"
+                    checked={formData.is_minimo}
+                    onChange={(e) => setFormData({...formData, is_minimo: e.target.checked})}
+                    className="w-6 h-6 rounded-lg text-emerald-600 border-slate-300 focus:ring-emerald-500"
+                  />
+                  <label htmlFor="is_minimo" className="text-sm font-black text-emerald-900">
+                    ミニモの低単価クーポンを利用
+                  </label>
+                </div>
 
                 {/* アイブロウ質問 */}
                 {(selectedServices.includes('eyebrow') || selectedServices.includes('brow_gym_men')) && (

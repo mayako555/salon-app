@@ -305,7 +305,16 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-slate-900">¥{(stats?.monthlyTotal ?? 0).toLocaleString()}</div>
-                  <p className="text-xs text-emerald-600 mt-1">当月の確定済み売上</p>
+                  <div className="flex flex-col gap-1 mt-2">
+                    <div className="flex justify-between text-[10px] font-bold">
+                      <span className="text-emerald-600">通常:</span>
+                      <span className="text-slate-700">¥{(stats?.monthlyRegularTotal ?? 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] font-bold">
+                      <span className="text-indigo-600">ミニモ:</span>
+                      <span className="text-slate-700">¥{(stats?.monthlyMinimoTotal ?? 0).toLocaleString()}</span>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 

@@ -11,7 +11,7 @@ export default async function StaffPortalShiftsPage({
 }) {
   const params = await searchParams;
   const monthParam = params.month;
-  const viewMode = params.view === "staff" ? "staff" : "calendar";
+  const viewMode = (params.view as any) || "calendar";
   
   // Parse target month from query or use current month
   const targetDate = monthParam ? new Date(monthParam) : new Date();

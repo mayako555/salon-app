@@ -99,6 +99,12 @@ export default function CheckoutDialog({
     setSelectedCustomer(customer);
     setCustomerSearch(customer.name);
     setShowCustomerResults(false);
+    
+    // Auto-set route to Minimo if customer is marked as Minimo
+    if (customer.is_minimo) {
+      setRoute("ミニモ");
+      handleFeeCalculation("ミニモ", techSales + productSales);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -345,7 +351,19 @@ export default function CheckoutDialog({
                 </div>
 
                 <div className="col-span-2 sm:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">予約経路</label>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-medium text-slate-700">予約経路</label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        name="is_minimo" 
+                        value="true" 
+                        checked={route.includes("ミニモ") || selectedCustomer?.is_minimo}
+                        className="w-3.5 h-3.5 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500" 
+                      />
+                      <span className="text-[10px] font-bold text-emerald-700">ミニモ対象</span>
+                    </label>
+                  </div>
                   <input required type="text" name="reservation_route" list="reservation-routes" value={route} onChange={(e) => {
                     const r = e.target.value;
                     setRoute(r);

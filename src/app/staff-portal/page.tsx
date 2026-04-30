@@ -5,7 +5,6 @@ import { getAllCustomers, Customer } from "@/lib/customers";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  Users, 
   ReceiptText, 
   CalendarHeart, 
   QrCode, 
@@ -16,7 +15,8 @@ import {
   MessageSquare,
   Sparkles,
   TrendingUp,
-  X
+  X,
+  Users
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -28,6 +28,7 @@ import { getMonthlySales } from "@/app/sales/actions";
 import { getDailyAttendance, recordClockIn, recordClockOut } from "@/app/attendance/actions";
 import { getAllPendingTasks, TaskRecord, generateBookingReply, sendReplyAndCompleteTask } from "@/app/tasks/actions";
 import { getDashboardStats } from "@/app/dashboard/actions";
+import { getMonthlyShifts } from "@/app/shifts/actions";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
@@ -37,6 +38,7 @@ export default function StaffDashboardPage() {
   const [recentCustomers, setRecentCustomers] = useState<Customer[]>([]);
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [storeStats, setStoreStats] = useState<any[]>([]);
+  const [todayShifts, setTodayShifts] = useState<any[]>([]);
   const [stats, setStats] = useState({ todaySales: 0, todayCount: 0 });
   const [attendance, setAttendance] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -48,18 +50,23 @@ export default function StaffDashboardPage() {
   useEffect(() => {
     async function load() {
       const today = format(new Date(), "yyyy-MM-dd");
-      const [customers, sales, attRecords, tRecords, dashboardRes] = await Promise.all([
+      const [customers, sales, attRecords, tRecords, dashboardRes, mShifts] = await Promise.all([
         getAllCustomers(),
         getMonthlySales(new Date().getFullYear(), new Date().getMonth() + 1),
         getDailyAttendance(today),
         getAllPendingTasks(),
-        getDashboardStats()
+        getDashboardStats(),
+        getMonthlyShifts(new Date().getFullYear(), new Date().getMonth() + 1)
       ]);
       
       setTasks(tRecords);
       if (dashboardRes.success && dashboardRes.data) {
         setStoreStats(dashboardRes.data.storeStats);
       }
+      
+      // Filter today's shifts
+      const tShifts = mShifts.filter((s: any) => s.date === today && s.type === 'work');
+      setTodayShifts(tShifts);
       const todaySalesData = sales.filter(s => s.date === today);
       const total = todaySalesData.reduce((acc, s) => acc + (s.tech_sales || 0) + (s.product_sales || 0), 0);
       
@@ -73,12 +80,12 @@ export default function StaffDashboardPage() {
       }
 
       // Sort by created_at desc and take top 5
-      const sorted = customers.sort((a, b) => {
+      const sorted = [...customers].sort((a, b) => {
         const dateA = a.created_at?.toDate?.() || new Date(0);
         const dateB = b.created_at?.toDate?.() || new Date(0);
         return dateB.getTime() - dateA.getTime();
-      }).slice(0, 5);
-      setRecentCustomers(sorted);
+      });
+      setRecentCustomers(sorted.slice(0, 5));
       setLoading(false);
     }
     load();
@@ -303,6 +310,57 @@ export default function StaffDashboardPage() {
                 );
               })
             )}
+          </div>
+        </div>
+
+        {/* Today's Staffing by Store */}
+        <div>
+          <div className="flex justify-between items-center mb-3 px-1">
+            <h2 className="font-bold text-slate-800 flex items-center gap-2">
+              <Users size={18} className="text-blue-500" />
+              今日の店舗別スタッフ
+            </h2>
+            <Link href="/staff-portal/shifts?view=store">
+              <Button variant="ghost" size="sm" className="text-[10px] font-bold text-blue-600 p-0 h-auto">
+                全体シフトを見る <ChevronRight size={12} />
+              </Button>
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-1 gap-3">
+            {["神戸", "元町", "六甲"].map(store => {
+              const staffAtStore = todayShifts.filter(s => 
+                s.segments?.some((seg: any) => seg.store === store)
+              );
+              
+              return (
+                <Card key={store} className="p-4 rounded-2xl border-slate-100 shadow-sm bg-white overflow-hidden relative">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-sm font-black text-slate-800 flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                      {store}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400">{staffAtStore.length}名 勤務予定</span>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {staffAtStore.length === 0 ? (
+                      <span className="text-[10px] text-slate-300 italic">本日の出勤予定はありません</span>
+                    ) : (
+                      staffAtStore.map(s => {
+                        const seg = s.segments?.find((seg: any) => seg.store === store);
+                        return (
+                          <div key={s.id} className="bg-slate-50 border border-slate-100 px-3 py-2 rounded-xl flex flex-col min-w-[80px]">
+                            <span className="text-xs font-bold text-slate-700">{s.staff_name}</span>
+                            <span className="text-[9px] text-slate-400 font-mono mt-0.5">{seg?.start_time} - {seg?.end_time}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         </div>
 

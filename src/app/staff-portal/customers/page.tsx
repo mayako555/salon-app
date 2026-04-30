@@ -4,15 +4,24 @@ import { useEffect, useState } from "react";
 import { getAllCustomers, Customer } from "@/lib/customers";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, UserPlus, AlertCircle, Phone, Calendar, ChevronRight } from "lucide-react";
+import { Search, UserPlus, AlertCircle, Phone, Calendar, ChevronRight, Scan } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
+import { toast } from "sonner";
+import ScanPaperDialog from "./ScanPaperDialog";
 
 export default function StaffCustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isScanOpen, setIsScanOpen] = useState(false);
+
+  const handleExtracted = (data: Partial<Customer>) => {
+    toast.success("AIが情報を抽出しました。登録画面で確認してください。");
+    // In a real app, we would redirect to a form with these values
+    console.log("Extracted Data:", data);
+  };
 
   useEffect(() => {
     async function load() {
@@ -37,9 +46,19 @@ export default function StaffCustomersPage() {
             <h1 className="text-xl font-bold mb-1">お客様管理</h1>
             <p className="opacity-90 text-sm">顧客名簿とカルテの確認ができます。</p>
           </div>
-          <Button size="icon" className="rounded-full bg-white/20 hover:bg-white/30 border-none text-white">
-            <UserPlus size={20} />
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => setIsScanOpen(true)}
+              size="icon" 
+              className="rounded-full bg-blue-500 hover:bg-blue-600 border-none text-white shadow-lg shadow-blue-900/20"
+              title="紙カルテをスキャン"
+            >
+              <Scan size={20} />
+            </Button>
+            <Button size="icon" className="rounded-full bg-white/20 hover:bg-white/30 border-none text-white">
+              <UserPlus size={20} />
+            </Button>
+          </div>
         </div>
         
         <div className="relative">
@@ -99,6 +118,12 @@ export default function StaffCustomersPage() {
           ))
         )}
       </div>
+
+      <ScanPaperDialog 
+        isOpen={isScanOpen}
+        onClose={() => setIsScanOpen(false)}
+        onExtracted={handleExtracted}
+      />
     </div>
   );
 }

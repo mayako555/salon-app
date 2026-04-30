@@ -41,9 +41,19 @@ export async function getDashboardStats() {
     );
     const monthlySalesSnap = await getDocs(monthlySalesQuery);
     let monthlyTotal = 0;
+    let monthlyMinimoTotal = 0;
+    let monthlyRegularTotal = 0;
+    
     monthlySalesSnap.forEach(doc => {
       const data = doc.data();
-      monthlyTotal += (data.tech_sales || 0) + (data.product_sales || 0);
+      const amount = (data.tech_sales || 0) + (data.product_sales || 0);
+      monthlyTotal += amount;
+      
+      if (data.reservation_route?.includes("ミニモ") || data.is_minimo) {
+        monthlyMinimoTotal += amount;
+      } else {
+        monthlyRegularTotal += amount;
+      }
     });
 
     // 4. Today's Sales by Store
@@ -98,8 +108,10 @@ export async function getDashboardStats() {
         staffCount,
         unprocessedAttendanceCount,
         monthlyTotal,
+        monthlyMinimoTotal,
+        monthlyRegularTotal,
         storeSummary,
-        storeStats // New field
+        storeStats
       }
     };
   } catch (error: any) {
