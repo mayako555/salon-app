@@ -25,11 +25,26 @@ import {
   Mail,
   Home,
   Edit2,
-  History
+  History,
+  CheckCircle2,
+  Link as LinkIcon
 } from "lucide-react";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 import Link from "next/link";
+import { toast } from "sonner";
+import { updateCustomer } from "@/lib/customers";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter 
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { QRCodeSVG } from "qrcode.react";
 
 export default function CustomerDetailPage() {
   const { id } = useParams();
@@ -41,6 +56,15 @@ export default function CustomerDetailPage() {
   
   // State for History Modal
   const [selectedHistoryKarte, setSelectedHistoryKarte] = useState<KarteRecord | null>(null);
+  
+  // State for Edit Customer
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState<Partial<Customer>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // State for LINE Link QR
+  const [isLinkQrOpen, setIsLinkQrOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -57,6 +81,44 @@ export default function CustomerDetailPage() {
     }
     load();
   }, [id]);
+
+  const handleEditClick = () => {
+    if (!customer) return;
+    setEditFormData({
+      name: customer.name,
+      name_kana: customer.name_kana,
+      phone: customer.phone,
+      email: customer.email,
+      postal_code: customer.postal_code,
+      address: customer.address,
+      birthday: customer.birthday,
+      customer_no: customer.customer_no,
+      gender: customer.gender,
+      is_minimo: customer.is_minimo,
+      allergies: customer.allergies || [],
+      risk_flags: customer.risk_flags || [],
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleSaveCustomer = async () => {
+    if (typeof id !== 'string') return;
+    setIsSaving(true);
+    const res = await updateCustomer(id, editFormData);
+    if (res.success) {
+      toast.success("情報を更新しました");
+      setCustomer({ ...customer!, ...editFormData });
+      setIsEditOpen(false);
+    } else {
+      toast.error("更新に失敗しました");
+    }
+    setIsSaving(false);
+  };
+
+  const handleShowLinkQr = () => {
+    setLinkUrl(window.location.origin + `/link-line/${id}`);
+    setIsLinkQrOpen(true);
+  };
 
   if (loading) return <div className="p-10 text-center animate-pulse text-slate-400">読み込み中...</div>;
   if (!customer) return <div className="p-10 text-center">お客様が見つかりませんでした</div>;
@@ -136,8 +198,11 @@ export default function CustomerDetailPage() {
         {/* Basic Info Tabs/Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="rounded-3xl p-6 border-none shadow-sm space-y-4">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <User size={14} /> Basic Information
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
+              <span className="flex items-center gap-2"><User size={14} /> Basic Information</span>
+              <Button variant="ghost" size="sm" onClick={handleEditClick} className="h-6 w-6 p-0 text-slate-400 hover:text-slate-900">
+                <Edit2 size={12} />
+              </Button>
             </h3>
             <div className="space-y-4">
               <div className="flex items-center gap-3">
@@ -182,6 +247,23 @@ export default function CustomerDetailPage() {
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-black ${customer.email_marketing_allowed ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-400'}`}>MAIL</span>
                 </div>
               </div>
+              <div className="pt-2">
+                {customer.line_user_id ? (
+                  <div className="flex items-center gap-2 bg-emerald-50 p-2.5 rounded-xl text-emerald-700 text-xs font-bold">
+                    <div className="w-5 h-5 bg-[#06C755] rounded-full flex items-center justify-center text-white"><CheckCircle2 size={12}/></div>
+                    LINE連携済み
+                  </div>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full rounded-xl border-[#06C755] text-[#06C755] hover:bg-emerald-50 gap-2 font-bold"
+                    onClick={handleShowLinkQr}
+                  >
+                    <LinkIcon size={14} /> LINE連携用QRを表示
+                  </Button>
+                )}
+              </div>
             </div>
           </Card>
         </div>
@@ -217,12 +299,12 @@ export default function CustomerDetailPage() {
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
                       <div className="bg-slate-100 w-12 h-12 rounded-2xl flex items-center justify-center text-slate-600 flex-col leading-none">
-                        <span className="text-[10px] font-bold">{format(record.date?.toDate?.() || record.date, "yyyy")}</span>
-                        <span className="text-lg font-black">{format(record.date?.toDate?.() || record.date, "MM/dd")}</span>
+                        <span className="text-[10px] font-bold">{format(record.date?.toDate?.() || record.date || new Date(), "yyyy")}</span>
+                        <span className="text-lg font-black">{format(record.date?.toDate?.() || record.date || new Date(), "MM/dd")}</span>
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-black text-slate-800 uppercase tracking-wider">{record.service_type.replace('_', ' ')}</span>
+                          <span className="font-black text-slate-800 uppercase tracking-wider">{(record.service_type || 'other').replace('_', ' ')}</span>
                           <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-bold uppercase">{record.visit_type}</span>
                         </div>
                         <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1 mt-0.5">
@@ -247,7 +329,7 @@ export default function CustomerDetailPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div className="bg-slate-50 p-3 rounded-2xl">
                       <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Menu</p>
-                      <p className="text-sm font-black text-slate-700">{record.service_type === 'eyelash_ext' ? 'エクステ' : record.service_type === 'lash_lift' ? 'パーマ' : 'アイブロウ'}</p>
+                      <p className="text-sm font-black text-slate-700">{record.service_type === 'eyelash_ext' ? 'エクステ' : record.service_type === 'lash_lift' ? 'パーマ' : record.service_type === 'eyebrow' ? 'アイブロウ' : 'その他'}</p>
                     </div>
                     {record.design.curl && <div className="bg-slate-50 p-3 rounded-2xl"><p className="text-[9px] font-black text-slate-400 uppercase mb-1">Curl/Thick/Len</p><p className="text-sm font-black text-slate-700">{record.design.curl}/{record.design.thickness}/{record.design.length}</p></div>}
                     <div className="bg-slate-900 p-3 rounded-2xl col-span-2 flex justify-between items-center text-white">
@@ -344,9 +426,9 @@ export default function CustomerDetailPage() {
                       <ClipboardList size={20} />
                     </div>
                     <div>
-                      <p className="text-sm font-black text-slate-800 uppercase tracking-tight">{entry.service_types.join(' / ')}</p>
+                      <p className="text-sm font-black text-slate-800 uppercase tracking-tight">{(entry.service_types || []).join(' / ') || '未設定'}</p>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        {format(entry.created_at?.toDate?.() || entry.created_at, "yyyy/MM/dd HH:mm")}
+                        {format(entry.created_at?.toDate?.() || entry.created_at || new Date(), "yyyy/MM/dd HH:mm")}
                       </p>
                     </div>
                   </div>
@@ -358,9 +440,9 @@ export default function CustomerDetailPage() {
                 </div>
                 
                 {/* Risk Preview in History */}
-                {entry.risk_flags.length > 0 && (
+                {(entry.risk_flags?.length ?? 0) > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {entry.risk_flags.map((flag, i) => (
+                    {entry.risk_flags?.map((flag, i) => (
                       <span key={i} className="text-[9px] font-black bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded uppercase">
                         {flag}
                       </span>
@@ -412,6 +494,122 @@ export default function CustomerDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Edit Customer Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-md rounded-[2rem] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black">顧客情報の編集</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">お名前</label>
+                <Input value={editFormData.name || ""} onChange={e => setEditFormData({...editFormData, name: e.target.value})} />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">フリガナ</label>
+                <Input value={editFormData.name_kana || ""} onChange={e => setEditFormData({...editFormData, name_kana: e.target.value})} />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">性別</label>
+                <Select value={editFormData.gender} onValueChange={(v: any) => setEditFormData({...editFormData, gender: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="female">女性</SelectItem>
+                    <SelectItem value="male">男性</SelectItem>
+                    <SelectItem value="other">その他</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">電話番号</label>
+                <Input value={editFormData.phone || ""} onChange={e => setEditFormData({...editFormData, phone: e.target.value})} />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">お客様No.</label>
+                <Input value={editFormData.customer_no || ""} onChange={e => setEditFormData({...editFormData, customer_no: e.target.value})} />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">メールアドレス</label>
+              <Input value={editFormData.email || ""} onChange={e => setEditFormData({...editFormData, email: e.target.value})} />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">郵便番号</label>
+                <Input value={editFormData.postal_code || ""} onChange={e => setEditFormData({...editFormData, postal_code: e.target.value})} />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">住所</label>
+                <Input value={editFormData.address || ""} onChange={e => setEditFormData({...editFormData, address: e.target.value})} />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">集客ルート</label>
+              <div className="flex items-center gap-2 mt-1">
+                <input 
+                  type="checkbox" 
+                  id="is_minimo" 
+                  checked={editFormData.is_minimo} 
+                  onChange={e => setEditFormData({...editFormData, is_minimo: e.target.checked})}
+                  className="rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                />
+                <label htmlFor="is_minimo" className="text-sm font-bold text-slate-700">ミニモからの集客</label>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">アレルギー・特記事項</label>
+              <Textarea 
+                value={editFormData.risk_flags?.join('\n') || ""} 
+                onChange={e => setEditFormData({...editFormData, risk_flags: e.target.value.split('\n')})} 
+                placeholder="注意点を一行ずつ入力"
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={isSaving}>キャンセル</Button>
+            <Button onClick={handleSaveCustomer} className="bg-slate-900" disabled={isSaving}>保存する</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* LINE Link QR Dialog */}
+      <Dialog open={isLinkQrOpen} onOpenChange={setIsLinkQrOpen}>
+        <DialogContent className="sm:max-w-xs rounded-[2rem] text-center">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black">LINE連携用QR</DialogTitle>
+          </DialogHeader>
+          <div className="py-6 flex flex-col items-center gap-6">
+            <div className="p-4 bg-white rounded-3xl shadow-xl border border-slate-100">
+              <QRCodeSVG 
+                value={linkUrl} 
+                size={200}
+                level="H"
+                includeMargin={false}
+              />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-bold text-slate-700">お客様のスマホで読み取ってください</p>
+              <p className="text-[10px] text-slate-400 leading-relaxed font-bold">
+                スキャンするとLINEログイン画面が開きます。<br/>
+                連携が完了すると、LINEでのお知らせが可能になります。
+              </p>
+            </div>
+          </div>
+          <Button variant="outline" onClick={() => setIsLinkQrOpen(false)} className="rounded-xl w-full">
+            閉じる
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

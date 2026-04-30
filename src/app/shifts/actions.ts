@@ -72,10 +72,16 @@ export async function saveShift(data: Omit<ShiftRecord, "id"> & { id?: string })
     const colRef = collection(db, SHIFTS_COLLECTION);
     let recordId = data.id;
 
+    // Remove undefined values to avoid Firestore errors
+    const cleanedData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    ) as any;
+    delete cleanedData.id; // ID should not be in the document data
+
     if (recordId) {
       const docRef = doc(db, SHIFTS_COLLECTION, recordId);
       await updateDoc(docRef, {
-        ...data,
+        ...cleanedData,
         updated_at: serverTimestamp()
       });
       
@@ -83,13 +89,13 @@ export async function saveShift(data: Omit<ShiftRecord, "id"> & { id?: string })
         table_name: SHIFTS_COLLECTION,
         record_id: recordId,
         action: "UPDATE",
-        old_data: null, // In a real app, we might fetch the old data first
-        new_data: data,
+        old_data: null,
+        new_data: cleanedData,
         actor: "Admin"
       });
     } else {
       const docRef = await addDoc(colRef, {
-        ...data,
+        ...cleanedData,
         created_at: serverTimestamp()
       });
       recordId = docRef.id;
@@ -99,7 +105,7 @@ export async function saveShift(data: Omit<ShiftRecord, "id"> & { id?: string })
         record_id: recordId,
         action: "INSERT",
         old_data: null,
-        new_data: data,
+        new_data: cleanedData,
         actor: "Admin"
       });
     }

@@ -96,3 +96,18 @@ export async function addCustomer(data: Omit<Customer, 'id' | 'created_at' | 'up
     return { success: false, error: error.message };
   }
 }
+
+export async function updateCustomer(id: string, data: Partial<Customer>) {
+  try {
+    const { doc, updateDoc } = await import("firebase/firestore");
+    const docRef = doc(db, CUSTOMERS_COLLECTION, id);
+    await updateDoc(docRef, {
+      ...data,
+      updated_at: serverTimestamp(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating customer:", error);
+    return { success: false, error: error.message };
+  }
+}

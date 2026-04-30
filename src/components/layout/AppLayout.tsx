@@ -19,7 +19,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   if (
     pathname.startsWith("/staff-portal") || 
     pathname.startsWith("/customers/intake") || 
-    pathname === "/entry" || 
+    pathname.startsWith("/entry") || 
     pathname.startsWith("/attendance/kiosk") ||
     pathname.startsWith("/staff/login")
   ) {

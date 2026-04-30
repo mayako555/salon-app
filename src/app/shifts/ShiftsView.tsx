@@ -19,7 +19,7 @@ type ShiftsViewProps = {
   viewMode: "calendar" | "staff" | "store";
   days: Date[];
   actualMonthDays: Date[];
-  uniqueStaff: { id: string; name: string }[];
+  uniqueStaff: { id: string; name: string; sort_order?: number }[];
 };
 
 export default function ShiftsView({
@@ -49,11 +49,54 @@ export default function ShiftsView({
   };
 
   const getShiftsForDate = (date: string) => {
-    return shifts.filter(s => s.date === date);
+    const rawShifts = shifts.filter(s => s.date === date);
+    // Merge duplicates for the same staff on the same day
+    const mergedMap = new Map<string, ShiftRecord>();
+    
+    rawShifts.forEach(s => {
+      const existing = mergedMap.get(s.staff_id);
+      if (!existing) {
+        mergedMap.set(s.staff_id, { ...s });
+      } else {
+        // If one is work, prefer work. Merge segments if both are work.
+        if (s.type === 'work') {
+          if (existing.type !== 'work') {
+            existing.type = 'work';
+            existing.segments = s.segments || [];
+          } else {
+            existing.segments = [...(existing.segments || []), ...(s.segments || [])];
+          }
+        } else if (existing.type !== 'work') {
+          // Both are non-work, just keep the first one
+        }
+      }
+    });
+    
+    return Array.from(mergedMap.values()).sort((a, b) => {
+      const orderA = uniqueStaff.find(s => s.id === a.staff_id)?.sort_order ?? 999;
+      const orderB = uniqueStaff.find(s => s.id === b.staff_id)?.sort_order ?? 999;
+      return orderA - orderB;
+    });
   };
 
   const getShiftForStaffDate = (staff_id: string, date: string) => {
-    return shifts.find(s => s.staff_id === staff_id && s.date === date);
+    const staffShifts = shifts.filter(s => s.staff_id === staff_id && s.date === date);
+    if (staffShifts.length === 0) return undefined;
+    if (staffShifts.length === 1) return staffShifts[0];
+    
+    // Merge duplicates
+    const merged = { ...staffShifts[0] };
+    staffShifts.slice(1).forEach(s => {
+      if (s.type === 'work') {
+        if (merged.type !== 'work') {
+          merged.type = 'work';
+          merged.segments = s.segments || [];
+        } else {
+          merged.segments = [...(merged.segments || []), ...(s.segments || [])];
+        }
+      }
+    });
+    return merged;
   };
 
   const handleAddShift = (date?: string) => {
@@ -101,7 +144,7 @@ export default function ShiftsView({
       <BulkShiftDialog 
         isOpen={isBulkDialogOpen}
         onClose={() => setIsBulkDialogOpen(false)}
-        staffList={staffList}
+        staffList={uniqueStaff as StaffProfile[]}
       />
       <ShiftEditDialog 
         isOpen={isDialogOpen}

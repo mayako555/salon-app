@@ -120,26 +120,31 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList }: BulkShif
                 {selectedStaffIds.length === staffList.length ? "解除" : "全選択"}
               </Button>
             </div>
-            <div className="grid grid-cols-2 gap-2 max-h-[120px] overflow-y-auto p-1 border rounded-md">
+            <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto p-2 border rounded-xl bg-slate-50/50">
               {staffList.map(staff => (
                 <button
                   key={staff.id}
                   type="button"
                   onClick={() => toggleStaff(staff.id)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-md border text-sm transition-all ${
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm transition-all shadow-sm ${
                     selectedStaffIds.includes(staff.id)
-                      ? "bg-slate-900 text-white border-slate-900"
-                      : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+                      ? "bg-slate-900 text-white border-slate-900 ring-2 ring-slate-900/20"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
                   }`}
                 >
-                  <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
                     selectedStaffIds.includes(staff.id) ? "border-white bg-white/20" : "border-slate-300"
                   }`}>
                     {selectedStaffIds.includes(staff.id) && <Check size={10} />}
                   </div>
-                  {staff.name}
+                  <span className="truncate font-medium">{staff.name}</span>
                 </button>
               ))}
+              {staffList.length === 0 && (
+                <div className="col-span-2 py-8 text-center text-slate-400 text-xs">
+                  選択可能なスタッフが見つかりません
+                </div>
+              )}
             </div>
           </div>
 

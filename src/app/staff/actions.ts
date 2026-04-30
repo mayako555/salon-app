@@ -10,6 +10,7 @@ import {
   doc,
   query, 
   orderBy, 
+  writeBatch,
   serverTimestamp
 } from "firebase/firestore";
 import { addAuditLog } from "../audit/actions";
@@ -28,6 +29,7 @@ export type StaffProfile = {
   is_invoice_registered?: boolean;
   is_active: boolean;
   monthly_sales_target?: number;
+  sort_order?: number;
   created_at?: any;
 };
 
@@ -36,9 +38,9 @@ const STAFF_COLLECTION = "staff_profiles";
 export async function getStaffList(): Promise<StaffProfile[]> {
   try {
     const colRef = collection(db, STAFF_COLLECTION);
-    const q = query(colRef, orderBy("name", "asc"));
+    // Remove orderBy from the query itself to ensure records without sort_order are also fetched
+    const q = query(colRef);
     
-    // Add a timeout to prevent page hang
     const getDocsWithTimeout = Promise.race([
       getDocs(q),
       new Promise((_, reject) => 
@@ -52,10 +54,18 @@ export async function getStaffList(): Promise<StaffProfile[]> {
       return [];
     }
 
-    return snapshot.docs.map((doc: any) => ({
+    const staff = snapshot.docs.map((doc: any) => ({
       id: doc.id,
       ...doc.data()
     })) as StaffProfile[];
+
+    // Sort in-memory instead
+    return staff.sort((a, b) => {
+      const orderA = a.sort_order ?? 999;
+      const orderB = b.sort_order ?? 999;
+      if (orderA !== orderB) return orderA - orderB;
+      return (a.name || "").localeCompare(b.name || "", "ja");
+    });
   } catch (error) {
     console.error("Error fetching staff from Firestore:", error);
     return [];
@@ -211,5 +221,21 @@ export async function deleteStaff(id: string, uid?: string) {
   } catch (error: any) {
     console.error("Error deleting staff:", error);
     return { success: false, error: error.message || "削除に失敗しました" };
+  }
+}
+
+export async function updateStaffOrder(orderedIds: string[]) {
+  try {
+    const batch = writeBatch(db);
+    orderedIds.forEach((id, index) => {
+      const docRef = doc(db, STAFF_COLLECTION, id);
+      batch.update(docRef, { sort_order: index });
+    });
+    await batch.commit();
+    revalidatePath("/staff");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating staff order:", error);
+    return { success: false, error: error.message };
   }
 }

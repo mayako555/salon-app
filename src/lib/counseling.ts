@@ -99,3 +99,18 @@ export async function getCounselingByCustomer(customerId: string): Promise<Couns
     return [];
   }
 }
+
+export async function updateCounselingResponse(id: string, data: Partial<CounselingResponse>) {
+  try {
+    const { doc, updateDoc } = await import("firebase/firestore");
+    const docRef = doc(db, COUNSELING_COLLECTION, id);
+    await updateDoc(docRef, {
+      ...data,
+      // We don't overwrite created_at
+    });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating counseling response:", error);
+    return { success: false, error: error.message };
+  }
+}

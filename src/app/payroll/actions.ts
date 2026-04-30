@@ -244,14 +244,16 @@ export async function generateStatements(year: number, month: number) {
     let totalPortalFees = 0;
 
     for (const sale of staffSales) {
-      totalTechSales += sale.tech_sales;
+      // Net tech sales = tech_sales - discount (HPB points are handled separately and not deducted)
+      const netTechSales = Math.max(0, sale.tech_sales - (sale.discount || 0));
+      totalTechSales += netTechSales;
       totalProductSales += sale.product_sales;
       totalPortalFees += (sale.portal_fee || 0);
       
       if (sale.is_nominated) nominationCount += 1;
 
       if (sale.payment_method !== "現金" && sale.payment_method !== "不明") {
-         cashlessTechSales += sale.tech_sales;
+         cashlessTechSales += netTechSales;
          cashlessProductSales += sale.product_sales;
       }
     }

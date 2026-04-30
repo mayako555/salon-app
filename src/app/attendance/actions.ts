@@ -23,6 +23,7 @@ export type AttendanceRecord = {
   clock_out: string | null; // ISO string
   break_minutes: number;
   status: AttendanceStatus;
+  store?: string; // Which store they clocked into
 };
 
 const ATTENDANCE_COLLECTION = "attendance";
@@ -66,7 +67,7 @@ export async function getMonthlyAttendance(year: number, month: number): Promise
   }
 }
 
-export async function recordClockIn(staffId: string, staffName: string) {
+export async function recordClockIn(staffId: string, staffName: string, store?: string) {
   try {
     const now = new Date();
     const dateStr = now.toISOString().split("T")[0];
@@ -79,6 +80,7 @@ export async function recordClockIn(staffId: string, staffName: string) {
       clock_out: null, 
       break_minutes: 60,
       status: "normal",
+      store: store || "不明",
       created_at: serverTimestamp()
     };
 
@@ -139,7 +141,7 @@ export async function recordClockOut(staffId: string) {
     return { success: false, error: error.message };
   }
 }
-export async function handleQRScan(staffId: string) {
+export async function handleQRScan(staffId: string, store?: string) {
   try {
     const now = new Date();
     const dateStr = now.toISOString().split("T")[0];
@@ -165,7 +167,7 @@ export async function handleQRScan(staffId: string) {
       return { success: true, action: "OUT", name: staffName };
     } else {
       // Not clocked in, perform clock in
-      const res = await recordClockIn(staffId, staffName);
+      const res = await recordClockIn(staffId, staffName, store);
       return { success: true, action: "IN", name: staffName };
     }
   } catch (error: any) {

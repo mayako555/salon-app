@@ -33,13 +33,23 @@ export default async function ShiftsPage({
     getStaffList()
   ]);
   
-  // Derive unique staff from shifts (in a real app, query all active staff from the DB)
-  // For the staff view table, we show all staff who have shifts OR are in the staff list
-  const staffFromShifts = shifts.map(s => ({ id: s.staff_id, name: s.staff_name }));
-  const allStaff = [...staffList, ...staffFromShifts.filter(s => !staffList.find(sl => sl.id === s.id))];
+  // Derive unique staff from shifts and official list
+  // We keep sort_order for the ones in staffList
+  const allStaff = staffList.map(s => ({ id: s.id, name: s.name, sort_order: s.sort_order }));
+  
+  shifts.forEach(s => {
+    if (!allStaff.find(sl => sl.id === s.staff_id)) {
+      allStaff.push({ id: s.staff_id, name: s.staff_name, sort_order: 999 });
+    }
+  });
+
   const uniqueStaff = Array.from(new Map(allStaff.map(s => [s.id, s])).values())
-    .map(s => ({ id: s.id, name: s.name }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => {
+      const orderA = a.sort_order ?? 999;
+      const orderB = b.sort_order ?? 999;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name, "ja");
+    });
 
   return (
     <ShiftsView 

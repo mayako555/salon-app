@@ -27,6 +27,7 @@ import { useAuth } from "@/lib/auth-context";
 import { getMonthlySales } from "@/app/sales/actions";
 import { getDailyAttendance, recordClockIn, recordClockOut } from "@/app/attendance/actions";
 import { getAllPendingTasks, TaskRecord, generateBookingReply, sendReplyAndCompleteTask } from "@/app/tasks/actions";
+import { getStaffList, StaffProfile } from "@/app/staff/actions";
 import { getDashboardStats } from "@/app/dashboard/actions";
 import { getMonthlyShifts } from "@/app/shifts/actions";
 import { Progress } from "@/components/ui/progress";
@@ -50,13 +51,14 @@ export default function StaffDashboardPage() {
   useEffect(() => {
     async function load() {
       const today = format(new Date(), "yyyy-MM-dd");
-      const [customers, sales, attRecords, tRecords, dashboardRes, mShifts] = await Promise.all([
+      const [customers, sales, attRecords, tRecords, dashboardRes, mShifts, sList] = await Promise.all([
         getAllCustomers(),
         getMonthlySales(new Date().getFullYear(), new Date().getMonth() + 1),
         getDailyAttendance(today),
         getAllPendingTasks(),
         getDashboardStats(),
-        getMonthlyShifts(new Date().getFullYear(), new Date().getMonth() + 1)
+        getMonthlyShifts(new Date().getFullYear(), new Date().getMonth() + 1),
+        getStaffList()
       ]);
       
       setTasks(tRecords);
@@ -64,8 +66,14 @@ export default function StaffDashboardPage() {
         setStoreStats(dashboardRes.data.storeStats);
       }
       
-      // Filter today's shifts
-      const tShifts = mShifts.filter((s: any) => s.date === today && s.type === 'work');
+      // Filter today's shifts and sort by staff sort_order
+      const tShifts = mShifts
+        .filter((s: any) => s.date === today && s.type === 'work')
+        .sort((a, b) => {
+          const staffA = sList.find(s => s.id === a.staff_id);
+          const staffB = sList.find(s => s.id === b.staff_id);
+          return (staffA?.sort_order ?? 999) - (staffB?.sort_order ?? 999);
+        });
       setTodayShifts(tShifts);
       const todaySalesData = sales.filter(s => s.date === today);
       const total = todaySalesData.reduce((acc, s) => acc + (s.tech_sales || 0) + (s.product_sales || 0), 0);

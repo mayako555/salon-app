@@ -19,11 +19,15 @@ import {
   AlertCircle,
   Loader2,
   Scan,
-  FileText
+  FileText,
+  Plus
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Customer } from "@/lib/customers";
+import { registerScannedCustomer, performOCR } from "./actions";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 type ScanPaperDialogProps = {
   isOpen: boolean;
@@ -34,6 +38,10 @@ type ScanPaperDialogProps = {
 export default function ScanPaperDialog({ isOpen, onClose, onExtracted }: ScanPaperDialogProps) {
   const [step, setStep] = useState<"upload" | "scanning" | "result">("upload");
   const [image, setImage] = useState<string | null>(null);
+  const [extractedData, setExtractedData] = useState<Partial<Customer>>({});
+  const [visitHistory, setVisitHistory] = useState("");
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,39 +49,99 @@ export default function ScanPaperDialog({ isOpen, onClose, onExtracted }: ScanPa
     if (file) {
       const reader = new FileReader();
       reader.onload = (prev) => {
-        setImage(prev.target?.result as string);
-        startScanning();
+        const imageData = prev.target?.result as string;
+        setImage(imageData);
+        startScanning(imageData);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const startScanning = () => {
+  const startScanning = async (imageData?: string) => {
+    const currentImage = imageData || image;
+    if (!currentImage) return;
     setStep("scanning");
-    // Simulate AI processing time
-    setTimeout(() => {
+    let ocrResult: any = null;
+    try {
+      const res = await performOCR(currentImage);
+      ocrResult = res;
+      
+      if (!res.success) {
+        if (res.error === "QUOTA_LIMIT_REACHED") {
+          setQuotaExceeded(true);
+          setStep("upload");
+          return;
+        }
+        if (res.error === "API_KEY_INVALID") {
+          toast.error(`APIキーの設定に問題があります: ${res.details || "有効化されていない可能性があります"}`);
+          setStep("upload");
+          return;
+        }
+        throw new Error(res.error);
+      }
+
+      const text = res.text || "";
+      
+      // Simple parsing logic (can be improved)
+      const phoneMatch = text.match(/\d{2,4}[-ー]\d{2,4}[-ー]\d{3,4}/) || text.match(/0\d{9,10}/);
+      const nameMatch = text.split("\n").find((line: string) => line.includes("様") || line.includes("名前"))?.replace(/様|名前|:|：/g, "").trim();
+      
+      if (!extractedData.name) {
+        setExtractedData({
+          name: nameMatch || "読み取り不可(手動入力)",
+          phone: phoneMatch ? phoneMatch[0] : "",
+          // Other fields might be hard to parse without LLM, so we put everything in history/notes
+        });
+        setVisitHistory(text); // Put everything in history for now so the user can see it
+      } else {
+        setVisitHistory(prev => prev + "\n\n--- 追加スキャン ---\n" + text);
+      }
+      
       setStep("result");
-    }, 3000);
+    } catch (err: any) {
+      console.error("OCR Failed:", err);
+      // Detailed error for debugging
+      const errorMsg = ocrResult?.message || err.message || "解析に失敗しました";
+      const errorDetails = ocrResult?.details || "";
+      
+      toast.error(errorMsg);
+      
+      // If we have detailed info, let's keep it in the history area so the user can read it
+      if (errorDetails) {
+        setVisitHistory(`【デバッグ情報: APIエラー】\n${errorMsg}\n\n詳細:\n${errorDetails}`);
+      }
+
+      // Fallback to manual entry step with empty data
+      if (!extractedData.name) {
+        setExtractedData({ name: "", phone: "", address: "" });
+      }
+      setStep("result");
+    }
   };
 
-  const handleConfirm = () => {
-    // Mocked extracted data
-    const mockData: Partial<Customer> = {
-      name: "山田 恵子",
-      name_kana: "ヤマダ ケイコ",
-      phone: "090-8888-9999",
-      gender: "female",
-      birthday: "1992-05-12",
-      has_allergy: true,
-      allergies: ["金属", "アルコール"],
-      risk_level: "yellow",
-      risk_flags: ["過去にトラブルあり（他店）", "アルコール消毒不可"],
-    };
+  const handleConfirm = async () => {
+    setIsRegistering(true);
     
-    onExtracted(mockData);
-    onClose();
-    setStep("upload");
-    setImage(null);
+    const finalData: any = {
+      ...extractedData,
+      is_active: true,
+      has_allergy: (extractedData.allergies?.length ?? 0) > 0,
+    };
+
+    const res = await registerScannedCustomer(finalData, visitHistory);
+    
+    if (res.success) {
+      toast.success("顧客情報を登録しました");
+      onExtracted(finalData);
+      onClose();
+      setStep("upload");
+      setImage(null);
+      setExtractedData({});
+      setVisitHistory("");
+    } else {
+      toast.error(res.error || "登録に失敗しました");
+    }
+    setIsRegistering(false);
   };
 
   return (
@@ -177,41 +245,102 @@ export default function ScanPaperDialog({ isOpen, onClose, onExtracted }: ScanPa
                   </div>
                 </div>
 
-                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Name</label>
-                      <p className="font-bold text-slate-800">山田 恵子</p>
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Phone</label>
-                      <p className="font-bold text-slate-800 tabular-nums">090-8888-9999</p>
+                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 space-y-6 max-h-[400px] overflow-y-auto">
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-1">基本情報</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-2">
+                        <label className="text-[10px] font-bold text-slate-500">お名前</label>
+                        <Input 
+                          value={extractedData.name || ""} 
+                          onChange={e => setExtractedData({...extractedData, name: e.target.value})}
+                          className="h-9 text-sm font-bold bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500">フリガナ</label>
+                        <Input 
+                          value={extractedData.name_kana || ""} 
+                          onChange={e => setExtractedData({...extractedData, name_kana: e.target.value})}
+                          className="h-9 text-sm bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500">電話番号</label>
+                        <Input 
+                          value={extractedData.phone || ""} 
+                          onChange={e => setExtractedData({...extractedData, phone: e.target.value})}
+                          className="h-9 text-sm font-mono bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500">生年月日</label>
+                        <Input 
+                          type="date"
+                          value={extractedData.birthday || ""} 
+                          onChange={e => setExtractedData({...extractedData, birthday: e.target.value})}
+                          className="h-9 text-sm bg-white"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-[10px] font-bold text-slate-500">住所</label>
+                        <Input 
+                          value={extractedData.address || ""} 
+                          onChange={e => setExtractedData({...extractedData, address: e.target.value})}
+                          className="h-9 text-sm bg-white"
+                        />
+                      </div>
                     </div>
                   </div>
                   
-                  <div className="border-t border-slate-200 pt-3">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Allergy Info</label>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      <span className="bg-rose-100 text-rose-600 text-[10px] font-black px-2 py-0.5 rounded-full">金属</span>
-                      <span className="bg-rose-100 text-rose-600 text-[10px] font-black px-2 py-0.5 rounded-full">アルコール</span>
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-1">アレルギー・注意点</h4>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500">アレルギー</label>
+                      <Input 
+                        value={extractedData.allergies?.join(", ") || ""} 
+                        onChange={e => setExtractedData({...extractedData, allergies: e.target.value.split(",").map(s => s.trim())})}
+                        className="h-9 text-sm bg-white"
+                        placeholder="例: 金属, アルコール"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500">リスクフラグ</label>
+                      <Textarea 
+                        value={extractedData.risk_flags?.join("\n") || ""} 
+                        onChange={e => setExtractedData({...extractedData, risk_flags: e.target.value.split("\n")})}
+                        className="text-xs bg-white min-h-[60px]"
+                        placeholder="注意点を一行ずつ入力"
+                      />
                     </div>
                   </div>
 
-                  <div className="border-t border-slate-200 pt-3">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Notes (Risk)</label>
-                    <p className="text-[11px] text-rose-600 font-bold mt-1 leading-relaxed">
-                      ・過去にまつエクで痒みが出た経験あり（他店）
-                      ・アルコール綿での消毒は避ける
-                    </p>
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-1">2枚目以降（来店履歴）</h4>
+                    <div className="bg-white p-3 rounded-xl border border-slate-200">
+                      <label className="text-[10px] font-bold text-slate-500 block mb-2">過去の施術メモ</label>
+                      <Textarea 
+                        value={visitHistory} 
+                        onChange={e => setVisitHistory(e.target.value)}
+                        className="text-xs border-none focus-visible:ring-0 min-h-[120px] p-0"
+                        placeholder="日付: 施術内容・特記事項...&#10;例: 2024/01/10: 120本。左目頭外れやすい。"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex gap-3">
-                  <Button variant="outline" className="flex-1 rounded-2xl h-12" onClick={() => setStep("upload")}>
-                    撮り直す
-                  </Button>
-                  <Button className="flex-1 rounded-2xl h-12 bg-slate-900" onClick={handleConfirm}>
-                    この情報で登録
+                <div className="flex flex-col gap-3">
+                  <div className="flex gap-3">
+                    <Button variant="outline" className="flex-1 rounded-2xl h-12" onClick={() => setStep("upload")} disabled={isRegistering}>
+                      <Plus className="mr-2" size={16} /> 次のページ
+                    </Button>
+                    <Button className="flex-1 rounded-2xl h-12 bg-slate-900 gap-2" onClick={handleConfirm} disabled={isRegistering}>
+                      {isRegistering ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                      顧客リストに追加
+                    </Button>
+                  </div>
+                  <Button variant="ghost" className="text-slate-400 text-xs" onClick={() => { setExtractedData({}); setVisitHistory(""); setStep("upload"); }}>
+                    クリアして最初から
                   </Button>
                 </div>
               </motion.div>
@@ -219,6 +348,35 @@ export default function ScanPaperDialog({ isOpen, onClose, onExtracted }: ScanPa
           </AnimatePresence>
         </div>
       </DialogContent>
+
+      {/* Quota Exceeded Alert */}
+      <Dialog open={quotaExceeded} onOpenChange={setQuotaExceeded}>
+        <DialogContent className="sm:max-w-xs rounded-[2rem] text-center p-8">
+          <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle size={32} />
+          </div>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-slate-800">無料枠の上限です</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <p className="text-sm text-slate-500 font-bold leading-relaxed">
+              Google Cloud Visionの無料枠（月間1,000枚）を超えました。
+            </p>
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              <p className="text-xs text-slate-400 font-black uppercase tracking-widest mb-1">次回の追加可能日</p>
+              <p className="text-lg font-black text-slate-700">
+                {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })} 以降
+              </p>
+            </div>
+            <p className="text-[10px] text-slate-400 font-bold">
+              ※ 手動での顧客登録は引き続き可能です。
+            </p>
+          </div>
+          <Button onClick={() => setQuotaExceeded(false)} className="w-full h-12 rounded-xl bg-slate-900">
+            閉じる
+          </Button>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

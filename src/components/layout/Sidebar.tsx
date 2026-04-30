@@ -32,6 +32,7 @@ const navigation = [
   { name: "自分の明細を確認", href: "/staff-portal/payroll", icon: Calculator, role: "staff" },
   { name: "希望休の提出", href: "/staff-portal/holidays", icon: CalendarDays, role: "staff" },
   { name: "交通費の申請", href: "/staff-portal/transport", icon: Train, role: "staff" },
+  { name: "マイQRコード", href: "/staff-portal/my-qr", icon: QrCode, role: "staff" },
   
   // Manager only sees Shift Management (in addition to staff items)
   { name: "シフト管理", href: "/shifts", icon: CalendarDays, role: "manager" },

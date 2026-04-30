@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Plus, Edit2, FileText } from "lucide-react";
 import StaffFormDialog from "./StaffFormDialog";
+import StaffOrderDialog from "./StaffOrderDialog";
 import DeleteStaffButton from "./DeleteStaffButton";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -20,7 +21,10 @@ export default async function StaffPage() {
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">スタッフ管理</h1>
             <p className="text-slate-500 mt-1 text-sm">サロンに在籍するスタッフ（正社員・業務委託）の情報を管理します。</p>
           </div>
-          <StaffFormDialog />
+          <div className="flex gap-2">
+            <StaffOrderDialog staffList={staffList} />
+            <StaffFormDialog />
+          </div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

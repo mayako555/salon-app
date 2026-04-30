@@ -17,18 +17,19 @@ export default function StaffCustomersPage() {
   const [loading, setLoading] = useState(true);
   const [isScanOpen, setIsScanOpen] = useState(false);
 
+  const load = async () => {
+    setLoading(true);
+    const data = await getAllCustomers();
+    setCustomers(data);
+    setLoading(false);
+  };
+
   const handleExtracted = (data: Partial<Customer>) => {
-    toast.success("AIが情報を抽出しました。登録画面で確認してください。");
-    // In a real app, we would redirect to a form with these values
-    console.log("Extracted Data:", data);
+    toast.success("AIスキャンが完了し、顧客リストに追加されました。");
+    load();
   };
 
   useEffect(() => {
-    async function load() {
-      const data = await getAllCustomers();
-      setCustomers(data);
-      setLoading(false);
-    }
     load();
   }, []);
 

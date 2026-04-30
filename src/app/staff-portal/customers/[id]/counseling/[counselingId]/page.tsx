@@ -18,6 +18,10 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
+import { toast } from "sonner";
+import { updateCounselingResponse } from "@/lib/counseling";
+import { Input } from "@/components/ui/input";
+import { Edit2, Save, X } from "lucide-react";
 
 export default function CounselingDetailPage() {
   const { id, counselingId } = useParams();
@@ -25,6 +29,9 @@ export default function CounselingDetailPage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [response, setResponse] = useState<CounselingResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editAnswers, setEditAnswers] = useState<Record<string, any>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -36,10 +43,25 @@ export default function CounselingDetailPage() {
       setCustomer(cData);
       const found = qData.find(q => q.id === counselingId);
       setResponse(found || null);
+      if (found) setEditAnswers(found.answers);
       setLoading(false);
     }
     load();
   }, [id, counselingId]);
+
+  const handleSave = async () => {
+    if (typeof counselingId !== 'string') return;
+    setIsSaving(true);
+    const res = await updateCounselingResponse(counselingId, { answers: editAnswers });
+    if (res.success) {
+      toast.success("回答内容を更新しました");
+      setResponse(prev => prev ? { ...prev, answers: editAnswers } : null);
+      setIsEditing(false);
+    } else {
+      toast.error("更新に失敗しました");
+    }
+    setIsSaving(false);
+  };
 
   if (loading) return <div className="p-10 text-center animate-pulse text-slate-400">読み込み中...</div>;
   if (!response || !customer) return <div className="p-10 text-center">データが見つかりませんでした</div>;
@@ -52,9 +74,17 @@ export default function CounselingDetailPage() {
     if (value === 'no') displayValue = 'いいえ';
     
     return (
-      <div className="flex justify-between items-start py-3 border-b border-slate-50">
+      <div className="flex justify-between items-start py-3 border-b border-slate-50 gap-4">
         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1">{label}</span>
-        <span className="text-sm font-bold text-slate-700 text-right flex-1">{displayValue}</span>
+        {isEditing ? (
+          <Input 
+            value={displayValue} 
+            onChange={e => setEditAnswers({...editAnswers, [label]: e.target.value})}
+            className="flex-1 h-8 text-xs font-bold"
+          />
+        ) : (
+          <span className="text-sm font-bold text-slate-700 text-right flex-1">{displayValue}</span>
+        )}
       </div>
     );
   };
@@ -79,11 +109,27 @@ export default function CounselingDetailPage() {
             <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md">
               <ClipboardList size={32} />
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-2xl font-black tracking-tight">カウンセリング回答詳細</h1>
               <p className="text-white/60 text-xs font-bold uppercase tracking-widest">
-                {customer.name} 様 | {format(response.created_at?.toDate?.() || response.created_at, "yyyy/MM/dd HH:mm")}
+                {customer.name} 様 | {format(response.created_at?.toDate?.() || response.created_at || new Date(), "yyyy/MM/dd HH:mm")}
               </p>
+            </div>
+            <div className="flex gap-2">
+              {isEditing ? (
+                <>
+                  <Button variant="ghost" size="sm" onClick={() => { setIsEditing(false); setEditAnswers(response.answers); }} className="text-white hover:bg-white/10">
+                    <X size={20} />
+                  </Button>
+                  <Button size="sm" onClick={handleSave} disabled={isSaving} className="bg-emerald-500 text-white rounded-full">
+                    {isSaving ? "保存中..." : <Save size={20} />}
+                  </Button>
+                </>
+              ) : (
+                <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)} className="text-white hover:bg-white/10">
+                  <Edit2 size={20} />
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -91,7 +137,7 @@ export default function CounselingDetailPage() {
 
       <div className="-mt-10 px-4 max-w-2xl mx-auto space-y-6">
         {/* Risk Flags */}
-        {response.risk_flags.length > 0 && (
+        {(response.risk_flags?.length ?? 0) > 0 && (
           <Card className={`p-5 rounded-3xl shadow-xl border-2 ${
             response.risk_level === 'red' ? 'bg-rose-50 border-rose-200' : 'bg-amber-50 border-amber-200'
           }`}>
@@ -100,7 +146,7 @@ export default function CounselingDetailPage() {
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">リスクアラート詳細</h3>
             </div>
             <div className="flex flex-wrap gap-2">
-              {response.risk_flags.map((flag, i) => (
+              {response.risk_flags?.map((flag, i) => (
                 <span key={i} className={`text-xs font-black px-3 py-1.5 rounded-xl ${
                   response.risk_level === 'red' ? 'bg-rose-600 text-white shadow-md' : 'bg-amber-400 text-white shadow-md'
                 }`}>
@@ -117,7 +163,7 @@ export default function CounselingDetailPage() {
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">基本質問 / 共通</h3>
             <div className="space-y-1">
               {renderAnswer("性別", response.gender === 'female' ? '女性' : '男性')}
-              {renderAnswer("サービス", response.service_types.join(' / '))}
+              {renderAnswer("サービス", (response.service_types || []).join(' / '))}
               {renderAnswer("アレルギーの有無", response.answers.allergies_present)}
               {renderAnswer("アレルギー内容", response.answers.allergies)}
               {renderAnswer("薬品アレルギー", response.answers.drug_allergy)}
@@ -128,7 +174,7 @@ export default function CounselingDetailPage() {
             </div>
           </section>
 
-          {(response.service_types.includes('eyebrow') || response.service_types.includes('brow_gym_men')) && (
+          {((response.service_types ?? []).includes('eyebrow') || (response.service_types ?? []).includes('brow_gym_men')) && (
             <section className="space-y-4">
               <h3 className="text-xs font-black text-emerald-500 uppercase tracking-widest border-b border-emerald-50 pb-2">アイブロウ・WAX</h3>
               <div className="space-y-1">
@@ -139,7 +185,7 @@ export default function CounselingDetailPage() {
             </section>
           )}
 
-          {(response.service_types.includes('eyelash_ext') || response.service_types.includes('lash_lift') || response.service_types.includes('and_healthy')) && (
+          {((response.service_types ?? []).includes('eyelash_ext') || (response.service_types ?? []).includes('lash_lift') || (response.service_types ?? []).includes('and_healthy')) && (
             <section className="space-y-4">
               <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest border-b border-amber-50 pb-2">まつ毛（エクステ・パーマ）</h3>
               <div className="space-y-1">
@@ -173,7 +219,7 @@ export default function CounselingDetailPage() {
               <img src={response.signature_url} className="max-h-32 object-contain" alt="Signature" />
             </div>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-              Signed At: {format(response.signed_at?.toDate?.() || response.signed_at, "yyyy/MM/dd HH:mm")}
+              Signed At: {format(response.signed_at?.toDate?.() || response.signed_at || new Date(), "yyyy/MM/dd HH:mm")}
             </p>
           </Card>
         )}

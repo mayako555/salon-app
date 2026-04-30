@@ -35,11 +35,14 @@ export default function StaffPortalSalesPage() {
   const mySales = allTodaysSales.filter(s => s.staff_name === profile?.name);
   const otherSales = allTodaysSales.filter(s => s.staff_name !== profile?.name);
 
+  // Calculate totals: (Tech + Product) - Discount (Excluding HPB points from deduction)
   const todaysTechTotal = mySales.reduce((acc, curr) => acc + curr.tech_sales, 0);
   const todaysProductTotal = mySales.reduce((acc, curr) => acc + curr.product_sales, 0);
+  const todaysDiscountTotal = mySales.reduce((acc, curr) => acc + (curr.discount || 0), 0);
 
   const globalTechTotal = allTodaysSales.reduce((acc, curr) => acc + curr.tech_sales, 0);
   const globalProductTotal = allTodaysSales.reduce((acc, curr) => acc + curr.product_sales, 0);
+  const globalDiscountTotal = allTodaysSales.reduce((acc, curr) => acc + (curr.discount || 0), 0);
 
   const staffNames = Array.from(new Set(sales.map(s => s.staff_name))).sort();
 
@@ -84,7 +87,7 @@ export default function StaffPortalSalesPage() {
              <div>
                <p className="text-xs text-slate-400 font-medium mb-1">本日のあなたの売上</p>
                <div className="flex items-end gap-2">
-                 <span className="text-2xl font-bold">¥{(todaysTechTotal + todaysProductTotal).toLocaleString()}</span>
+                 <span className="text-2xl font-bold">¥{(todaysTechTotal + todaysProductTotal - todaysDiscountTotal).toLocaleString()}</span>
                </div>
              </div>
              <CheckCircle2 className="text-emerald-400 opacity-50" size={32} />
@@ -107,7 +110,7 @@ export default function StaffPortalSalesPage() {
                       <span className="font-bold text-slate-800">{sale.customer_name} 様</span>
                     </div>
                     <div className="text-right">
-                      <span className="font-bold text-slate-800 text-sm">¥{(sale.tech_sales + sale.product_sales).toLocaleString()}</span>
+                      <span className="font-bold text-slate-800 text-sm">¥{(sale.tech_sales + sale.product_sales - (sale.discount || 0)).toLocaleString()}</span>
                     </div>
                   </div>
                   <div className="text-xs text-slate-500 flex flex-wrap gap-x-3 gap-y-1 mt-2">
@@ -133,7 +136,7 @@ export default function StaffPortalSalesPage() {
              <div>
                <p className="text-xs text-slate-500 font-medium mb-1">【全店舗】当日の合算売上</p>
                <div className="flex items-end gap-2">
-                 <span className="text-2xl font-bold text-slate-800">¥{(globalTechTotal + globalProductTotal).toLocaleString()}</span>
+                 <span className="text-2xl font-bold text-slate-800">¥{(globalTechTotal + globalProductTotal - globalDiscountTotal).toLocaleString()}</span>
                </div>
              </div>
           </div>
@@ -154,7 +157,7 @@ export default function StaffPortalSalesPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="font-bold text-slate-700 text-sm">¥{(sale.tech_sales + sale.product_sales).toLocaleString()}</span>
+                  <span className="font-bold text-slate-700 text-sm">¥{(sale.tech_sales + sale.product_sales - (sale.discount || 0)).toLocaleString()}</span>
                 </div>
               </div>
             ))}

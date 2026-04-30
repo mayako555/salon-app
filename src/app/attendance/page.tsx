@@ -120,6 +120,7 @@ export default function AttendancePage() {
               <TableHead>退勤打刻</TableHead>
               <TableHead>休憩時間</TableHead>
               <TableHead>実労働時間</TableHead>
+              <TableHead>店舗</TableHead>
               {(isAdmin || isManager) && <TableHead className="text-right">アクション</TableHead>}
             </TableRow>
           </TableHeader>
@@ -154,6 +155,11 @@ export default function AttendancePage() {
                   <TableCell className="font-mono text-slate-700">{clockOutTime}</TableCell>
                   <TableCell>{record.break_minutes} 分</TableCell>
                   <TableCell className="font-medium text-slate-700">{workingHoursText}</TableCell>
+                  <TableCell>
+                    <span className="font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded text-[10px]">
+                      {record.store || "未指定"}
+                    </span>
+                  </TableCell>
                   {(isAdmin || isManager) && (
                     <TableCell className="text-right">
                       <Button 
@@ -175,7 +181,7 @@ export default function AttendancePage() {
             })}
             {!loading && attendanceRecords.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-10 text-slate-500">
+                <TableCell colSpan={8} className="text-center py-10 text-slate-500">
                   {isAdmin || isManager ? "本日の打刻実績はありません" : "あなたの本日の打刻実績はありません"}
                 </TableCell>
               </TableRow>
