@@ -51,18 +51,16 @@ ${rawText}
 
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_CLOUD_VISION_API_KEY;
     const modelId = "gemini-1.5-flash";
-    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${apiKey}`;
+    // Using v1beta for better model compatibility if v1 is 404
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
-    console.log(`Attempting Gemini parsing via direct REST API (v1) with model: ${modelId}...`);
+    console.log(`Attempting Gemini parsing via direct REST API (v1beta) with model: ${modelId}...`);
     
     const response = await fetch(apiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          response_mime_type: "application/json",
-        }
+        contents: [{ parts: [{ text: prompt }] }]
       })
     });
 
