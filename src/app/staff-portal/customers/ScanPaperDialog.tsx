@@ -104,6 +104,8 @@ export default function ScanPaperDialog({ isOpen, onClose, onExtracted }: ScanPa
         setVisitHistory(d.visit_history || text);
       } else {
         // Fallback to simple parsing if Gemini fails
+        console.error("Gemini Parsing failed, using fallback:", parseRes.error);
+        
         const phoneMatch = text.match(/\d{2,4}[-ー]\d{2,4}[-ー]\d{3,4}/) || text.match(/0\d{9,10}/);
         
         // Improved regex to ignore common labels like "お名前"
@@ -112,7 +114,7 @@ export default function ScanPaperDialog({ isOpen, onClose, onExtracted }: ScanPa
         for (const line of lines) {
           if (line.includes("様") || line.includes("名前")) {
             const cleaned = line.replace(/お名前|名前|様|:|：/g, "").trim();
-            if (cleaned.length > 1) { // Ignore single characters like 'お'
+            if (cleaned.length > 1) { 
               foundName = cleaned;
               break;
             }
@@ -125,6 +127,11 @@ export default function ScanPaperDialog({ isOpen, onClose, onExtracted }: ScanPa
           phone: phoneMatch ? phoneMatch[0] : "",
         }));
         setVisitHistory(text);
+        
+        // Display the specific error for debugging
+        toast.error(`AI解析失敗: ${parseRes.error || "原因不明"}. 予備モードで動作中`, {
+          duration: 6000,
+        });
       }
       
       setStep("result");
