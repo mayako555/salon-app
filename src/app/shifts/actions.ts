@@ -134,7 +134,7 @@ export async function saveShift(data: Omit<ShiftRecord, "id"> & { id?: string })
     await addAuditLog({
       table_name: SHIFTS_COLLECTION,
       record_id: recordId,
-      action: "SAVE_CONSOLIDATED",
+      action: "UPDATE",
       old_data: null,
       new_data: cleanedData,
       actor: "Admin"
