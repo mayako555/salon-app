@@ -128,11 +128,30 @@ export default function CustomerDetailPage() {
   };
 
   const handleShowLinkQr = () => {
-    // 連携用ページへのURLを生成
-    // 環境変数があればそれを使用、なければ現在のURL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-    setLinkUrl(`${baseUrl}/link-line/${id}`);
+    // LINEアプリが直接立ち上がるようにLIFF URLを使用
+    const liffId = process.env.NEXT_PUBLIC_LIFF_ID || "2009912937-1KgShdZB";
+    setLinkUrl(`https://liff.line.me/${liffId}/link-line/${id}`);
     setIsLinkQrOpen(true);
+  };
+
+  const handleTestLineMessage = async () => {
+    if (!customer?.line_user_id || !id) return;
+    if (!confirm("テストメッセージ（予約確定通知）を送信しますか？")) return;
+    
+    // Test data: Tomorrow at 10:00
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dateStr = format(tomorrow, "yyyy-MM-dd");
+    
+    // Import the action dynamically to avoid circular dependencies if any
+    const { testSendLineMessage } = await import("./actions");
+    const res = await testSendLineMessage(customer.name, customer.line_user_id, dateStr, "10:00");
+    
+    if (res.success) {
+      toast.success("テストメッセージを送信しました");
+    } else {
+      toast.error("送信に失敗しました: " + res.error);
+    }
   };
 
   if (loading) return <div className="p-10 text-center animate-pulse text-slate-400">読み込み中...</div>;
@@ -263,12 +282,22 @@ export default function CustomerDetailPage() {
                 </div>
               </div>
               <div className="pt-2">
-                {customer.line_user_id ? (
-                  <div className="flex items-center gap-2 bg-emerald-50 p-2.5 rounded-xl text-emerald-700 text-xs font-bold">
-                    <div className="w-5 h-5 bg-[#06C755] rounded-full flex items-center justify-center text-white"><CheckCircle2 size={12}/></div>
-                    LINE連携済み
-                  </div>
-                ) : (
+                    {customer.line_user_id ? (
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                          <CheckCircle2 size={10} />
+                          連携済み
+                        </span>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={handleTestLineMessage}
+                          className="h-7 text-[10px] font-bold text-slate-400 hover:text-emerald-600 px-2"
+                        >
+                          テスト送信
+                        </Button>
+                      </div>
+                    ) : (
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -612,6 +641,27 @@ export default function CustomerDetailPage() {
                 <Input value={editFormData.phone || ""} onChange={e => setEditFormData({...editFormData, phone: e.target.value})} />
               </div>
               <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">生年月日 (例: 19900101)</label>
+                <Input 
+                  value={editFormData.birthday || ""} 
+                  placeholder="YYYYMMDD"
+                  onChange={e => {
+                    let val = e.target.value.replace(/\D/g, "");
+                    if (val.length === 8) {
+                      val = `${val.substring(0, 4)}-${val.substring(4, 6)}-${val.substring(6, 8)}`;
+                    }
+                    setEditFormData({...editFormData, birthday: val});
+                  }} 
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">メールアドレス</label>
+                <Input value={editFormData.email || ""} onChange={e => setEditFormData({...editFormData, email: e.target.value})} />
+              </div>
+              <div>
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">お客様No.</label>
                 <Input 
                   value={editFormData.customer_no || ""} 
@@ -623,15 +673,34 @@ export default function CustomerDetailPage() {
               </div>
             </div>
 
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">メールアドレス</label>
-              <Input value={editFormData.email || ""} onChange={e => setEditFormData({...editFormData, email: e.target.value})} />
-            </div>
-
             <div className="grid grid-cols-3 gap-4">
               <div className="col-span-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">郵便番号</label>
-                <Input value={editFormData.postal_code || ""} onChange={e => setEditFormData({...editFormData, postal_code: e.target.value})} />
+                <Input 
+                  value={editFormData.postal_code || ""} 
+                  placeholder="0000000"
+                  onChange={async e => {
+                    const code = e.target.value.replace(/\D/g, "");
+                    setEditFormData({...editFormData, postal_code: code});
+                    
+                    if (code.length === 7) {
+                      try {
+                        const res = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${code}`);
+                        const data = await res.json();
+                        if (data.results) {
+                          const addr = data.results[0];
+                          setEditFormData(prev => ({
+                            ...prev,
+                            postal_code: code,
+                            address: `${addr.address1}${addr.address2}${addr.address3}`
+                          }));
+                        }
+                      } catch (err) {
+                        console.error("Address fetch error:", err);
+                      }
+                    }
+                  }} 
+                />
               </div>
               <div className="col-span-2">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">住所</label>
