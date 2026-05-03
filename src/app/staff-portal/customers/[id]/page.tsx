@@ -129,7 +129,8 @@ export default function CustomerDetailPage() {
 
   const handleShowLinkQr = () => {
     // 連携用ページへのURLを生成
-    const baseUrl = window.location.origin;
+    // 環境変数があればそれを使用、なければ現在のURL
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
     setLinkUrl(`${baseUrl}/link-line/${id}`);
     setIsLinkQrOpen(true);
   };

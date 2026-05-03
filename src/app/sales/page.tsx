@@ -2,10 +2,10 @@
 
 import { useState, useEffect, use } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { getMonthlySales, SalesRecord } from "./actions";
+import { getMonthlySales, SalesRecord, deleteSale, clearMonthlyCsvImports } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Download, ChevronLeft, ChevronRight, Search, FileUp, Settings, Lock } from "lucide-react";
+import { Plus, Download, ChevronLeft, ChevronRight, Search, FileUp, Settings, Lock, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { format, isSameMonth } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -21,11 +21,10 @@ export default function SalesPage({
   searchParams: Promise<{ month?: string }>
 }) {
   const params = use(searchParams);
-  const monthParam = params.month;
-  
-  const targetDate = monthParam ? new Date(monthParam) : new Date();
-  const year = targetDate.getFullYear();
-  const month = targetDate.getMonth() + 1;
+  const targetDateStr = params.month || format(new Date(), "yyyy-MM");
+  const [yearNum, monthNum] = targetDateStr.split("-").map(Number);
+  const year = yearNum;
+  const month = monthNum;
 
   const [sales, setSales] = useState<SalesRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,18 +38,37 @@ export default function SalesPage({
     load();
   }, [year, month]);
 
+  const handleDeleteSale = async (id: string) => {
+    if (!confirm("この売上データを削除してよろしいですか？")) return;
+    const res = await deleteSale(id);
+    if (res.success) {
+      setSales(sales.filter(s => s.id !== id));
+    }
+  };
+
+  const handleClearImports = async () => {
+    if (!confirm(`${year}年${month}月のCSV取り込みデータをすべて削除しますか？`)) return;
+    const res = await clearMonthlyCsvImports(year, month);
+    if (res.success) {
+      alert(`${res.count}件のデータを削除しました。`);
+      setSales(sales.filter(s => s.source !== 'hotpepper'));
+    }
+  };
+
   const cashSales = sales.filter(s => s.payment_method === '現金');
   const cashlessSales = sales.filter(s => s.payment_method !== '現金');
+
+  const totalTechSales = sales.reduce((sum, s) => sum + s.tech_sales, 0);
+  const totalProductSales = sales.reduce((sum, s) => sum + s.product_sales, 0);
+  const totalNomination = sales.reduce((sum, s) => sum + (s.nomination_fee || 0), 0);
+  const totalDiscount = sales.reduce((sum, s) => sum + (s.discount || 0), 0);
+  const totalSales = totalTechSales + totalProductSales + totalNomination - totalDiscount;
 
   const cashTechSales = cashSales.reduce((sum, s) => sum + s.tech_sales, 0);
   const cashlessTechSales = cashlessSales.reduce((sum, s) => sum + s.tech_sales, 0);
   
   const cashProductSales = cashSales.reduce((sum, s) => sum + s.product_sales, 0);
   const cashlessProductSales = cashlessSales.reduce((sum, s) => sum + s.product_sales, 0);
-
-  const totalTechSales = cashTechSales + cashlessTechSales;
-  const totalProductSales = cashProductSales + cashlessProductSales;
-  const totalSales = totalTechSales + totalProductSales;
 
   // Aggregate by store and staff
   const stores = ["六甲", "元町", "神戸"];
@@ -59,7 +77,7 @@ export default function SalesPage({
   const getSalesTotal = (staff: string | null, store: string | null) => {
     return sales
       .filter(s => (staff ? s.staff_name === staff : true) && (store ? s.store_name === store : true))
-      .reduce((sum, s) => sum + s.tech_sales + s.product_sales, 0);
+      .reduce((sum, s) => sum + s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0), 0);
   };
 
   return (
@@ -80,6 +98,10 @@ export default function SalesPage({
                 <DailyCloseDialog />
                 <CheckoutDialog staffList={staffNames} />
                 <CSVUploadButton />
+                <Button variant="outline" size="sm" onClick={handleClearImports} className="text-rose-600 border-rose-200 hover:bg-rose-50 h-10 px-3">
+                  <Trash2 size={16} className="mr-1" />
+                  CSVクリア
+                </Button>
                 <Link href="/admin/master-data">
                   <Button variant="outline" size="icon" className="h-10 w-10 border-slate-200">
                     <Settings size={20} className="text-slate-500" />
@@ -172,15 +194,19 @@ export default function SalesPage({
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
               <div className="p-4 flex flex-col sm:flex-row items-center justify-between border-b border-slate-100 gap-4 bg-slate-50">
                 <div className="flex items-center gap-1 bg-white border border-slate-200 p-1 rounded-md shadow-sm">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-slate-100 rounded-sm">
-                    <ChevronLeft size={16} className="text-slate-600" />
-                  </Button>
+                  <Link href={`/sales?month=${format(new Date(year, month - 2, 1), "yyyy-MM")}`}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-slate-100 rounded-sm">
+                      <ChevronLeft size={16} className="text-slate-600" />
+                    </Button>
+                  </Link>
                   <div className="px-4 font-bold text-slate-700 tabular-nums">
                     {year}年 {month}月
                   </div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-slate-100 rounded-sm">
-                    <ChevronRight size={16} className="text-slate-600" />
-                  </Button>
+                  <Link href={`/sales?month=${format(new Date(year, month, 1), "yyyy-MM")}`}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-slate-100 rounded-sm">
+                      <ChevronRight size={16} className="text-slate-600" />
+                    </Button>
+                  </Link>
                 </div>
                 
                 <div className="flex gap-2 items-center">
@@ -203,7 +229,7 @@ export default function SalesPage({
                       <TableHead className="w-[60px]">時間</TableHead>
                       <TableHead className="w-[80px]">店舗</TableHead>
                       <TableHead className="w-[100px]">担当</TableHead>
-                      <TableHead className="w-[120px]">お名前</TableHead>
+                      <TableHead className="w-[120px]">お客様名</TableHead>
                       <TableHead className="w-[80px] text-center">新・リピ</TableHead>
                       <TableHead>コース</TableHead>
                       <TableHead className="text-right w-[80px]">技術売上</TableHead>
@@ -213,6 +239,7 @@ export default function SalesPage({
                       <TableHead className="text-right w-[80px] text-orange-500">HPB pt</TableHead>
                       <TableHead className="w-[120px] text-center">支払方法</TableHead>
                       <TableHead className="text-right font-bold w-[100px]">合計金額</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -280,6 +307,11 @@ export default function SalesPage({
                             </TableCell>
                             <TableCell className="text-right font-bold text-slate-800 bg-slate-50">
                               ¥{Math.max(0, saleTotal).toLocaleString()}
+                            </TableCell>
+                            <TableCell>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-500" onClick={() => handleDeleteSale(sale.id)}>
+                                <Trash2 size={14} />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         );
