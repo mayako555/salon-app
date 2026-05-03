@@ -232,9 +232,9 @@ export default function ShiftEditDialog({
                     <button 
                       type="button"
                       onClick={() => removeSegment(idx)}
-                      className="absolute -top-2 -right-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-500 rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute -top-2 -right-2 bg-white border-2 border-slate-200 text-slate-500 hover:text-rose-500 rounded-full p-1.5 shadow-md z-10 transition-colors"
                     >
-                      <X size={12} />
+                      <X size={14} />
                     </button>
                     
                     <div className="grid grid-cols-2 gap-2 mb-2">

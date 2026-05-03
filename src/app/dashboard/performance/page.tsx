@@ -17,35 +17,114 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import AuthGuard from "@/components/AuthGuard";
 
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter,
+  DialogTrigger
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { updateStaffMonthlyTarget } from "./actions";
+
 export default function PerformancePage() {
   const [stats, setStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isTargetDialogOpen, setIsTargetDialogOpen] = useState(false);
+  const [editingTargets, setEditingTargets] = useState<Record<string, number>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  
   const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+
+  async function load() {
+    setLoading(true);
+    const res = await getStaffPerformanceStats(year, month);
+    if (res.success && res.data) {
+      setStats(res.data);
+      // Initialize editing targets
+      const targets: Record<string, number> = {};
+      res.data.forEach((s: any) => targets[s.staffId] = s.target);
+      setEditingTargets(targets);
+    } else if (!res.success) {
+      toast.error("データの取得に失敗しました");
+    }
+    setLoading(false);
+  }
 
   useEffect(() => {
-    async function load() {
-      const res = await getStaffPerformanceStats(now.getFullYear(), now.getMonth() + 1);
-      if (res.success && res.data) {
-        setStats(res.data);
-      } else if (!res.success) {
-        toast.error("データの取得に失敗しました");
-      }
-      setLoading(false);
-    }
     load();
   }, []);
+
+  const handleSaveTargets = async () => {
+    setIsSaving(true);
+    try {
+      const promises = Object.entries(editingTargets).map(([staffId, target]) => 
+        updateStaffMonthlyTarget(staffId, year, month, target)
+      );
+      await Promise.all(promises);
+      toast.success("月間目標を更新しました");
+      setIsTargetDialogOpen(false);
+      load();
+    } catch (err) {
+      toast.error("保存に失敗しました");
+    }
+    setIsSaving(false);
+  };
 
   if (loading) return <div className="p-12 text-center animate-pulse text-slate-400 font-bold">分析中...</div>;
 
   return (
     <AuthGuard requireRole="manager">
       <div className="space-y-8 pb-20">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
-            <TrendingUp className="text-emerald-500" size={32} />
-            スタッフ売上目標管理
-          </h1>
-          <p className="text-slate-500 font-medium">今月の売上達成状況と必要平均単価の分析</p>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex flex-col gap-2">
+            <h1 className="text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
+              <TrendingUp className="text-emerald-500" size={32} />
+              スタッフ売上目標管理
+            </h1>
+            <p className="text-slate-500 font-medium">
+              {year}年{month}月の売上達成状況
+            </p>
+          </div>
+
+          <Dialog open={isTargetDialogOpen} onOpenChange={setIsTargetDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-slate-900 rounded-2xl h-12 px-6 font-black gap-2 shadow-lg hover:shadow-xl transition-all">
+                <Target size={18} />
+                目標を設定する
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md rounded-[2.5rem] max-h-[85vh] flex flex-col overflow-hidden p-0">
+              <DialogHeader className="p-8 pb-0">
+                <DialogTitle className="text-xl font-black">{month}月の目標設定</DialogTitle>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto p-8 pt-4 space-y-4">
+                {stats.map(staff => (
+                  <div key={staff.staffId} className="flex items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl">
+                    <span className="font-bold text-slate-700">{staff.staffName}</span>
+                    <div className="relative w-40">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">¥</span>
+                      <Input 
+                        type="number"
+                        className="pl-8 h-10 rounded-xl font-black text-right"
+                        value={editingTargets[staff.staffId] || 0}
+                        onChange={e => setEditingTargets({...editingTargets, [staff.staffId]: parseInt(e.target.value) || 0})}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <DialogFooter className="p-8 pt-0 gap-2">
+                <Button variant="outline" onClick={() => setIsTargetDialogOpen(false)} disabled={isSaving} className="rounded-xl">キャンセル</Button>
+                <Button onClick={handleSaveTargets} disabled={isSaving} className="bg-slate-900 rounded-xl px-8">
+                  {isSaving ? "保存中..." : "保存する"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <div className="grid gap-6">
@@ -91,7 +170,7 @@ export default function PerformancePage() {
                     <Progress value={progress} className="h-3 rounded-full bg-slate-100" />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-50 pt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-t border-slate-50 pt-6">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
                         <CalendarDays size={20} />
@@ -102,20 +181,30 @@ export default function PerformancePage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-2xl md:col-span-2">
-                      <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-500">
+                    <div className="bg-slate-50/50 p-4 rounded-2xl flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500">
+                        <TrendingUp size={20} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">現在の実績平均</p>
+                        <div className="flex items-baseline gap-2">
+                          <p className="text-xl font-black text-emerald-700">¥{staff.currentDailyAvg.toLocaleString()}</p>
+                          <span className="text-[10px] font-bold text-slate-400">({staff.workedDaysCount}日稼働)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-900 text-white p-4 rounded-2xl flex items-center gap-4 shadow-xl shadow-slate-900/20 ring-4 ring-slate-900/10">
+                      <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-amber-400">
                         <Banknote size={20} />
                       </div>
                       <div className="flex-1">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">1日あたりの必要売上平均</p>
+                        <p className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-1">1日あたりの必要売上平均</p>
                         <div className="flex items-baseline gap-2">
-                          <p className="text-xl font-black text-slate-900">¥{staff.requiredDailyAvg.toLocaleString()}</p>
-                          <span className="text-[10px] font-bold text-slate-400">/ day</span>
+                          <p className="text-xl font-black text-white">¥{staff.requiredDailyAvg.toLocaleString()}</p>
+                          <span className="text-[10px] font-bold text-white/40">/ day</span>
                         </div>
                       </div>
-                      {staff.remainingDays > 0 && staff.remaining > 0 && (
-                        <ArrowRight className="text-slate-200" />
-                      )}
                     </div>
                   </div>
                 </div>

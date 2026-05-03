@@ -22,10 +22,10 @@ export default function AuthGuard({ children, requireRole = "staff" }: AuthGuard
         router.push(`/login?redirect=${pathname}`);
       } else if (requireRole === "admin" && !isAdmin) {
         // Admin required but user is not admin
-        router.push("/dashboard?error=restricted");
+        router.push("/staff-portal");
       } else if (requireRole === "manager" && !(isManager || isAdmin)) {
         // Manager required but user is not manager/admin
-        router.push("/dashboard?error=restricted");
+        router.push("/staff-portal");
       } else if (requireRole === "staff" && !isStaff) {
         // Staff profile required but not found for this user
         router.push("/login?error=profile_not_found");

@@ -118,7 +118,7 @@ export default function AttendancePage() {
               <TableHead>状態</TableHead>
               <TableHead>出勤打刻</TableHead>
               <TableHead>退勤打刻</TableHead>
-              <TableHead>休憩時間</TableHead>
+              {(isAdmin || isManager) && <TableHead>休憩時間</TableHead>}
               <TableHead>実労働時間</TableHead>
               <TableHead>店舗</TableHead>
               {(isAdmin || isManager) && <TableHead className="text-right">アクション</TableHead>}
@@ -153,7 +153,7 @@ export default function AttendancePage() {
                   </TableCell>
                   <TableCell className="font-mono text-slate-700">{clockInTime}</TableCell>
                   <TableCell className="font-mono text-slate-700">{clockOutTime}</TableCell>
-                  <TableCell>{record.break_minutes} 分</TableCell>
+                  {(isAdmin || isManager) && <TableCell>{record.break_minutes} 分</TableCell>}
                   <TableCell className="font-medium text-slate-700">{workingHoursText}</TableCell>
                   <TableCell>
                     <span className="font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded text-[10px]">

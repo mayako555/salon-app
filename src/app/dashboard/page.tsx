@@ -41,6 +41,13 @@ export default function DashboardPage() {
   const [editingTargetData, setEditingTargetData] = useState<Record<string, number>>({});
 
   useEffect(() => {
+    if (!loading && !isAdmin && !isManager) {
+      window.location.href = "/staff-portal";
+      return;
+    }
+  }, [loading, isAdmin, isManager]);
+
+  useEffect(() => {
     async function load() {
       if (isAdmin || isManager) {
         const res = await getDashboardStats();
@@ -140,7 +147,6 @@ export default function DashboardPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-3xl font-bold">10:00 - 19:00</div>
-                    <p className="text-xs text-emerald-100/70 mt-1">休憩: 60分 (予定)</p>
                   </CardContent>
                 </Card>
 

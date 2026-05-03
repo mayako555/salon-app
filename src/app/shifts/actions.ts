@@ -72,43 +72,73 @@ export async function saveShift(data: Omit<ShiftRecord, "id"> & { id?: string })
     const colRef = collection(db, SHIFTS_COLLECTION);
     let recordId = data.id;
 
+    // 1. Konsolidate: Find all existing records for this staff and date
+    // This cleans up duplicates that might have been created by multiple bulk saves
+    const q = query(
+      colRef, 
+      where("staff_id", "==", data.staff_id),
+      where("date", "==", data.date)
+    );
+    const existingDocs = await getDocs(q);
+    
     // Remove undefined values to avoid Firestore errors
     const cleanedData = Object.fromEntries(
       Object.entries(data).filter(([_, v]) => v !== undefined)
     ) as any;
-    delete cleanedData.id; // ID should not be in the document data
+    delete cleanedData.id;
+
+    const batch = writeBatch(db);
 
     if (recordId) {
+      // Update the specific record
       const docRef = doc(db, SHIFTS_COLLECTION, recordId);
-      await updateDoc(docRef, {
+      batch.update(docRef, {
         ...cleanedData,
         updated_at: serverTimestamp()
       });
-      
-      await addAuditLog({
-        table_name: SHIFTS_COLLECTION,
-        record_id: recordId,
-        action: "UPDATE",
-        old_data: null,
-        new_data: cleanedData,
-        actor: "Admin"
+
+      // Delete OTHER records for the same day if they exist (cleanup)
+      existingDocs.docs.forEach(d => {
+        if (d.id !== recordId) {
+          batch.delete(d.ref);
+        }
       });
     } else {
-      const docRef = await addDoc(colRef, {
-        ...cleanedData,
-        created_at: serverTimestamp()
-      });
-      recordId = docRef.id;
-
-      await addAuditLog({
-        table_name: SHIFTS_COLLECTION,
-        record_id: recordId,
-        action: "INSERT",
-        old_data: null,
-        new_data: cleanedData,
-        actor: "Admin"
-      });
+      // If no ID provided but a record exists for this day, update the first one found
+      if (!existingDocs.empty) {
+        const firstDoc = existingDocs.docs[0];
+        recordId = firstDoc.id;
+        batch.update(firstDoc.ref, {
+          ...cleanedData,
+          updated_at: serverTimestamp()
+        });
+        
+        // Delete others
+        existingDocs.docs.slice(1).forEach(d => {
+          batch.delete(d.ref);
+        });
+      } else {
+        // Truly a new record
+        const newDocRef = doc(colRef);
+        recordId = newDocRef.id;
+        batch.set(newDocRef, {
+          ...cleanedData,
+          created_at: serverTimestamp(),
+          updated_at: serverTimestamp()
+        });
+      }
     }
+
+    await batch.commit();
+
+    await addAuditLog({
+      table_name: SHIFTS_COLLECTION,
+      record_id: recordId,
+      action: "SAVE_CONSOLIDATED",
+      old_data: null,
+      new_data: cleanedData,
+      actor: "Admin"
+    });
 
     return { success: true, id: recordId };
   } catch (error: any) {

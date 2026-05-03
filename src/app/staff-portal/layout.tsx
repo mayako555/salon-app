@@ -88,6 +88,17 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{profile?.role || "staff"}</p>
             </div>
           </div>
+          {isAdminOrManager && (
+            <Link href="/dashboard" className="mb-2 block">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start text-blue-400 border-blue-400/30 hover:bg-blue-400/10 rounded-xl gap-3 font-bold h-11"
+              >
+                <Settings size={18} />
+                管理者画面へ
+              </Button>
+            </Link>
+          )}
           <Button 
             onClick={handleLogout} 
             variant="ghost" 
@@ -108,6 +119,11 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
           <span className="text-sm font-black tracking-tighter">SALON PORTAL</span>
         </div>
         <div className="flex items-center gap-3">
+          {isAdminOrManager && (
+            <Link href="/dashboard" className="text-blue-400">
+              <Settings size={18} />
+            </Link>
+          )}
           <span className="text-[10px] font-black opacity-60">{profile?.name}</span>
           <Button variant="ghost" size="icon" onClick={handleLogout} className="text-slate-400 h-8 w-8"><LogOut size={16} /></Button>
         </div>
