@@ -22,18 +22,23 @@ export async function parseExtractedText(rawText: string) {
 このテキストから、顧客情報を抽出してJSON形式で返してください。
 
 【ルール】
-1. 氏名、フリガナ、電話番号、住所、郵便番号、生年月日、職業、アレルギー、リスク（注意点）を抽出してください。
-2. 「会員No」や「顧客No」があれば customer_no フィールドに入れてください。
-3. 性別が判断できれば gender ("male" / "female") を入れてください。
-4. それ以外の「過去の施術履歴」や「メモ」と思われる部分は、 visit_history フィールドにまとめてください。
-5. 日本語で出力してください。
-6. JSON以外の余計な解説は含めないでください。
+1. 氏名を抽出し、「名字(last_name)」と「名前(first_name)」に分けてください。
+2. フリガナも名字(last_name_kana)と名前(first_name_kana)に分けてください。
+3. すべてのフリガナは必ず「全角カタカナ」で出力してください（ひらがなは禁止）。
+4. 電話番号、住所、郵便番号、生年月日、職業、アレルギー、リスク（注意点）を抽出してください。
+5. 「会員No」や「顧客No」があれば customer_no フィールドに入れてください。
+6. 性別が判断できれば gender ("male" / "female") を入れてください。
+7. それ以外の「過去の施術履歴」や「メモ」と思われる部分は、 visit_history フィールドにまとめてください。
+8. 日本語で出力してください。
+9. JSON以外の余計な解説は含めないでください。
 
 【期待するJSON構造】
 {
   "customer_no": "会員番号",
-  "name": "名前",
-  "name_kana": "ふりがな",
+  "last_name": "名字",
+  "first_name": "名前",
+  "last_name_kana": "ミョウジ",
+  "first_name_kana": "ナマエ",
   "phone": "電話番号",
   "postal_code": "郵便番号",
   "address": "住所",
@@ -85,6 +90,29 @@ ${rawText}
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         const jsonStr = jsonMatch ? jsonMatch[0] : text;
         const data = JSON.parse(jsonStr);
+
+        // Helper to force Katakana and Half-width
+        const toKatakana = (str: string) => str ? str.replace(/[\u3041-\u3096]/g, (ch: string) => 
+          String.fromCharCode(ch.charCodeAt(0) + 0x60)
+        ) : "";
+        
+        const toHalfWidth = (str: string) => str ? str.replace(/[！-～]/g, (s) => 
+          String.fromCharCode(s.charCodeAt(0) - 0xfee0)
+        ).replace(/　/g, " ") : "";
+
+        // Reconstruct full names and force Katakana
+        data.last_name_kana = toKatakana(data.last_name_kana);
+        data.first_name_kana = toKatakana(data.first_name_kana);
+        data.name_kana = data.name_kana || `${data.last_name_kana} ${data.first_name_kana}`.trim();
+        data.name_kana = toKatakana(data.name_kana);
+
+        data.name = data.name || `${data.last_name || ""} ${data.first_name || ""}`.trim();
+        
+        // Force half-width for customer_no
+        if (data.customer_no) {
+          data.customer_no = toHalfWidth(data.customer_no).replace(/\s/g, "");
+        }
+
         return { success: true, data };
       } catch (err: any) {
         console.error(`Error with model ${modelId}:`, err.message);
@@ -175,31 +203,6 @@ export type VisitRecord = {
 import { adminDb, adminStorage } from "@/lib/firebase-admin";
 import { getDownloadURL } from "firebase-admin/storage";
 
-export async function uploadScanImage(base64Image: string) {
-  try {
-    const bucket = adminStorage.bucket();
-    const base64Data = base64Image.split(",")[1] || base64Image;
-    const buffer = Buffer.from(base64Data, "base64");
-    
-    const fileName = `scans/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-    const file = bucket.file(fileName);
-    
-    await file.save(buffer, {
-      metadata: { contentType: "image/jpeg" },
-      public: true
-    });
-
-    // Make it public so it's viewable by eye
-    await file.makePublic();
-    
-    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
-    return { success: true, url: publicUrl };
-  } catch (error: any) {
-    console.error("Upload Error:", error);
-    return { success: false, error: error.message };
-  }
-}
-
 export async function registerScannedCustomer(
   customerData: Omit<Customer, 'id' | 'created_at' | 'updated_at'>,
   visitHistory?: string,
@@ -257,7 +260,7 @@ export async function registerScannedCustomer(
         const isEyelash = trimmedContent.includes("エクステ") || trimmedContent.includes("本");
         const isPerm = trimmedContent.includes("パーマ") || trimmedContent.includes("リフト");
         
-        await adminDb.collection("karte_records").add({
+        await addDoc(collection(db, "karte_records"), {
           customer_id: customerId,
           date: visitDate,
           staff_id: "scanned_import",

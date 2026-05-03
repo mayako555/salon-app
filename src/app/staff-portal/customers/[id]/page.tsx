@@ -87,7 +87,11 @@ export default function CustomerDetailPage() {
     if (!customer) return;
     setEditFormData({
       name: customer.name,
+      last_name: customer.last_name || customer.name.split(" ")[0],
+      first_name: customer.first_name || customer.name.split(" ")[1],
       name_kana: customer.name_kana,
+      last_name_kana: customer.last_name_kana || customer.name_kana.split(" ")[0],
+      first_name_kana: customer.first_name_kana || customer.name_kana.split(" ")[1],
       phone: customer.phone,
       email: customer.email,
       postal_code: customer.postal_code,
@@ -105,10 +109,17 @@ export default function CustomerDetailPage() {
   const handleSaveCustomer = async () => {
     if (typeof id !== 'string') return;
     setIsSaving(true);
-    const res = await updateCustomer(id, editFormData);
+    
+    const finalUpdate: any = {
+      ...editFormData,
+      name: `${editFormData.last_name || ""} ${editFormData.first_name || ""}`.trim(),
+      name_kana: `${editFormData.last_name_kana || ""} ${editFormData.first_name_kana || ""}`.trim(),
+    };
+
+    const res = await updateCustomer(id, finalUpdate);
     if (res.success) {
       toast.success("情報を更新しました");
-      setCustomer({ ...customer!, ...editFormData });
+      setCustomer({ ...customer!, ...finalUpdate });
       setIsEditOpen(false);
     } else {
       toast.error("更新に失敗しました");
@@ -117,7 +128,9 @@ export default function CustomerDetailPage() {
   };
 
   const handleShowLinkQr = () => {
-    setLinkUrl(window.location.origin + `/link-line/${id}`);
+    // 連携用ページへのURLを生成
+    const baseUrl = window.location.origin;
+    setLinkUrl(`${baseUrl}/link-line/${id}`);
     setIsLinkQrOpen(true);
   };
 
@@ -551,13 +564,33 @@ export default function CustomerDetailPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">お名前</label>
-                <Input value={editFormData.name || ""} onChange={e => setEditFormData({...editFormData, name: e.target.value})} />
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">名字 (姓)</label>
+                <Input value={editFormData.last_name || ""} onChange={e => setEditFormData({...editFormData, last_name: e.target.value})} />
               </div>
               <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">フリガナ</label>
-                <Input value={editFormData.name_kana || ""} onChange={e => setEditFormData({...editFormData, name_kana: e.target.value})} />
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">名前 (名)</label>
+                <Input value={editFormData.first_name || ""} onChange={e => setEditFormData({...editFormData, first_name: e.target.value})} />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">セイ (フリガナ)</label>
+                <Input 
+                  value={editFormData.last_name_kana || ""} 
+                  onChange={e => {
+                    const val = e.target.value.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
+                    setEditFormData({...editFormData, last_name_kana: val});
+                  }} 
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">メイ (フリガナ)</label>
+                <Input 
+                  value={editFormData.first_name_kana || ""} 
+                  onChange={e => {
+                    const val = e.target.value.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
+                    setEditFormData({...editFormData, first_name_kana: val});
+                  }} 
+                />
               </div>
               <div>
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">性別</label>
@@ -579,7 +612,13 @@ export default function CustomerDetailPage() {
               </div>
               <div>
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">お客様No.</label>
-                <Input value={editFormData.customer_no || ""} onChange={e => setEditFormData({...editFormData, customer_no: e.target.value})} />
+                <Input 
+                  value={editFormData.customer_no || ""} 
+                  onChange={e => {
+                    const val = e.target.value.replace(/[！-～]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0)).replace(/\s/g, "");
+                    setEditFormData({...editFormData, customer_no: val});
+                  }} 
+                />
               </div>
             </div>
 

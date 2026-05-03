@@ -16,8 +16,12 @@ export type Customer = {
   id: string;
   customer_no?: string; // お客様No.
   first_visit_date?: string; // 初来店日
-  name: string;
-  name_kana: string;
+  name: string; // Full name (e.g. "藤 衣")
+  last_name?: string; // 名字
+  first_name?: string; // 名前
+  name_kana: string; // Full kana (e.g. "フジ マイ")
+  last_name_kana?: string; // 名字フリガナ
+  first_name_kana?: string; // 名前フリガナ
   gender: 'male' | 'female' | 'other';
   phone: string;
   postal_code?: string; // 郵便番号
@@ -102,8 +106,14 @@ export async function getCustomerById(id: string): Promise<Customer | null> {
 export async function addCustomer(data: Omit<Customer, 'id' | 'created_at' | 'updated_at'>) {
   try {
     const colRef = collection(db, CUSTOMERS_COLLECTION);
+    
+    // Filter out undefined values
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+
     const docRef = await addDoc(colRef, {
-      ...data,
+      ...cleanData,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp(),
     });
@@ -118,8 +128,14 @@ export async function updateCustomer(id: string, data: Partial<Customer>) {
   try {
     const { doc, updateDoc } = await import("firebase/firestore");
     const docRef = doc(db, CUSTOMERS_COLLECTION, id);
+    
+    // Filter out undefined values to prevent Firestore errors
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+
     await updateDoc(docRef, {
-      ...data,
+      ...cleanData,
       updated_at: serverTimestamp(),
     });
     return { success: true };

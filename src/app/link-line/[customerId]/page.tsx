@@ -20,12 +20,21 @@ export default function LinkLinePage() {
     const initLiff = async () => {
       try {
         const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
-        if (!liffId) throw new Error("LIFF ID is not configured");
+        if (!liffId) {
+          console.error("LIFF ID is missing in environment variables");
+          setCustomerName("【設定エラー: LIFF ID未設定】");
+          setStatus("error");
+          setLoading(false);
+          return;
+        }
 
         await liff.init({ liffId });
         
-        if (typeof customerId === 'string') {
-          const customer = await getCustomerById(customerId);
+        // Use either customerId or id depending on the route param name
+        const targetId = (customerId || (params as any)?.id) as string;
+        
+        if (targetId) {
+          const customer = await getCustomerById(targetId);
           if (customer) {
             setCustomerName(customer.name);
           } else {

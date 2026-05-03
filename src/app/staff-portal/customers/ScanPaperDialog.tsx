@@ -29,6 +29,9 @@ import { registerScannedCustomer, performOCR, parseExtractedText } from "./actio
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
+import { storage } from "@/lib/firebase";
+import { ref, uploadString, getDownloadURL } from "firebase/storage";
+
 type ScanPaperDialogProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -64,21 +67,34 @@ export default function ScanPaperDialog({ isOpen, onClose, onExtracted }: ScanPa
     setIsUploading(true);
     
     try {
-      // Parallel: OCR/AI Parsing AND Uploading to Storage
-      const [ocrResult, uploadResult] = await Promise.all([
-        performOCR(imageData).then(async (res) => {
-          if (!res.success) return res;
-          const parseRes = await parseExtractedText(res.text || "");
-          return { ...res, parse: parseRes };
-        }),
-        import("./actions").then(m => m.uploadScanImage(imageData))
-      ]);
+      // 1. OCR/AI Parsing (Server Action)
+      const ocrPromise = performOCR(imageData).then(async (res) => {
+        if (!res.success) return res;
+        const parseRes = await parseExtractedText(res.text || "");
+        return { ...res, parse: parseRes };
+      });
+
+      // 2. Client-side Upload to Firebase Storage
+      const uploadPromise = (async () => {
+        try {
+          const fileName = `scans/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+          const storageRef = ref(storage, fileName);
+          // Standard web SDK upload
+          await uploadString(storageRef, imageData, "data_url");
+          const url = await getDownloadURL(storageRef);
+          return { success: true, url };
+        } catch (err: any) {
+          console.error("Upload Error:", err);
+          return { success: false, error: err.message };
+        }
+      })();
+
+      const [ocrResult, uploadResult] = await Promise.all([ocrPromise, uploadPromise]);
 
       // 1. Handle Upload Result
       if (uploadResult.success && uploadResult.url) {
         setScannedImages(prev => [...prev, uploadResult.url]);
       } else {
-        console.error("Upload failed:", uploadResult.error);
         toast.error("画像の保存に失敗しました。データのみ解析します。");
       }
 
@@ -136,9 +152,16 @@ export default function ScanPaperDialog({ isOpen, onClose, onExtracted }: ScanPa
     setIsRegistering(true);
     
     try {
-      // Ensure we use the latest state from the form fields
+      // Ensure we use the latest state and reconstruct full names
+      const lastName = extractedData.last_name || "";
+      const firstName = extractedData.first_name || "";
+      const lastNameKana = extractedData.last_name_kana || "";
+      const firstNameKana = extractedData.first_name_kana || "";
+
       const finalData: any = {
         ...extractedData,
+        name: extractedData.name || `${lastName} ${firstName}`.trim(),
+        name_kana: extractedData.name_kana || `${lastNameKana} ${firstNameKana}`.trim(),
         is_active: true,
         has_allergy: (extractedData.allergies?.length ?? 0) > 0,
       };
@@ -304,24 +327,53 @@ export default function ScanPaperDialog({ isOpen, onClose, onExtracted }: ScanPa
                   <div className="space-y-4">
                     <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-1">基本情報 (AI読取・手動修正可)</h4>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2">
-                        <label className="text-[10px] font-bold text-slate-500">お名前</label>
+                      {/* Name Split */}
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500">姓 (名字)</label>
                         <Input 
-                          value={extractedData.name || ""} 
-                          onChange={e => setExtractedData({...extractedData, name: e.target.value})}
-                          className="h-10 text-base font-black bg-white border-slate-200 focus:border-blue-500 rounded-xl"
-                          placeholder="未入力"
+                          value={extractedData.last_name || ""} 
+                          onChange={e => setExtractedData({...extractedData, last_name: e.target.value})}
+                          className="h-10 text-base font-black bg-white border-slate-200 rounded-xl"
+                          placeholder="姓"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-bold text-slate-500">フリガナ</label>
+                        <label className="text-[10px] font-bold text-slate-500">名 (名前)</label>
                         <Input 
-                          value={extractedData.name_kana || ""} 
-                          onChange={e => setExtractedData({...extractedData, name_kana: e.target.value})}
+                          value={extractedData.first_name || ""} 
+                          onChange={e => setExtractedData({...extractedData, first_name: e.target.value})}
+                          className="h-10 text-base font-black bg-white border-slate-200 rounded-xl"
+                          placeholder="名"
+                        />
+                      </div>
+
+                      {/* Kana Split with Auto-Katakana */}
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500">セイ (フリガナ)</label>
+                        <Input 
+                          value={extractedData.last_name_kana || ""} 
+                          onChange={e => {
+                            const val = e.target.value.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
+                            setExtractedData({...extractedData, last_name_kana: val});
+                          }}
                           className="h-9 text-sm bg-white rounded-lg"
+                          placeholder="セイ"
                         />
                       </div>
                       <div>
+                        <label className="text-[10px] font-bold text-slate-500">メイ (フリガナ)</label>
+                        <Input 
+                          value={extractedData.first_name_kana || ""} 
+                          onChange={e => {
+                            const val = e.target.value.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
+                            setExtractedData({...extractedData, first_name_kana: val});
+                          }}
+                          className="h-9 text-sm bg-white rounded-lg"
+                          placeholder="メイ"
+                        />
+                      </div>
+
+                      <div className="col-span-1">
                         <label className="text-[10px] font-bold text-slate-500">電話番号</label>
                         <Input 
                           value={extractedData.phone || ""} 
@@ -329,7 +381,7 @@ export default function ScanPaperDialog({ isOpen, onClose, onExtracted }: ScanPa
                           className="h-9 text-sm font-mono bg-white rounded-lg"
                         />
                       </div>
-                      <div>
+                      <div className="col-span-1">
                         <label className="text-[10px] font-bold text-slate-500">生年月日</label>
                         <Input 
                           type="date"
@@ -342,8 +394,12 @@ export default function ScanPaperDialog({ isOpen, onClose, onExtracted }: ScanPa
                         <label className="text-[10px] font-bold text-slate-500">会員No</label>
                         <Input 
                           value={extractedData.customer_no || ""} 
-                          onChange={e => setExtractedData({...extractedData, customer_no: e.target.value})}
+                          onChange={e => {
+                            const val = e.target.value.replace(/[！-～]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0)).replace(/\s/g, "");
+                            setExtractedData({...extractedData, customer_no: val});
+                          }}
                           className="h-9 text-sm font-mono bg-white rounded-lg"
+                          placeholder="半角英数字"
                         />
                       </div>
                       <div className="col-span-2">
