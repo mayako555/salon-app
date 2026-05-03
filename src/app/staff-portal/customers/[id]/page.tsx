@@ -39,7 +39,8 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogFooter 
+  DialogFooter,
+  DialogTrigger
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -411,6 +412,53 @@ export default function CustomerDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Scanned Charts (Visual Check) Section */}
+        {customer.chart_image_urls && customer.chart_image_urls.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 px-1">
+              <Camera className="text-blue-500" size={24} /> スキャン済み紙カルテ (目視確認)
+            </h2>
+            <Card className="rounded-3xl p-6 border-none shadow-sm space-y-6">
+              <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                {customer.chart_image_urls.map((url, i) => (
+                  <Dialog key={i}>
+                    <DialogTrigger asChild>
+                      <button className="relative flex-shrink-0 w-32 h-44 rounded-2xl overflow-hidden border-2 border-slate-100 shadow-sm hover:scale-105 transition-transform bg-white group">
+                        <img src={url} alt={`Scanned page ${i+1}`} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors">
+                          <Info className="text-white opacity-0 group-hover:opacity-100" size={24} />
+                        </div>
+                        <div className="absolute top-2 left-2 bg-black/50 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
+                          #{i+1}
+                        </div>
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl h-[90vh] p-0 overflow-hidden bg-black/95 border-none rounded-none sm:rounded-[2rem]">
+                      <div className="relative w-full h-full flex items-center justify-center p-4">
+                        <img src={url} className="max-w-full max-h-full object-contain shadow-2xl" alt="Full scan" />
+                        <div className="absolute top-6 left-6 text-white bg-black/40 backdrop-blur-md px-4 py-2 rounded-full font-black text-sm border border-white/20">
+                          スキャン原本 #{i+1}
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                ))}
+              </div>
+
+              {customer.notes && (
+                <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+                  <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                    <ClipboardList size={10} /> インポート時のAI書き起こしメモ
+                  </h4>
+                  <p className="text-xs text-slate-600 leading-relaxed font-medium whitespace-pre-wrap">
+                    {customer.notes}
+                  </p>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
 
         {/* Counseling History Section */}
         <div className="space-y-4">

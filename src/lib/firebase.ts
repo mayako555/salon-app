@@ -1,8 +1,10 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { Firestore, initializeFirestore, getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
+// ... existing config ...
   apiKey: "AIzaSyBox-c3ZDIe0TNoAR3wDNlypyP-HA1tF98",
   authDomain: "salonapp-ee4d2.firebaseapp.com",
   projectId: "salonapp-ee4d2",
@@ -26,5 +28,6 @@ try {
 }
 
 const auth = getAuth(app);
+const storage = getStorage(app);
 
-export { db, auth };
+export { db, auth, storage };

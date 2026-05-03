@@ -50,40 +50,52 @@ ${rawText}
 `;
 
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_CLOUD_VISION_API_KEY;
-    const modelId = "gemini-2.0-flash";
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
-
-    console.log(`Attempting Gemini parsing via direct REST API (v1beta) with model: ${modelId}...`);
     
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
-    });
+    // Priority: Try models that are more likely to have free quota (1.5, flash-latest, then 2.0)
+    const modelIds = ["gemini-1.5-flash", "gemini-flash-latest", "gemini-1.5-flash-8b", "gemini-2.0-flash-exp", "gemini-2.0-flash"];
+    let lastError = null;
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Gemini API Error (${response.status}): ${JSON.stringify(errorData)}`);
+    for (const modelId of modelIds) {
+      try {
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+        console.log(`Attempting Gemini parsing (v1beta) with model: ${modelId}...`);
+        
+        const response = await fetch(apiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.warn(`Model ${modelId} failed:`, errorData.error?.message || response.status);
+          lastError = errorData.error?.message || response.status;
+          continue; // Try next model
+        }
+
+        const result = await response.json();
+        const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (!text) throw new Error("Empty response");
+
+        console.log(`Success with model: ${modelId}!`);
+        
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : text;
+        const data = JSON.parse(jsonStr);
+        return { success: true, data };
+      } catch (err: any) {
+        console.error(`Error with model ${modelId}:`, err.message);
+        lastError = err.message;
+        continue;
+      }
     }
 
-    const result = await response.json();
-    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (!text) {
-      throw new Error("Gemini returned empty response.");
-    }
-
-    console.log(`Success with direct API! Raw Response:`, text);
-    
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    const jsonStr = jsonMatch ? jsonMatch[0] : text;
-    const data = JSON.parse(jsonStr);
-    console.log("Parsed AI Data:", data);
-    return { success: true, data };
+    throw new Error(lastError || "All Gemini models failed.");
   } catch (error: any) {
-    console.error("Gemini Parsing Error (Direct API):", error);
+    console.error("Gemini Parsing Error (Fallback Loop):", error);
     return { success: false, error: error.message };
   }
 }
@@ -160,13 +172,51 @@ export type VisitRecord = {
   created_at: any;
 };
 
+import { adminDb, adminStorage } from "@/lib/firebase-admin";
+import { getDownloadURL } from "firebase-admin/storage";
+
+export async function uploadScanImage(base64Image: string) {
+  try {
+    const bucket = adminStorage.bucket();
+    const base64Data = base64Image.split(",")[1] || base64Image;
+    const buffer = Buffer.from(base64Data, "base64");
+    
+    const fileName = `scans/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+    const file = bucket.file(fileName);
+    
+    await file.save(buffer, {
+      metadata: { contentType: "image/jpeg" },
+      public: true
+    });
+
+    // Make it public so it's viewable by eye
+    await file.makePublic();
+    
+    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+    return { success: true, url: publicUrl };
+  } catch (error: any) {
+    console.error("Upload Error:", error);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function registerScannedCustomer(
   customerData: Omit<Customer, 'id' | 'created_at' | 'updated_at'>,
-  visitHistory?: string
+  visitHistory?: string,
+  imageUrls: string[] = []
 ) {
   try {
+    // Ensure chart_image_urls and notes are included
+    const dataToSave = {
+      ...customerData,
+      chart_image_urls: imageUrls,
+      notes: visitHistory,
+      is_active: true,
+      has_allergy: (customerData.allergies?.length ?? 0) > 0,
+    };
+
     // 1. Create the customer record
-    const res = await addCustomer(customerData);
+    const res = await addCustomer(dataToSave as any);
     
     if (!res.success || !res.id) {
       throw new Error(res.error || "Failed to create customer");
@@ -174,33 +224,30 @@ export async function registerScannedCustomer(
 
     const customerId = res.id;
 
-    // 2. Add an initial counseling response (if data exists)
-    // We treat the scanned "Counseling sheet" info as a counseling record
+    // 2. Add an initial counseling response
     await addCounselingResponse({
       customer_id: customerId,
-      service_types: [], // Scanned info might not specify
+      service_types: [],
       gender: customerData.gender as any,
       answers: {
         is_scanned: true,
         allergies: customerData.allergies,
         risk_flags: customerData.risk_flags,
-        scanned_history: visitHistory
+        scanned_history: visitHistory,
+        image_urls: imageUrls
       },
       risk_level: customerData.risk_level || 'none',
       risk_flags: customerData.risk_flags || [],
       signed_at: new Date()
     });
 
-    // 3. If there's visit history, add it to a karte_records collection
+    // 3. Process visit history (same as before but more robust)
     if (visitHistory) {
-      // Split by double newline or date-like patterns to separate visits
       const visitEntries = visitHistory.split(/\n\n|(?=\d{4}\/\d{1,2}\/\d{1,2})/).filter(v => v.trim().length > 0);
-      
       for (const visitContent of visitEntries) {
         const trimmedContent = visitContent.trim();
         if (!trimmedContent) continue;
 
-        // Try to extract date (e.g. 2024/01/15)
         const dateMatch = trimmedContent.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
         let visitDate = new Date();
         if (dateMatch) {
@@ -210,7 +257,7 @@ export async function registerScannedCustomer(
         const isEyelash = trimmedContent.includes("エクステ") || trimmedContent.includes("本");
         const isPerm = trimmedContent.includes("パーマ") || trimmedContent.includes("リフト");
         
-        await addDoc(collection(db, "karte_records"), {
+        await adminDb.collection("karte_records").add({
           customer_id: customerId,
           date: visitDate,
           staff_id: "scanned_import",
@@ -222,7 +269,7 @@ export async function registerScannedCustomer(
             count: parseInt(trimmedContent.match(/(\d+)本/)?.[1] || "0")
           },
           notes: trimmedContent,
-          photos: [], // We don't have individual images per visit in this simple string version
+          photos: imageUrls, // Link original photos to each record as well
           created_at: serverTimestamp(),
           edit_history: []
         });

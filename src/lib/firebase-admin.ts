@@ -16,49 +16,41 @@ function createDummyProxy<T extends object>(): T {
   });
 }
 
-// We use require to avoid top-level evaluation if we are in build phase
 let adminAuth: any;
 let adminDb: any;
+let adminStorage: any;
 
 try {
   if (isBuild) {
     adminAuth = createDummyProxy();
     adminDb = createDummyProxy();
+    adminStorage = createDummyProxy();
   } else {
     // Only require firebase-admin at runtime
     const admin = require("firebase-admin");
 
     const getPrivateKey = () => {
+      // ... (existing code for getPrivateKey)
       const key = process.env.FIREBASE_PRIVATE_KEY;
       if (!key) return null;
-      
-      // If user pasted the entire JSON file contents by mistake
       if (key.trim().startsWith('{')) {
         try {
           const parsed = JSON.parse(key);
-          if (parsed.private_key) {
-            return parsed.private_key.replace(/\\n/g, "\n");
-          }
-        } catch (e) {
-          console.error("Failed to parse FIREBASE_PRIVATE_KEY as JSON");
-        }
+          if (parsed.private_key) return parsed.private_key.replace(/\\n/g, "\n");
+        } catch (e) {}
       }
-      
       return key.replace(/\\n/g, "\n").replace(/\"/g, "").trim();
     };
 
     const getClientEmail = () => {
+      // ... (existing code for getClientEmail)
       const email = process.env.FIREBASE_CLIENT_EMAIL;
       if (email) return email;
-      
-      // Fallback: try to extract from JSON in FIREBASE_PRIVATE_KEY
       const key = process.env.FIREBASE_PRIVATE_KEY;
       if (key && key.trim().startsWith('{')) {
         try {
           const parsed = JSON.parse(key);
-          if (parsed.client_email) {
-            return parsed.client_email;
-          }
+          if (parsed.client_email) return parsed.client_email;
         } catch (e) {}
       }
       return undefined;
@@ -76,20 +68,25 @@ try {
       
       if (firebaseAdminConfig.clientEmail && hasValidKey) {
         admin.initializeApp({
-          credential: admin.credential.cert(firebaseAdminConfig)
+          credential: admin.credential.cert(firebaseAdminConfig),
+          storageBucket: "salonapp-ee4d2.firebasestorage.app"
         });
       } else {
-        admin.initializeApp();
+        admin.initializeApp({
+          storageBucket: "salonapp-ee4d2.firebasestorage.app"
+        });
       }
     }
 
     adminAuth = admin.auth();
     adminDb = admin.firestore();
+    adminStorage = admin.storage();
   }
 } catch (error) {
   console.error("CRITICAL: Firebase Admin failed to load:", error);
   adminAuth = createDummyProxy();
   adminDb = createDummyProxy();
+  adminStorage = createDummyProxy();
 }
 
-export { adminAuth, adminDb };
+export { adminAuth, adminDb, adminStorage };
