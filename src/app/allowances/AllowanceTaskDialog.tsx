@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { X, CheckCircle2, MessageSquare, Edit3, Megaphone, HelpCircle } from "lucide-react";
-import { AllowanceTaskStatus, saveStaffAllowanceTask, markAllowanceChecked, AllowanceType } from "./actions";
+import { X, CheckCircle2, MessageSquare, Edit3, Megaphone, HelpCircle, Trash2, Loader2 } from "lucide-react";
+import { AllowanceTaskStatus, saveStaffAllowanceTask, markAllowanceChecked, AllowanceType, deleteAllowance } from "./actions";
 
 type AllowanceTaskDialogProps = {
   task: AllowanceTaskStatus;
@@ -14,12 +14,20 @@ type AllowanceTaskDialogProps = {
 
 export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }: AllowanceTaskDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   
   // States for each allowance type (Review, Blog, SNS, Treatment)
   const [reviewCount, setReviewCount] = useState("");
   const [blogCount, setBlogCount] = useState("");
   const [snsCount, setSnsCount] = useState("");
   const [treatmentCount, setTreatmentCount] = useState("");
+  
+  const [reviewStore, setReviewStore] = useState("六甲");
+  const [blogStore, setBlogStore] = useState("六甲");
+  const [snsStore, setSnsStore] = useState("六甲");
+  const [treatmentStore, setTreatmentStore] = useState("六甲");
+
+  const STORES = ["六甲", "元町", "神戸"];
 
   const calculateAmount = (type: AllowanceType, countStr: string) => {
     const count = parseInt(countStr || "0", 10);
@@ -37,16 +45,16 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
       const allowances = [];
       
       const rAmount = calculateAmount("review", reviewCount);
-      if (rAmount > 0) allowances.push({ type: "review" as AllowanceType, amount: rAmount, target_details: { count: parseInt(reviewCount) } });
+      if (rAmount > 0) allowances.push({ type: "review" as AllowanceType, amount: rAmount, store_name: reviewStore, target_details: { count: parseInt(reviewCount) } });
       
       const bAmount = calculateAmount("blog", blogCount);
-      if (bAmount > 0) allowances.push({ type: "blog" as AllowanceType, amount: bAmount, target_details: { count: parseInt(blogCount) } });
+      if (bAmount > 0) allowances.push({ type: "blog" as AllowanceType, amount: bAmount, store_name: blogStore, target_details: { count: parseInt(blogCount) } });
       
       const sAmount = calculateAmount("sns", snsCount);
-      if (sAmount > 0) allowances.push({ type: "sns" as AllowanceType, amount: sAmount, target_details: { count: parseInt(snsCount) } });
+      if (sAmount > 0) allowances.push({ type: "sns" as AllowanceType, amount: sAmount, store_name: snsStore, target_details: { count: parseInt(snsCount) } });
       
       const tAmount = calculateAmount("treatment", treatmentCount);
-      if (tAmount > 0) allowances.push({ type: "treatment" as AllowanceType, amount: tAmount, target_details: { count: parseInt(treatmentCount) } });
+      if (tAmount > 0) allowances.push({ type: "treatment" as AllowanceType, amount: tAmount, store_name: treatmentStore, target_details: { count: parseInt(treatmentCount) } });
 
       const res = await saveStaffAllowanceTask({
         staff_id: task.staff_id,
@@ -60,10 +68,26 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
       } else {
         alert(res.error);
       }
-    } catch (err) {
-      alert("エラーが発生しました");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteAllowance = async (id: string) => {
+    if (!confirm("この手当データを削除してよろしいですか？")) return;
+    
+    setIsDeleting(id);
+    try {
+      const res = await deleteAllowance(id);
+      if (res.success) {
+        onSuccess(); // Refresh parent data
+      } else {
+        alert(res.error);
+      }
+    } catch (err) {
+      alert("削除中にエラーが発生しました");
+    } finally {
+      setIsDeleting(null);
     }
   };
 
@@ -116,8 +140,23 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
                       {a.type === 'transport' && <span className="text-slate-500">🚆</span>}
                       {a.type === 'other' && <span className="text-slate-500">📦</span>}
                       {a.type === 'review' ? '口コミ' : a.type === 'blog' ? 'ブログ' : a.type === 'sns' ? 'SNS' : a.type === 'treatment' ? 'トリートメント' : a.type === 'transport' ? '交通費申請' : 'その他'}
+                      {a.store_name && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 ml-1">
+                          {a.store_name}
+                        </span>
+                      )}
                     </span>
-                    <span className="font-bold text-emerald-600">¥{a.amount.toLocaleString()}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="font-bold text-emerald-600">¥{a.amount.toLocaleString()}</span>
+                      <button 
+                        type="button"
+                        onClick={() => handleDeleteAllowance(a.id)}
+                        disabled={isDeleting === a.id}
+                        className="text-slate-300 hover:text-rose-500 transition-colors p-1"
+                      >
+                        {isDeleting === a.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -137,6 +176,9 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
                   <p className="text-xs text-slate-500 mt-0.5">星5の件数 × 500円</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <select value={reviewStore} onChange={e => setReviewStore(e.target.value)} className="h-10 px-2 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-emerald-500/20">
+                    {STORES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                   <input type="number" min="0" value={reviewCount} onChange={e => setReviewCount(e.target.value)} placeholder="0" className="w-16 h-10 px-2 border border-slate-300 rounded-md text-center font-bold" />
                   <span className="text-sm font-medium text-slate-600">件</span>
                 </div>
@@ -155,6 +197,9 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
                   <p className="text-xs text-slate-500 mt-0.5">SNS経由予約数 × 500円</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <select value={snsStore} onChange={e => setSnsStore(e.target.value)} className="h-10 px-2 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-emerald-500/20">
+                    {STORES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                   <input type="number" min="0" value={snsCount} onChange={e => setSnsCount(e.target.value)} placeholder="0" className="w-16 h-10 px-2 border border-slate-300 rounded-md text-center font-bold" />
                   <span className="text-sm font-medium text-slate-600">件</span>
                 </div>
@@ -173,6 +218,9 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
                   <p className="text-xs text-slate-500 mt-0.5">5本以上で 3,000円支給</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <select value={blogStore} onChange={e => setBlogStore(e.target.value)} className="h-10 px-2 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-emerald-500/20">
+                    {STORES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                   <input type="number" min="0" value={blogCount} onChange={e => setBlogCount(e.target.value)} placeholder="0" className="w-16 h-10 px-2 border border-slate-300 rounded-md text-center font-bold" />
                   <span className="text-sm font-medium text-slate-600">本</span>
                 </div>
@@ -191,6 +239,9 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
                   <p className="text-xs text-slate-500 mt-0.5">10件達成で 5,000円支給</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <select value={treatmentStore} onChange={e => setTreatmentStore(e.target.value)} className="h-10 px-2 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-emerald-500/20">
+                    {STORES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                   <input type="number" min="0" value={treatmentCount} onChange={e => setTreatmentCount(e.target.value)} placeholder="0" className="w-16 h-10 px-2 border border-slate-300 rounded-md text-center font-bold" />
                   <span className="text-sm font-medium text-slate-600">件</span>
                 </div>

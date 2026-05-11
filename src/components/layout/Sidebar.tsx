@@ -14,7 +14,9 @@ import {
   Settings,
   Scissors,
   Train,
-  QrCode
+  QrCode,
+  Database,
+  BookOpen
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -28,6 +30,7 @@ import { useAuth } from "@/lib/auth-context";
 const managementNav = [
   { name: "ダッシュボード", href: "/dashboard", icon: LayoutDashboard, role: "staff" },
   { name: "売上管理", href: "/sales", icon: Coins, role: "staff" },
+  { name: "マスタ管理", href: "/staff-portal/sales/master", icon: Database, role: "admin" },
   { name: "勤怠管理", href: "/attendance", icon: Clock, role: "staff" },
   { name: "シフト管理", href: "/shifts", icon: CalendarDays, role: "manager" },
   { name: "スタッフ管理", href: "/staff", icon: Users, role: "admin" },
@@ -43,6 +46,7 @@ const staffNav = [
   { name: "自分の明細を確認", href: "/staff-portal/payroll", icon: Calculator },
   { name: "希望休の提出", href: "/staff-portal/holidays", icon: CalendarDays },
   { name: "交通費の申請", href: "/staff-portal/transport", icon: Train },
+  { name: "就業規則", href: "/staff-portal/rules", icon: BookOpen },
 ];
 
 export function Sidebar() {

@@ -29,6 +29,7 @@ import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
+import AdvancedCharts from "./AdvancedCharts";
 
 export default function DashboardPage() {
   const { profile, isAdmin, isManager } = useAuth();
@@ -122,9 +123,9 @@ export default function DashboardPage() {
               <CardContent className="flex flex-col items-center gap-6">
                 <div className="bg-white p-4 rounded-2xl shadow-inner border border-slate-100">
                   <QRCodeSVG 
-                    value={profile?.id || "unknown"} 
+                    value={`salon-auth:${profile?.id || "unknown"}`} 
                     size={200}
-                    level="H"
+                    level="M"
                     includeMargin={true}
                     fgColor="#0f172a"
                   />
@@ -351,6 +352,8 @@ export default function DashboardPage() {
                 </Card>
               </Link>
             </div>
+
+            <AdvancedCharts />
 
             <div className="grid gap-6 md:grid-cols-2">
               <Card className="col-span-1 bg-white border-none shadow-sm">

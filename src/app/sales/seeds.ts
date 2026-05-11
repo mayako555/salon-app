@@ -16,6 +16,7 @@ export type SalesMasterItem = {
   isActive: boolean;
   staffAssignable?: boolean;
   equipmentAssignable?: boolean;
+  sortOrder?: number;
   created_at?: any;
   updated_at?: any;
 };
@@ -52,35 +53,69 @@ const MOTOMACHI_DATA: Partial<SalesMasterItem>[] = [
 ];
 
 const KOBE_DATA: Partial<SalesMasterItem>[] = [
-  // 通常メニュー
-  { itemType: "menu", category: "上まつげ", name: "上まつげ 60本", price: 5900 },
-  { itemType: "menu", category: "上まつげ", name: "上まつげ 80本", price: 6500 },
-  { itemType: "menu", category: "上まつげ", name: "上まつげ 100本", price: 7500 },
-  { itemType: "menu", category: "上まつげ", name: "上まつげ 120本", price: 8500 },
-  { itemType: "menu", category: "上まつげ", name: "上まつげ 140本", price: 9500 },
-  { itemType: "menu", category: "まつげパーマ", name: "次世代似合わせまつげパーマ（ラッシュリフト）", price: 6500 },
-  { itemType: "menu", category: "アイブロウ", name: "美眉スタイリング＆WAX", price: 5500 },
-  // クーポン
-  { itemType: "coupon", category: "お試し", name: "選べるラッシュリフトお試し", price: 4400 },
-  { itemType: "coupon", category: "つけ放題", name: "フラットラッシュ60分つけ放題", price: 5980 },
-  { itemType: "coupon", category: "Healthy", name: "＆Healthy（100本＋まつげパーマ）", price: 8800 },
-  // メッセージクーポン
-  { itemType: "messageCoupon", category: "再来", name: "Welcome Backクーポン", price: 5000 },
-  { itemType: "messageCoupon", category: "つけ放題", name: "シルクエクステ90分つけ放題 3980円", price: 3980 }
+  // アイブロウメニュー
+  { itemType: "menu", category: "アイブロウメニュー", name: "アイブロウワックス", price: 5500 },
+  { itemType: "menu", category: "アイブロウメニュー", name: "アイブロウワックス＋間引き", price: 6500 },
+  { itemType: "menu", category: "アイブロウメニュー", name: "ハリウッドブロウリフト", price: 7500 },
+  
+  // マツエクメニュー
+  { itemType: "menu", category: "マツエクメニュー", name: "上マツエク60本", price: 4500 },
+  { itemType: "menu", category: "マツエクメニュー", name: "上マツエク80本", price: 5500 },
+  { itemType: "menu", category: "マツエクメニュー", name: "上マツエク100本", price: 6500 },
+  { itemType: "menu", category: "マツエクメニュー", name: "上マツエク120本", price: 7500 },
+  { itemType: "menu", category: "マツエクメニュー", name: "上マツエク140本", price: 8500 },
+  { itemType: "menu", category: "マツエクメニュー", name: "上マツエク160本", price: 9500 },
+  { itemType: "menu", category: "マツエクメニュー", name: "上マツエク180本", price: 10500 },
+  { itemType: "menu", category: "マツエクメニュー", name: "上マツエク200本", price: 11500 },
+  { itemType: "menu", category: "マツエクメニュー", name: "上マツエクつけ放題1h", price: 7000 },
+  { itemType: "menu", category: "マツエクメニュー", name: "上マツエクつけ放題1.5h", price: 9000 },
+  { itemType: "menu", category: "マツエクメニュー", name: "上マツエクつけ放題2h", price: 11000 },
+  { itemType: "menu", category: "マツエクメニュー", name: "下マツエク30本まで", price: 3500 },
+  { itemType: "menu", category: "マツエクメニュー", name: "下マツエクつけ放題", price: 5500 },
+  
+  // まつ毛パーマメニュー
+  { itemType: "menu", category: "まつ毛パーマメニュー", name: "上まつ毛パーマ", price: 6500 },
+  { itemType: "menu", category: "まつ毛パーマメニュー", name: "下まつ毛パーマ", price: 5000 },
+  { itemType: "menu", category: "まつ毛パーマメニュー", name: "上下まつげパーマ", price: 10000 },
+  
+  // 毛質変更
+  { itemType: "menu", category: "毛質変更", name: "セーブルに変更", price: 1100 },
+  { itemType: "menu", category: "毛質変更", name: "カシミアに変更", price: 1650 },
+  { itemType: "menu", category: "毛質変更", name: "カラー部分変更", price: 1100 },
+  { itemType: "menu", category: "毛質変更", name: "カラー全体変更", price: 2200 },
+  { itemType: "menu", category: "毛質変更", name: "カラーカシミアに変更", price: 2750 },
+  { itemType: "menu", category: "毛質変更", name: "２Dボリュームラッシュ", price: 2200 },
+  { itemType: "menu", category: "毛質変更", name: "３Dボリュームラッシュ", price: 3300 },
+  { itemType: "menu", category: "毛質変更", name: "４Dボリュームラッシュ", price: 4400 },
+  { itemType: "menu", category: "毛質変更", name: "５Dボリュームラッシュ", price: 5500 },
+  { itemType: "menu", category: "毛質変更", name: "カラー３D", price: 3850 },
+  { itemType: "menu", category: "毛質変更", name: "アニメワンホン", price: 2200 },
+  { itemType: "menu", category: "毛質変更", name: "ボリュームワンホン", price: 3300 },
+  { itemType: "menu", category: "毛質変更", name: "バインドロック", price: 3300 },
+  { itemType: "menu", category: "毛質変更", name: "アンドヘルシー", price: 3300 },
+  
+  // 付け替えオフ
+  { itemType: "menu", category: "付け替えオフ", name: "他店付け替えオフ", price: 1100 },
+  { itemType: "menu", category: "付け替えオフ", name: "当店付け替えオフ", price: 0 },
+  { itemType: "menu", category: "付け替えオフ", name: "他店オフのみ", price: 2200 },
+  { itemType: "menu", category: "付け替えオフ", name: "当店オフのみ", price: 1100 },
+  { itemType: "menu", category: "付け替えオフ", name: "他店LEDオフ", price: 3300 },
+  { itemType: "menu", category: "付け替えオフ", name: "他店バインドロックオフ", price: 3300 },
+  
+  // その他オプション / その他
+  { itemType: "menu", category: "その他オプション", name: "指名料", price: 550 },
+  { itemType: "menu", category: "その他オプション", name: "アイシャンプー", price: 550 },
+  { itemType: "menu", category: "その他オプション", name: "アイパック", price: 550 },
+  { itemType: "menu", category: "その他オプション", name: "トリートメント上", price: 1100 },
+  { itemType: "menu", category: "その他オプション", name: "トリートメント上下", price: 2200 },
+  { itemType: "menu", category: "その他オプション", name: "スペシャルケア上", price: 2200 },
+  { itemType: "menu", category: "その他オプション", name: "スペシャルケア上下", price: 3300 },
+  { itemType: "menu", category: "その他オプション", name: "トリートメントキャンペーン", price: 550 },
+  { itemType: "menu", category: "その他", name: "低刺激グルー", price: 550 },
+  { itemType: "menu", category: "その他", name: "LEDグルー", price: 2200 }
 ];
 
-const ROKKO_DATA: Partial<SalesMasterItem>[] = [
-  // 通常メニュー
-  { itemType: "menu", category: "親子割", name: "親子割 100本まで", price: 5000 },
-  { itemType: "menu", category: "上まつげ", name: "上まつげ 100本", price: 7500 },
-  { itemType: "menu", category: "パーマ", name: "似合わせラッシュリフト", price: 6500 },
-  // クーポン
-  { itemType: "coupon", category: "お試し", name: "上下ラッシュリフトお試し", price: 6600 },
-  { itemType: "coupon", category: "Healthy", name: "＆Healthy（100本＋まつげパーマ）", price: 8800 },
-  // メッセージクーポン
-  { itemType: "messageCoupon", category: "割引", name: "1000円割引クーポン", price: -1000 },
-  { itemType: "messageCoupon", category: "限定", name: "DM限定 上まつげ120本コース 5510円", price: 5510 }
-];
+const ROKKO_DATA: Partial<SalesMasterItem>[] = [...KOBE_DATA];
 
 export async function seedSalesMasterData() {
   const batch = writeBatch(db);

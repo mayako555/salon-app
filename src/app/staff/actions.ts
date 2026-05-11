@@ -54,10 +54,14 @@ export async function getStaffList(): Promise<StaffProfile[]> {
       return [];
     }
 
-    const staff = snapshot.docs.map((doc: any) => ({
-      id: doc.id,
-      ...doc.data()
-    })) as StaffProfile[];
+    const staff = snapshot.docs.map((doc: any) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null)
+      };
+    }) as StaffProfile[];
 
     // Sort in-memory instead
     return staff.sort((a, b) => {

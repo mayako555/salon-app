@@ -27,7 +27,15 @@ export async function getStoreTargets(month: string): Promise<StoreTarget[]> {
     const colRef = collection(db, STORE_TARGETS_COLLECTION);
     const q = query(colRef, where("month", "==", month));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as StoreTarget[];
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        store_name: data.store_name,
+        month: data.month,
+        target: data.target
+      };
+    }) as StoreTarget[];
   } catch (error) {
     console.error("Error fetching store targets:", error);
     return [];

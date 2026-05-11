@@ -21,25 +21,34 @@ const MASTER_COLLECTION = "sales_master";
 export async function getMasterItems(store?: string): Promise<SalesMasterItem[]> {
   try {
     const colRef = collection(db, MASTER_COLLECTION);
-    let q;
-    if (store && store !== "all") {
-      q = query(colRef, where("store", "==", store), orderBy("itemType"), orderBy("name"));
-    } else {
-      q = query(colRef, orderBy("store"), orderBy("itemType"), orderBy("name"));
-    }
     
-    const getDocsWithTimeout = Promise.race([
-      getDocs(q),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Firestore fetch timed out (10s)")), 10000)
-      )
-    ]);
+    // インデックスエラーを避けるため、一旦全件取得（データ量が少ないマスタではこの方が安全）
+    const snapshot = await getDocs(colRef);
+    let items = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        // Timestampオブジェクトをミリ秒に変換してプレーンなオブジェクトにする
+        created_at: data.created_at?.toMillis?.() || data.created_at || null,
+        updated_at: data.updated_at?.toMillis?.() || data.updated_at || null,
+      };
+    }) as SalesMasterItem[];
 
-    const snapshot = await getDocsWithTimeout as any;
-    return snapshot.docs.map((doc: any) => ({
-      id: doc.id,
-      ...doc.data()
-    })) as SalesMasterItem[];
+    // 店舗フィルタ（特定店舗 + 共通）
+    if (store && store !== "all") {
+      items = items.filter(item => item.store === store || item.store === "共通");
+    }
+
+    // メモリ上で並べ替え（並び順、店舗、アイテムタイプ、名前の順）
+    return items.sort((a, b) => {
+      const orderA = a.sortOrder ?? 999;
+      const orderB = b.sortOrder ?? 999;
+      if (orderA !== orderB) return orderA - orderB;
+      if (a.store !== b.store) return a.store.localeCompare(b.store);
+      if (a.itemType !== b.itemType) return a.itemType.localeCompare(b.itemType);
+      return a.name.localeCompare(b.name);
+    });
   } catch (error: any) {
     console.error("Error fetching master items:", error);
     return [];
@@ -61,6 +70,7 @@ export async function upsertMasterItem(data: Partial<SalesMasterItem>) {
       restrictions: data.restrictions || "",
       notes: data.notes || "",
       isActive: data.isActive !== undefined ? data.isActive : true,
+      sortOrder: data.sortOrder !== undefined ? data.sortOrder : 999,
       staffAssignable: !!data.staffAssignable,
       equipmentAssignable: !!data.equipmentAssignable,
       updated_at: serverTimestamp()
@@ -154,6 +164,19 @@ export async function toggleItemStatus(id: string, active: boolean) {
     return { success: true };
   } catch (error: any) {
     console.error("Error toggling status:", error);
+    return { success: false, error: error.message };
+  }
+}export async function updateMasterItemOrder(id: string, newOrder: number) {
+  try {
+    await Promise.race([
+      setDoc(doc(db, MASTER_COLLECTION, id), { sortOrder: newOrder }, { merge: true }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Firestore operation timed out (10s)")), 10000)
+      )
+    ]);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating order:", error);
     return { success: false, error: error.message };
   }
 }

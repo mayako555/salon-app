@@ -34,10 +34,15 @@ export async function getDailyAttendance(dateStr: string): Promise<AttendanceRec
     const q = query(colRef, where("date", "==", dateStr));
     const snapshot = await getDocs(q);
     
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as AttendanceRecord[];
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null),
+        updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : (data.updated_at || null)
+      };
+    }) as AttendanceRecord[];
   } catch (error) {
     console.error("Error fetching daily attendance:", error);
     return [];
@@ -57,10 +62,15 @@ export async function getMonthlyAttendance(year: number, month: number): Promise
     );
     const snapshot = await getDocs(q);
     
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as AttendanceRecord[];
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null),
+        updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : (data.updated_at || null)
+      };
+    }) as AttendanceRecord[];
   } catch (error) {
     console.error("Error fetching monthly attendance:", error);
     return [];

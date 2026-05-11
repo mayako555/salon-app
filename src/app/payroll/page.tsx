@@ -6,9 +6,11 @@ import GenerateButton from "./GenerateButton";
 import CloseButton from "./CloseButton";
 import CSVExportButton from "./CSVExportButton";
 import StatementDialog from "./StatementDialog";
+import EditMetricsDialog from "./EditMetricsDialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Banknote, UserCircle2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Banknote, UserCircle2, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard";
+import Link from "next/link";
 
 export default async function PayrollPage({
   searchParams
@@ -25,16 +27,32 @@ export default async function PayrollPage({
   const isClosed = statements.length > 0 && statements.every(s => s.status === "closed");
   const totalPaid = statements.reduce((acc, curr) => acc + curr.final_paid_amount, 0);
 
+  const prevMonth = format(new Date(year, month - 2, 1), "yyyy-MM");
+  const nextMonth = format(new Date(year, month, 1), "yyyy-MM");
+
   return (
     <AuthGuard requireRole="admin">
       <div className="space-y-6 pb-24 animate-in fade-in duration-300">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-              <Banknote className="text-emerald-600" />
-              <span>給与・報酬計算 ({year}年{month}月)</span>
-            </h1>
-            <p className="text-slate-500 mt-1 text-sm">各種マスタおよび当月の売上・手当データをもとに総支給額を算出します</p>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 p-1 rounded-lg">
+              <Link href={`/payroll?month=${prevMonth}`} className="p-1.5 hover:bg-white hover:shadow-sm rounded-md transition-all text-slate-400 hover:text-slate-900">
+                <ChevronLeft size={20} />
+              </Link>
+              <div className="px-3 font-bold text-slate-700 text-sm tabular-nums">
+                {year}年{month}月
+              </div>
+              <Link href={`/payroll?month=${nextMonth}`} className="p-1.5 hover:bg-white hover:shadow-sm rounded-md transition-all text-slate-400 hover:text-slate-900">
+                <ChevronRight size={20} />
+              </Link>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+                <Banknote className="text-emerald-600" />
+                <span>給与・報酬計算</span>
+              </h1>
+              <p className="text-slate-500 mt-0.5 text-xs">各種マスタおよび当月の売上・手当データをもとに算出します</p>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             <CSVExportButton statements={statements} year={year} month={month} />
@@ -88,7 +106,7 @@ export default async function PayrollPage({
                   <TableHead className="text-right">手当合計</TableHead>
                   <TableHead className="text-right text-emerald-600">消費税加算</TableHead>
                   <TableHead className="text-right">最終請求額</TableHead>
-                  <TableHead className="text-right w-24">アクション</TableHead>
+                  <TableHead className="text-right w-32">アクション</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -121,7 +139,10 @@ export default async function PayrollPage({
                       ¥{stmt.final_paid_amount.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right">
-                      <StatementDialog stmt={stmt} />
+                      <div className="flex justify-end items-center gap-1">
+                        {!isClosed && <EditMetricsDialog stmt={stmt} onUpdate={() => {}} />}
+                        <StatementDialog stmt={stmt} />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

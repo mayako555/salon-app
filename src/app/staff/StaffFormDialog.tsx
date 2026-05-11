@@ -48,8 +48,8 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
       )}
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 duration-200 border border-slate-200">
             <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50 rounded-t-xl">
                <h3 className="font-bold text-lg text-slate-800">{staff ? "スタッフ情報の編集" : "スタッフの登録"}</h3>
                <button 

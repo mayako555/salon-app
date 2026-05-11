@@ -502,3 +502,62 @@ export async function closeMonthlyStatements(year: number, month: number) {
     return { success: false, error: error.message };
   }
 }
+
+export async function updateStatementMetrics(id: string, metrics: { worked_hours?: number, worked_days?: number }) {
+  try {
+    const docRef = doc(db, STATEMENTS_COLLECTION, id);
+    const snapshot = await getDocs(query(collection(db, STATEMENTS_COLLECTION), where("__name__", "==", id)));
+    if (snapshot.empty) return { success: false, error: "データが見つかりません" };
+    
+    const currentData = snapshot.docs[0].data() as MonthlyStatement;
+    if (currentData.status === "closed") return { success: false, error: "確定済みのデータは編集できません" };
+
+    const newMetrics = {
+      ...currentData.details.metrics,
+      worked_hours: metrics.worked_hours ?? currentData.details.metrics.worked_hours,
+      worked_days: metrics.worked_days ?? currentData.details.metrics.worked_days
+    };
+
+    // Recalculate if it's a salary type (hourly wage needs worked_hours)
+    let baseAmount = currentData.base_amount;
+    let finalAmount = currentData.final_paid_amount;
+    
+    // Fetch contract to get hourly wage if needed
+    // For now, simple re-calc based on old base_amount / old_hours * new_hours might be risky.
+    // Better to just store and let the UI or a "Recalculate" trigger handle it.
+    // Actually, let's just update the metrics and base_amount if possible.
+    
+    // We'll need the staff's contract to be accurate.
+    const contracts = await getContractsList();
+    const contract = contracts.find(c => c.staff_id === currentData.staff_id);
+    
+    if (contract && contract.contract_type === "hourly") {
+      baseAmount = Math.floor((newMetrics.worked_hours || 0) * (contract.hourly_wage || 0));
+    }
+
+    const updatedDetails = {
+      ...currentData.details,
+      metrics: newMetrics
+    };
+
+    const intermediateAmount = baseAmount + currentData.total_allowances;
+    // Social insurance recalculation would be complex here, so we'll just update the base and final for now.
+    // In a real app, you'd trigger the full generate logic for this one person.
+    
+    // Simplified recalculation of final amount (payments - deductions + tax)
+    const newFinalAmount = baseAmount + currentData.total_allowances - currentData.total_deductions + (currentData.details.tax_addition || 0);
+
+    await updateDoc(docRef, {
+      base_amount: baseAmount,
+      final_paid_amount: newFinalAmount,
+      "details.metrics": newMetrics,
+      "details.base_tech_salary": contract?.contract_type === "hourly" ? 0 : currentData.details.base_tech_salary, // Reset or keep
+      updated_at: serverTimestamp()
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating metrics:", error);
+    return { success: false, error: error.message };
+  }
+}

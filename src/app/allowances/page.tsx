@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { getMonthlyAllowances, AllowanceType, AllowanceRecord } from "./actions";
 import { getStaffList } from "@/app/staff/actions";
 import { Button } from "@/components/ui/button";
@@ -8,8 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Download, ChevronLeft, ChevronRight, MessageSquare, Edit3, Megaphone, HelpCircle, Train, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import AllowanceTaskDialog from "./AllowanceTaskDialog";
+import NominationDetailDialog from "./NominationDetailDialog";
 import AuthGuard from "@/components/AuthGuard";
 import { AllowanceTaskStatus, getMonthlyAllowanceTasks, unmarkAllowanceChecked } from "./actions";
+import { UserCheck } from "lucide-react";
 
 export default function AllowancesPage({
   searchParams
@@ -22,10 +25,14 @@ export default function AllowancesPage({
   const targetDate = monthParam ? new Date(monthParam) : new Date();
   const year = targetDate.getFullYear();
   const month = targetDate.getMonth() + 1;
+  
+  const router = useRouter();
+  const pathname = usePathname();
 
   const [tasks, setTasks] = useState<AllowanceTaskStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<AllowanceTaskStatus | null>(null);
+  const [detailStaff, setDetailStaff] = useState<AllowanceTaskStatus | null>(null);
 
   const loadTasks = async () => {
     setLoading(true);
@@ -43,6 +50,12 @@ export default function AllowancesPage({
       await unmarkAllowanceChecked(staffId, `${year}-${String(month).padStart(2, '0')}`);
       loadTasks();
     }
+  };
+
+  const handleMonthChange = (offset: number) => {
+    const newDate = new Date(year, month - 1 + offset, 1);
+    const newMonthStr = format(newDate, "yyyy-MM");
+    router.push(`${pathname}?month=${newMonthStr}`);
   };
 
   const getAllowanceIcon = (type: AllowanceType) => {
@@ -80,13 +93,23 @@ export default function AllowancesPage({
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
         <div className="p-4 flex items-center justify-between border-b border-slate-100 bg-slate-50/50">
           <div className="flex items-center gap-1 bg-white border border-slate-200 p-1 rounded-md shadow-sm">
-            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-slate-100 rounded-sm">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 hover:bg-slate-100 rounded-sm"
+              onClick={() => handleMonthChange(-1)}
+            >
               <ChevronLeft size={16} className="text-slate-600" />
             </Button>
             <div className="px-4 font-bold text-slate-700 tabular-nums">
               {year}年 {month}月
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-slate-100 rounded-sm">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 hover:bg-slate-100 rounded-sm"
+              onClick={() => handleMonthChange(1)}
+            >
               <ChevronRight size={16} className="text-slate-600" />
             </Button>
           </div>
@@ -119,6 +142,7 @@ export default function AllowancesPage({
             <TableRow className="bg-slate-50/50">
               <TableHead className="w-[100px]">ステータス</TableHead>
               <TableHead>スタッフ名</TableHead>
+              <TableHead>指名数</TableHead>
               <TableHead>手当内訳</TableHead>
               <TableHead className="text-right">手当合計額</TableHead>
               <TableHead className="text-right">アクション</TableHead>
@@ -127,11 +151,11 @@ export default function AllowancesPage({
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-10 text-slate-400">読込中...</TableCell>
+                <TableCell colSpan={6} className="text-center py-10 text-slate-400">読込中...</TableCell>
               </TableRow>
             ) : tasks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-10 text-slate-500">
+                <TableCell colSpan={6} className="text-center py-10 text-slate-500">
                   スタッフデータがありません
                 </TableCell>
               </TableRow>
@@ -151,6 +175,15 @@ export default function AllowancesPage({
                   </TableCell>
                   <TableCell className="font-bold text-slate-800">
                     {task.staff_name}
+                  </TableCell>
+                  <TableCell>
+                    <button 
+                      onClick={() => setDetailStaff(task)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 hover:bg-blue-100 transition-all font-black text-xs group"
+                    >
+                      <UserCheck size={14} className="group-hover:scale-110 transition-transform" />
+                      {task.nomination_count} 件
+                    </button>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-2">
@@ -202,6 +235,16 @@ export default function AllowancesPage({
             setSelectedTask(null);
             loadTasks();
           }} 
+        />
+      )}
+
+      {detailStaff && (
+        <NominationDetailDialog
+          staffName={detailStaff.staff_name}
+          month={`${year}年${month}月`}
+          nominations={detailStaff.nominations}
+          isOpen={true}
+          onClose={() => setDetailStaff(null)}
         />
       )}
     </div>

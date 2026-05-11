@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { getMonthlySales, SalesRecord, deleteSale, clearMonthlyCsvImports } from "./actions";
+import { getStaffList, StaffProfile } from "../staff/actions";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Download, ChevronLeft, ChevronRight, Search, FileUp, Settings, Lock, Trash2 } from "lucide-react";
@@ -14,6 +15,12 @@ import CheckoutDialog from "./CheckoutDialog";
 import DailyCloseDialog from "./DailyCloseDialog";
 import SalesExportCSVButton from "./SalesExportCSVButton";
 import AuthGuard from "@/components/AuthGuard";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export default function SalesPage({
   searchParams
@@ -27,16 +34,34 @@ export default function SalesPage({
   const month = monthNum;
 
   const [sales, setSales] = useState<SalesRecord[]>([]);
+  const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
-      const data = await getMonthlySales(year, month);
-      setSales(data);
+      const [salesData, staffData] = await Promise.all([
+        getMonthlySales(year, month),
+        getStaffList()
+      ]);
+      setSales(salesData);
+      setStaffProfiles(staffData);
       setLoading(false);
     }
     load();
   }, [year, month]);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  const filteredSales = sales.filter(s => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      (s.staff_name || "").toLowerCase().includes(query) ||
+      (s.customer_name || "").toLowerCase().includes(query) ||
+      (s.store_name || "").toLowerCase().includes(query) ||
+      (s.menu_course || "").toLowerCase().includes(query)
+    );
+  });
 
   const handleDeleteSale = async (id: string) => {
     if (!confirm("この売上データを削除してよろしいですか？")) return;
@@ -56,7 +81,8 @@ export default function SalesPage({
   };
 
   const cashSales = sales.filter(s => s.payment_method === '現金');
-  const cashlessSales = sales.filter(s => s.payment_method !== '現金');
+  const cashlessSales = sales.filter(s => s.payment_method !== '現金' && s.payment_method !== '不明');
+  const unknownSales = sales.filter(s => s.payment_method === '不明');
 
   const totalTechSales = sales.reduce((sum, s) => sum + s.tech_sales, 0);
   const totalProductSales = sales.reduce((sum, s) => sum + s.product_sales, 0);
@@ -71,19 +97,56 @@ export default function SalesPage({
   const cashlessProductSales = cashlessSales.reduce((sum, s) => sum + s.product_sales, 0);
 
   // Aggregate by store and staff
+  // Helper to normalize names for comparison (handles kanji variations and whitespace)
+  const normalizeName = (name: string | null) => {
+    if (!name) return "";
+    return name
+      .replace(/\s+/g, "")
+      .replace(/[凛凜]/g, "凛"); // Treat both versions of Rin as the same
+  };
+
   const stores = ["六甲", "元町", "神戸"];
-  const staffNames = Array.from(new Set(sales.map(s => s.staff_name))).sort();
   
-  const getSalesTotal = (staff: string | null, store: string | null) => {
-    return sales
-      .filter(s => (staff ? s.staff_name === staff : true) && (store ? s.store_name === store : true))
-      .reduce((sum, s) => sum + s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0), 0);
+  // Sort staff profiles first
+  const sortedProfiles = [...staffProfiles].sort((a, b) => {
+    const orderA = a.sort_order ?? 999;
+    const orderB = b.sort_order ?? 999;
+    if (orderA !== orderB) return orderA - orderB;
+    return a.name.localeCompare(b.name, "ja");
+  });
+
+  // Get names from sorted profiles
+  const staffNames = sortedProfiles.map(p => p.name);
+
+  // Add any staff names from sales that are not in profiles (normalize to avoid duplicates)
+  const salesStaffNames = Array.from(new Set(sales.map(s => s.staff_name)));
+  salesStaffNames.forEach(name => {
+    if (!name) return;
+    const normalizedName = normalizeName(name);
+    const alreadyExists = staffNames.some(existingName => normalizeName(existingName) === normalizedName);
+    
+    if (!alreadyExists) {
+      staffNames.push(name);
+    }
+  });
+  
+  const getSalesMetrics = (staff: string | null, store: string | null) => {
+    let filtered = sales;
+    if (staff) {
+      const staffNormal = normalizeName(staff);
+      filtered = filtered.filter(s => normalizeName(s.staff_name) === staffNormal);
+    }
+    if (store) filtered = filtered.filter(s => s.store_name === store);
+    
+    const discount = filtered.reduce((sum, s) => sum + (s.discount || 0), 0);
+    const total = filtered.reduce((sum, s) => sum + s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0), 0);
+    
+    return { total, discount };
   };
 
   return (
     <AuthGuard requireRole="admin">
       <div className="space-y-6 animate-in fade-in duration-300">
-        {/* ... existing content ... */}
         {loading ? (
           <div className="flex items-center justify-center py-20 text-slate-500">読み込み中...</div>
         ) : (
@@ -163,27 +226,61 @@ export default function SalesPage({
                   </TableHeader>
                   <TableBody>
                     {staffNames.map(staff => (
-                      <TableRow key={staff}>
+                      <TableRow key={staff} className={cn("cursor-pointer hover:bg-slate-50 transition-colors", searchQuery === staff && "bg-emerald-50")} onClick={() => setSearchQuery(searchQuery === staff ? "" : staff)}>
                         <TableCell className="font-medium bg-slate-50/30">{staff}</TableCell>
-                        {stores.map(store => (
-                          <TableCell key={store} className="text-right text-slate-600">
-                            ¥{getSalesTotal(staff, store).toLocaleString()}
-                          </TableCell>
-                        ))}
+                        {stores.map(store => {
+                          const { total, discount } = getSalesMetrics(staff, store);
+                          return (
+                            <TableCell key={store} className="text-right text-slate-600">
+                              <div className="flex flex-col items-end">
+                                <span className="font-medium">¥{total.toLocaleString()}</span>
+                                {discount > 0 && (
+                                  <span className="text-[10px] text-rose-500 font-bold leading-none mt-0.5 opacity-80">
+                                    (引 ¥{discount.toLocaleString()})
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                          );
+                        })}
                         <TableCell className="text-right font-bold text-emerald-700 bg-emerald-50/10">
-                          ¥{getSalesTotal(staff, null).toLocaleString()}
+                          <div className="flex flex-col items-end">
+                            <span>¥{getSalesMetrics(staff, null).total.toLocaleString()}</span>
+                            {getSalesMetrics(staff, null).discount > 0 && (
+                              <span className="text-[10px] text-rose-500 font-bold leading-none mt-0.5 opacity-80">
+                                (引 ¥{getSalesMetrics(staff, null).discount.toLocaleString()})
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="bg-slate-50">
                       <TableCell className="font-bold text-slate-800">店舗合計</TableCell>
-                      {stores.map(store => (
-                        <TableCell key={store} className="text-right font-bold text-slate-800">
-                          ¥{getSalesTotal(null, store).toLocaleString()}
-                        </TableCell>
-                      ))}
+                      {stores.map(store => {
+                        const { total, discount } = getSalesMetrics(null, store);
+                        return (
+                          <TableCell key={store} className="text-right font-bold text-slate-800">
+                            <div className="flex flex-col items-end">
+                              <span>¥{total.toLocaleString()}</span>
+                              {discount > 0 && (
+                                <span className="text-[10px] text-rose-500 font-bold leading-none mt-0.5 opacity-80">
+                                  (引 ¥{discount.toLocaleString()})
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                        );
+                      })}
                       <TableCell className="text-right font-bold text-emerald-700">
-                        ¥{totalSales.toLocaleString()}
+                        <div className="flex flex-col items-end">
+                          <span>¥{totalSales.toLocaleString()}</span>
+                          {totalDiscount > 0 && (
+                            <span className="text-[10px] text-rose-500 font-bold leading-none mt-0.5 opacity-80">
+                              (引 ¥{totalDiscount.toLocaleString()})
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   </TableBody>
@@ -215,6 +312,8 @@ export default function SalesPage({
                     <input 
                       type="text" 
                       placeholder="担当者・顧客名検索..." 
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                     />
                   </div>
@@ -243,14 +342,14 @@ export default function SalesPage({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sales.length === 0 ? (
+                    {filteredSales.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={14} className="text-center py-12 text-slate-500">
-                          日計（会計）データがありません。右上の「会計を登録」から入力してください。
+                        <TableCell colSpan={15} className="text-center py-12 text-slate-500">
+                          {searchQuery ? "条件に一致するデータが見つかりません。" : "日計（会計）データがありません。右上の「会計を登録」から入力してください。"}
                         </TableCell>
                       </TableRow>
                     ) : (
-                      sales.sort((a, b) => a.date.localeCompare(b.date) || a.time?.localeCompare(b.time || "")).map((sale) => {
+                      [...filteredSales].sort((a, b) => a.date.localeCompare(b.date) || a.time?.localeCompare(b.time || "")).map((sale) => {
                         const saleTotal = sale.tech_sales + sale.product_sales + (sale.nomination_fee || 0) + (sale.cancel_fee || 0) - (sale.discount || 0);
 
                         return (
@@ -299,10 +398,15 @@ export default function SalesPage({
                               {sale.hpb_points > 0 ? `¥${sale.hpb_points.toLocaleString()}` : "-"}
                             </TableCell>
                             <TableCell className="text-center">
-                              <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${
-                                sale.payment_method === '現金' ? 'bg-slate-100 text-slate-700' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                              }`}>
-                                {sale.payment_method || "-"}
+                              <span className={cn(
+                                "px-2 py-0.5 rounded-full text-[10px] font-black",
+                                sale.payment_method === '現金' 
+                                  ? 'bg-slate-100 text-slate-700' 
+                                  : sale.payment_method === '不明'
+                                    ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                                    : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                              )}>
+                                {sale.payment_method || "不明"}
                               </span>
                             </TableCell>
                             <TableCell className="text-right font-bold text-slate-800 bg-slate-50">

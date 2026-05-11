@@ -11,6 +11,7 @@ import {
   orderBy, 
   updateDoc, 
   doc, 
+  deleteDoc,
   writeBatch,
   Timestamp,
   serverTimestamp
@@ -18,6 +19,7 @@ import {
 import { SalesMasterItem, seedSalesMasterData } from "./seeds";
 import { addAuditLog } from "../audit/actions";
 import { revalidatePath } from "next/cache";
+import { addCustomer } from "@/lib/customers";
 
 export type SalesSource = "checkout" | "hotpepper" | "manual";
 
@@ -56,6 +58,31 @@ export type SalesRecord = {
 
 const SALES_COLLECTION = "sales";
 
+const MASTER_COLLECTION = "sales_master";
+
+export async function resetSalesMasterData() {
+  try {
+    const colRef = collection(db, MASTER_COLLECTION);
+    const snapshot = await getDocs(colRef);
+    
+    // 一括削除（Batch処理）
+    const batch = writeBatch(db);
+    snapshot.docs.forEach((d) => {
+      batch.delete(d.ref);
+    });
+    await batch.commit();
+    
+    // 最新データをシード
+    await seedSalesMasterData();
+    
+    revalidatePath("/staff-portal/sales/master");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error resetting master data:", error);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function getStoreMasterData(store: string): Promise<SalesMasterItem[]> {
   try {
     const colRef = collection(db, "sales_master");
@@ -70,10 +97,15 @@ export async function getStoreMasterData(store: string): Promise<SalesMasterItem
       }
     }
 
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as SalesMasterItem[];
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null),
+        updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : (data.updated_at || null)
+      };
+    }) as SalesMasterItem[];
   } catch (error) {
     console.error("Error fetching store master data:", error);
     return [];
@@ -129,9 +161,33 @@ export async function addCheckout(formData: FormData) {
     const storeName = formData.get("store_name") as string;
     const date = formData.get("date") as string;
     const time = formData.get("time") as string || "00:00";
-    const customerName = formData.get("customer_name") as string || "名無し";
-    const customerId = formData.get("customer_id") as string || null;
+    
+    // Name handling
+    const lastName = formData.get("last_name") as string || "";
+    const firstName = formData.get("first_name") as string || "";
+    const customerName = (lastName + " " + firstName).trim() || "名無し";
+    
+    let customerId = formData.get("customer_id") as string || null;
     const customerType = formData.get("customer_type") as "新規" | "リピ" | "不明";
+    
+    // Auto-create customer if ID is missing and we have a name
+    if (!customerId && (lastName || firstName)) {
+      const newCustomerRes = await addCustomer({
+        name: customerName,
+        last_name: lastName,
+        first_name: firstName,
+        name_kana: "", // Placeholder, staff can fix later
+        phone: "",
+        gender: "female", // Default
+        allergies: [],
+        has_allergy: false,
+        notes: "会計時に自動登録されました"
+      });
+      if (newCustomerRes.success) {
+        customerId = newCustomerRes.id;
+      }
+    }
+
     const menuCourse = formData.get("menu_course") as string || "";
     const options = formData.get("options") as string || "";
     const techSales = parseInt(formData.get("tech_sales") as string || "0", 10);
@@ -221,6 +277,105 @@ export async function addCheckout(formData: FormData) {
     return { success: true };
   } catch (error: any) {
     console.error("Error adding checkout to Firestore:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateCheckout(id: string, formData: FormData) {
+  try {
+    const staffId = formData.get("staff_id") as string;
+    const staffName = formData.get("staff_name") as string;
+    const storeName = formData.get("store_name") as string;
+    const date = formData.get("date") as string;
+    const time = formData.get("time") as string || "00:00";
+    
+    // Name handling
+    const lastName = formData.get("last_name") as string || "";
+    const firstName = formData.get("first_name") as string || "";
+    const customerName = (lastName + " " + firstName).trim() || "名無し";
+    
+    let customerId = formData.get("customer_id") as string || null;
+    const customerType = formData.get("customer_type") as "新規" | "リピ" | "不明";
+    
+    // Auto-create customer if ID is missing and we have a name
+    if (!customerId && (lastName || firstName)) {
+      const newCustomerRes = await addCustomer({
+        name: customerName,
+        last_name: lastName,
+        first_name: firstName,
+        name_kana: "", // Placeholder
+        phone: "",
+        gender: "female",
+        allergies: [],
+        has_allergy: false,
+        notes: "会計更新時に自動登録されました"
+      });
+      if (newCustomerRes.success) {
+        customerId = newCustomerRes.id;
+      }
+    }
+
+    const menuCourse = formData.get("menu_course") as string || "";
+    const options = formData.get("options") as string || "";
+    const techSales = parseInt(formData.get("tech_sales") as string || "0", 10);
+    const prodSales = parseInt(formData.get("product_sales") as string || "0", 10);
+    const isNominated = formData.get("is_nominated") === "true";
+    const nominationFee = parseInt(formData.get("nomination_fee") as string || "0", 10);
+    const discount = parseInt(formData.get("discount") as string || "0", 10);
+    const discountReason = formData.get("discount_reason") as string || "";
+    const portalFee = parseInt(formData.get("portal_fee") as string || "0", 10);
+    const hpbPoints = parseInt(formData.get("hpb_points") as string || "0", 10);
+    const cancelFee = parseInt(formData.get("cancel_fee") as string || "0", 10);
+    const paymentMethod = formData.get("payment_method") as string || "現金";
+    const reservationRoute = formData.get("reservation_route") as string || "その他";
+    const hairMaterial = formData.get("hair_material") as string || "";
+    
+    const nextBookingDate = formData.get("next_booking_date") as string || "";
+    const nextBookingTime = formData.get("next_booking_time") as string || "";
+    const nextBookingLineReminder = formData.get("next_booking_line_reminder") === "true";
+    const isMinimo = formData.get("is_minimo") === "true" || reservationRoute.includes("ミニモ");
+
+    if (!staffName || !date) {
+      return { success: false, error: "必須項目が入力されていません。" };
+    }
+
+    const payload = {
+      staff_id: staffId,
+      staff_name: staffName,
+      store_name: storeName,
+      date,
+      time,
+      customer_name: customerName,
+      customer_id: customerId,
+      customer_type: customerType,
+      menu_course: menuCourse,
+      tech_sales: techSales,
+      product_sales: prodSales,
+      is_nominated: isNominated,
+      nomination_fee: nominationFee,
+      discount: discount,
+      discount_reason: discountReason,
+      portal_fee: portalFee,
+      hpb_points: hpbPoints,
+      reservation_route: reservationRoute,
+      payment_method: paymentMethod,
+      hair_material: hairMaterial,
+      options: options,
+      cancel_fee: cancelFee,
+      next_booking_date: nextBookingDate,
+      next_booking_time: nextBookingTime,
+      next_booking_line_reminder: nextBookingLineReminder,
+      is_minimo: isMinimo,
+      updated_at: serverTimestamp()
+    };
+
+    const docRef = doc(db, SALES_COLLECTION, id);
+    await updateDoc(docRef, payload);
+
+    revalidatePath("/staff-portal/sales");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating checkout in Firestore:", error);
     return { success: false, error: error.message };
   }
 }
@@ -333,6 +488,15 @@ export async function importHotPepperCsv(formData: FormData) {
         timeFormatted = timeMatch ? `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}` : "00:00";
       }
 
+      const isMinimoByMenu = menuCourses.some(m => 
+        m.toLowerCase().includes("min") || 
+        m.includes("ミニ")
+      );
+
+      const reservationRoute = isMinimoByMenu 
+        ? "ミニモ" 
+        : (firstRow["予約経路"] || firstRow["来店のきっかけ"] || "ホットペッパー");
+
       const docRef = doc(colRef);
       batch.set(docRef, {
         staff_id: "unknown",
@@ -352,13 +516,14 @@ export async function importHotPepperCsv(formData: FormData) {
         discount_reason: discountReasons.length > 0 ? discountReasons.join(", ") : "CSV一括読込",
         portal_fee: 0,
         hpb_points: hpbPoints,
-        reservation_route: firstRow["予約経路"] || "ホットペッパー",
-        payment_method: firstRow["支払方法"] || "不明",
+        reservation_route: reservationRoute,
+        payment_method: firstRow["支払方法"] || firstRow["決済方法"] || firstRow["支払区分"] || firstRow["決済区分"] || "不明",
         hair_material: "",
         options: "",
         cancel_fee: 0,
         status: "draft",
         source: "hotpepper" as SalesSource,
+        is_minimo: isMinimoByMenu,
         created_at: serverTimestamp()
       });
       importCount++;

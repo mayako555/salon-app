@@ -5,9 +5,12 @@ import {
   getMasterItems, 
   upsertMasterItem, 
   deleteMasterItem, 
-  toggleItemStatus 
+  toggleItemStatus,
+  updateMasterItemOrder
 } from "@/app/sales/master-actions";
+import { resetSalesMasterData } from "@/app/sales/actions";
 import { SalesMasterItem } from "@/app/sales/seeds";
+import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +26,8 @@ import {
   AlertTriangle,
   Database,
   ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   Zap,
   MoreVertical,
   ChevronRight,
@@ -38,14 +43,147 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  useSensor, 
+  useSensors, 
+  DragEndEvent 
+} from "@dnd-kit/core";
+import { 
+  arrayMove, 
+  SortableContext, 
+  sortableKeyboardCoordinates, 
+  verticalListSortingStrategy, 
+  useSortable 
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
+
+// --- Sortable Item Component ---
+function SortableItem({ 
+  item, 
+  index, 
+  filteredCount, 
+  onToggle, 
+  onEdit, 
+  onDelete 
+}: { 
+  item: SalesMasterItem; 
+  index: number; 
+  filteredCount: number; 
+  onToggle: (id: string, current: boolean) => void;
+  onEdit: (item: SalesMasterItem) => void;
+  onDelete: (id: string) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: item.id! });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : 1,
+    position: 'relative' as any,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <Card className={cn(
+        "group border-none shadow-sm hover:shadow-xl transition-all rounded-2xl overflow-hidden",
+        !item.isActive ? 'opacity-60 bg-slate-50' : 'bg-white',
+        isDragging && "shadow-2xl ring-2 ring-blue-500 ring-offset-2 scale-[1.02] z-50"
+      )}>
+        <CardContent className="p-4 flex items-center gap-4">
+          {/* Drag Handle */}
+          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-2 hover:bg-slate-50 rounded-lg text-slate-300 hover:text-slate-600 transition-colors">
+            <GripVertical size={20} />
+          </div>
+
+          <div className={cn(
+            "w-2 h-12 rounded-full",
+            item.itemType === 'menu' ? 'bg-blue-400' :
+            item.itemType === 'coupon' ? 'bg-rose-400' :
+            item.itemType === 'messageCoupon' ? 'bg-amber-400' :
+            'bg-slate-300'
+          )} />
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest h-5 rounded-md border-slate-200 text-slate-400">
+                {item.store}
+              </Badge>
+              <span className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">{item.category}</span>
+              <Badge variant="secondary" className="text-[9px] font-bold h-5 bg-slate-100 text-slate-500">
+                #{item.sortOrder || index}
+              </Badge>
+            </div>
+            <h3 className="font-black text-slate-800 truncate">{item.name}</h3>
+            {item.hpbName && <p className="text-[10px] text-slate-400 truncate mt-0.5">{item.hpbName}</p>}
+          </div>
+
+          <div className="text-right flex flex-col items-end gap-1 px-4 border-l border-slate-50">
+            <p className="text-lg font-black text-slate-900 tracking-tight">¥{item.price.toLocaleString()}</p>
+            {item.duration && <p className="text-[10px] font-black text-slate-400 flex items-center gap-1"><Clock size={10} /> {item.duration}</p>}
+          </div>
+
+          <div className="flex items-center gap-1">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className={cn(
+                "rounded-xl h-10 w-10",
+                item.isActive ? 'text-blue-600 bg-blue-50' : 'text-slate-400 bg-slate-100'
+              )}
+              onClick={() => onToggle(item.id!, item.isActive)}
+            >
+              {item.isActive ? <Check size={18} /> : <X size={18} />}
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="rounded-xl h-10 w-10 text-slate-400 hover:text-blue-600 hover:bg-slate-50"
+              onClick={() => onEdit(item)}
+            >
+              <Edit2 size={16} />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="rounded-xl h-10 w-10 text-slate-400 hover:text-rose-600 hover:bg-slate-50"
+              onClick={() => onDelete(item.id!)}
+            >
+              <Trash2 size={16} />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Helper to merge classes
+function cn(...classes: any[]) {
+  return classes.filter(Boolean).join(' ');
+}
 
 export default function MasterManagementPage() {
+  const { profile } = useAuth();
   const [items, setItems] = useState<SalesMasterItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [storeFilter, setStoreFilter] = useState<string>("all");
   const [editingItem, setEditingItem] = useState<Partial<SalesMasterItem> | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState("");
   const [bulkText, setBulkText] = useState("");
 
   useEffect(() => {
@@ -95,6 +233,49 @@ export default function MasterManagementPage() {
     }
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Drag starts after 8px movement to allow clicking
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = filteredItems.findIndex(item => item.id === active.id);
+    const newIndex = filteredItems.findIndex(item => item.id === over.id);
+
+    const newItems = arrayMove(filteredItems, oldIndex, newIndex);
+    
+    // Optimistic update
+    const updatedWithOrder = newItems.map((item, idx) => ({
+      ...item,
+      sortOrder: idx
+    }));
+    
+    // Apply locally
+    setItems(prev => {
+      const otherItems = prev.filter(p => !newItems.find(n => n.id === p.id));
+      return [...otherItems, ...updatedWithOrder].sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+    });
+
+    // Persist to Firestore
+    toast.promise(
+      Promise.all(updatedWithOrder.map(item => updateMasterItemOrder(item.id!, item.sortOrder!))),
+      {
+        loading: '順番を保存中...',
+        success: '順番を保存しました',
+        error: '順番の保存に失敗しました'
+      }
+    );
+  };
+
   const handleBulkImport = async () => {
     const lines = bulkText.trim().split("\n");
     let count = 0;
@@ -131,6 +312,22 @@ export default function MasterManagementPage() {
     loadItems();
   };
 
+  const handleReset = async () => {
+    if (resetConfirmText !== "リセット") return;
+    
+    setLoading(true);
+    setIsResetDialogOpen(false);
+    const res = await resetSalesMasterData();
+    if (res.success) {
+      toast.success("マスタデータを初期化しました");
+      setResetConfirmText("");
+      loadItems();
+    } else {
+      toast.error("エラー: " + res.error);
+      setLoading(false);
+    }
+  };
+
   const filteredItems = items.filter(item => 
     item.name.toLowerCase().includes(search.toLowerCase()) ||
     item.category.toLowerCase().includes(search.toLowerCase()) ||
@@ -147,6 +344,51 @@ export default function MasterManagementPage() {
           <p className="text-slate-500 font-medium">メニュー、クーポン、店販品の管理</p>
         </div>
         <div className="flex gap-3">
+          {profile?.role === 'admin' && (
+            <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+              <DialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="rounded-xl border-rose-200 text-rose-600 hover:bg-rose-50 shadow-sm font-bold"
+                >
+                  <AlertTriangle size={16} className="mr-2" /> マスタ初期化
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md rounded-3xl">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-black text-rose-600 flex items-center gap-2">
+                    <AlertTriangle /> マスタデータの初期化
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                  <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100 text-sm text-rose-700 leading-relaxed">
+                    この操作を行うと、現在登録されているすべてのメニュー、クーポン、商品データが削除され、定義ファイルにある最新の初期データに置き換わります。<br />
+                    <strong>※この操作は取り消せません。</strong>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-slate-500">実行するには、下のボックスに「リセット」と入力してください。</p>
+                    <Input 
+                      placeholder="リセット" 
+                      value={resetConfirmText}
+                      onChange={(e) => setResetConfirmText(e.target.value)}
+                      className="h-12 bg-slate-50 border-slate-200 rounded-xl font-black text-center text-lg"
+                    />
+                  </div>
+                </div>
+                <DialogFooter className="gap-2">
+                  <Button variant="ghost" onClick={() => setIsResetDialogOpen(false)} className="rounded-xl font-bold">キャンセル</Button>
+                  <Button 
+                    onClick={handleReset} 
+                    disabled={resetConfirmText !== "リセット"}
+                    className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black px-8 shadow-lg shadow-rose-100 disabled:opacity-30"
+                  >
+                    初期化を実行する
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="rounded-xl border-slate-200 hover:bg-slate-100 shadow-sm font-bold text-slate-600">
@@ -239,64 +481,31 @@ export default function MasterManagementPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3">
-              {filteredItems.map((item) => (
-                <Card key={item.id} className={`group border-none shadow-sm hover:shadow-xl transition-all rounded-2xl overflow-hidden ${!item.isActive ? 'opacity-60 bg-slate-50' : 'bg-white'}`}>
-                  <CardContent className="p-4 flex items-center gap-4">
-                    <div className={`w-2 h-12 rounded-full ${
-                      item.itemType === 'menu' ? 'bg-blue-400' :
-                      item.itemType === 'coupon' ? 'bg-rose-400' :
-                      item.itemType === 'messageCoupon' ? 'bg-amber-400' :
-                      'bg-slate-300'
-                    }`} />
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest h-5 rounded-md border-slate-200 text-slate-400">
-                          {item.store}
-                        </Badge>
-                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">{item.category}</span>
-                      </div>
-                      <h3 className="font-black text-slate-800 truncate">{item.name}</h3>
-                      {item.hpbName && <p className="text-[10px] text-slate-400 truncate mt-0.5">{item.hpbName}</p>}
-                    </div>
-
-                    <div className="text-right flex flex-col items-end gap-1 px-4 border-l border-slate-50">
-                      <p className="text-lg font-black text-slate-900 tracking-tight">¥{item.price.toLocaleString()}</p>
-                      {item.duration && <p className="text-[10px] font-black text-slate-400 flex items-center gap-1"><Clock size={10} /> {item.duration}</p>}
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className={`rounded-xl h-10 w-10 ${item.isActive ? 'text-blue-600 bg-blue-50' : 'text-slate-400 bg-slate-100'}`}
-                        onClick={() => handleToggle(item.id!, item.isActive)}
-                      >
-                        {item.isActive ? <Check size={18} /> : <X size={18} />}
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="rounded-xl h-10 w-10 text-slate-400 hover:text-blue-600 hover:bg-slate-50"
-                        onClick={() => {
-                          setEditingItem(item);
-                          setIsDialogOpen(true);
-                        }}
-                      >
-                        <Edit2 size={16} />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="rounded-xl h-10 w-10 text-slate-400 hover:text-rose-600 hover:bg-slate-50"
-                        onClick={() => handleDelete(item.id!)}
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              <DndContext 
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext 
+                  items={filteredItems.map(i => i.id!)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {filteredItems.map((item, index) => (
+                    <SortableItem 
+                      key={item.id}
+                      item={item}
+                      index={index}
+                      filteredCount={filteredItems.length}
+                      onToggle={handleToggle}
+                      onEdit={(item) => {
+                        setEditingItem(item);
+                        setIsDialogOpen(true);
+                      }}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
             </div>
           )}
         </div>
@@ -351,11 +560,20 @@ export default function MasterManagementPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Category</label>
-                <Input 
-                  value={editingItem?.category} 
+                <select 
+                  className="w-full h-12 bg-slate-50 border-none rounded-2xl px-4 font-bold text-sm"
+                  value={editingItem?.category}
                   onChange={(e) => setEditingItem({ ...editingItem!, category: e.target.value })}
-                  className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
-                />
+                >
+                  <option value="">選択してください</option>
+                  <option value="アイブロウメニュー">アイブロウメニュー</option>
+                  <option value="マツエクメニュー">マツエクメニュー</option>
+                  <option value="まつ毛パーマメニュー">まつ毛パーマメニュー</option>
+                  <option value="毛質変更">毛質変更</option>
+                  <option value="付け替えオフ">付け替えオフ</option>
+                  <option value="その他オプション">その他オプション</option>
+                  <option value="その他">その他</option>
+                </select>
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Price</label>
@@ -403,6 +621,29 @@ export default function MasterManagementPage() {
                 onChange={(e) => setEditingItem({ ...editingItem!, notes: e.target.value })}
                 className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Sort Order (表示順)</label>
+                <Input 
+                  type="number"
+                  value={editingItem?.sortOrder || 0} 
+                  onChange={(e) => setEditingItem({ ...editingItem!, sortOrder: parseInt(e.target.value) || 0 })}
+                  className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
+                />
+              </div>
+              <div className="space-y-2 pt-6 flex items-center">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={editingItem?.isActive} 
+                    onChange={(e) => setEditingItem({ ...editingItem!, isActive: e.target.checked })}
+                    className="w-5 h-5 rounded-lg border-slate-200"
+                  />
+                  <span className="text-sm font-bold text-slate-700">有効（表示する）</span>
+                </label>
+              </div>
             </div>
 
             <DialogFooter className="pt-6">

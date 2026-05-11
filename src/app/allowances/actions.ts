@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { addAuditLog } from "@/app/audit/actions";
 import { getStaffList } from "@/app/staff/actions";
+import { getMonthlySales, SalesRecord } from "@/app/sales/actions";
 
 export type AllowanceType = "review" | "blog" | "sns" | "treatment" | "transport" | "other";
 
@@ -54,6 +55,7 @@ export type AllowanceRecord = {
   target_month: string; // YYYY-MM
   type: AllowanceType;
   amount: number;
+  store_name?: string;
   target_details?: any; // JSON
   created_at: string;
 };
@@ -98,6 +100,8 @@ export type AllowanceTaskStatus = {
   is_checked: boolean;
   total_amount: number;
   allowances: AllowanceRecord[];
+  nomination_count: number;
+  nominations: SalesRecord[];
 };
 
 export async function getMonthlyAllowanceTasks(year: number, month: number): Promise<AllowanceTaskStatus[]> {
@@ -126,7 +130,10 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
     const checksSnapshot = await getDocs(checksQ);
     const checkedStaffIds = new Set(checksSnapshot.docs.map(d => d.data().staff_id));
 
-    // 4. スタッフごとに集計
+    // 4. その月の全売上取得（指名数カウント用）
+    const monthlySales = await getMonthlySales(year, month);
+
+    // 5. スタッフごとに集計
     const tasks: AllowanceTaskStatus[] = staffList.map(staff => {
       // 古いデータは staff_id が staff-名前 だったりするので名前でもマッチさせる
       const staffAllowances = allAllowances.filter(a => a.staff_id === staff.id || a.staff_name === staff.name);
@@ -137,13 +144,22 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
 
+      // 指名データを抽出（名前でマッチング）
+      const staffNameNormal = staff.name.replace(/\s+/g, "");
+      const staffNominations = monthlySales.filter(s => {
+        const saleStaffNameNormal = (s.staff_name || "").replace(/\s+/g, "");
+        return saleStaffNameNormal === staffNameNormal && s.is_nominated;
+      });
+
       return {
         staff_id: staff.id,
         staff_name: staff.name,
         target_month: targetPrefix,
         is_checked: checkedStaffIds.has(staff.id),
         total_amount: totalAmount,
-        allowances: staffAllowances
+        allowances: staffAllowances,
+        nomination_count: staffNominations.length,
+        nominations: staffNominations
       };
     });
 
@@ -185,7 +201,7 @@ export async function saveStaffAllowanceTask(data: {
   staff_id: string;
   staff_name: string;
   target_month: string;
-  allowances: { type: AllowanceType, amount: number, target_details?: any }[];
+  allowances: { type: AllowanceType, amount: number, store_name: string, target_details?: any }[];
 }) {
   try {
     const batch = writeBatch(db);
@@ -195,15 +211,16 @@ export async function saveStaffAllowanceTask(data: {
     for (const item of data.allowances) {
        if (item.amount > 0) {
          const docRef = doc(collection(db, ALLOWANCES_COLLECTION));
-         batch.set(docRef, {
-           staff_id: data.staff_id,
-           staff_name: data.staff_name,
-           target_month: data.target_month,
-           type: item.type,
-           amount: item.amount,
-           target_details: item.target_details || {},
-           created_at: serverTimestamp()
-         });
+          batch.set(docRef, {
+            staff_id: data.staff_id,
+            staff_name: data.staff_name,
+            target_month: data.target_month,
+            type: item.type,
+            amount: item.amount,
+            store_name: item.store_name,
+            target_details: item.target_details || {},
+            created_at: serverTimestamp()
+          });
          addedCount++;
        }
     }
@@ -241,6 +258,7 @@ export async function addAllowance(formData: FormData) {
     const targetMonth = formData.get("target_month") as string; // YYYY-MM
     const type = formData.get("type") as AllowanceType;
     const amount = parseInt(formData.get("amount") as string || "0", 10);
+    const storeName = formData.get("store_name") as string || "";
     const detailText = formData.get("detail_text") as string || "";
 
     if (!staffName || !targetMonth || !type) {
@@ -254,6 +272,7 @@ export async function addAllowance(formData: FormData) {
       target_month: targetMonth,
       type,
       amount,
+      store_name: storeName,
       target_details: { context: detailText },
       created_at: serverTimestamp()
     };

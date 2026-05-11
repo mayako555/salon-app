@@ -100,10 +100,10 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
         grade: grade,
         job_title: jobTitle,
         hourly_wage: Number(hourlyWage),
-        monthly_base_salary: Number(baseSalary),
-        business_allowance: Number(roleAllowance),
-        attendance_allowance: Number(attendanceAllowance),
-        service_year_allowance: Number(serviceAllowance),
+        monthly_base_salary: contractType === "outsourcing" ? 0 : Number(baseSalary),
+        business_allowance: contractType === "outsourcing" ? 0 : Number(roleAllowance),
+        attendance_allowance: contractType === "outsourcing" ? 0 : Number(attendanceAllowance),
+        service_year_allowance: contractType === "outsourcing" ? 0 : Number(serviceAllowance),
         tech_sales_quota: Number(formData.get("tech_sales_quota")),
         tech_sales_threshold: Number(techSalesThreshold),
         tech_sales_ratio: Number(techSalesRatio),
@@ -185,44 +185,46 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
             </div>
           </div>
 
-          <div className="bg-emerald-50/50 p-4 rounded-lg border border-emerald-100 space-y-4">
-            <div className="flex justify-between items-center border-b border-emerald-100 pb-2 mb-2">
-              <h4 className="font-bold text-sm text-emerald-900 flex items-center gap-2">
-                給与グレード/適用ランク
-              </h4>
-              <Link 
-                href="/admin/salary-grades" 
-                className="text-[10px] text-emerald-600 font-medium hover:underline flex items-center gap-1"
-              >
-                <Settings size={10} />
-                等級マスタを編集
-              </Link>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-emerald-700 mb-1 text-xs">等級グレード</label>
-                <select 
-                  value={grade}
-                  onChange={(e) => handleGradeChange(e.target.value)}
-                  className="w-full h-9 px-2 border border-emerald-200 rounded-md bg-white outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm shadow-sm"
+          {contractType !== "outsourcing" && (
+            <div className="bg-emerald-50/50 p-4 rounded-lg border border-emerald-100 space-y-4">
+              <div className="flex justify-between items-center border-b border-emerald-100 pb-2 mb-2">
+                <h4 className="font-bold text-sm text-emerald-900 flex items-center gap-2">
+                  給与グレード/適用ランク
+                </h4>
+                <Link 
+                  href="/admin/salary-grades" 
+                  className="text-[10px] text-emerald-600 font-medium hover:underline flex items-center gap-1"
                 >
-                  <option value="">カスタム（手動設定）</option>
-                  {dbGrades.map(g => (
-                    <option key={g.id} value={g.code}>{g.code}: {g.title}</option>
-                  ))}
-                </select>
+                  <Settings size={10} />
+                  等級マスタを編集
+                </Link>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-emerald-700 mb-1 text-xs">役職・ランク名</label>
-                <input 
-                  value={jobTitle}
-                  onChange={(e) => setJobTitle(e.target.value)}
-                  placeholder="マネージャー 等" 
-                  className="w-full h-9 px-2 border border-emerald-200 rounded-md bg-white outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm shadow-sm" 
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-emerald-700 mb-1 text-xs">等級グレード</label>
+                  <select 
+                    value={grade}
+                    onChange={(e) => handleGradeChange(e.target.value)}
+                    className="w-full h-9 px-2 border border-emerald-200 rounded-md bg-white outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm shadow-sm"
+                  >
+                    <option value="">カスタム（手動設定）</option>
+                    {dbGrades.map(g => (
+                      <option key={g.id} value={g.code}>{g.code}: {g.title}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-emerald-700 mb-1 text-xs">役職・ランク名</label>
+                  <input 
+                    value={jobTitle}
+                    onChange={(e) => setJobTitle(e.target.value)}
+                    placeholder="マネージャー 等" 
+                    className="w-full h-9 px-2 border border-emerald-200 rounded-md bg-white outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm shadow-sm" 
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 space-y-4">
             <h4 className="font-bold text-sm text-slate-900 border-b border-slate-200 pb-2 mb-4">基本報酬・給与設定</h4>

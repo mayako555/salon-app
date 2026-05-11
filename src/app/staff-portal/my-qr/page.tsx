@@ -37,7 +37,7 @@ export default function MyQRPage() {
               <QRCodeSVG 
                 value={qrValue} 
                 size={200}
-                level="H"
+                level="M"
                 includeMargin={false}
               />
             </div>

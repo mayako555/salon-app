@@ -75,10 +75,12 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
                 </div>
                 <div className="text-center text-xs mt-1 border-b border-black pb-1">支給内訳</div>
                 <div className="p-2 space-y-2 h-[200px]">
-                   <div className="flex justify-between">
-                     <span className="text-xs">{stmt.type === "salary" ? "基本給" : "ベース報酬"}</span>
-                     <span>{stmt.base_amount.toLocaleString()}</span>
-                   </div>
+                   {stmt.type === "salary" && (
+                     <div className="flex justify-between">
+                       <span className="text-xs">基本給</span>
+                       <span>{stmt.base_amount.toLocaleString()}</span>
+                     </div>
+                   )}
                    {stmt.details.base_tech_salary > 0 && (
                      <div className="flex justify-between text-xs"><span>技術歩合/インセンティブ</span><span>{stmt.details.base_tech_salary.toLocaleString()}</span></div>
                    )}
