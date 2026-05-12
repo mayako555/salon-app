@@ -10,12 +10,21 @@ import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 import { toast } from "sonner";
 import ScanPaperDialog from "./ScanPaperDialog";
+import AddCustomerDialog from "./AddCustomerDialog";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export default function StaffCustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [isScanOpen, setIsScanOpen] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [selectedStore, setSelectedStore] = useState<string>("すべて");
 
   const load = async () => {
     setLoading(true);
@@ -33,11 +42,16 @@ export default function StaffCustomersPage() {
     load();
   }, []);
 
-  const filtered = customers.filter(c => 
-    c.name.includes(search) || 
-    c.name_kana.includes(search) || 
-    c.phone.includes(search)
-  );
+  const filtered = customers.filter(c => {
+    const matchesSearch = (c.name || "").includes(search) || 
+                         (c.name_kana || "").includes(search) || 
+                         (c.phone || "").includes(search);
+    
+    if (selectedStore === "すべて") return matchesSearch;
+    return matchesSearch && c.store_name === selectedStore;
+  });
+
+  const stores = ["すべて", "神戸", "六甲", "元町"];
 
   return (
     <div className="pb-24">
@@ -56,7 +70,11 @@ export default function StaffCustomersPage() {
             >
               <Scan size={20} />
             </Button>
-            <Button size="icon" className="rounded-full bg-white/20 hover:bg-white/30 border-none text-white">
+            <Button 
+              onClick={() => setIsAddOpen(true)}
+              size="icon" 
+              className="rounded-full bg-white/20 hover:bg-white/30 border-none text-white"
+            >
               <UserPlus size={20} />
             </Button>
           </div>
@@ -70,6 +88,23 @@ export default function StaffCustomersPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+        </div>
+
+        <div className="flex gap-2 mt-4 overflow-x-auto pb-1 no-scrollbar">
+          {stores.map(s => (
+            <button
+              key={s}
+              onClick={() => setSelectedStore(s)}
+              className={cn(
+                "px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all",
+                selectedStore === s 
+                  ? "bg-white text-orange-600 shadow-md" 
+                  : "bg-white/10 text-white hover:bg-white/20"
+              )}
+            >
+              {s}{s !== "すべて" ? "店" : ""}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -87,7 +122,7 @@ export default function StaffCustomersPage() {
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
                   customer.has_allergy ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-600'
                 }`}>
-                  {customer.name[0]}
+                  {(customer.name || "?")[0]}
                 </div>
                 
                 <div className="flex-1 min-w-0">
@@ -104,6 +139,11 @@ export default function StaffCustomersPage() {
                     <div className="flex items-center gap-1">
                       <Phone size={12} className="text-slate-300" /> {customer.phone}
                     </div>
+                    {customer.store_name && (
+                      <div className="bg-slate-100 text-slate-500 text-[10px] px-1.5 py-0.5 rounded-md font-bold">
+                        {customer.store_name}
+                      </div>
+                    )}
                     {customer.latest_counseling && (
                       <div className="flex items-center gap-1">
                         <Calendar size={12} className="text-slate-300" /> 
@@ -124,6 +164,12 @@ export default function StaffCustomersPage() {
         isOpen={isScanOpen}
         onClose={() => setIsScanOpen(false)}
         onExtracted={handleExtracted}
+      />
+
+      <AddCustomerDialog
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        onSuccess={load}
       />
     </div>
   );

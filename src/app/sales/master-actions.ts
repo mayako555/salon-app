@@ -69,6 +69,7 @@ export async function upsertMasterItem(data: Partial<SalesMasterItem>) {
       hpbName: data.hpbName || "",
       restrictions: data.restrictions || "",
       notes: data.notes || "",
+      imageUrl: data.imageUrl || "",
       isActive: data.isActive !== undefined ? data.isActive : true,
       sortOrder: data.sortOrder !== undefined ? data.sortOrder : 999,
       staffAssignable: !!data.staffAssignable,

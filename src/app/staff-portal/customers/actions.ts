@@ -286,3 +286,32 @@ export async function registerScannedCustomer(
     return { success: false, error: error.message };
   }
 }
+
+export async function registerManualCustomer(formData: {
+  customer_no: string;
+  name: string;
+  name_kana: string;
+  phone: string;
+  store_name: string;
+}) {
+  try {
+    const res = await addCustomer({
+      ...formData,
+      is_active: true,
+      has_allergy: false,
+      risk_level: 'none',
+      risk_flags: [],
+      allergies: [],
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp()
+    } as any);
+
+    if (res.success) {
+      revalidatePath("/staff-portal/customers");
+    }
+    return res;
+  } catch (error: any) {
+    console.error("Error in registerManualCustomer:", error);
+    return { success: false, error: error.message };
+  }
+}

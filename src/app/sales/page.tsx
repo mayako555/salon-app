@@ -51,16 +51,78 @@ export default function SalesPage({
   }, [year, month]);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStaffs, setSelectedStaffs] = useState<Set<string>>(new Set());
+  const [selectedStores, setSelectedStores] = useState<Set<string>>(new Set());
   
+  const normalizeName = (name: string | null) => {
+    if (!name) return "";
+    return name
+      .replace(/\s+/g, "")
+      .replace(/[凛凜]/g, "凛");
+  };
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const handleToggleSelectAll = () => {
+    if (selectedIds.size === filteredSales.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredSales.map(s => s.id)));
+    }
+  };
+
+  const handleToggleSelect = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const handleBatchDelete = async (idsToDelete: string[]) => {
+    if (idsToDelete.length === 0) return;
+    if (!confirm(`${idsToDelete.length}件のデータを削除してもよろしいですか？`)) return;
+    
+    setLoading(true);
+    let successCount = 0;
+    for (const id of idsToDelete) {
+      const res = await deleteSale(id);
+      if (res.success) successCount++;
+    }
+    
+    setSales(sales.filter(s => !idsToDelete.includes(s.id)));
+    setSelectedIds(new Set());
+    setLoading(false);
+    alert(`${successCount}件のデータを削除しました。`);
+  };
+
   const filteredSales = sales.filter(s => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      (s.staff_name || "").toLowerCase().includes(query) ||
-      (s.customer_name || "").toLowerCase().includes(query) ||
-      (s.store_name || "").toLowerCase().includes(query) ||
-      (s.menu_course || "").toLowerCase().includes(query)
-    );
+    if (selectedStaffs.size > 0) {
+      const staffMatch = Array.from(selectedStaffs).some(staff => 
+        normalizeName(s.staff_name) === normalizeName(staff)
+      );
+      if (!staffMatch) return false;
+    }
+    
+    if (selectedStores.size > 0) {
+      if (!selectedStores.has(s.store_name)) return false;
+    }
+
+    if (searchQuery) {
+      const keywords = searchQuery.toLowerCase().split(/\s+/).filter(k => k.length > 0);
+      
+      const isMatched = keywords.every(keyword => {
+        return (
+          (s.staff_name || "").toLowerCase().includes(keyword) ||
+          (s.customer_name || "").toLowerCase().includes(keyword) ||
+          (s.store_name || "").toLowerCase().includes(keyword) ||
+          (s.menu_course || "").toLowerCase().includes(keyword)
+        );
+      });
+      
+      if (!isMatched) return false;
+    }
+    
+    return true;
   });
 
   const handleDeleteSale = async (id: string) => {
@@ -68,6 +130,9 @@ export default function SalesPage({
     const res = await deleteSale(id);
     if (res.success) {
       setSales(sales.filter(s => s.id !== id));
+      const next = new Set(selectedIds);
+      next.delete(id);
+      setSelectedIds(next);
     }
   };
 
@@ -82,13 +147,11 @@ export default function SalesPage({
 
   const cashSales = sales.filter(s => s.payment_method === '現金');
   const cashlessSales = sales.filter(s => s.payment_method !== '現金' && s.payment_method !== '不明');
-  const unknownSales = sales.filter(s => s.payment_method === '不明');
 
   const totalTechSales = sales.reduce((sum, s) => sum + s.tech_sales, 0);
   const totalProductSales = sales.reduce((sum, s) => sum + s.product_sales, 0);
-  const totalNomination = sales.reduce((sum, s) => sum + (s.nomination_fee || 0), 0);
   const totalDiscount = sales.reduce((sum, s) => sum + (s.discount || 0), 0);
-  const totalSales = totalTechSales + totalProductSales + totalNomination - totalDiscount;
+  const totalSales = sales.reduce((sum, s) => sum + s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0), 0);
 
   const cashTechSales = cashSales.reduce((sum, s) => sum + s.tech_sales, 0);
   const cashlessTechSales = cashlessSales.reduce((sum, s) => sum + s.tech_sales, 0);
@@ -96,18 +159,8 @@ export default function SalesPage({
   const cashProductSales = cashSales.reduce((sum, s) => sum + s.product_sales, 0);
   const cashlessProductSales = cashlessSales.reduce((sum, s) => sum + s.product_sales, 0);
 
-  // Aggregate by store and staff
-  // Helper to normalize names for comparison (handles kanji variations and whitespace)
-  const normalizeName = (name: string | null) => {
-    if (!name) return "";
-    return name
-      .replace(/\s+/g, "")
-      .replace(/[凛凜]/g, "凛"); // Treat both versions of Rin as the same
-  };
-
   const stores = ["六甲", "元町", "神戸"];
   
-  // Sort staff profiles first
   const sortedProfiles = [...staffProfiles].sort((a, b) => {
     const orderA = a.sort_order ?? 999;
     const orderB = b.sort_order ?? 999;
@@ -115,10 +168,8 @@ export default function SalesPage({
     return a.name.localeCompare(b.name, "ja");
   });
 
-  // Get names from sorted profiles
   const staffNames = sortedProfiles.map(p => p.name);
 
-  // Add any staff names from sales that are not in profiles (normalize to avoid duplicates)
   const salesStaffNames = Array.from(new Set(sales.map(s => s.staff_name)));
   salesStaffNames.forEach(name => {
     if (!name) return;
@@ -139,9 +190,51 @@ export default function SalesPage({
     if (store) filtered = filtered.filter(s => s.store_name === store);
     
     const discount = filtered.reduce((sum, s) => sum + (s.discount || 0), 0);
+    const techSales = filtered.reduce((sum, s) => sum + (s.tech_sales || 0), 0);
+    const productSales = filtered.reduce((sum, s) => sum + (s.product_sales || 0), 0);
     const total = filtered.reduce((sum, s) => sum + s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0), 0);
     
-    return { total, discount };
+    return { total, discount, techSales, productSales };
+  };
+
+  const toggleStaffFilter = (staff: string) => {
+    const next = new Set(selectedStaffs);
+    if (next.has(staff)) next.delete(staff);
+    else next.add(staff);
+    setSelectedStaffs(next);
+    setSelectedIds(new Set());
+  };
+
+  const toggleStoreFilter = (store: string) => {
+    const next = new Set(selectedStores);
+    if (next.has(store)) next.delete(store);
+    else next.add(store);
+    setSelectedStores(next);
+    setSelectedIds(new Set());
+  };
+
+  const toggleMatrixFilter = (staff: string | null, store: string | null) => {
+    if (staff && store) {
+      // Intersection click: special toggle
+      if (selectedStaffs.size === 1 && selectedStaffs.has(staff) && selectedStores.size === 1 && selectedStores.has(store)) {
+        setSelectedStaffs(new Set());
+        setSelectedStores(new Set());
+      } else {
+        setSelectedStaffs(new Set([staff]));
+        setSelectedStores(new Set([store]));
+      }
+    } else if (staff) {
+      toggleStaffFilter(staff);
+    } else if (store) {
+      toggleStoreFilter(store);
+    }
+  };
+
+  const clearFilters = () => {
+    setSelectedStaffs(new Set());
+    setSelectedStores(new Set());
+    setSearchQuery("");
+    setSelectedIds(new Set());
   };
 
   return (
@@ -196,7 +289,7 @@ export default function SalesPage({
                 </div>
               </div>
               
-              <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-5 rounded-xl border border-slate-700 shadow-md flex flex-col justify-center relative overflow-hidden">
+              <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-5 rounded-xl border border-slate-200 shadow-md flex flex-col justify-center relative overflow-hidden">
                 <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white opacity-5 rounded-full blur-xl"></div>
                 <p className="text-sm font-medium text-slate-300 mb-1 relative z-10">当月 総売上</p>
                 <div className="flex items-end gap-2 mb-3 relative z-10">
@@ -209,8 +302,70 @@ export default function SalesPage({
               </div>
             </div>
 
+            {/* Explicit Filter Panel */}
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                  <Search size={16} className="text-slate-400" />
+                  絞り込み条件
+                </h3>
+                {(selectedStaffs.size > 0 || selectedStores.size > 0 || searchQuery) && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs h-7 text-rose-500 hover:text-rose-600 font-bold">
+                    条件をすべてクリア
+                  </Button>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">対象店舗</p>
+                  <div className="flex flex-wrap gap-3">
+                    {stores.map(store => {
+                      const isChecked = selectedStores.has(store);
+                      return (
+                        <label key={store} className={cn(
+                          "flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all cursor-pointer text-sm font-medium",
+                          isChecked ? "bg-emerald-50 border-emerald-200 text-emerald-700 ring-1 ring-emerald-200" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                        )}>
+                          <input 
+                            type="checkbox" 
+                            checked={isChecked} 
+                            onChange={() => toggleStoreFilter(store)}
+                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          {store}店
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">担当スタッフ</p>
+                  <div className="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto p-1">
+                    {staffNames.map(staff => {
+                      const isChecked = Array.from(selectedStaffs).some(s => normalizeName(s) === normalizeName(staff));
+                      return (
+                        <label key={staff} className={cn(
+                          "flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all cursor-pointer text-xs font-medium",
+                          isChecked ? "bg-blue-50 border-blue-200 text-blue-700 ring-1 ring-blue-200" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                        )}>
+                          <input 
+                            type="checkbox" 
+                            checked={isChecked} 
+                            onChange={() => toggleStaffFilter(staff)}
+                            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          {staff}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
-              <div className="bg-slate-50 border-b border-slate-100 p-4">
+              <div className="bg-slate-50 border-b border-slate-100 p-4 flex justify-between items-center">
                 <h2 className="font-bold text-slate-800">店舗・スタッフ別 集計マトリックス</h2>
               </div>
               <div className="overflow-x-auto">
@@ -219,23 +374,53 @@ export default function SalesPage({
                     <TableRow>
                       <TableHead className="font-bold w-[150px]">スタッフ名</TableHead>
                       {stores.map(store => (
-                        <TableHead key={store} className="text-right">{store}店</TableHead>
+                        <TableHead 
+                          key={store} 
+                          className={cn(
+                            "text-right cursor-pointer hover:bg-slate-100 transition-colors",
+                            selectedStores.has(store) && "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200"
+                          )}
+                          onClick={() => toggleMatrixFilter(null, store)}
+                        >
+                          {store}店
+                        </TableHead>
                       ))}
                       <TableHead className="text-right font-bold text-emerald-700">合計</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {staffNames.map(staff => (
-                      <TableRow key={staff} className={cn("cursor-pointer hover:bg-slate-50 transition-colors", searchQuery === staff && "bg-emerald-50")} onClick={() => setSearchQuery(searchQuery === staff ? "" : staff)}>
-                        <TableCell className="font-medium bg-slate-50/30">{staff}</TableCell>
+                      <TableRow key={staff}>
+                        <TableCell 
+                          className={cn(
+                            "font-medium bg-slate-50/30 cursor-pointer hover:bg-slate-100 transition-colors",
+                            selectedStaffs.has(staff) && "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200"
+                          )}
+                          onClick={() => toggleMatrixFilter(staff, null)}
+                        >
+                          {staff}
+                        </TableCell>
                         {stores.map(store => {
-                          const { total, discount } = getSalesMetrics(staff, store);
+                          const { total, discount, techSales, productSales } = getSalesMetrics(staff, store);
+                          const isSelected = selectedStaffs.has(staff) && selectedStores.has(store);
+                          
                           return (
-                            <TableCell key={store} className="text-right text-slate-600">
+                            <TableCell 
+                              key={store} 
+                              className={cn(
+                                "text-right text-slate-600 cursor-pointer hover:bg-blue-50 transition-colors",
+                                isSelected && "bg-blue-100 text-blue-800 ring-1 ring-inset ring-blue-300"
+                              )}
+                              onClick={() => toggleMatrixFilter(staff, store)}
+                            >
                               <div className="flex flex-col items-end">
-                                <span className="font-medium">¥{total.toLocaleString()}</span>
+                                <span className="font-medium text-slate-900">¥{total.toLocaleString()}</span>
+                                <div className="flex gap-1.5 text-[9px] font-bold leading-none mt-1">
+                                  <span className="text-indigo-500/80">技 ¥{techSales.toLocaleString()}</span>
+                                  <span className="text-emerald-500/80">店 ¥{productSales.toLocaleString()}</span>
+                                </div>
                                 {discount > 0 && (
-                                  <span className="text-[10px] text-rose-500 font-bold leading-none mt-0.5 opacity-80">
+                                  <span className="text-[9px] text-rose-500 font-bold leading-none mt-1">
                                     (引 ¥{discount.toLocaleString()})
                                   </span>
                                 )}
@@ -245,9 +430,13 @@ export default function SalesPage({
                         })}
                         <TableCell className="text-right font-bold text-emerald-700 bg-emerald-50/10">
                           <div className="flex flex-col items-end">
-                            <span>¥{getSalesMetrics(staff, null).total.toLocaleString()}</span>
+                            <span className="text-slate-900">¥{getSalesMetrics(staff, null).total.toLocaleString()}</span>
+                            <div className="flex gap-1.5 text-[9px] font-bold leading-none mt-1">
+                              <span className="text-indigo-500/60">技 ¥{getSalesMetrics(staff, null).techSales.toLocaleString()}</span>
+                              <span className="text-emerald-500/60">店 ¥{getSalesMetrics(staff, null).productSales.toLocaleString()}</span>
+                            </div>
                             {getSalesMetrics(staff, null).discount > 0 && (
-                              <span className="text-[10px] text-rose-500 font-bold leading-none mt-0.5 opacity-80">
+                              <span className="text-[9px] text-rose-500 font-bold leading-none mt-1">
                                 (引 ¥{getSalesMetrics(staff, null).discount.toLocaleString()})
                               </span>
                             )}
@@ -258,13 +447,17 @@ export default function SalesPage({
                     <TableRow className="bg-slate-50">
                       <TableCell className="font-bold text-slate-800">店舗合計</TableCell>
                       {stores.map(store => {
-                        const { total, discount } = getSalesMetrics(null, store);
+                        const { total, discount, techSales, productSales } = getSalesMetrics(null, store);
                         return (
                           <TableCell key={store} className="text-right font-bold text-slate-800">
                             <div className="flex flex-col items-end">
-                              <span>¥{total.toLocaleString()}</span>
+                              <span className="text-slate-900">¥{total.toLocaleString()}</span>
+                              <div className="flex gap-1.5 text-[9px] font-bold leading-none mt-1">
+                                <span className="text-indigo-600/70">技 ¥{techSales.toLocaleString()}</span>
+                                <span className="text-emerald-600/70">店 ¥{productSales.toLocaleString()}</span>
+                              </div>
                               {discount > 0 && (
-                                <span className="text-[10px] text-rose-500 font-bold leading-none mt-0.5 opacity-80">
+                                <span className="text-[9px] text-rose-600 font-bold leading-none mt-1">
                                   (引 ¥{discount.toLocaleString()})
                                 </span>
                               )}
@@ -274,9 +467,13 @@ export default function SalesPage({
                       })}
                       <TableCell className="text-right font-bold text-emerald-700">
                         <div className="flex flex-col items-end">
-                          <span>¥{totalSales.toLocaleString()}</span>
+                          <span className="text-slate-900 text-lg">¥{totalSales.toLocaleString()}</span>
+                          <div className="flex gap-1.5 text-[10px] font-bold leading-none mt-1">
+                            <span className="text-indigo-700">技 ¥{sales.reduce((sum, s) => sum + s.tech_sales, 0).toLocaleString()}</span>
+                            <span className="text-emerald-700">店 ¥{totalProductSales.toLocaleString()}</span>
+                          </div>
                           {totalDiscount > 0 && (
-                            <span className="text-[10px] text-rose-500 font-bold leading-none mt-0.5 opacity-80">
+                            <span className="text-[10px] text-rose-600 font-bold leading-none mt-1">
                               (引 ¥{totalDiscount.toLocaleString()})
                             </span>
                           )}
@@ -306,7 +503,36 @@ export default function SalesPage({
                   </Link>
                 </div>
                 
-                <div className="flex gap-2 items-center">
+                <div className="flex gap-4 items-center">
+                  {selectedIds.size > 0 && (
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={() => handleBatchDelete(Array.from(selectedIds))}
+                      className="h-8 px-3 text-xs font-bold"
+                    >
+                      選択中の{selectedIds.size}件を削除
+                    </Button>
+                  )}
+                  
+                  {filteredSales.length > 0 && (selectedStaffs.size > 0 || selectedStores.size > 0 || searchQuery) && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleBatchDelete(filteredSales.map(s => s.id))}
+                      className="h-8 px-3 text-xs font-bold text-rose-600 border-rose-200 hover:bg-rose-50"
+                    >
+                      表示中の全{filteredSales.length}件を削除
+                    </Button>
+                  )}
+
+                  {(selectedStaffs.size > 0 || selectedStores.size > 0) && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-bold ring-1 ring-blue-100">
+                      絞り込み中: {selectedStaffs.size > 0 ? Array.from(selectedStaffs).join(",") : "全員"} / {selectedStores.size > 0 ? Array.from(selectedStores).join(",") : "全店舗"}
+                      <button onClick={clearFilters} className="hover:text-blue-900 ml-1">×</button>
+                    </div>
+                  )}
+
                   <div className="relative w-full sm:w-64">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
                     <input 
@@ -324,6 +550,14 @@ export default function SalesPage({
                 <Table className="whitespace-nowrap min-w-[1000px]">
                   <TableHeader className="bg-slate-100/80">
                     <TableRow className="border-b-2 border-slate-200">
+                      <TableHead className="w-[40px] text-center">
+                        <input 
+                          type="checkbox" 
+                          checked={filteredSales.length > 0 && selectedIds.size === filteredSales.length}
+                          onChange={handleToggleSelectAll}
+                          className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                        />
+                      </TableHead>
                       <TableHead className="w-[80px]">日付</TableHead>
                       <TableHead className="w-[60px]">時間</TableHead>
                       <TableHead className="w-[80px]">店舗</TableHead>
@@ -344,16 +578,25 @@ export default function SalesPage({
                   <TableBody>
                     {filteredSales.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={15} className="text-center py-12 text-slate-500">
-                          {searchQuery ? "条件に一致するデータが見つかりません。" : "日計（会計）データがありません。右上の「会計を登録」から入力してください。"}
+                        <TableCell colSpan={16} className="text-center py-12 text-slate-500">
+                          { (searchQuery || selectedStaffs.size > 0 || selectedStores.size > 0) ? "条件に一致するデータが見つかりません。" : "日計（会計）データがありません。右上の「会計を登録」から入力してください。"}
                         </TableCell>
                       </TableRow>
                     ) : (
                       [...filteredSales].sort((a, b) => a.date.localeCompare(b.date) || a.time?.localeCompare(b.time || "")).map((sale) => {
                         const saleTotal = sale.tech_sales + sale.product_sales + (sale.nomination_fee || 0) + (sale.cancel_fee || 0) - (sale.discount || 0);
+                        const isRowSelected = selectedIds.has(sale.id);
 
                         return (
-                          <TableRow key={sale.id} className={`hover:bg-amber-50/30 ${sale.status === 'closed' ? 'bg-slate-50 opacity-90' : ''}`}>
+                          <TableRow key={sale.id} className={`hover:bg-amber-50/30 ${sale.status === 'closed' ? 'bg-slate-50 opacity-90' : ''} ${isRowSelected ? 'bg-emerald-50/50' : ''}`}>
+                            <TableCell className="text-center">
+                              <input 
+                                type="checkbox" 
+                                checked={isRowSelected}
+                                onChange={() => handleToggleSelect(sale.id)}
+                                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                              />
+                            </TableCell>
                             <TableCell className="font-medium text-slate-600">
                               {format(new Date(sale.date), "MM/dd")}
                             </TableCell>

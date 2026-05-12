@@ -31,6 +31,10 @@ export type SalesRecord = {
   date: string; // YYYY-MM-DD
   time: string; // HH:MM
   customer_name: string;
+  last_name?: string;
+  first_name?: string;
+  last_name_kana?: string;
+  first_name_kana?: string;
   customer_type: "新規" | "リピ" | "不明";
   menu_course: string;
   tech_sales: number;
@@ -165,7 +169,11 @@ export async function addCheckout(formData: FormData) {
     // Name handling
     const lastName = formData.get("last_name") as string || "";
     const firstName = formData.get("first_name") as string || "";
+    const lastNameKana = formData.get("last_name_kana") as string || "";
+    const firstNameKana = formData.get("first_name_kana") as string || "";
+    
     const customerName = (lastName + " " + firstName).trim() || "名無し";
+    const customerNameKana = (lastNameKana + " " + firstNameKana).trim() || "";
     
     let customerId = formData.get("customer_id") as string || null;
     const customerType = formData.get("customer_type") as "新規" | "リピ" | "不明";
@@ -176,7 +184,9 @@ export async function addCheckout(formData: FormData) {
         name: customerName,
         last_name: lastName,
         first_name: firstName,
-        name_kana: "", // Placeholder, staff can fix later
+        name_kana: customerNameKana,
+        last_name_kana: lastNameKana,
+        first_name_kana: firstNameKana,
         phone: "",
         gender: "female", // Default
         allergies: [],
@@ -220,6 +230,10 @@ export async function addCheckout(formData: FormData) {
       date,
       time,
       customer_name: customerName,
+      last_name: lastName,
+      first_name: firstName,
+      last_name_kana: lastNameKana,
+      first_name_kana: firstNameKana,
       customer_id: customerId,
       customer_type: customerType,
       menu_course: menuCourse,
@@ -292,7 +306,11 @@ export async function updateCheckout(id: string, formData: FormData) {
     // Name handling
     const lastName = formData.get("last_name") as string || "";
     const firstName = formData.get("first_name") as string || "";
+    const lastNameKana = formData.get("last_name_kana") as string || "";
+    const firstNameKana = formData.get("first_name_kana") as string || "";
+    
     const customerName = (lastName + " " + firstName).trim() || "名無し";
+    const customerNameKana = (lastNameKana + " " + firstNameKana).trim() || "";
     
     let customerId = formData.get("customer_id") as string || null;
     const customerType = formData.get("customer_type") as "新規" | "リピ" | "不明";
@@ -303,7 +321,9 @@ export async function updateCheckout(id: string, formData: FormData) {
         name: customerName,
         last_name: lastName,
         first_name: firstName,
-        name_kana: "", // Placeholder
+        name_kana: customerNameKana,
+        last_name_kana: lastNameKana,
+        first_name_kana: firstNameKana,
         phone: "",
         gender: "female",
         allergies: [],
@@ -346,6 +366,10 @@ export async function updateCheckout(id: string, formData: FormData) {
       date,
       time,
       customer_name: customerName,
+      last_name: lastName,
+      first_name: firstName,
+      last_name_kana: lastNameKana,
+      first_name_kana: firstNameKana,
       customer_id: customerId,
       customer_type: customerType,
       menu_course: menuCourse,
@@ -394,7 +418,7 @@ export async function importHotPepperCsv(formData: FormData) {
     const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, dynamicTyping: true });
     const rows = parsed.data as any[];
 
-    // Step 1: Group rows by Accounting ID or unique visit identifier
+    // Step 1: Group rows by Accounting ID
     const groups: Record<string, any[]> = {};
     rows.forEach(row => {
       const accountingId = row["会計ID"] || row["予約ID"] || "";
@@ -411,130 +435,76 @@ export async function importHotPepperCsv(formData: FormData) {
     const colRef = collection(db, SALES_COLLECTION);
     let importCount = 0;
 
-    // Step 2: Process each group as a single sales record
+    // Step 2: Process each group
     Object.values(groups).forEach(groupRows => {
       const firstRow = groupRows[0];
-      
-      const staffRow = groupRows.find(r => r["スタッフ"] || r["担当スタッフ"] || r["スタッフ名"]) || firstRow;
-      const rawStaffName = staffRow["スタッフ"] || staffRow["担当スタッフ"] || staffRow["スタッフ名"] || "フリー";
-      // Trim all spaces to avoid "佐藤 瑠美" vs "佐藤瑠美"
+      const rawStaffName = groupRows.find(r => r["スタッフ"] || r["担当スタッフ"] || r["スタッフ名"])?.["スタッフ"] || "フリー";
       const staffName = String(rawStaffName).replace(/\s+/g, "");
-      
       const rawDate = String(firstRow["会計日"] || firstRow["来店日"] || "");
       const rawTime = String(firstRow["会計時間"] || "");
-      const rawCustomerName = firstRow["お客様名"] || firstRow["顧客名"] || "HotPepper経由";
-      const customerName = String(rawCustomerName).trim();
+      const customerName = String(firstRow["お客様名"] || firstRow["顧客名"] || "HotPepper経由").trim();
       
       const parseMoney = (val: any) => {
         if (val === undefined || val === null) return 0;
-        if (typeof val === 'number') return val;
         return parseInt(val.toString().replace(/[^\d-]/g, ""), 10) || 0;
       };
 
-      let techSales = 0;
-      let prodSales = 0;
-      let discount = 0;
-      let hpbPoints = 0;
-      let nominationFee = 0;
-      let menuCourses: string[] = [];
-      let discountReasons: string[] = [];
+      let techSales = 0, prodSales = 0, discount = 0, hpbPoints = 0, nominationFee = 0;
+      let menuCourses: string[] = [], discountReasons: string[] = [];
 
       groupRows.forEach(row => {
-        const category = String(row["区分"] || row["カテゴリ"] || "");
+        const category = String(row["区分"] || "");
         const amount = parseMoney(row["金額"]);
-        const menu = String(row["メニュー・店販・割引・サービス・オプション"] || row["予約メニュー"] || "");
+        const menu = String(row["メニュー・店販・割引・サービス・オプション"] || "");
         const isCancel = String(row["会計区分"] || "").includes("取り消し");
         const val = isCancel ? -Math.abs(amount) : amount;
         
-        if (category.includes("店販")) {
-          prodSales += val;
-        } else if (category.includes("割引") || menu.includes("割引") || (val < 0 && !isCancel)) {
-          // It's a discount if category/menu says so, OR if it's a negative amount in a normal 'accounting' row
-          discount += Math.abs(val);
+        if (category.includes("店販")) prodSales += val;
+        else if (category.includes("割引") || val < 0) {
+          discount += isCancel ? -Math.abs(amount) : Math.abs(amount);
           if (menu && !discountReasons.includes(menu)) discountReasons.push(menu);
-        } else if (category.includes("施術")) {
-          techSales += val;
-        } else if (category.includes("その他") || category.includes("サービス")) {
-           if (menu.includes("指名料")) nominationFee += val;
-           else techSales += val;
-        } else {
-           techSales += val;
-        }
-        
-        if (menu && !menuCourses.includes(menu) && !menu.includes("割引") && !menu.includes("指名料")) {
-          menuCourses.push(menu);
-        }
-        
-        hpbPoints += parseMoney(row["ポイント使用"] || row["利用ポイント"] || "0");
+        } else if (category.includes("施術")) techSales += val;
+        else if (menu.includes("指名料")) nominationFee += val;
+        else techSales += val;
+
+        if (menu && !menuCourses.includes(menu) && !menu.includes("割引") && !menu.includes("指名料")) menuCourses.push(menu);
+        hpbPoints += isCancel ? -Math.abs(parseMoney(row["ポイント使用"])) : Math.abs(parseMoney(row["ポイント使用"]));
       });
 
-      const isNominated = nominationFee > 0;
+      if (groupRows.some(r => String(r["会計区分"] || "").includes("取り消し")) && (techSales + prodSales === 0)) return;
 
-      // Date & Time formatting
-      let dateFormatted = "";
-      if (rawDate.length === 8 && /^\d+$/.test(rawDate)) {
-        dateFormatted = `${rawDate.substring(0, 4)}-${rawDate.substring(4, 6)}-${rawDate.substring(6, 8)}`;
-      } else {
-        const dateMatch = rawDate.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
-        dateFormatted = dateMatch ? `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}` : new Date().toISOString().split("T")[0];
-      }
-
-      let timeFormatted = "00:00";
-      if (rawTime && /^\d+$/.test(rawTime)) {
-        const paddedTime = rawTime.padStart(6, '0');
-        timeFormatted = `${paddedTime.substring(0, 2)}:${paddedTime.substring(2, 4)}`;
-      } else {
-        const timeMatch = rawDate.match(/(\d{1,2}):(\d{2})/) || rawTime.match(/(\d{1,2}):(\d{2})/);
-        timeFormatted = timeMatch ? `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}` : "00:00";
-      }
-
-      const isMinimoByMenu = menuCourses.some(m => 
-        m.toLowerCase().includes("min") || 
-        m.includes("ミニ")
-      );
-
-      const reservationRoute = isMinimoByMenu 
-        ? "ミニモ" 
-        : (firstRow["予約経路"] || firstRow["来店のきっかけ"] || "ホットペッパー");
+      let dateFormatted = rawDate.includes("-") ? rawDate : `${rawDate.substring(0, 4)}-${rawDate.substring(4, 6)}-${rawDate.substring(6, 8)}`;
+      let timeFormatted = rawTime.includes(":") ? rawTime : `${rawTime.padStart(4, '0').substring(0, 2)}:${rawTime.padStart(4, '0').substring(2, 4)}`;
 
       const docRef = doc(colRef);
       batch.set(docRef, {
-        staff_id: "unknown",
         staff_name: staffName,
         store_name: storeName,
         date: dateFormatted,
         time: timeFormatted,
         customer_name: customerName,
-        customer_no: firstRow["お客様番号"] || "",
         customer_type: groupRows.some(r => (r["新規再来"] || "").includes("新規")) ? "新規" : "リピ",
         menu_course: menuCourses.slice(0, 3).join(", "),
         tech_sales: techSales,
         product_sales: prodSales,
-        is_nominated: isNominated,
+        is_nominated: nominationFee !== 0,
         nomination_fee: nominationFee,
         discount: discount,
-        discount_reason: discountReasons.length > 0 ? discountReasons.join(", ") : "CSV一括読込",
-        portal_fee: 0,
+        discount_reason: discountReasons.join(", ") || "CSV一括読込",
         hpb_points: hpbPoints,
-        reservation_route: reservationRoute,
-        payment_method: firstRow["支払方法"] || firstRow["決済方法"] || firstRow["支払区分"] || firstRow["決済区分"] || "不明",
-        hair_material: "",
-        options: "",
-        cancel_fee: 0,
+        reservation_route: "ホットペッパー",
         status: "draft",
         source: "hotpepper" as SalesSource,
-        is_minimo: isMinimoByMenu,
         created_at: serverTimestamp()
       });
       importCount++;
     });
 
     await batch.commit();
-    revalidatePath("/staff-portal");
     revalidatePath("/staff-portal/sales");
     return { success: true, count: importCount };
   } catch (error: any) {
-    console.error("Error importing CSV to Firestore:", error);
+    console.error("Error importing CSV:", error);
     return { success: false, error: error.message };
   }
 }
@@ -543,58 +513,23 @@ export async function closeDailySales(date: string) {
   try {
     const colRef = collection(db, SALES_COLLECTION);
     const q = query(colRef, where("date", "==", date), where("status", "==", "draft"));
-    
-    const getDocsPromise = async () => {
-      const snapshot = await getDocs(q);
-      if (snapshot.empty) return { success: true, count: 0 };
-
-      const batch = writeBatch(db);
-      snapshot.docs.forEach(d => {
-        batch.update(d.ref, { status: "closed" });
-      });
-      
-      await batch.commit();
-
-      await addAuditLog({
-        table_name: SALES_COLLECTION,
-        record_id: `daily-close-${date}`,
-        action: "CLOSE_ACCOUNTING",
-        old_data: { date, status: "draft" },
-        new_data: { date, status: "closed", count: snapshot.size },
-        actor: "管理者"
-      });
-
-      return { success: true, count: snapshot.size };
-    };
-
-    const res = await Promise.race([
-      getDocsPromise(),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Firestore operation timed out (15s)")), 15000)
-      )
-    ]);
-
-    revalidatePath("/staff-portal");
-    revalidatePath("/staff-portal/sales");
-    return res as any;
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return { success: true, count: 0 };
+    const batch = writeBatch(db);
+    snapshot.docs.forEach(d => batch.update(d.ref, { status: "closed" }));
+    await batch.commit();
+    return { success: true, count: snapshot.size };
   } catch (error: any) {
-    console.error("Error closing sales in Firestore:", error);
     return { success: false, error: error.message };
   }
 }
 
 export async function deleteSale(id: string) {
   try {
-    const docRef = doc(db, SALES_COLLECTION, id);
-    // Use actual delete for cleanup
-    const { deleteDoc } = await import("firebase/firestore");
-    await deleteDoc(docRef);
-
+    await deleteDoc(doc(db, SALES_COLLECTION, id));
     revalidatePath("/staff-portal/sales");
-    revalidatePath("/sales");
     return { success: true };
   } catch (error: any) {
-    console.error("Error deleting sale:", error);
     return { success: false, error: error.message };
   }
 }
@@ -603,43 +538,20 @@ export async function clearMonthlyCsvImports(year: number, month: number) {
   try {
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
     const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
-    
-    const colRef = collection(db, SALES_COLLECTION);
-    // Use a simpler query that doesn't require composite indexes
-    const q = query(
-      colRef, 
-      where("date", ">=", startDate), 
-      where("date", "<=", endDate)
-    );
-    
+    const q = query(collection(db, SALES_COLLECTION), where("date", ">=", startDate), where("date", "<=", endDate));
     const snapshot = await getDocs(q);
-    if (snapshot.empty) return { success: true, count: 0, message: "対象データが見つかりませんでした。" };
-
     const batch = writeBatch(db);
     let count = 0;
     snapshot.docs.forEach(d => {
-      const data = d.data();
-      // Broaden filter to catch old records without 'source' field
-      const isHotPepper = 
-        data.source === "hotpepper" || 
-        String(data.reservation_route).includes("ホットペッパー") ||
-        String(data.reservation_route).includes("HOT PEPPER") ||
-        data.discount_reason === "CSV一括読込";
-
-      if (isHotPepper) {
+      if (d.data().source === "hotpepper") {
         batch.delete(d.ref);
         count++;
       }
     });
-
-    if (count > 0) {
-      await batch.commit();
-    }
-
-    revalidatePath("/sales");
-    return { success: true, count, message: `${count}件の取り込みデータを削除しました。` };
+    if (count > 0) await batch.commit();
+    revalidatePath("/staff-portal/sales");
+    return { success: true, count };
   } catch (error: any) {
-    console.error("Error clearing CSV imports:", error);
     return { success: false, error: error.message };
   }
 }

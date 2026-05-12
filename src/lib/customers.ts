@@ -58,6 +58,7 @@ export type Customer = {
   
   chart_image_urls?: string[]; // スキャンしたカルテ画像のURLリスト
   notes?: string; // 自由記述のメモ
+  store_name?: string; // 所属店舗 (例: "神戸", "六甲")
   
   created_at: any;
   updated_at: any;

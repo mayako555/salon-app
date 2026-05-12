@@ -4,11 +4,12 @@ import { collection, writeBatch, doc } from "firebase/firestore";
 export type SalesMasterItem = {
   id?: string;
   store: "六甲" | "神戸" | "元町" | "共通";
-  itemType: "menu" | "coupon" | "messageCoupon" | "option" | "discount" | "fee";
+  itemType: "menu" | "coupon" | "messageCoupon" | "option" | "discount" | "fee" | "karteTemplate";
   category: string;
   name: string;
   internalName?: string;
   price: number;
+  imageUrl?: string;
   duration?: string; // 所要時間
   hpbName?: string;  // HPBクーポン名
   restrictions?: string; // 制約

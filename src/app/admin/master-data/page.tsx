@@ -25,7 +25,8 @@ const STORES = ["六甲", "神戸", "元町"];
 const ITEM_TYPES = [
   { id: "menu", label: "通常メニュー" },
   { id: "coupon", label: "クーポン" },
-  { id: "messageCoupon", label: "メッセージクーポン" }
+  { id: "messageCoupon", label: "メッセージクーポン" },
+  { id: "karteTemplate", label: "カルテテンプレート" }
 ];
 
 export default function MasterDataPage() {
@@ -49,9 +50,9 @@ export default function MasterDataPage() {
   };
 
   const filteredItems = items.filter(item => 
-    item.itemType === selectedType && 
+    item.itemType === (selectedType as any) && 
     (item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-     item.category.toLowerCase().includes(searchQuery.toLowerCase()))
+     (item.category || "").toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const handleToggleStatus = async (id: string, currentStatus: boolean) => {
@@ -89,17 +90,27 @@ export default function MasterDataPage() {
     setIsSaving(false);
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setEditingItem(prev => ({ ...prev, imageUrl: ev.target?.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/sales" className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
+            <Link href="/staff-portal" className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
               <ArrowLeft size={20} />
             </Link>
             <div>
               <h1 className="text-xl font-bold text-slate-800">POSマスタ管理</h1>
-              <p className="text-xs text-slate-500 font-normal">店舗別のメニュー・クーポン設定</p>
+              <p className="text-xs text-slate-500 font-normal">店舗別のメニュー・クーポン・カルテ背景設定</p>
             </div>
           </div>
           
@@ -155,7 +166,7 @@ export default function MasterDataPage() {
                 itemType: selectedType as any,
                 isActive: true,
                 price: 0,
-                category: "",
+                category: selectedType === 'karteTemplate' ? 'カルテ' : "",
                 name: ""
               })}
               className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 h-10 px-6"
@@ -174,9 +185,15 @@ export default function MasterDataPage() {
                   <TableHead className="w-12 text-center">有効</TableHead>
                   <TableHead>カテゴリ</TableHead>
                   <TableHead className="min-w-[200px]">名称</TableHead>
-                  <TableHead className="text-right">価格 (円)</TableHead>
-                  <TableHead className="text-center">指名可</TableHead>
-                  <TableHead className="text-center">設備可</TableHead>
+                  {selectedType !== 'karteTemplate' ? (
+                    <>
+                      <TableHead className="text-right">価格 (円)</TableHead>
+                      <TableHead className="text-center">指名可</TableHead>
+                      <TableHead className="text-center">設備可</TableHead>
+                    </>
+                  ) : (
+                    <TableHead className="text-center">背景画像</TableHead>
+                  )}
                   <TableHead className="w-24 text-right pr-6">操作</TableHead>
                 </TableRow>
               </TableHeader>
@@ -214,19 +231,31 @@ export default function MasterDataPage() {
                       <TableCell className="font-medium text-slate-800">
                         {item.name}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-slate-700">
-                        ¥{item.price.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${item.staffAssignable ? "bg-blue-100 text-blue-700" : "text-slate-300"}`}>
-                          {item.staffAssignable ? "スタッフ" : "-"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${item.equipmentAssignable ? "bg-purple-100 text-purple-700" : "text-slate-300"}`}>
-                          {item.equipmentAssignable ? "設備" : "-"}
-                        </span>
-                      </TableCell>
+                      {selectedType !== 'karteTemplate' ? (
+                        <>
+                          <TableCell className="text-right font-mono text-slate-700">
+                            ¥{item.price.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${item.staffAssignable ? "bg-blue-100 text-blue-700" : "text-slate-300"}`}>
+                              {item.staffAssignable ? "スタッフ" : "-"}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${item.equipmentAssignable ? "bg-purple-100 text-purple-700" : "text-slate-300"}`}>
+                              {item.equipmentAssignable ? "設備" : "-"}
+                            </span>
+                          </TableCell>
+                        </>
+                      ) : (
+                        <TableCell className="text-center">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} className="h-10 w-16 object-cover rounded border mx-auto" />
+                          ) : (
+                            <span className="text-[10px] text-slate-400">なし</span>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell className="text-right pr-6">
                         <div className="flex justify-end gap-2">
                           <button 
@@ -254,8 +283,8 @@ export default function MasterDataPage() {
 
       {/* Editor Modal */}
       {editingItem && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <Card className="w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 my-8">
             <form onSubmit={handleSave}>
               <CardHeader className="bg-slate-50 border-b border-slate-200">
                 <CardTitle className="text-lg">
@@ -272,7 +301,7 @@ export default function MasterDataPage() {
                     required
                     value={editingItem.category || ""} 
                     onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
-                    placeholder="例: カット, クーポン, キャンペーン"
+                    placeholder="例: カット, クーポン, アイブロウ"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -281,39 +310,72 @@ export default function MasterDataPage() {
                     required
                     value={editingItem.name || ""} 
                     onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                    placeholder="例: スタンダードカット"
+                    placeholder="例: スタンダードテンプレート"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-slate-700">価格 (円)</label>
-                  <Input 
-                    type="number"
-                    required
-                    value={editingItem.price || 0} 
-                    onChange={(e) => setEditingItem({ ...editingItem, price: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-
-                <div className="flex items-center gap-4 pt-2">
-                  <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={editingItem.staffAssignable} 
-                      onChange={(e) => setEditingItem({ ...editingItem, staffAssignable: e.target.checked })}
-                      className="w-4 h-4 rounded text-emerald-600 border-slate-300"
-                    />
-                    スタッフ指名可
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={editingItem.equipmentAssignable} 
-                      onChange={(e) => setEditingItem({ ...editingItem, equipmentAssignable: e.target.checked })}
-                      className="w-4 h-4 rounded text-emerald-600 border-slate-300"
-                    />
-                    設備割当可
-                  </label>
-                </div>
+                
+                {selectedType !== 'karteTemplate' ? (
+                  <>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700">価格 (円)</label>
+                      <Input 
+                        type="number"
+                        required
+                        value={editingItem.price || 0} 
+                        onChange={(e) => setEditingItem({ ...editingItem, price: parseInt(e.target.value) || 0 })}
+                      />
+                    </div>
+                    <div className="flex items-center gap-4 pt-2">
+                      <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={editingItem.staffAssignable} 
+                          onChange={(e) => setEditingItem({ ...editingItem, staffAssignable: e.target.checked })}
+                          className="w-4 h-4 rounded text-emerald-600 border-slate-300"
+                        />
+                        スタッフ指名可
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={editingItem.equipmentAssignable} 
+                          onChange={(e) => setEditingItem({ ...editingItem, equipmentAssignable: e.target.checked })}
+                          className="w-4 h-4 rounded text-emerald-600 border-slate-300"
+                        />
+                        設備割当可
+                      </label>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-3 pt-2">
+                    <label className="text-sm font-medium text-slate-700 block">背景画像</label>
+                    <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center gap-3 bg-slate-50">
+                      {editingItem.imageUrl ? (
+                        <div className="relative w-full aspect-video rounded-lg overflow-hidden border">
+                          <img src={editingItem.imageUrl} className="w-full h-full object-contain" />
+                          <button 
+                            type="button" 
+                            onClick={() => setEditingItem({ ...editingItem, imageUrl: "" })}
+                            className="absolute top-2 right-2 bg-slate-900/60 text-white rounded-full p-1.5 hover:bg-rose-500"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-center">
+                          <Plus className="mx-auto text-slate-300 mb-2" size={32} />
+                          <p className="text-[10px] text-slate-400 font-bold">クリックして画像をアップロード</p>
+                        </div>
+                      )}
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleImageUpload} 
+                        className="absolute inset-0 opacity-0 cursor-pointer" 
+                      />
+                    </div>
+                  </div>
+                )}
               </CardContent>
               <div className="p-6 pt-0 flex justify-end gap-3">
                 <Button variant="ghost" onClick={() => setEditingItem(null)} disabled={isSaving}>

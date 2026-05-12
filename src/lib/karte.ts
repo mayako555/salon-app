@@ -63,6 +63,7 @@ export type KarteRecord = {
     previous_data: any;
   }[];
   eye_diagram_url?: string; // 手書きの目のマーク・デザインマップ
+  past_karte_photos?: { url: string; description: string }[];
   notes?: string;
   created_at: any;
 };

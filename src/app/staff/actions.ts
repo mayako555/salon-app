@@ -59,7 +59,8 @@ export async function getStaffList(): Promise<StaffProfile[]> {
       return {
         id: doc.id,
         ...data,
-        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null)
+        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null),
+        updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : (data.updated_at || null)
       };
     }) as StaffProfile[];
 
