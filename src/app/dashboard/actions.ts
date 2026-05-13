@@ -41,21 +41,28 @@ export async function getDashboardStats() {
       where("date", "<=", `${currentMonthPrefix}-31`)
     );
     const monthlySalesSnap = await getDocs(monthlySalesQuery);
-    let monthlyTotal = 0;
-    let monthlyMinimoTotal = 0;
-    let monthlyRegularTotal = 0;
+    let monthlyMinimoVisits = 0;
+    let monthlyRegularVisits = 0;
     
     monthlySalesSnap.forEach(doc => {
       const data = doc.data();
       const amount = (data.tech_sales || 0) + (data.product_sales || 0) + (data.hpb_points || 0) - (data.discount || 0);
       monthlyTotal += amount;
       
-      if (data.reservation_route?.includes("ミニモ") || data.is_minimo) {
+      const route = String(data.reservation_route || "");
+      const isMinimo = data.is_minimo === true || route.includes("ミニモ") || route.toLowerCase().includes("min");
+
+      if (isMinimo) {
         monthlyMinimoTotal += amount;
+        monthlyMinimoVisits++;
       } else {
         monthlyRegularTotal += amount;
+        monthlyRegularVisits++;
       }
     });
+
+    const monthlyMinimoAvg = monthlyMinimoVisits > 0 ? Math.round(monthlyMinimoTotal / monthlyMinimoVisits) : 0;
+    const monthlyRegularAvg = monthlyRegularVisits > 0 ? Math.round(monthlyRegularTotal / monthlyRegularVisits) : 0;
 
     // 4. Today's Sales by Store
     const todaySalesQuery = query(
@@ -111,6 +118,10 @@ export async function getDashboardStats() {
         monthlyTotal,
         monthlyMinimoTotal,
         monthlyRegularTotal,
+        monthlyMinimoAvg,
+        monthlyRegularAvg,
+        monthlyMinimoVisits,
+        monthlyRegularVisits,
         storeSummary,
         storeStats
       }
@@ -160,20 +171,21 @@ export async function getAdvancedAnalytics() {
         total += amount;
         
         const route = String(data.reservation_route || "");
-        const isMinimo = data.is_minimo === true || route.includes("ミニモ") || route.toLowerCase().includes("min");
+        const menu = String(data.menu_course || "");
+        const isMinimo = data.is_minimo === true || 
+                        route.includes("ミニモ") || 
+                        route.includes("minimo") ||
+                        menu.includes("ミニモ");
         
         if (isMinimo) {
           minimo += amount;
         }
         
-        // Count 1: Making a next booking (KPI for future)
         const hasNextBooking = !!data.next_booking_date;
         if (hasNextBooking) {
           totalNextBookings++;
         }
 
-        // Count 2: Identifying the category of THIS visit (for current breakdown)
-        const menu = String(data.menu_course || "");
         const discountReason = String(data.discount_reason || "");
         const isNextBookingVisit = 
           menu.includes("次回予約") || 
@@ -187,25 +199,37 @@ export async function getAdvancedAnalytics() {
         if (data.tech_sales > 0) treatmentCount++;
         
         const rawStore = data.store_name || "不明";
-        const store = rawStore.replace("店", "");
-        if (storeSales[store] !== undefined) {
-          storeSales[store].total += amount;
-          storeSales[store].count++;
+        const storeKey = rawStore.includes("六甲") ? "六甲" : rawStore.includes("元町") ? "元町" : rawStore.includes("神戸") ? "神戸" : "不明";
+        
+        // Only count as a 'visit' for unit price calculation if they actually had technical sales
+        if (storeSales[storeKey] !== undefined && (data.tech_sales || 0) > 0) {
+          storeSales[storeKey].total += amount;
+          storeSales[storeKey].count++;
           
-          // Granular visit classification (Mutual exclusive)
           if (isMinimo) {
-            storeSales[store].minimo += amount;
-            storeSales[store].minimoVisits = (storeSales[store].minimoVisits || 0) + 1;
-          } else if (isNextBookingVisit) {
-            storeSales[store].nextBookingVisits++;
+            storeSales[storeKey].minimo += amount;
+            storeSales[storeKey].minimoVisits++;
           } else {
-            storeSales[store].regularVisits = (storeSales[store].regularVisits || 0) + 1;
+            if (isNextBookingVisit) {
+              storeSales[storeKey].nextBookingVisits++;
+            } else {
+              storeSales[storeKey].regularVisits++;
+            }
           }
 
           if (hasNextBooking) {
-            storeSales[store].nextBookings++;
+            storeSales[storeKey].nextBookings++;
           }
         }
+      });
+
+      // Calculate averages per store
+      Object.keys(storeSales).forEach(key => {
+        const s = storeSales[key];
+        const regularSales = s.total - s.minimo;
+        const regularVisits = s.regularVisits + s.nextBookingVisits;
+        (s as any).avgRegular = regularVisits > 0 ? Math.round(regularSales / regularVisits) : 0;
+        (s as any).avgMinimo = s.minimoVisits > 0 ? Math.round(s.minimo / s.minimoVisits) : 0;
       });
 
       // 2. Fetch Shifts for occupancy (Fetch all for month to avoid index requirements)
@@ -234,6 +258,13 @@ export async function getAdvancedAnalytics() {
       const occupancy = totalWorkMinutes > 0 ? Math.min(100, (estimatedTreatmentMinutes / totalWorkMinutes) * 100) : 0;
 
       const totalCount = Object.values(storeSales).reduce((acc, s) => acc + s.count, 0);
+      const totalRegularSales = total - minimo;
+      const totalMinimoVisits = Object.values(storeSales).reduce((acc, s) => acc + s.minimoVisits, 0);
+      const totalRegularVisits = totalCount - totalMinimoVisits;
+
+      const avgMinimo = totalMinimoVisits > 0 ? Math.round(minimo / totalMinimoVisits) : 0;
+      const avgRegular = totalRegularVisits > 0 ? Math.round(totalRegularSales / totalRegularVisits) : 0;
+
       const nextBookingRatio = totalCount > 0 ? Math.round((totalNextBookings / totalCount) * 100) : 0;
       const nextBookingVisitRatio = totalCount > 0 ? Math.round((totalNextBookingVisits / totalCount) * 100) : 0;
 
@@ -241,6 +272,8 @@ export async function getAdvancedAnalytics() {
         month: monthStr,
         total,
         minimo,
+        avgMinimo,
+        avgRegular,
         occupancy: Math.round(occupancy),
         stores: storeSales,
         nextBookingRatio,

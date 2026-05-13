@@ -307,6 +307,41 @@ export default function CustomerDetailPage() {
                     <LinkIcon size={14} /> LINE連携用QRを表示
                   </Button>
                 )}
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                    <History size={10} /> 過去の紙カルテ・外部画像
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {customer.chart_image_urls?.map((url, i) => (
+                      <div key={i} className="w-12 h-16 bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
+                        <img src={url} className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                    <label className="w-12 h-16 bg-slate-50 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center text-slate-300 cursor-pointer hover:bg-slate-100">
+                      <Plus size={20} />
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file || !id) return;
+                          const reader = new FileReader();
+                          reader.onload = async (ev) => {
+                            const newUrl = ev.target?.result as string;
+                            const updatedUrls = [...(customer.chart_image_urls || []), newUrl];
+                            const res = await updateCustomer(id as string, { chart_image_urls: updatedUrls });
+                            if (res.success) {
+                              setCustomer({ ...customer, chart_image_urls: updatedUrls });
+                              toast.success("画像を保存しました");
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }} 
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
           </Card>
@@ -436,6 +471,22 @@ export default function CustomerDetailPage() {
                         {record.treatment_photos.map((photo, i) => (
                           <div key={i} className="space-y-1">
                             <div className="aspect-square bg-emerald-50/50 rounded-2xl overflow-hidden border border-emerald-100 shadow-inner">
+                              <img src={photo.url} className="w-full h-full object-cover" />
+                            </div>
+                            {photo.description && <p className="text-[10px] text-slate-500 font-bold px-1">{photo.description}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {record.past_karte_photos && record.past_karte_photos.length > 0 && (
+                    <div className="space-y-2 pt-2">
+                      <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-1"><History size={12}/> 過去の紙カルテ画像</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {record.past_karte_photos.map((photo, i) => (
+                          <div key={i} className="space-y-1">
+                            <div className="aspect-square bg-amber-50/30 rounded-2xl overflow-hidden border border-amber-100 shadow-inner">
                               <img src={photo.url} className="w-full h-full object-cover" />
                             </div>
                             {photo.description && <p className="text-[10px] text-slate-500 font-bold px-1">{photo.description}</p>}

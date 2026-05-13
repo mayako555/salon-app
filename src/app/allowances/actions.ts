@@ -252,6 +252,30 @@ export async function saveStaffAllowanceTask(data: {
   }
 }
 
+export async function getStaffAllowanceHistory(staff_id: string): Promise<AllowanceRecord[]> {
+  try {
+    const colRef = collection(db, ALLOWANCES_COLLECTION);
+    const q = query(
+      colRef, 
+      where("staff_id", "==", staff_id),
+      orderBy("created_at", "desc")
+    );
+    const snapshot = await getDocs(q);
+    
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || new Date().toISOString())
+      };
+    }) as AllowanceRecord[];
+  } catch (error) {
+    console.error("Error fetching staff allowance history:", error);
+    return [];
+  }
+}
+
 export async function addAllowance(formData: FormData) {
   try {
     const staffName = formData.get("staff_name") as string;

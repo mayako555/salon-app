@@ -32,6 +32,17 @@ export type MonthlyStatement = {
   total_deductions: number;
   final_paid_amount: number;
   status: "draft" | "closed";
+  adjustments?: {
+    tech_cashless_sales_override?: number;
+    retail_cashless_sales_override?: number;
+    transport_fee_override?: number;
+    health_insurance_override?: number;
+    pension_override?: number;
+    employment_insurance_override?: number;
+    income_tax_override?: number;
+    resident_tax_override?: number;
+    custom_adjustments?: { name: string; amount: number }[];
+  };
   details: {
     base_tech_salary: number;
     base_product_salary: number;
@@ -56,6 +67,7 @@ export type MonthlyStatement = {
     };
   };
   created_at: any;
+  updated_at?: any;
 };
 
 const STATEMENTS_COLLECTION = "monthly_statements";
@@ -110,9 +122,18 @@ export async function generateStatements(year: number, month: number) {
     return { success: false, error: "すでに締め処理が完了している月です。再計算できません。" };
   }
 
-  // 2. Clear old draft statements for this month
+  // 2. Fetch existing draft statements to preserve manual adjustments
   const qDraft = query(colRef, where("target_month", "==", targetMonth), where("status", "==", "draft"));
   const draftSnapshot = await getDocs(qDraft);
+  
+  const adjustmentMap: Record<string, MonthlyStatement["adjustments"]> = {};
+  draftSnapshot.docs.forEach(d => {
+    const data = d.data() as MonthlyStatement;
+    if (data.adjustments) {
+      adjustmentMap[data.staff_id] = data.adjustments;
+    }
+  });
+
   const batch = writeBatch(db);
   draftSnapshot.docs.forEach(d => {
     batch.delete(d.ref);
@@ -122,7 +143,7 @@ export async function generateStatements(year: number, month: number) {
   const newBatch = writeBatch(db);
 
   // 3. Fetch dependencies
-  const contracts = await getContractsList(); // from the active ones
+  const contracts = await getContractsList(); 
   const sales = await getMonthlySales(year, month);
   const allowances = await getMonthlyAllowances(year, month);
   const attendances = await getMonthlyAttendance(year, month);
@@ -142,6 +163,9 @@ export async function generateStatements(year: number, month: number) {
     const staffAllowances = allowances.filter((a: any) => a.staff_name === contract.staff_name);
     const staffAttendances = attendances.filter((a: AttendanceRecord) => a.staff_name === contract.staff_name);
 
+    // Get preserved adjustments
+    const preservedAdjusts = adjustmentMap[contract.staff_id];
+
     // Track custom contract allowances
     const contractCustomAllowanceTotal = (contract.custom_allowances || []).reduce((acc: number, curr: any) => acc + curr.amount, 0);
 
@@ -156,10 +180,8 @@ export async function generateStatements(year: number, month: number) {
           const diffMs = outTime.getTime() - inTime.getTime();
           let diffMins = Math.floor(diffMs / 60000);
           
-          // Subtract break time
           diffMins -= (record.break_minutes || 0);
 
-          // Cap at 8 hours (480 minutes) per shift to fit scheduled bounds
           if (diffMins > 480) {
              diffMins = 480;
           }
@@ -170,12 +192,10 @@ export async function generateStatements(year: number, month: number) {
 
     workedHours = Math.round(workedHours * 10) / 10;
     
-    // Fallbacks if no live punches yet
     const finalWorkedDays = workedDays > 0 ? workedDays : 21;
     const finalWorkedHours = workedHours > 0 ? workedHours : (contract.contract_type === "hourly" ? 80 : 168);
 
     if (contract.contract_type === "hourly") {
-      // ===== HOURLY WAGE CALCULATION ======
       let totalMinutesWorked = 0;
       for (const att of staffAttendances) {
         if (att.clock_in && att.clock_out && att.status === "normal") {
@@ -191,13 +211,10 @@ export async function generateStatements(year: number, month: number) {
       const baseHourlySalary = Math.floor(totalHours * (contract.hourly_wage || 0));
 
       const allowanceTotal = staffAllowances.reduce((acc, curr) => acc + curr.amount, 0) + contractCustomAllowanceTotal;
+      const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
 
-      const intermediatePaidAmount = baseHourlySalary + allowanceTotal;
-      
-      // Calculate tax and deductions for standard employees
-      // They typically don't have invoice additions; tax logic might involve deduction strings (源泉など) 
-      // but for MVP consistency we'll just push flat amounts unless designated otherwise.
-      const taxAddition = 0; // Employees don't invoice add
+      const intermediatePaidAmount = baseHourlySalary + allowanceTotal + customAdjustTotal;
+      const taxAddition = 0; 
       const finalPaidAmount = intermediatePaidAmount + taxAddition;
 
       const statementPayload = {
@@ -210,11 +227,12 @@ export async function generateStatements(year: number, month: number) {
         total_deductions: 0,
         final_paid_amount: finalPaidAmount,
         status: "draft",
+        adjustments: preservedAdjusts,
         details: {
           base_tech_salary: 0,
           base_product_salary: 0,
           nomination_reward: 0,
-          transport_fee: 0,
+          transport_fee: preservedAdjusts?.transport_fee_override ?? 0,
           cashless_deduction: 0,
           tax_addition: taxAddition,
           metrics: {
@@ -238,13 +256,11 @@ export async function generateStatements(year: number, month: number) {
     let totalTechSales = 0;
     let totalProductSales = 0;
     let nominationCount = 0;
-    
     let cashlessTechSales = 0;
     let cashlessProductSales = 0;
     let totalPortalFees = 0;
 
     for (const sale of staffSales) {
-      // Net tech sales = tech_sales - discount (HPB points are handled separately and not deducted)
       const netTechSales = Math.max(0, sale.tech_sales - (sale.discount || 0));
       totalTechSales += netTechSales;
       totalProductSales += sale.product_sales;
@@ -258,9 +274,11 @@ export async function generateStatements(year: number, month: number) {
       }
     }
 
-    // ====== MIDDLE ROUTER FOR CONTRACTS NEEDING SALES AGGREGATION ======
+    // Apply preserved sales overrides
+    const effectiveCashlessTech = preservedAdjusts?.tech_cashless_sales_override ?? cashlessTechSales;
+    const effectiveCashlessRetail = preservedAdjusts?.retail_cashless_sales_override ?? cashlessProductSales;
+
     if (contract.contract_type === "monthly") {
-      // ===== MONTHLY WAGE CALCULATION (e.g. Shibata) ======
       const techSalesTaxFree = Math.floor(totalTechSales / 1.1);
       const productSalesTaxFree = Math.floor(totalProductSales / 1.1);
       
@@ -275,28 +293,28 @@ export async function generateStatements(year: number, month: number) {
       
       const baseMonthlySalary = contract.monthly_base_salary || 0;
       const totalCommission = techCommission + productCommission + nominationReward;
-      
       const allowanceTotal = staffAllowances.reduce((acc: any, curr: any) => acc + curr.amount, 0) + contractCustomAllowanceTotal;
+      const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
 
       const base_amount = baseMonthlySalary + totalCommission;
-      const cashlessDeduction = 0;
-      const taxAddition = 0;
-      
-      const transportFee = 17950; // Mock fixed commuter pass
+      const transportFee = preservedAdjusts?.transport_fee_override ?? 17950; 
 
-      // Run Japanese Tax Calculation
       const taxes = calculatePayrollTaxes({
         baseSalary: base_amount,
-        allowances: allowanceTotal,
+        allowances: allowanceTotal + customAdjustTotal,
         transportFee: transportFee,
         dependentsCount: 0
       });
 
-      const totalDeductions = taxes.totalSocialInsurances + taxes.incomeTax + taxes.residentTax;
+      // Apply overrides for taxes if preserved
+      const health = preservedAdjusts?.health_insurance_override ?? taxes.healthInsurance;
+      const pension = preservedAdjusts?.pension_override ?? taxes.pension;
+      const employment = preservedAdjusts?.employment_insurance_override ?? taxes.employmentInsurance;
+      const incomeTax = preservedAdjusts?.income_tax_override ?? taxes.incomeTax;
+      const residentTax = preservedAdjusts?.resident_tax_override ?? taxes.residentTax;
 
-      // Final = payments - deductions (grossWithTransport is payments + transport, but final paid is exactly grossWithTransport - totalDeductions)
-      const grossWithTransport = base_amount + allowanceTotal + transportFee;
-      let final_paid = grossWithTransport - totalDeductions;
+      const totalDeductions = health + pension + employment + incomeTax + residentTax;
+      const final_paid = base_amount + allowanceTotal + transportFee + customAdjustTotal - totalDeductions;
 
       const statementPayload = {
         staff_id: contract.staff_id,
@@ -308,25 +326,22 @@ export async function generateStatements(year: number, month: number) {
         total_deductions: totalDeductions,
         final_paid_amount: final_paid,
         status: "draft",
+        adjustments: preservedAdjusts,
         details: {
           base_tech_salary: techCommission,
           base_product_salary: productCommission,
           nomination_reward: nominationReward,
           transport_fee: transportFee,
-          cashless_deduction: cashlessDeduction,
-          tax_addition: taxAddition,
+          cashless_deduction: 0,
+          tax_addition: 0,
           social_insurance: {
-             employment: taxes.employmentInsurance,
-             health: taxes.healthInsurance,
-             pension: taxes.pension,
-             income_tax: taxes.incomeTax,
-             resident_tax: taxes.residentTax
+             employment, health, pension, income_tax: incomeTax, resident_tax: residentTax
           },
           metrics: {
             total_tech_sales: totalTechSales,
             total_product_sales: totalProductSales, 
             nomination_count: nominationCount,
-            cashless_sales_total: cashlessTechSales + cashlessProductSales,
+            cashless_sales_total: effectiveCashlessTech + effectiveCashlessRetail,
             worked_days: finalWorkedDays,
             worked_hours: finalWorkedHours
           }
@@ -340,50 +355,46 @@ export async function generateStatements(year: number, month: number) {
     }
 
     if (contract.contract_type === "tier_monthly") {
-      // ===== TIER MONTHLY WAGE CALCULATION (e.g. Ohtani) ======
       const techSalesTaxFree = Math.floor(totalTechSales / 1.1);
       const productSalesTaxFree = Math.floor(totalProductSales / 1.1);
-      
       const personalTaxFreeSales = techSalesTaxFree + productSalesTaxFree;
       const baseMonthlySalary = contract.monthly_base_salary || 280000;
       
       let incentive = 0;
       if (personalTaxFreeSales >= 400000) {
-          // Increment is 5,000 per 50,000 threshold starting at 400,000.
-          // 400k-449k -> math.floor(400k/50k)*5000 - 35000 = 8*5k - 35k = 5000
-          // 650k -> math.floor(650k/50k)*5k - 35k = 13*5k - 35k = 30000
           incentive = Math.floor(personalTaxFreeSales / 50000) * 5000 - 35000;
       }
       
-      const nominationReward = nominationCount * contract.nomination_fee; // Ohtani's table doesn't mention flat nomination but handles it via allowances or zeroing it out.
+      const nominationReward = nominationCount * contract.nomination_fee;
       const allowanceTotal = staffAllowances.reduce((acc: any, curr: any) => acc + curr.amount, 0) + contractCustomAllowanceTotal;
+      const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
 
-      const intermediatePaidAmount = baseMonthlySalary + incentive + nominationReward + allowanceTotal;
-      const taxAddition = 0; 
-      const finalPaidAmount = intermediatePaidAmount + taxAddition;
+      const intermediatePaidAmount = baseMonthlySalary + incentive + nominationReward + allowanceTotal + customAdjustTotal;
+      const finalPaidAmount = intermediatePaidAmount;
 
       const statementPayload = {
         staff_id: contract.staff_id,
         staff_name: contract.staff_name || "不明",
         target_month: targetMonth,
         type: "salary", 
-        base_amount: baseMonthlySalary + incentive, // Treating incentive as part of base performance salary for UI consistency
+        base_amount: baseMonthlySalary + incentive,
         total_allowances: allowanceTotal,
         total_deductions: 0,
         final_paid_amount: finalPaidAmount,
         status: "draft",
+        adjustments: preservedAdjusts,
         details: {
-          base_tech_salary: incentive, // We map the total incentive here so the UI can represent it
+          base_tech_salary: incentive,
           base_product_salary: 0,
           nomination_reward: nominationReward,
-          transport_fee: 0,
+          transport_fee: preservedAdjusts?.transport_fee_override ?? 0,
           cashless_deduction: 0,
-          tax_addition: taxAddition,
+          tax_addition: 0,
           metrics: {
             total_tech_sales: totalTechSales,
             total_product_sales: totalProductSales, 
             nomination_count: nominationCount,
-            cashless_sales_total: cashlessTechSales + cashlessProductSales,
+            cashless_sales_total: effectiveCashlessTech + effectiveCashlessRetail,
             worked_days: finalWorkedDays,
             worked_hours: finalWorkedHours
           }
@@ -396,69 +407,49 @@ export async function generateStatements(year: number, month: number) {
       continue;
     }
 
-    // ====== OUTSOURCING COMMISSION CALCULATION (Sato Excel Model) ======
-    // 1. Tech Base Calculation
+    // ====== OUTSOURCING ======
     const techTaxDeduction = Math.floor(totalTechSales * 0.1); 
-    const techCashlessFee = contract.deduction_cashless_ratio > 0 ? Math.floor(cashlessTechSales * (contract.deduction_cashless_ratio / 100)) : 0;
+    const techCashlessFee = contract.deduction_cashless_ratio > 0 ? Math.floor(effectiveCashlessTech * (contract.deduction_cashless_ratio / 100)) : 0;
     
     const commissionableTechSales = Math.max(0, totalTechSales - techTaxDeduction - techCashlessFee - totalPortalFees);
-    const baseTechSalaryFloat = commissionableTechSales * (contract.tech_sales_ratio / 100);
-    const baseTechSalary = Math.floor(baseTechSalaryFloat);
+    const baseTechSalary = Math.floor(commissionableTechSales * (contract.tech_sales_ratio / 100));
     
-    // 2. Product Base Calculation
     const productTaxDeduction = Math.floor(totalProductSales * 0.1);
-    const productCashlessFee = contract.deduction_cashless_ratio > 0 ? Math.floor(cashlessProductSales * (contract.deduction_cashless_ratio / 100)) : 0;
+    const productCashlessFee = contract.deduction_cashless_ratio > 0 ? Math.floor(effectiveCashlessRetail * (contract.deduction_cashless_ratio / 100)) : 0;
     
     const commissionableProductSales = Math.max(0, totalProductSales - productTaxDeduction - productCashlessFee);
-    const baseProductSalaryFloat = commissionableProductSales * (contract.product_sales_ratio / 100);
-    const baseProductSalary = Math.floor(baseProductSalaryFloat);
+    const baseProductSalary = Math.floor(commissionableProductSales * (contract.product_sales_ratio / 100));
     
-    // 3. Nomination is rewarded flatly based on count (e.g. 550 flat per sub-item)
     const nominationReward = nominationCount * contract.nomination_fee;
-    
     let baseAmount = baseTechSalary + baseProductSalary + nominationReward;
 
-    // 4. Allowances
     const allowanceTotal = staffAllowances.reduce((acc, curr) => acc + curr.amount, 0) + contractCustomAllowanceTotal;
+    const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
 
-    // 5. Final Calculations (Invoice Additions & Manager allowances)
-    let intermediatePaidAmount = baseAmount + allowanceTotal;
-    
+    let intermediatePaidAmount = baseAmount + allowanceTotal + customAdjustTotal;
     let taxAddition = 0;
-    // If they are an invoice issuer (we assume they are unless explicitly marked to 'deduct' tax in the old logic)
-    // Actually, Sato's excel adds 10% to the final computed rewards.
     if (!contract.deduction_consumption_tax) {
-       // Since the db flag was "deduction_consumption_tax", false means "don't deduct, give it to them" -> Add 10% tax!
        taxAddition = Math.floor(intermediatePaidAmount * 0.1); 
     }
 
     const finalPaidAmount = intermediatePaidAmount + taxAddition;
-    
-    // Summarizing deductions purely for the UI display format
-    // Total deductions here technically represent the burden assumed by the staff *before* commission multiplication, 
-    // but the UI expects a pure "-¥" for display. 
-    // Wait, the UI uses `total_deductions` to subtract from `base_amount + total_allowances`!
-    // Since our `baseAmount` is ALREADY reduced, we shouldn't subtract them again!
-    // So `totalDeductions` as an out-of-pocket UI metric should just be 0, or we alter the math representation to be "Raw Sales Base -> Deductions -> Commission = Final".
-    // Since the database specifies `target_details`, let's just emit totalDeductions = 0, and cleanly display that tax is an *Addition* instead of a Deduction in the new Excel model.
-    const totalDeductions = 0;
 
-    // Create statement
     const statementPayload = {
       staff_id: contract.staff_id,
       staff_name: contract.staff_name || "不明",
       target_month: targetMonth,
-      type: "reward", // Assuming reward for contracts, salary for normal employments
+      type: "reward", 
       base_amount: baseAmount,
       total_allowances: allowanceTotal,
-      total_deductions: totalDeductions,
+      total_deductions: 0,
       final_paid_amount: finalPaidAmount,
       status: "draft",
+      adjustments: preservedAdjusts,
       details: {
         base_tech_salary: baseTechSalary,
         base_product_salary: baseProductSalary,
         nomination_reward: nominationReward,
-        transport_fee: 0, // Mock
+        transport_fee: preservedAdjusts?.transport_fee_override ?? 0,
         cashless_deduction: techCashlessFee + productCashlessFee,
         tax_addition: taxAddition,
         social_insurance: undefined,
@@ -466,7 +457,7 @@ export async function generateStatements(year: number, month: number) {
           total_tech_sales: totalTechSales,
           total_product_sales: totalProductSales,
           nomination_count: nominationCount,
-          cashless_sales_total: cashlessTechSales + cashlessProductSales
+          cashless_sales_total: effectiveCashlessTech + effectiveCashlessRetail
         }
       },
       created_at: serverTimestamp()
@@ -482,82 +473,83 @@ export async function generateStatements(year: number, month: number) {
 
 export async function closeMonthlyStatements(year: number, month: number) {
   const targetMonth = `${year}-${String(month).padStart(2, '0')}`;
-  
   try {
     const colRef = collection(db, STATEMENTS_COLLECTION);
     const q = query(colRef, where("target_month", "==", targetMonth), where("status", "==", "draft"));
     const snapshot = await getDocs(q);
-    
     if (snapshot.empty) return { success: false, error: "該当月のデータが見つかりません" };
-
     const batch = writeBatch(db);
     snapshot.docs.forEach(d => {
       batch.update(d.ref, { status: "closed", updated_at: serverTimestamp() });
     });
-    
     await batch.commit();
     return { success: true };
   } catch (error: any) {
-    console.error("Error closing statements:", error);
     return { success: false, error: error.message };
   }
 }
 
-export async function updateStatementMetrics(id: string, metrics: { worked_hours?: number, worked_days?: number }) {
+export async function updateStatementMetrics(
+  id: string, 
+  data: { 
+    worked_hours?: number; 
+    worked_days?: number;
+    adjustments?: MonthlyStatement["adjustments"];
+  }
+) {
   try {
     const docRef = doc(db, STATEMENTS_COLLECTION, id);
-    const snapshot = await getDocs(query(collection(db, STATEMENTS_COLLECTION), where("__name__", "==", id)));
-    if (snapshot.empty) return { success: false, error: "データが見つかりません" };
+    const snap = await getDocs(query(collection(db, STATEMENTS_COLLECTION), where("__name__", "==", id)));
+    if (snap.empty) return { success: false, error: "データが見つかりません" };
     
-    const currentData = snapshot.docs[0].data() as MonthlyStatement;
+    const currentData = snap.docs[0].data() as MonthlyStatement;
     if (currentData.status === "closed") return { success: false, error: "確定済みのデータは編集できません" };
 
     const newMetrics = {
       ...currentData.details.metrics,
-      worked_hours: metrics.worked_hours ?? currentData.details.metrics.worked_hours,
-      worked_days: metrics.worked_days ?? currentData.details.metrics.worked_days
+      worked_hours: data.worked_hours ?? currentData.details.metrics.worked_hours,
+      worked_days: data.worked_days ?? currentData.details.metrics.worked_days
     };
 
-    // Recalculate if it's a salary type (hourly wage needs worked_hours)
-    let baseAmount = currentData.base_amount;
-    let finalAmount = currentData.final_paid_amount;
-    
-    // Fetch contract to get hourly wage if needed
-    // For now, simple re-calc based on old base_amount / old_hours * new_hours might be risky.
-    // Better to just store and let the UI or a "Recalculate" trigger handle it.
-    // Actually, let's just update the metrics and base_amount if possible.
-    
-    // We'll need the staff's contract to be accurate.
+    const newAdjustments = data.adjustments || currentData.adjustments;
     const contracts = await getContractsList();
     const contract = contracts.find(c => c.staff_id === currentData.staff_id);
-    
+
+    let baseAmount = currentData.base_amount;
+    let transportFee = newAdjustments?.transport_fee_override ?? currentData.details.transport_fee;
+
     if (contract && contract.contract_type === "hourly") {
       baseAmount = Math.floor((newMetrics.worked_hours || 0) * (contract.hourly_wage || 0));
     }
 
-    const updatedDetails = {
-      ...currentData.details,
-      metrics: newMetrics
-    };
+    const social = currentData.details.social_insurance ? {
+      ...currentData.details.social_insurance,
+      health: newAdjustments?.health_insurance_override ?? currentData.details.social_insurance.health,
+      pension: newAdjustments?.pension_override ?? currentData.details.social_insurance.pension,
+      employment: newAdjustments?.employment_insurance_override ?? currentData.details.social_insurance.employment,
+      income_tax: newAdjustments?.income_tax_override ?? currentData.details.social_insurance.income_tax,
+      resident_tax: newAdjustments?.resident_tax_override ?? currentData.details.social_insurance.resident_tax,
+    } : undefined;
 
-    const intermediateAmount = baseAmount + currentData.total_allowances;
-    // Social insurance recalculation would be complex here, so we'll just update the base and final for now.
-    // In a real app, you'd trigger the full generate logic for this one person.
-    
-    // Simplified recalculation of final amount (payments - deductions + tax)
-    const newFinalAmount = baseAmount + currentData.total_allowances - currentData.total_deductions + (currentData.details.tax_addition || 0);
+    const totalDeductions = social ? (social.health + social.pension + social.employment + social.income_tax + social.resident_tax) : currentData.total_deductions;
+    const customAdjustTotal = (newAdjustments?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
+
+    const finalPaidAmount = baseAmount + currentData.total_allowances + customAdjustTotal - totalDeductions + (currentData.details.tax_addition || 0);
 
     await updateDoc(docRef, {
       base_amount: baseAmount,
-      final_paid_amount: newFinalAmount,
+      total_deductions: totalDeductions,
+      final_paid_amount: finalPaidAmount,
+      adjustments: newAdjustments,
       "details.metrics": newMetrics,
-      "details.base_tech_salary": contract?.contract_type === "hourly" ? 0 : currentData.details.base_tech_salary, // Reset or keep
+      "details.social_insurance": social,
+      "details.transport_fee": transportFee,
       updated_at: serverTimestamp()
     });
 
     return { success: true };
   } catch (error: any) {
-    console.error("Error updating metrics:", error);
+    console.error("Error updating statement:", error);
     return { success: false, error: error.message };
   }
 }

@@ -21,7 +21,12 @@ export type StaffRole = "admin" | "manager" | "staff";
 export type StaffProfile = {
   id: string;
   uid?: string; // Firebase Auth UID
-  name: string;
+  name: string; // Combined name (Full name)
+  last_name?: string;
+  first_name?: string;
+  last_name_kana?: string;
+  first_name_kana?: string;
+  name_kana?: string; // Combined kana
   email?: string;
   role: StaffRole;
   employment_type: "employee" | "outsourcing" | "part_time";
@@ -29,6 +34,7 @@ export type StaffProfile = {
   is_invoice_registered?: boolean;
   is_active: boolean;
   monthly_sales_target?: number;
+  sns_accounts?: string[];
   sort_order?: number;
   created_at?: any;
 };
@@ -81,7 +87,14 @@ import { adminAuth } from "@/lib/firebase-admin";
 
 export async function addStaff(formData: FormData) {
   try {
-    const name = formData.get("name") as string;
+    const lastName = formData.get("last_name") as string || "";
+    const firstName = formData.get("first_name") as string || "";
+    const lastNameKana = formData.get("last_name_kana") as string || "";
+    const firstNameKana = formData.get("first_name_kana") as string || "";
+    
+    const name = (lastName + " " + firstName).trim();
+    const nameKana = (lastNameKana + " " + firstNameKana).trim();
+
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
     const employment_type = formData.get("employment_type") as "employee" | "outsourcing" | "part_time";
@@ -114,6 +127,11 @@ export async function addStaff(formData: FormData) {
     const staffData = {
       uid: uid || null,
       name,
+      last_name: lastName,
+      first_name: firstName,
+      last_name_kana: lastNameKana,
+      first_name_kana: firstNameKana,
+      name_kana: nameKana,
       email,
       role,
       employment_type,
@@ -121,6 +139,7 @@ export async function addStaff(formData: FormData) {
       max_holiday_requests,
       is_active: true,
       monthly_sales_target,
+      sns_accounts: formData.getAll("sns_accounts") as string[],
       created_at: serverTimestamp()
     };
     
@@ -152,7 +171,14 @@ export async function addStaff(formData: FormData) {
 
 export async function editStaff(id: string, formData: FormData) {
   try {
-    const name = formData.get("name") as string;
+    const lastName = formData.get("last_name") as string || "";
+    const firstName = formData.get("first_name") as string || "";
+    const lastNameKana = formData.get("last_name_kana") as string || "";
+    const firstNameKana = formData.get("first_name_kana") as string || "";
+    
+    const name = (lastName + " " + firstName).trim();
+    const nameKana = (lastNameKana + " " + firstNameKana).trim();
+
     const email = formData.get("email") as string;
     const employment_type = formData.get("employment_type") as "employee" | "outsourcing" | "part_time";
     const is_invoice_registered = formData.get("is_invoice_registered") === "true";
@@ -167,12 +193,18 @@ export async function editStaff(id: string, formData: FormData) {
     const colRef = doc(db, STAFF_COLLECTION, id);
     const staffData = {
       name,
+      last_name: lastName,
+      first_name: firstName,
+      last_name_kana: lastNameKana,
+      first_name_kana: firstNameKana,
+      name_kana: nameKana,
       email,
       role,
       employment_type,
       is_invoice_registered,
       max_holiday_requests,
       monthly_sales_target,
+      sns_accounts: formData.getAll("sns_accounts") as string[],
       updated_at: serverTimestamp()
     };
 

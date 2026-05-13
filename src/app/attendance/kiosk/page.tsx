@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { recordClockIn, recordClockOut, getDailyAttendance, handleQRScan } from "../actions";
@@ -15,15 +15,20 @@ import {
   LogOut, 
   LogIn,
   Sparkles,
-  Loader2
+  Loader2,
+  MapPin
 } from "lucide-react";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { QrCode, X } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 
-export default function AttendanceKioskPage() {
+function KioskContent() {
+  const searchParams = useSearchParams();
+  const storeName = searchParams.get("store") || "未設定";
+  
   const [staffList, setStaffList] = useState<any[]>([]);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -74,9 +79,9 @@ export default function AttendanceKioskPage() {
           toast.success(`${staffName}さん、お疲れ様でした！`);
         }
       } else {
-        const res = await recordClockIn(staffId, staffName);
+        const res = await recordClockIn(staffId, staffName, storeName);
         if (res.success) {
-          toast.success(`${staffName}さん、おはようございます！`);
+          toast.success(`${staffName}さん、おはようございます！ (${storeName}店)`);
         }
       }
       await loadData();
@@ -92,12 +97,12 @@ export default function AttendanceKioskPage() {
       setIsScanning(true);
       const staffId = data.text;
       try {
-        const res = await handleQRScan(staffId);
+        const res = await handleQRScan(staffId, storeName);
         if (res.success) {
           if (res.action === "IN") {
-            toast.success(`${res.name}さん、おはようございます！ (QR)`);
+            toast.success(`${res.name}さん、おはようございます！ (${storeName}店)`);
           } else {
-            toast.success(`${res.name}さん、お疲れ様でした！ (QR)`);
+            toast.success(`${res.name}さん、お疲れ様でした！`);
           }
           setShowScanner(false);
           await loadData();
@@ -107,7 +112,7 @@ export default function AttendanceKioskPage() {
       } catch (error) {
         toast.error("スキャン処理中にエラーが発生しました");
       } finally {
-        setTimeout(() => setIsScanning(false), 2000); // Prevent double scans
+        setTimeout(() => setIsScanning(false), 2000);
       }
     }
   };
@@ -137,14 +142,19 @@ export default function AttendanceKioskPage() {
       <div className="max-w-6xl mx-auto relative z-10">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-12 gap-8 text-center md:text-left">
-          <div className="space-y-2">
+          <div className="space-y-4">
             <div className="flex items-center justify-center md:justify-start gap-3">
               <div className="bg-emerald-500 p-2 rounded-xl shadow-lg shadow-emerald-500/20">
                 <Clock className="text-white w-6 h-6" />
               </div>
               <h1 className="text-3xl font-black text-white tracking-tight">STORE TIMECARD</h1>
             </div>
-            <p className="text-slate-400 font-bold tracking-widest uppercase text-xs">お店専用 勤怠管理システム</p>
+            
+            <div className="flex items-center justify-center md:justify-start gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-2xl backdrop-blur-md">
+              <MapPin size={16} className="text-emerald-400" />
+              <span className="text-lg font-black text-white tracking-tight">{storeName}</span>
+              <span className="text-[10px] text-slate-500 font-bold uppercase ml-1">Terminal Active</span>
+            </div>
           </div>
 
           <div className="bg-white/5 border border-white/10 p-6 rounded-3xl backdrop-blur-xl flex flex-col items-center md:items-end min-w-[280px]">
@@ -191,7 +201,7 @@ export default function AttendanceKioskPage() {
                       </div>
                       {isClockedIn && (
                         <div className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse">
-                          WORKING
+                          WORKING @ {currentAtt.store || storeName}
                         </div>
                       )}
                     </div>
@@ -306,5 +316,13 @@ export default function AttendanceKioskPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function AttendanceKioskPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Loading...</div>}>
+      <KioskContent />
+    </Suspense>
   );
 }

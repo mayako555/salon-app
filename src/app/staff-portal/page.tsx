@@ -33,6 +33,7 @@ import { getMonthlyShifts } from "@/app/shifts/actions";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
+import SNSTaskSection from "@/app/tasks/SNSTaskSection";
 
 export default function StaffDashboardPage() {
   const { profile } = useAuth();
@@ -147,7 +148,7 @@ export default function StaffDashboardPage() {
            {!attendance ? (
              <div className="flex flex-col gap-4">
                <div className="flex items-center gap-4">
-                 <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-900/40">
+                 <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 flex items-center justify-center text-emerald-400">
                    <Clock size={24} />
                  </div>
                  <div>
@@ -155,26 +156,28 @@ export default function StaffDashboardPage() {
                    <p className="text-[10px] text-slate-400 font-bold">今日も一日頑張りましょう！</p>
                  </div>
                </div>
-               <div className="bg-slate-800 rounded-xl p-4 mt-2 border border-slate-700">
-                 <p className="text-slate-300 text-xs text-center font-bold">
-                   出勤・退勤の打刻は店舗の専用端末（iPad等）またはQRコードリーダーから行ってください。
+               <div className="bg-slate-800/50 rounded-xl p-4 mt-2 border border-slate-700/50">
+                 <p className="text-slate-400 text-[10px] text-center font-bold">
+                   ※打刻は店舗の専用端末（iPad等）で行ってください。
                  </p>
                </div>
              </div>
            ) : (
              <div className="flex flex-col gap-4">
                <div className="flex items-center gap-4">
-                 <div className="w-12 h-12 rounded-2xl bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-900/40 animate-pulse">
+                 <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-900/40 animate-pulse">
                    <Clock size={24} />
                  </div>
                   <div>
                     <h3 className="font-black text-white">勤務中</h3>
-                    <p className="text-[10px] text-slate-400 font-bold">今日も一日頑張りましょう！</p>
+                    <p className="text-[10px] text-emerald-400 font-bold">
+                      開始：{format(attendance.clock_in?.toDate?.() || new Date(attendance.clock_in), "HH:mm")}
+                    </p>
                   </div>
                </div>
-               <div className="bg-slate-800 rounded-xl p-4 mt-2 border border-slate-700">
-                 <p className="text-slate-300 text-xs text-center font-bold">
-                   退勤の打刻は店舗の専用端末（iPad等）から行ってください。
+               <div className="bg-slate-800/50 rounded-xl p-4 mt-2 border border-slate-700/50">
+                 <p className="text-slate-400 text-[10px] text-center font-bold">
+                   ※退勤の打刻は店舗の専用端末で行ってください。
                  </p>
                </div>
              </div>
@@ -318,6 +321,10 @@ export default function StaffDashboardPage() {
                 );
               })
             )}
+          </div>
+
+          <div className="mt-8">
+            <SNSTaskSection assignedAccounts={profile?.sns_accounts} />
           </div>
         </div>
 

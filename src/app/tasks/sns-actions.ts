@@ -1,0 +1,121 @@
+"use server";
+
+import { db } from "@/lib/firebase";
+import { 
+  collection, 
+  getDocs, 
+  addDoc, 
+  query, 
+  where, 
+  orderBy, 
+  updateDoc, 
+  doc, 
+  serverTimestamp,
+  limit
+} from "firebase/firestore";
+import { generateSNSContent as generateAI } from "@/lib/gemini";
+import { revalidatePath } from "next/cache";
+
+export type SNSPostStatus = "uncreated" | "draft" | "posted";
+
+export type SNSPost = {
+  id: string;
+  account: string;
+  genre: string;
+  platform: string;
+  theme: string;
+  content: string;
+  status: SNSPostStatus;
+  target_date: string;
+  scheduled_time?: string;
+  created_at?: any;
+  updated_at?: any;
+};
+
+const SNS_POSTS_COLLECTION = "sns_posts";
+
+export async function getDailySNSPosts(date: string): Promise<SNSPost[]> {
+  try {
+    const colRef = collection(db, SNS_POSTS_COLLECTION);
+    const q = query(colRef, where("target_date", "==", date));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as SNSPost[];
+  } catch (error) {
+    console.error("Error fetching SNS posts:", error);
+    return [];
+  }
+}
+
+export async function saveSNSPost(data: Partial<SNSPost> & { account: string; target_date: string }) {
+  try {
+    const colRef = collection(db, SNS_POSTS_COLLECTION);
+    
+    if (data.id) {
+      // Update
+      const docRef = doc(db, SNS_POSTS_COLLECTION, data.id);
+      const updateData = { ...data };
+      delete updateData.id;
+      await updateDoc(docRef, {
+        ...updateData,
+        updated_at: serverTimestamp()
+      });
+      revalidatePath("/dashboard");
+      revalidatePath("/staff-portal");
+      return { success: true, id: data.id };
+    } else {
+      // Create
+      const docRef = await addDoc(colRef, {
+        ...data,
+        status: data.status || "uncreated",
+        content: data.content || "",
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
+      });
+      revalidatePath("/dashboard");
+      revalidatePath("/staff-portal");
+      return { success: true, id: docRef.id };
+    }
+  } catch (error: any) {
+    console.error("Error saving SNS post:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteSNSPost(id: string) {
+  try {
+    const docRef = doc(db, SNS_POSTS_COLLECTION, id);
+    await updateDoc(docRef, { is_deleted: true }); // Using soft delete for safety
+    revalidatePath("/dashboard");
+    revalidatePath("/staff-portal");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateSNSPostStatus(id: string, status: SNSPostStatus) {
+  try {
+    const docRef = doc(db, SNS_POSTS_COLLECTION, id);
+    await updateDoc(docRef, {
+      status,
+      updated_at: serverTimestamp()
+    });
+    revalidatePath("/dashboard");
+    revalidatePath("/staff-portal");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function generateSNSContent(params: {
+  account: string;
+  genre: string;
+  platform: string;
+  theme: string;
+}) {
+  return await generateAI(params);
+}

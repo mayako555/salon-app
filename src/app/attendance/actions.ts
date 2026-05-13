@@ -21,6 +21,9 @@ export type AttendanceRecord = {
   date: string; // YYYY-MM-DD
   clock_in: string | null; // ISO string
   clock_out: string | null; // ISO string
+  effective_clock_in?: string | null;
+  effective_clock_out?: string | null;
+  is_effective_manual?: boolean;
   break_minutes: number;
   status: AttendanceStatus;
   store?: string; // Which store they clocked into
@@ -82,12 +85,38 @@ export async function recordClockIn(staffId: string, staffName: string, store?: 
     const now = new Date();
     const dateStr = now.toISOString().split("T")[0];
     const colRef = collection(db, ATTENDANCE_COLLECTION);
+    
+    let effectiveIn = now.toISOString();
+    
+    // Fetch shift to calculate effectiveIn
+    const shiftSnap = await getDocs(query(
+      collection(db, "shifts"), 
+      where("staff_id", "==", staffId), 
+      where("date", "==", dateStr)
+    ));
+    
+    if (!shiftSnap.empty) {
+      const shift = shiftSnap.docs[0].data();
+      if (shift.segments && shift.segments.length > 0) {
+        const shiftStarts = shift.segments.map((s: any) => s.start_time).sort();
+        const scheduledStart = shiftStarts[0];
+        const schedIn = new Date(`${dateStr}T${scheduledStart}:00`);
+        
+        // Effective In: later of actual in and scheduled in (if punched early, set to scheduled start)
+        if (now < schedIn) {
+          effectiveIn = schedIn.toISOString();
+        }
+      }
+    }
+
     const payload = {
       staff_id: staffId,
       staff_name: staffName,
       date: dateStr,
       clock_in: now.toISOString(),
       clock_out: null, 
+      effective_clock_in: effectiveIn,
+      effective_clock_out: null,
       break_minutes: 60,
       status: "normal",
       store: store || "不明",
@@ -130,8 +159,36 @@ export async function recordClockOut(staffId: string) {
     if (!snapshot.empty) {
       const docId = snapshot.docs[0].id;
       const docRef = doc(db, ATTENDANCE_COLLECTION, docId);
+      
+      const clockOutTime = now.toISOString();
+      let effectiveIn = snapshot.docs[0].data().effective_clock_in || snapshot.docs[0].data().clock_in;
+      let effectiveOut = clockOutTime;
+
+      // Fetch shift for this day
+      const shiftSnap = await getDocs(query(
+        collection(db, "shifts"), 
+        where("staff_id", "==", staffId), 
+        where("date", "==", dateStr)
+      ));
+      
+      if (!shiftSnap.empty) {
+        const shift = shiftSnap.docs[0].data();
+        if (shift.segments && shift.segments.length > 0) {
+          const shiftEnds = shift.segments.map((s: any) => s.end_time).sort();
+          const scheduledEnd = shiftEnds[shiftEnds.length - 1];
+          const schedOut = new Date(`${dateStr}T${scheduledEnd}:00`);
+          
+          // Effective Out: earlier of actual out and scheduled out (if punched late, set to scheduled end)
+          if (now > schedOut) {
+            effectiveOut = schedOut.toISOString();
+          }
+        }
+      }
+
       const updatePayload = {
-        clock_out: now.toISOString(),
+        clock_out: clockOutTime,
+        effective_clock_in: effectiveIn,
+        effective_clock_out: effectiveOut,
         updated_at: serverTimestamp()
       };
       await updateDoc(docRef, updatePayload);
@@ -151,18 +208,17 @@ export async function recordClockOut(staffId: string) {
     return { success: false, error: error.message };
   }
 }
+
 export async function handleQRScan(staffId: string, store?: string) {
   try {
     const now = new Date();
     const dateStr = now.toISOString().split("T")[0];
     const colRef = collection(db, ATTENDANCE_COLLECTION);
     
-    // 1. Fetch Staff Name
     const staffDoc = await getDocs(query(collection(db, "staff_profiles"), where("__name__", "==", staffId)));
     if (staffDoc.empty) return { success: false, error: "スタッフが見つかりません" };
     const staffName = staffDoc.docs[0].data().name;
 
-    // 2. Check for active session (not clocked out yet today)
     const qActive = query(
       colRef, 
       where("staff_id", "==", staffId), 
@@ -172,11 +228,9 @@ export async function handleQRScan(staffId: string, store?: string) {
     const activeSnapshot = await getDocs(qActive);
 
     if (!activeSnapshot.empty) {
-      // Already clocked in, perform clock out
       const res = await recordClockOut(staffId);
       return { success: true, action: "OUT", name: staffName };
     } else {
-      // Not clocked in, perform clock in
       const res = await recordClockIn(staffId, staffName, store);
       return { success: true, action: "IN", name: staffName };
     }

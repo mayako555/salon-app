@@ -61,7 +61,7 @@ function SortableStaffItem({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 50 : 1,
+    zIndex: isDragging ? 50 : undefined,
     position: 'relative' as any,
   };
 
@@ -96,7 +96,10 @@ function SortableStaffItem({
                   <Badge variant="outline" className="text-[9px] font-bold border-emerald-200 text-emerald-600 h-5">インボイス登録</Badge>
                 )}
               </div>
-              <h3 className="font-black text-slate-800 truncate text-lg">{staff.name}</h3>
+              {staff.name_kana && (
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mb-0.5 leading-none">{staff.name_kana}</p>
+              )}
+              <h3 className="font-black text-slate-800 truncate text-lg leading-tight">{staff.name}</h3>
               <div className="flex items-center gap-3 mt-1">
                 <p className="text-[10px] text-slate-400 flex items-center gap-1"><Mail size={10} /> {staff.email || "メール未設定"}</p>
                 <p className="text-[10px] text-slate-400 flex items-center gap-1"><Briefcase size={10} /> {staff.role}</p>

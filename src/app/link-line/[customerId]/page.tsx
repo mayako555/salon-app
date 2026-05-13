@@ -109,15 +109,22 @@ export default function LinkLinePage() {
           <div className="space-y-6">
             <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 text-left">
               <p className="text-xs text-blue-700 font-bold leading-relaxed">
-                連携すると、次回以降のカルテ入力がスムーズになり、サロンからのメッセージをLINEで受け取れるようになります。
+                連携すると、サロンからの予約確認メッセージをLINEで受け取れるようになります。
               </p>
             </div>
-            <Button 
-              className="w-full h-14 rounded-2xl bg-[#06C755] hover:bg-[#05b34c] text-white font-black text-lg shadow-lg shadow-emerald-200"
-              onClick={handleLink}
-            >
-              LINEと連携する
-            </Button>
+            
+            <div className="space-y-3">
+              <Button 
+                className="w-full h-14 rounded-2xl bg-[#06C755] hover:bg-[#05b34c] text-white font-black text-lg shadow-lg shadow-emerald-200"
+                onClick={handleLink}
+              >
+                LINEでログインして連携
+              </Button>
+              
+              <p className="text-[10px] text-slate-400 font-bold">
+                ※まだお友達追加されていない場合は、連携後に自動的にお友達追加画面が表示されるか、トーク画面が開きます。
+              </p>
+            </div>
           </div>
         )}
 

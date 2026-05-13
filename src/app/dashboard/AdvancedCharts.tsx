@@ -54,7 +54,10 @@ export default function AdvancedCharts() {
         nextBookingVisits: vals.nextBookingVisits || 0,
         regularVisits: vals.regularVisits || 0,
         minimoVisits: vals.minimoVisits || 0,
-        totalVisits: (vals.regularVisits || 0) + (vals.nextBookingVisits || 0) + (vals.minimoVisits || 0)
+        totalVisits: (vals.regularVisits || 0) + (vals.nextBookingVisits || 0) + (vals.minimoVisits || 0),
+        avgRegular: vals.avgRegular || 0,
+        avgMinimo: vals.avgMinimo || 0,
+        count: vals.count || 0
       };
     });
     return { ...d, stores };
@@ -99,7 +102,16 @@ export default function AdvancedCharts() {
                 <Tooltip 
                   cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
-                  formatter={(value: number) => [`¥${value.toLocaleString()}`, ""]}
+                  formatter={(value: number, name: string, props: any) => {
+                    const data = props.payload;
+                    if (name === "通常売上") {
+                      return [`¥${value.toLocaleString()} (単価: ¥${(data.avgRegular || 0).toLocaleString()})`, name];
+                    }
+                    if (name === "ミニモ売上") {
+                      return [`¥${value.toLocaleString()} (単価: ¥${(data.avgMinimo || 0).toLocaleString()})`, name];
+                    }
+                    return [`¥${value.toLocaleString()}`, name];
+                  }}
                 />
                 <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '20px' }} />
                 <Bar name="通常売上" dataKey="total" stackId="total" fill="#10b981" radius={[0, 0, 0, 0]} />
@@ -118,6 +130,8 @@ export default function AdvancedCharts() {
         </CardContent>
       </Card>
 
+      <div className="hidden md:block" />
+
       {/* Visit Breakdown Charts (Small Multiples) */}
       <Card className="bg-white border-none shadow-sm md:col-span-2">
         <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between pb-4 gap-4">
@@ -134,7 +148,7 @@ export default function AdvancedCharts() {
         <CardContent>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {["六甲", "元町", "神戸"].map((store) => (
-              <div key={store} className="space-y-2">
+              <div key={store} className="space-y-4">
                 <h4 className="text-sm font-black text-slate-600 text-center bg-slate-50 py-2 rounded-xl border border-slate-100">{store}店</h4>
                 <div className="h-[250px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
@@ -168,6 +182,29 @@ export default function AdvancedCharts() {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
+                </div>
+                {/* Store Specific Unit Price Info */}
+                <div className="grid grid-cols-2 gap-2">
+                  {(() => {
+                    // Find latest month with actual visits for this store
+                    const latestData = [...chartData].reverse().find(d => d.stores[store]?.totalVisits > 0)?.stores[store];
+                    return (
+                      <>
+                        <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-100 text-center">
+                          <p className="text-[10px] font-black text-emerald-600 uppercase mb-1">通常単価</p>
+                          <p className="text-sm font-black text-emerald-700">
+                            ¥{(latestData?.avgRegular || 0).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="p-3 bg-indigo-50 rounded-2xl border border-indigo-100 text-center">
+                          <p className="text-[10px] font-black text-indigo-600 uppercase mb-1">ミニモ単価</p>
+                          <p className="text-sm font-black text-indigo-700">
+                            ¥{(latestData?.avgMinimo || 0).toLocaleString()}
+                          </p>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
@@ -216,7 +253,6 @@ export default function AdvancedCharts() {
                 />
                 <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '20px' }} />
                 
-                {/* Stacked bars for nextBookingVisits per store */}
                 <Bar yAxisId="left" name="六甲:来店数" dataKey="stores.六甲.nextBookingVisits" stackId="visit" fill="#10b981" />
                 <Bar yAxisId="left" name="元町:来店数" dataKey="stores.元町.nextBookingVisits" stackId="visit" fill="#6366f1" />
                 <Bar yAxisId="left" name="神戸:来店数" dataKey="stores.神戸.nextBookingVisits" stackId="visit" fill="#f43f5e" radius={[4, 4, 0, 0]}>
@@ -241,9 +277,6 @@ export default function AdvancedCharts() {
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-          <p className="text-[10px] text-slate-400 mt-4 text-center">
-            ※ 棒グラフ: 店舗別の次回予約来店人数 / 黄色線: 全体の次回予約率(%)
-          </p>
         </CardContent>
       </Card>
 
@@ -290,9 +323,6 @@ export default function AdvancedCharts() {
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-          <p className="text-[10px] text-slate-400 mt-4 text-center">
-            ※ シフト総時間に対する推定施術時間の割合（1人あたり60分と仮定）
-          </p>
         </CardContent>
       </Card>
 
@@ -329,25 +359,14 @@ export default function AdvancedCharts() {
                 />
                 <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '20px' }} />
                 
-                {/* Rokko */}
                 <Bar name="六甲:通常" dataKey="stores.六甲.regular" stackId="rokko" fill="#10b981" />
                 <Bar name="六甲:ミニモ" dataKey="stores.六甲.minimo" stackId="rokko" fill="#059669" radius={[4, 4, 0, 0]} />
-                
-                {/* Motomachi */}
                 <Bar name="元町:通常" dataKey="stores.元町.regular" stackId="moto" fill="#6366f1" />
                 <Bar name="元町:ミニモ" dataKey="stores.元町.minimo" stackId="moto" fill="#4f46e5" radius={[4, 4, 0, 0]} />
-                
-                {/* Kobe */}
                 <Bar name="神戸:通常" dataKey="stores.神戸.regular" stackId="kobe" fill="#f43f5e" />
                 <Bar name="神戸:ミニモ" dataKey="stores.神戸.minimo" stackId="kobe" fill="#e11d48" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
-          <div className="mt-4 flex justify-center gap-6">
-             <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-[#10b981] rounded-full" /> <span className="text-[10px] font-bold text-slate-500">六甲</span></div>
-             <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-[#6366f1] rounded-full" /> <span className="text-[10px] font-bold text-slate-500">元町</span></div>
-             <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-[#f43f5e] rounded-full" /> <span className="text-[10px] font-bold text-slate-500">神戸</span></div>
-             <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-slate-300 rounded-full" /> <span className="text-[10px] font-bold text-slate-500">濃い色はミニモ売上</span></div>
           </div>
         </CardContent>
       </Card>

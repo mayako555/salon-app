@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import AdvancedCharts from "./AdvancedCharts";
+import SNSTaskSection from "@/app/tasks/SNSTaskSection";
 
 export default function DashboardPage() {
   const { profile, isAdmin, isManager } = useAuth();
@@ -231,9 +232,12 @@ export default function DashboardPage() {
                       <p className="font-bold text-slate-800 text-xs">【重要】来月の希望休について</p>
                       <p className="text-[10px] text-slate-400 mt-1">25日までにポータルから提出をお願いします。</p>
                     </div>
-                  </div>
+                   </div>
                 </CardContent>
               </Card>
+
+              {/* SNS Task Section */}
+              <SNSTaskSection assignedAccounts={profile?.sns_accounts} />
             </div>
           </div>
         )}
@@ -282,6 +286,9 @@ export default function DashboardPage() {
         {/* ADMIN VIEW */}
         {(isAdmin || isManager) && (
           <>
+            <div className="mb-8">
+              <SNSTaskSection />
+            </div>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 whitespace-nowrap">
               <Card className="bg-white border-none shadow-sm hover:shadow-md transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -312,14 +319,14 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-slate-900">¥{(stats?.monthlyTotal ?? 0).toLocaleString()}</div>
-                  <div className="flex flex-col gap-1 mt-2">
+                  <div className="flex flex-col gap-1.5 mt-2">
                     <div className="flex justify-between text-[10px] font-bold">
                       <span className="text-emerald-600">通常:</span>
-                      <span className="text-slate-700">¥{(stats?.monthlyRegularTotal ?? 0).toLocaleString()}</span>
+                      <span className="text-slate-700 text-right">¥{(stats?.monthlyRegularTotal ?? 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-[10px] font-bold">
                       <span className="text-indigo-600">ミニモ:</span>
-                      <span className="text-slate-700">¥{(stats?.monthlyMinimoTotal ?? 0).toLocaleString()}</span>
+                      <span className="text-slate-700 text-right">¥{(stats?.monthlyMinimoTotal ?? 0).toLocaleString()}</span>
                     </div>
                   </div>
                 </CardContent>

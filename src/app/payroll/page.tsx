@@ -6,7 +6,7 @@ import GenerateButton from "./GenerateButton";
 import CloseButton from "./CloseButton";
 import CSVExportButton from "./CSVExportButton";
 import StatementDialog from "./StatementDialog";
-import EditMetricsDialog from "./EditMetricsDialog";
+import EditStatementDialog from "./EditStatementDialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Banknote, UserCircle2, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard";
@@ -140,7 +140,7 @@ export default async function PayrollPage({
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end items-center gap-1">
-                        {!isClosed && <EditMetricsDialog stmt={stmt} onUpdate={() => {}} />}
+                        {!isClosed && <EditStatementDialog stmt={stmt} onUpdate={() => {}} />}
                         <StatementDialog stmt={stmt} />
                       </div>
                     </TableCell>
