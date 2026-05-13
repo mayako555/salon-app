@@ -137,19 +137,25 @@ export default function AttendancePage() {
                   // Merge logic
                   acc[record.staff_id].break_minutes += record.break_minutes;
                   acc[record.staff_id]._allRecords.push(record);
-                  
-                  // Keep earliest clock_in and latest clock_out for display
-                  if (record.clock_in && (!acc[record.staff_id].clock_in || new Date(record.clock_in) < new Date(acc[record.staff_id].clock_in))) {
+                                    // Keep earliest clock_in and latest clock_out for display
+                  const currentIn = acc[record.staff_id].clock_in;
+                  if (record.clock_in && (!currentIn || new Date(record.clock_in) < new Date(currentIn))) {
                     acc[record.staff_id].clock_in = record.clock_in;
                   }
-                  if (record.clock_out && (!acc[record.staff_id].clock_out || new Date(record.clock_out) > new Date(acc[record.staff_id].clock_out))) {
+                  
+                  const currentOut = acc[record.staff_id].clock_out;
+                  if (record.clock_out && (!currentOut || new Date(record.clock_out) > new Date(currentOut))) {
                     acc[record.staff_id].clock_out = record.clock_out;
                   }
+                  
                   // Same for effective
-                  if (record.effective_clock_in && (!acc[record.staff_id].effective_clock_in || new Date(record.effective_clock_in) < new Date(acc[record.staff_id].effective_clock_in))) {
+                  const currentEffIn = acc[record.staff_id].effective_clock_in;
+                  if (record.effective_clock_in && (!currentEffIn || new Date(record.effective_clock_in) < new Date(currentEffIn))) {
                     acc[record.staff_id].effective_clock_in = record.effective_clock_in;
                   }
-                  if (record.effective_clock_out && (!acc[record.staff_id].effective_clock_out || new Date(record.effective_clock_out) > new Date(acc[record.staff_id].effective_clock_out))) {
+                  
+                  const currentEffOut = acc[record.staff_id].effective_clock_out;
+                  if (record.effective_clock_out && (!currentEffOut || new Date(record.effective_clock_out) > new Date(currentEffOut))) {
                     acc[record.staff_id].effective_clock_out = record.effective_clock_out;
                   }
                 }
@@ -177,7 +183,7 @@ export default function AttendancePage() {
 
                 let workingHoursText = "--";
                 if (cin && cout) {
-                  const ms = new Date(cout).getTime() - new Date(cin).getTime();
+                  const ms = new Date(cout!).getTime() - new Date(cin!).getTime();
                   const totalMinutes = Math.floor(ms / 60000) - record.break_minutes;
                   const hrs = Math.floor(totalMinutes / 60);
                   const mins = totalMinutes % 60;
@@ -272,7 +278,12 @@ export default function AttendancePage() {
                 <Input 
                   type="datetime-local" 
                   value={editingRecord?.effective_clock_in ? editingRecord.effective_clock_in.slice(0, 16) : ""} 
-                  onChange={(e) => setEditingRecord({...editingRecord!, effective_clock_in: new Date(e.target.value).toISOString()})}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) {
+                      setEditingRecord({...editingRecord!, effective_clock_in: new Date(val).toISOString()});
+                    }
+                  }}
                   className="h-10 rounded-lg bg-slate-50 border-none font-bold text-xs"
                 />
               </div>
@@ -281,7 +292,12 @@ export default function AttendancePage() {
                 <Input 
                   type="datetime-local" 
                   value={editingRecord?.effective_clock_out ? editingRecord.effective_clock_out.slice(0, 16) : ""} 
-                  onChange={(e) => setEditingRecord({...editingRecord!, effective_clock_out: new Date(e.target.value).toISOString()})}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) {
+                      setEditingRecord({...editingRecord!, effective_clock_out: new Date(val).toISOString()});
+                    }
+                  }}
                   className="h-10 rounded-lg bg-slate-50 border-none font-bold text-xs"
                 />
               </div>
