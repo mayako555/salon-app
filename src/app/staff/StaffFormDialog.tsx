@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { 
   Dialog, 
   DialogContent, 
@@ -7,6 +8,9 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "@/components/ui/dialog";
+import { StaffProfile, addStaff, editStaff } from "./actions";
+import { Button } from "@/components/ui/button";
+import { Plus, Edit2 } from "lucide-react";
 
 export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
   const [isOpen, setIsOpen] = useState(false);

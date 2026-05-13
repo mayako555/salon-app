@@ -44,7 +44,7 @@ export async function getDailyAttendance(dateStr: string): Promise<AttendanceRec
         ...data,
         created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null),
         updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : (data.updated_at || null)
-      };
+      } as any;
     }) as AttendanceRecord[];
   } catch (error) {
     console.error("Error fetching daily attendance:", error);
@@ -72,7 +72,7 @@ export async function getMonthlyAttendance(year: number, month: number): Promise
         ...data,
         created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null),
         updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : (data.updated_at || null)
-      };
+      } as any;
     }) as AttendanceRecord[];
   } catch (error) {
     console.error("Error fetching monthly attendance:", error);

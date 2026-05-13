@@ -139,8 +139,11 @@ export default function CurriculumMasterPage() {
                   <label className="text-[10px] font-black text-emerald-500 uppercase ml-1">必要無料モデル数</label>
                   <Input 
                     type="number"
-                    value={editingItem.free_model_target}
-                    onChange={e => setEditingItem({...editingItem, free_model_target: parseInt(e.target.value)})}
+                    value={isNaN(editingItem.free_model_target as number) ? "" : editingItem.free_model_target}
+                    onChange={e => {
+                      const val = parseInt(e.target.value);
+                      setEditingItem({...editingItem, free_model_target: isNaN(val) ? 0 : val});
+                    }}
                     className="h-12 rounded-xl bg-emerald-50/50 border-none font-bold"
                   />
                 </div>
@@ -148,8 +151,11 @@ export default function CurriculumMasterPage() {
                   <label className="text-[10px] font-black text-blue-500 uppercase ml-1">必要有料モデル数</label>
                   <Input 
                     type="number"
-                    value={editingItem.paid_model_target}
-                    onChange={e => setEditingItem({...editingItem, paid_model_target: parseInt(e.target.value)})}
+                    value={isNaN(editingItem.paid_model_target as number) ? "" : editingItem.paid_model_target}
+                    onChange={e => {
+                      const val = parseInt(e.target.value);
+                      setEditingItem({...editingItem, paid_model_target: isNaN(val) ? 0 : val});
+                    }}
                     className="h-12 rounded-xl bg-blue-50/50 border-none font-bold"
                   />
                 </div>
