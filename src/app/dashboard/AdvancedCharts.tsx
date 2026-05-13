@@ -120,7 +120,7 @@ export default function AdvancedCharts() {
                     dataKey="total" 
                     position="top" 
                     offset={10}
-                    formatter={(val: number) => `¥${(val / 10000).toFixed(1)}万`}
+                    formatter={(val: any) => val ? `¥${(val / 10000).toFixed(1)}万` : ""}
                     style={{ fontSize: '10px', fontWeight: 'bold', fill: '#475569' }}
                   />
                 </Bar>
@@ -176,7 +176,7 @@ export default function AdvancedCharts() {
                         <LabelList 
                           dataKey={`stores.${store}.totalVisits`} 
                           position="top" 
-                          formatter={(val: number) => val > 0 ? `${val}人` : ''}
+                          formatter={(val: any) => val > 0 ? `${val}人` : ''}
                           style={{ fontSize: '9px', fontWeight: 'bold', fill: '#64748b' }}
                         />
                       </Bar>
@@ -259,7 +259,7 @@ export default function AdvancedCharts() {
                   <LabelList 
                     dataKey="nextBookingVisits" 
                     position="top" 
-                    formatter={(val: number) => `${val}人`}
+                    formatter={(val: any) => `${val || 0}人`}
                     style={{ fontSize: '10px', fontWeight: 'bold', fill: '#475569' }}
                   />
                 </Bar>
