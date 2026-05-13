@@ -32,6 +32,7 @@ export type StaffProfile = {
   employment_type: "employee" | "outsourcing" | "part_time";
   max_holiday_requests: number;
   is_invoice_registered?: boolean;
+  is_trainee: boolean;
   is_active: boolean;
   monthly_sales_target?: number;
   sns_accounts?: string[];
@@ -107,6 +108,8 @@ export async function addStaff(formData: FormData) {
       return { success: false, error: "名前、メールアドレス、パスワードは必須です" };
     }
 
+    const is_trainee = formData.get("is_trainee") === "true";
+
     // 1. Create Firebase Auth User (Optional)
     let uid: string | undefined;
     try {
@@ -136,6 +139,7 @@ export async function addStaff(formData: FormData) {
       role,
       employment_type,
       is_invoice_registered,
+      is_trainee,
       max_holiday_requests,
       is_active: true,
       monthly_sales_target,
@@ -186,6 +190,8 @@ export async function editStaff(id: string, formData: FormData) {
     const role = (formData.get("role") as StaffRole) || "staff";
     const monthly_sales_target = parseInt(formData.get("monthly_sales_target") as string || "0", 10);
 
+    const is_trainee = formData.get("is_trainee") === "true";
+
     if (!name || !email) {
       return { success: false, error: "名前、メールアドレスは必須です" };
     }
@@ -202,6 +208,7 @@ export async function editStaff(id: string, formData: FormData) {
       role,
       employment_type,
       is_invoice_registered,
+      is_trainee,
       max_holiday_requests,
       monthly_sales_target,
       sns_accounts: formData.getAll("sns_accounts") as string[],

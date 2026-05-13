@@ -102,12 +102,18 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
             </select>
           </div>
 
-          {employmentType === "outsourcing" && (
-            <div className="flex items-center gap-2 py-2">
-              <input type="checkbox" id={`is_invoice_registered-${staff?.id||'new'}`} name="is_invoice_registered" value="true" defaultChecked={staff?.is_invoice_registered} className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500" />
-              <label htmlFor={`is_invoice_registered-${staff?.id||'new'}`} className="text-sm font-medium text-slate-700 cursor-pointer">インボイス登録済み</label>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center gap-2 py-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <input type="checkbox" id={`is_trainee-${staff?.id||'new'}`} name="is_trainee" value="true" defaultChecked={staff?.is_trainee} className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500" />
+              <label htmlFor={`is_trainee-${staff?.id||'new'}`} className="text-sm font-bold text-slate-700 cursor-pointer">研修中（新人）</label>
             </div>
-          )}
+            {employmentType === "outsourcing" && (
+              <div className="flex items-center gap-2 py-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <input type="checkbox" id={`is_invoice_registered-${staff?.id||'new'}`} name="is_invoice_registered" value="true" defaultChecked={staff?.is_invoice_registered} className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500" />
+                <label htmlFor={`is_invoice_registered-${staff?.id||'new'}`} className="text-sm font-bold text-slate-700 cursor-pointer">インボイス登録</label>
+              </div>
+            )}
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">メールアドレス（ログイン用）</label>

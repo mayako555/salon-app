@@ -27,6 +27,8 @@ import {
   Edit2,
   History,
   CheckCircle2,
+  Plus,
+  Smartphone,
   Link as LinkIcon
 } from "lucide-react";
 import { format } from "date-fns";
@@ -65,7 +67,9 @@ export default function CustomerDetailPage() {
   
   // State for LINE Link QR
   const [isLinkQrOpen, setIsLinkQrOpen] = useState(false);
+  const [isEntryQrOpen, setIsEntryQrOpen] = useState(false); // New: Counseling QR
   const [linkUrl, setLinkUrl] = useState("");
+  const [entryUrl, setEntryUrl] = useState(""); // New: Entry URL
 
   useEffect(() => {
     async function load() {
@@ -132,6 +136,14 @@ export default function CustomerDetailPage() {
     const liffId = process.env.NEXT_PUBLIC_LIFF_ID || "2009912937-1KgShdZB";
     setLinkUrl(`https://liff.line.me/${liffId}/link-line/${id}`);
     setIsLinkQrOpen(true);
+  };
+
+  const handleShowEntryQr = () => {
+    // Use the current direct URL instead of LIFF to ensure it always opens the entry form
+    // regardless of LIFF endpoint settings.
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    setEntryUrl(`${baseUrl}/entry?id=${id}`);
+    setIsEntryQrOpen(true);
   };
 
   const handleTestLineMessage = async () => {
@@ -298,14 +310,27 @@ export default function CustomerDetailPage() {
                         </Button>
                       </div>
                     ) : (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full rounded-xl border-[#06C755] text-[#06C755] hover:bg-emerald-50 gap-2 font-bold"
-                    onClick={handleShowLinkQr}
-                  >
-                    <LinkIcon size={14} /> LINE連携用QRを表示
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full rounded-xl border-rose-200 text-rose-600 hover:bg-rose-50 gap-2 font-bold"
+                      onClick={handleShowEntryQr}
+                    >
+                      <Smartphone size={14} /> お客様入力用QR (カルテ)
+                    </Button>
+
+                    {!customer.line_user_id && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full rounded-xl border-[#06C755] text-[#06C755] hover:bg-emerald-50 gap-2 font-bold"
+                        onClick={handleShowLinkQr}
+                      >
+                        <LinkIcon size={14} /> LINE連携用QRを表示
+                      </Button>
+                    )}
+                  </div>
                 )}
                 <div className="mt-4 pt-4 border-t border-slate-100">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
@@ -814,6 +839,35 @@ export default function CustomerDetailPage() {
             </div>
           </div>
           <Button variant="outline" onClick={() => setIsLinkQrOpen(false)} className="rounded-xl w-full">
+            閉じる
+          </Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Counseling Entry QR Dialog */}
+      <Dialog open={isEntryQrOpen} onOpenChange={setIsEntryQrOpen}>
+        <DialogContent className="sm:max-w-xs rounded-[2rem] text-center border-none shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-rose-600">お客様入力用QR</DialogTitle>
+          </DialogHeader>
+          <div className="py-6 flex flex-col items-center gap-6">
+            <div className="p-4 bg-white rounded-3xl shadow-xl border border-rose-100">
+              <QRCodeSVG 
+                value={entryUrl} 
+                size={200}
+                level="H"
+                includeMargin={false}
+              />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-bold text-slate-700">お客様のスマホで読み取ってください</p>
+              <p className="text-[10px] text-slate-400 leading-relaxed font-bold">
+                スキャンするとお客様自身のスマホで<br/>
+                カウンセリング内容を入力・修正いただけます。
+              </p>
+            </div>
+          </div>
+          <Button variant="outline" onClick={() => setIsEntryQrOpen(false)} className="rounded-xl w-full border-rose-100 text-rose-400 hover:text-rose-600">
             閉じる
           </Button>
         </DialogContent>

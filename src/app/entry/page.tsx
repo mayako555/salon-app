@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,10 +22,11 @@ import {
   MessageSquare,
   Smartphone
 } from "lucide-react";
-import { addCustomer } from "@/lib/customers";
+import { addCustomer, getCustomerById, updateCustomer } from "@/lib/customers";
 import { addCounselingResponse, calculateRiskFlags, ServiceType } from "@/lib/counseling";
 import { toast } from "sonner";
 import liff from "@line/liff";
+import { useSearchParams } from "next/navigation";
 
 // --- Sub-components ---
 
@@ -105,10 +106,20 @@ const SignaturePad = ({ onSave }: { onSave: (url: string) => void }) => {
 // --- Main Component ---
 
 export default function CustomerEntryPage() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center animate-pulse text-slate-400">読み込み中...</div>}>
+      <CustomerEntryFormContent />
+    </Suspense>
+  );
+}
+
+function CustomerEntryFormContent() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [lineProfile, setLineProfile] = useState<{ userId: string; displayName: string } | null>(null);
+  const searchParams = useSearchParams();
+  const customerIdParam = searchParams.get("id");
 
   // Form State
   const [selectedServices, setSelectedServices] = useState<ServiceType[]>([]);
@@ -142,6 +153,19 @@ export default function CustomerEntryPage() {
   });
 
   useEffect(() => {
+    if (customerIdParam) {
+      getCustomerById(customerIdParam).then(data => {
+        if (data) {
+          setFormData((prev: any) => ({
+            ...prev,
+            ...data,
+            id: customerIdParam
+          }));
+          if (data.gender) setFormData((prev: any) => ({ ...prev, gender: data.gender }));
+        }
+      });
+    }
+
     const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
     if (liffId) {
       liff.init({ liffId }).then(() => {
@@ -151,13 +175,13 @@ export default function CustomerEntryPage() {
             setFormData((prev: any) => ({ 
               ...prev, 
               name: prev.name || profile.displayName, 
-              line_user_id: profile.userId 
+              line_user_id: prev.line_user_id || profile.userId 
             }));
           });
         }
       }).catch((err: any) => console.error("LIFF Init Error:", err));
     }
-  }, []);
+  }, [customerIdParam]);
 
   const handleLineLogin = () => {
     if (!liff.isLoggedIn()) {
@@ -191,8 +215,7 @@ export default function CustomerEntryPage() {
     try {
       const { riskLevel, riskFlags } = calculateRiskFlags(formData.answers, selectedServices);
 
-      // 1. Add/Update Customer
-      const customerRes = await addCustomer({
+      const customerPayload = {
         name: formData.name,
         name_kana: formData.name_kana,
         gender: formData.gender as any,
@@ -216,12 +239,19 @@ export default function CustomerEntryPage() {
         has_allergy: (formData.answers.allergies || []).length > 0 || formData.answers.allergies_present === 'yes',
         risk_level: riskLevel,
         risk_flags: riskFlags,
-      });
+      };
 
-      if (customerRes.success && customerRes.id) {
-        // 2. Add Counseling Response
+      let customerRes;
+      if (formData.id) {
+        customerRes = await updateCustomer(formData.id, customerPayload);
+        if (customerRes.success) (customerRes as any).id = formData.id;
+      } else {
+        customerRes = await addCustomer(customerPayload);
+      }
+
+      if (customerRes.success && (customerRes as any).id) {
         await addCounselingResponse({
-          customer_id: customerRes.id,
+          customer_id: (customerRes as any).id,
           service_types: selectedServices,
           gender: formData.gender as any,
           answers: formData.answers,
@@ -241,8 +271,6 @@ export default function CustomerEntryPage() {
       setLoading(false);
     }
   };
-
-  // --- Rendering Helpers ---
 
   const renderStepHeader = (title: string, subtitle: string) => (
     <div className="text-center mb-8">
@@ -332,7 +360,6 @@ export default function CustomerEntryPage() {
       </header>
 
       <div className="max-w-md mx-auto px-5 pt-8">
-        {/* Progress */}
         <div className="flex gap-1.5 mb-10 px-2">
           {[0, 1, 2, 3, 4, 5].map((i) => (
             <div 
@@ -343,7 +370,6 @@ export default function CustomerEntryPage() {
         </div>
 
         <AnimatePresence mode="wait">
-          {/* Step 0: Service Selection */}
           {step === 0 && (
             <motion.div key="s0" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
               {renderStepHeader("メニュー選択", "本日受ける施術をすべて選択してください")}
@@ -373,7 +399,6 @@ export default function CustomerEntryPage() {
                   </button>
                 ))}
               </div>
-
               <div className="space-y-4 pt-4">
                 <label className="text-sm font-bold text-slate-700 block ml-1">性別</label>
                 <div className="flex gap-3">
@@ -392,7 +417,6 @@ export default function CustomerEntryPage() {
                   ))}
                 </div>
               </div>
-
               <Button 
                 className="w-full h-16 rounded-2xl text-lg font-extrabold mt-8 shadow-xl shadow-rose-200 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition-all" 
                 onClick={nextStep}
@@ -403,11 +427,9 @@ export default function CustomerEntryPage() {
             </motion.div>
           )}
 
-          {/* Step 1: Basic Info */}
           {step === 1 && (
             <motion.div key="s1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
               {renderStepHeader("基本情報", "お客様の情報を教えてください")}
-              
               {!lineProfile ? (
                 <Card className="p-5 rounded-3xl border-2 border-emerald-500 bg-emerald-50/30 overflow-hidden relative group" onClick={handleLineLogin}>
                    <div className="flex items-center gap-4">
@@ -420,9 +442,6 @@ export default function CustomerEntryPage() {
                      </div>
                      <ChevronRight size={20} className="text-emerald-500" />
                    </div>
-                   <div className="absolute top-0 right-0 p-2 opacity-10">
-                     <Smartphone size={60} />
-                   </div>
                 </Card>
               ) : (
                 <div className="bg-emerald-500 text-white p-3 rounded-2xl flex items-center gap-3 shadow-lg shadow-emerald-100">
@@ -430,7 +449,6 @@ export default function CustomerEntryPage() {
                   <span className="text-xs font-black">LINE連携済み: {lineProfile.displayName}様</span>
                 </div>
               )}
-
               <Card className="p-6 rounded-3xl border-none shadow-sm space-y-5">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
@@ -446,7 +464,6 @@ export default function CustomerEntryPage() {
                     <Input type="tel" placeholder="09012345678" className="h-12 rounded-xl bg-slate-50 border-none font-bold" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
                   </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-bold text-slate-400 mb-1.5 block ml-1">生年月日</label>
@@ -463,7 +480,6 @@ export default function CustomerEntryPage() {
                     </select>
                   </div>
                 </div>
-
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-1.5 block ml-1">郵便番号</label>
                   <Input placeholder="6570000" className="h-12 rounded-xl bg-slate-50 border-none font-bold" value={formData.postal_code} onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })} />
@@ -472,16 +488,7 @@ export default function CustomerEntryPage() {
                   <label className="text-xs font-bold text-slate-400 mb-1.5 block ml-1">住所</label>
                   <Input placeholder="兵庫県神戸市..." className="h-12 rounded-xl bg-slate-50 border-none font-bold" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-400 mb-1.5 block ml-1">メールアドレス</label>
-                  <Input type="email" placeholder="example@mail.com" className="h-12 rounded-xl bg-slate-50 border-none font-bold" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-400 mb-1.5 block ml-1">職業</label>
-                  <Input placeholder="会社員など" className="h-12 rounded-xl bg-slate-50 border-none font-bold" value={formData.occupation} onChange={(e) => setFormData({ ...formData, occupation: e.target.value })} />
-                </div>
               </Card>
-
               <div className="flex gap-3 mt-8">
                 <Button variant="outline" className="h-16 w-20 rounded-2xl border-none shadow-sm bg-white" onClick={prevStep}>
                   <ChevronLeft />
@@ -497,332 +504,74 @@ export default function CustomerEntryPage() {
             </motion.div>
           )}
 
-          {/* Step 2: Specific Counseling Questions (Combined for now, simplified) */}
           {step === 2 && (
             <motion.div key="s2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
               {renderStepHeader("カウンセリング", "安全な施術のために詳細をお伺いします")}
-              
               <div className="space-y-8">
-                {/* 共通の来店きっかけ */}
                 <CheckboxGroup 
                   label="来店きっかけ（複数選択可）"
                   options={['ホームページ', 'Instagram', 'SNS', '紹介', 'ちらし', 'ホットペッパー', '看板', 'ミニモ', 'その他']}
                   selected={formData.referral_source}
-                  onChange={(val: any) => {
-                    const isMinimo = val.includes("ミニモ");
-                    setFormData({...formData, referral_source: val, is_minimo: isMinimo});
-                  }}
+                  onChange={(val: any) => setFormData({...formData, referral_source: val, is_minimo: val.includes("ミニモ")})}
                 />
-
-                <div className="flex items-center gap-3 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
-                  <input 
-                    type="checkbox" 
-                    id="is_minimo"
-                    checked={formData.is_minimo}
-                    onChange={(e) => setFormData({...formData, is_minimo: e.target.checked})}
-                    className="w-6 h-6 rounded-lg text-emerald-600 border-slate-300 focus:ring-emerald-500"
-                  />
-                  <label htmlFor="is_minimo" className="text-sm font-black text-emerald-900">
-                    ミニモの低単価クーポンを利用
-                  </label>
-                </div>
-
-                {/* アイブロウ質問 */}
                 {(selectedServices.includes('eyebrow') || selectedServices.includes('brow_gym_men')) && (
                   <div className="space-y-6 border-l-4 border-emerald-400 pl-4 py-2">
                     <h3 className="font-black text-slate-800">アイブロウ・WAXについて</h3>
-                    <RadioGroup 
-                      label="ワックス脱毛の経験はありますか？"
-                      options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]}
-                      value={formData.answers.wax_experience}
-                      onChange={(val: any) => updateAnswers('wax_experience', val)}
-                    />
-                    <RadioGroup 
-                      label="現在、ピーリングやゼオスキン、レチノール（高濃度ビタミンA）製品を使用中ですか？"
-                      options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]}
-                      value={formData.answers.peeling_history}
-                      onChange={(val: any) => updateAnswers('peeling_history', val)}
-                    />
-                    <RadioGroup 
-                      label="大切なイベントを2ヶ月以内に控えていますか？"
-                      options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]}
-                      value={formData.answers.important_event}
-                      onChange={(val: any) => updateAnswers('important_event', val)}
-                    />
+                    <RadioGroup label="ワックス脱毛の経験はありますか？" options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]} value={formData.answers.wax_experience} onChange={(val: any) => updateAnswers('wax_experience', val)} />
+                    <RadioGroup label="現在ピーリング製品を使用中ですか？" options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]} value={formData.answers.peeling_history} onChange={(val: any) => updateAnswers('peeling_history', val)} />
                   </div>
                 )}
-
-                {/* まつ毛質問 */}
-                {(selectedServices.includes('eyelash_ext') || selectedServices.includes('lash_lift') || selectedServices.includes('and_healthy')) && (
-                  <div className="space-y-6 border-l-4 border-amber-400 pl-4 py-2">
-                    <h3 className="font-black text-slate-800">まつ毛施術について</h3>
-                    <RadioGroup 
-                      label="まつ毛エクステの経験はありますか？"
-                      options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]}
-                      value={formData.answers.eyelash_ext_experience}
-                      onChange={(val: any) => updateAnswers('eyelash_ext_experience', val)}
-                    />
-                    <RadioGroup 
-                      label="まつ毛パーマの経験はありますか？"
-                      options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]}
-                      value={formData.answers.lash_lift_experience}
-                      onChange={(val: any) => updateAnswers('lash_lift_experience', val)}
-                    />
-                    <CheckboxGroup 
-                      label="現在の体調（あてはまるものすべて）"
-                      options={['良好', '寝不足', '生理中', '神経過敏', '頭痛', '肩こり', '腰痛']}
-                      selected={formData.answers.body_condition || []}
-                      onChange={(val: any) => updateAnswers('body_condition', val)}
-                    />
-                    <RadioGroup 
-                      label="コンタクトレンズを使用していますか？"
-                      options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]}
-                      value={formData.answers.contact_lens}
-                      onChange={(val: any) => updateAnswers('contact_lens', val)}
-                    />
-                  </div>
-                )}
-
-                {/* 女性特有の質問 */}
-                {formData.gender === 'female' && (
-                  <div className="space-y-6 border-l-4 border-rose-400 pl-4 py-2">
-                    <h3 className="font-black text-slate-800">女性特有の確認</h3>
-                    <div className="grid grid-cols-1 gap-4">
-                      <RadioGroup 
-                        label="現在、妊娠中ですか？"
-                        options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]}
-                        value={formData.answers.pregnancy}
-                        onChange={(val: any) => updateAnswers('pregnancy', val)}
-                      />
-                      <RadioGroup 
-                        label="現在、授乳中ですか？"
-                        options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]}
-                        value={formData.answers.lactation}
-                        onChange={(val: any) => updateAnswers('lactation', val)}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div className="bg-rose-50 p-5 rounded-2xl border border-rose-100 space-y-6">
-                  <div>
-                    <label className="text-sm font-bold text-rose-800 block mb-3 flex items-center gap-2">
-                      <AlertTriangle size={16} /> アレルギーはありますか？
-                    </label>
-                    <RadioGroup 
-                      options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]}
-                      value={formData.answers.allergies_present}
-                      onChange={(val: any) => updateAnswers('allergies_present', val)}
-                    />
-                    {formData.answers.allergies_present === 'yes' && (
-                      <div className="mt-4">
-                        <CheckboxGroup 
-                          options={['金属', '化粧品', 'ゴム', '植物', '光', '薬', '食品', 'アルコール']}
-                          selected={formData.answers.allergies || []}
-                          onChange={(val: any) => updateAnswers('allergies', val)}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <RadioGroup 
-                      label="薬品によるアレルギーはありますか？"
-                      options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]}
-                      value={formData.answers.drug_allergy}
-                      onChange={(val: any) => updateAnswers('drug_allergy', val)}
-                    />
-                  </div>
-
-                  <div>
-                    <RadioGroup 
-                      label="過去にまつ毛・眉毛施術でトラブル（赤み・痒み・腫れ等）がありましたか？"
-                      options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]}
-                      value={formData.answers.past_trouble}
-                      onChange={(val: any) => updateAnswers('past_trouble', val)}
-                    />
-                  </div>
+                <div className="bg-rose-50 p-5 rounded-2xl border border-rose-100">
+                  <RadioGroup label="アレルギーはありますか？" options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]} value={formData.answers.allergies_present} onChange={(val: any) => updateAnswers('allergies_present', val)} />
+                  {formData.answers.allergies_present === 'yes' && (
+                    <div className="mt-4"><CheckboxGroup options={['金属', '化粧品', 'ゴム', 'アルコール']} selected={formData.answers.allergies || []} onChange={(val: any) => updateAnswers('allergies', val)} /></div>
+                  )}
                 </div>
-
-                <div className="space-y-4">
-                  <label className="text-sm font-bold text-slate-700 block ml-1">疾患・手術歴の確認</label>
-                  <div className="bg-white p-5 rounded-3xl border border-slate-100 space-y-6">
-                    <RadioGroup 
-                      label="美容整形・レーシック・アートメイク歴はありますか？"
-                      options={[{id:'yes', label:'あり'}, {id:'no', label:'なし'}]}
-                      value={formData.answers.surgery_history}
-                      onChange={(val: any) => updateAnswers('surgery_history', val)}
-                    />
-                    {formData.answers.surgery_history === 'yes' && (
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-400">時期・内容を教えてください（例: 1ヶ月前に二重整形）</label>
-                        <Input 
-                          placeholder="内容を入力" 
-                          className="h-10 rounded-xl bg-slate-50 border-none"
-                          value={formData.answers.surgery_content}
-                          onChange={(e) => updateAnswers('surgery_content', e.target.value)}
-                        />
-                      </div>
-                    )}
-
-                    <RadioGroup 
-                      label="現在、目や皮膚に疾患（炎症・ものもらい等）はありますか？"
-                      options={[{id:'yes', label:'あり'}, {id:'no', label:'なし'}]}
-                      value={formData.answers.skin_inflammation}
-                      onChange={(val: any) => updateAnswers('skin_inflammation', val)}
-                    />
-                    
-                    <RadioGroup 
-                      label="本日パッチテストを希望されますか？"
-                      options={[{id:'yes', label:'希望する'}, {id:'no', label:'希望しない'}]}
-                      value={formData.answers.patch_test_request}
-                      onChange={(val: any) => updateAnswers('patch_test_request', val)}
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-3">
-                  <label className="text-sm font-bold text-slate-700 block ml-1">備考・その他（現在服用中の薬など）</label>
-                  <textarea 
-                    className="w-full bg-white border border-slate-100 rounded-2xl p-4 text-sm min-h-[100px] focus:ring-2 focus:ring-rose-500/20 shadow-sm"
-                    placeholder="スタッフに伝えておきたいことがあればご記入ください"
-                    value={formData.answers.other_notes}
-                    onChange={(e) => updateAnswers('other_notes', e.target.value)}
-                  />
+                  <label className="text-sm font-bold text-slate-700 block ml-1">備考・その他</label>
+                  <textarea className="w-full bg-white border border-slate-100 rounded-2xl p-4 text-sm min-h-[100px]" placeholder="特記事項があればご記入ください" value={formData.answers.other_notes} onChange={(e) => updateAnswers('other_notes', e.target.value)} />
                 </div>
               </div>
-
               <div className="flex gap-3 mt-8">
-                <Button variant="outline" className="h-16 w-20 rounded-2xl border-none shadow-sm bg-white" onClick={prevStep}>
-                  <ChevronLeft />
-                </Button>
-                <Button className="flex-1 h-16 rounded-2xl text-lg font-extrabold shadow-xl shadow-rose-200 bg-rose-600 hover:bg-rose-700" onClick={nextStep}>
-                  次へ進む <ChevronRight className="ml-2" />
-                </Button>
+                <Button variant="outline" className="h-16 w-20 rounded-2xl border-none shadow-sm bg-white" onClick={prevStep}><ChevronLeft /></Button>
+                <Button className="flex-1 h-16 rounded-2xl text-lg font-extrabold shadow-xl shadow-rose-200 bg-rose-600 hover:bg-rose-700" onClick={nextStep}>次へ進む <ChevronRight className="ml-2" /></Button>
               </div>
             </motion.div>
           )}
 
-          {/* Step 3: Photos & SNS Permission */}
           {step === 3 && (
             <motion.div key="s3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
-              {renderStepHeader("写真・SNS同意", "デザインの記録と広報へのご協力について")}
-              
-              <div className="space-y-6">
-                <div className="bg-white p-6 rounded-3xl shadow-sm space-y-6">
-                  <div className="space-y-4">
-                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                      <Camera className="text-rose-500" size={18} /> 施術前後の写真撮影
-                    </label>
-                    <RadioGroup 
-                      options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]}
-                      value={formData.photo_permission}
-                      onChange={(val: any) => setFormData({...formData, photo_permission: val})}
-                    />
-                  </div>
-
-                  <div className="space-y-4 border-t border-slate-50 pt-6">
-                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                      <Sparkles className="text-amber-500" size={18} /> 写真のSNS等への使用
-                    </label>
-                    <RadioGroup 
-                      options={[
-                        {id:'yes', label:'はい（目元/眉のみ）'}, 
-                        {id:'full', label:'はい（顔全体OK）'}, 
-                        {id:'no', label:'いいえ'}
-                      ]}
-                      value={formData.sns_permission_scope}
-                      onChange={(val: any) => setFormData({...formData, sns_permission_scope: val})}
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-3xl shadow-sm space-y-6">
-                  <label className="text-sm font-bold text-slate-700 block">お知らせ・ダイレクトメール</label>
-                  <div className="flex gap-4">
-                    <div className="flex-1 space-y-2">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">DM (ハガキ)</p>
-                      <RadioGroup 
-                        options={[{id:'yes', label:'可'}, {id:'no', label:'不可'}]}
-                        value={formData.dm_allowed ? 'yes' : 'no'}
-                        onChange={(val: any) => setFormData({...formData, dm_allowed: val === 'yes'})}
-                      />
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Email</p>
-                      <RadioGroup 
-                        options={[{id:'yes', label:'可'}, {id:'no', label:'不可'}]}
-                        value={formData.email_marketing_allowed ? 'yes' : 'no'}
-                        onChange={(val: any) => setFormData({...formData, email_marketing_allowed: val === 'yes'})}
-                      />
-                    </div>
-                  </div>
-                </div>
+              {renderStepHeader("写真・SNS同意", "広報へのご協力について")}
+              <div className="bg-white p-6 rounded-3xl shadow-sm space-y-6">
+                <RadioGroup label="施術写真の撮影" options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]} value={formData.photo_permission} onChange={(val: any) => setFormData({...formData, photo_permission: val})} />
+                <RadioGroup label="SNSへの掲載" options={[{id:'yes', label:'目元のみ可'}, {id:'full', label:'全体可'}, {id:'no', label:'不可'}]} value={formData.sns_permission_scope} onChange={(val: any) => setFormData({...formData, sns_permission_scope: val})} />
               </div>
-
               <div className="flex gap-3 mt-8">
-                <Button variant="outline" className="h-16 w-20 rounded-2xl border-none shadow-sm bg-white" onClick={prevStep}>
-                  <ChevronLeft />
-                </Button>
-                <Button className="flex-1 h-16 rounded-2xl text-lg font-extrabold shadow-xl shadow-rose-200 bg-rose-600 hover:bg-rose-700" onClick={nextStep}>
-                  同意事項へ <ChevronRight className="ml-2" />
-                </Button>
+                <Button variant="outline" className="h-16 w-20 rounded-2xl border-none shadow-sm bg-white" onClick={prevStep}><ChevronLeft /></Button>
+                <Button className="flex-1 h-16 rounded-2xl text-lg font-extrabold shadow-xl shadow-rose-200 bg-rose-600 hover:bg-rose-700" onClick={nextStep}>同意事項へ <ChevronRight className="ml-2" /></Button>
               </div>
             </motion.div>
           )}
 
-          {/* Step 4: Consent Form */}
           {step === 4 && (
             <motion.div key="s4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
-              {renderStepHeader("同意書", "内容をよくお読みになり、ご署名をお願いします")}
-              
-              <div className="bg-white p-6 rounded-3xl shadow-inner border border-slate-100 max-h-[400px] overflow-y-auto text-xs space-y-6 text-slate-600 leading-relaxed scroll-smooth">
-                <div className="text-center font-black text-slate-900 text-lg border-b border-slate-100 pb-3">事前説明書・同意書</div>
-                
-                <section className="space-y-2">
-                  <h4 className="font-bold text-slate-900 text-sm">1. 施術について</h4>
-                  <p>カウンセリングに基づき、最適な施術を行いますが、体質や体調により、充血、腫れ、痒み、かぶれ等の症状が出る可能性があります。万が一異常を感じた場合は、速やかに医師の診察を受けてください。</p>
-                </section>
-
-                <section className="space-y-2">
-                  <h4 className="font-bold text-slate-900 text-sm">2. 免責事項</h4>
-                  <p>施術中、または施術後に伴う諸症状が起こりうる可能性を説明し、その可能性を十分に理解頂いた上での施術の為、故意または重過失を除き、当店は一切の責任を負いかねます。また、払い戻し等の請求にも応じられません。</p>
-                </section>
-
-                <section className="space-y-2">
-                  <h4 className="font-bold text-slate-900 text-sm">3. 注意事項</h4>
-                  <ul className="list-disc ml-4 space-y-1">
-                    <li>施術中は目を開けたり、強く閉じたりしないでください。</li>
-                    <li>アートメイク・整形・レーシック等の後は、医師の許可を得てからご来店ください。</li>
-                    <li>お直しは1週間以内のご連絡、10日以内のご来店に限り、1回無料で承ります。</li>
-                  </ul>
-                </section>
-
-                <div className="bg-slate-50 p-4 rounded-2xl text-[10px] space-y-1 font-medium italic border border-slate-100">
-                  <p>店舗名：Jasmine Lash</p>
-                  <p>代表者：岡田 万耶子</p>
-                  <p>所在地：兵庫県神戸市灘区森後町2丁目3-11 ゴールドウッズ3F</p>
-                </div>
+              {renderStepHeader("同意書", "ご署名をお願いします")}
+              <div className="bg-white p-6 rounded-3xl shadow-inner border border-slate-100 max-h-[300px] overflow-y-auto text-xs space-y-4 text-slate-600">
+                <p className="font-bold text-slate-900">事前説明書・同意書</p>
+                <p>体質や体調により、充血、腫れ、痒み等の症状が出る可能性があります。故意または重過失を除き、当店は一切の責任を負いかねます。</p>
               </div>
-
               <div className="space-y-4">
-                <label className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Signature size={18} className="text-rose-500" /> ご署名
-                </label>
+                <label className="text-sm font-bold text-slate-700 block ml-1 flex items-center gap-2"><Signature size={18} className="text-rose-500" /> ご署名</label>
                 <SignaturePad onSave={(url) => setFormData({...formData, signature: url})} />
-                <p className="text-[10px] text-slate-400 text-center">※枠内に指またはペンで署名してください</p>
               </div>
-
               <div className="flex gap-3 mt-8">
-                <Button variant="outline" className="h-16 w-20 rounded-2xl border-none shadow-sm bg-white" onClick={prevStep}>
-                  <ChevronLeft />
-                </Button>
+                <Button variant="outline" className="h-16 w-20 rounded-2xl border-none shadow-sm bg-white" onClick={prevStep}><ChevronLeft /></Button>
                 <Button 
                   className="flex-1 h-16 rounded-2xl text-lg font-extrabold shadow-xl shadow-rose-200 bg-rose-600 hover:bg-rose-700" 
                   onClick={handleSubmit}
-                  disabled={!formData.signature || loading}
+                  disabled={loading || !formData.signature}
                 >
-                  {loading ? "送信中..." : "同意して送信する"}
+                  {loading ? "送信中..." : "内容を確認して送信"}
                 </Button>
               </div>
             </motion.div>

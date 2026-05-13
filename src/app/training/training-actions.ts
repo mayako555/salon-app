@@ -65,9 +65,36 @@ export type ModelRecord = {
   model_name: string;
   model_phone: string;
   model_type: "free" | "paid";
+  service_type: "extension" | "lash_lift";
+  
+  // Extension Specific
+  extension_count?: string;
+  extension_design?: string;
+  extension_material?: string;
+  extension_thickness?: string;
+  off_time?: string;
+  total_time?: string;
+
+  // Lash Lift Specific
+  lash_lift_rod?: string;
+  processing_time_1?: string;
+  processing_time_2?: string;
+  eye_width?: string;
+  lash_quality_length?: string;
+  lash_quality_thickness?: string;
+
+  // Checklists (Key-Value map of checklist items)
+  checklists?: Record<string, boolean>;
+
+  // Reflection Details
+  reflection: string; // Combined summary or legacy field
+  reflection_points?: string; // 反省点
+  improvement_points?: string; // 改善点
+  good_points?: string; // 出来たと思う事
+  chart_points?: string; // カルテを書くときのポイント
+
   photo_before?: string[];
   photo_after?: string[];
-  reflection: string;
   created_at?: any;
 };
 

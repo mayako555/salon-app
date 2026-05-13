@@ -400,61 +400,104 @@ export default function ShiftsView({
                 </tr>
               </thead>
               <tbody>
-                {["神戸", "元町", "六甲"].map((store) => (
-                  <tr key={store} className="hover:bg-slate-50/50">
-                    <td className="sticky left-0 bg-white p-3 border-b border-r border-slate-200 font-bold text-slate-800 z-10 text-left shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
-                      {store}
-                    </td>
-                    {actualMonthDays.map((day) => {
-                      const dateStr = format(day, "yyyy-MM-dd");
-                      const dayShifts = getShiftsForDate(dateStr);
-                      // Find all staff who have a work segment at this store on this day
-                      const storeShifts = dayShifts.filter(shift => 
-                        shift.type === "work" && 
-                        shift.segments?.some(seg => seg.store === store)
-                      );
+                {["神戸", "元町", "六甲"].map((store) => {
+                  // Calculate Averages for this store
+                  let totalAllVisits = 0;
+                  let totalDebutedVisits = 0;
+                  const storeDaysCount = actualMonthDays.length;
 
-                      return (
-                        <td 
-                          key={dateStr} 
-                          className="border-b border-r border-slate-200 p-1 align-top min-h-[60px] max-w-[85px]"
-                        >
-                          <div className="h-full min-h-[50px] flex flex-col gap-1 p-0.5">
-                            {storeShifts.map(shift => {
-                              // Find specifically the segments for this store
-                              const segments = shift.segments?.filter(seg => seg.store === store) || [];
-                              return (
-                                <div 
-                                  key={shift.id} 
-                                  className={`p-1 rounded border text-[9px] leading-tight transition-all text-left bg-white
-                                    ${isReadOnly ? '' : 'cursor-pointer hover:ring-1 hover:ring-slate-400'}
-                                    ${getStoreBadgeClasses(store).replace('bg-', 'border-').replace('100', '200')}
-                                  `}
-                                  onClick={() => handleEditShift(shift)}
-                                >
-                                  <div className="font-bold truncate text-[10px] mb-0.5 text-slate-700">{shift.staff_name}</div>
-                                  {segments.map((seg, idx) => (
-                                    <div key={idx} className="text-slate-500 font-mono">
-                                      {seg.start_time}-{seg.end_time}
-                                    </div>
-                                  ))}
-                                </div>
-                              );
-                            })}
-                            {storeShifts.length === 0 && !isReadOnly && (
-                              <div 
-                                className="w-full h-full min-h-[40px] opacity-0 hover:opacity-100 flex items-center justify-center text-slate-300 cursor-pointer rounded hover:bg-slate-50"
-                                onClick={() => handleAddShift(dateStr)}
-                              >
-                                <Plus size={14} />
-                              </div>
-                            )}
+                  actualMonthDays.forEach(day => {
+                    const dateStr = format(day, "yyyy-MM-dd");
+                    const dayShifts = getShiftsForDate(dateStr);
+                    const storeShifts = dayShifts.filter(shift => 
+                      shift.type === "work" && 
+                      shift.segments?.some(seg => seg.store === store)
+                    );
+                    
+                    totalAllVisits += storeShifts.length;
+                    
+                    const debutedCount = storeShifts.filter(s => {
+                      const staff = staffList.find(sl => sl.id === s.staff_id);
+                      return staff && !staff.is_trainee;
+                    }).length;
+                    
+                    totalDebutedVisits += debutedCount;
+                  });
+
+                  const avgAll = (totalAllVisits / storeDaysCount).toFixed(1);
+                  const avgDebuted = (totalDebutedVisits / storeDaysCount).toFixed(1);
+
+                  return (
+                    <tr key={store} className="hover:bg-slate-50/50">
+                      <td className="sticky left-0 bg-white p-4 border-b border-r border-slate-200 z-10 text-left shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                        <div className="flex flex-col">
+                          <span className="font-black text-slate-800 text-sm mb-2">{store}</span>
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center bg-slate-50 px-2 py-1 rounded text-[10px] border border-slate-100">
+                              <span className="text-slate-500 font-bold">全スタッフ平均</span>
+                              <span className="font-black text-slate-900">{avgAll}人</span>
+                            </div>
+                            <div className="flex justify-between items-center bg-blue-50 px-2 py-1 rounded text-[10px] border border-blue-100">
+                              <span className="text-blue-600 font-bold">デビュー済み平均</span>
+                              <span className="font-black text-blue-900">{avgDebuted}人</span>
+                            </div>
                           </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                        </div>
+                      </td>
+                      {actualMonthDays.map((day) => {
+                        const dateStr = format(day, "yyyy-MM-dd");
+                        const dayShifts = getShiftsForDate(dateStr);
+                        const storeShifts = dayShifts.filter(shift => 
+                          shift.type === "work" && 
+                          shift.segments?.some(seg => seg.store === store)
+                        );
+
+                        return (
+                          <td 
+                            key={dateStr} 
+                            className="border-b border-r border-slate-200 p-1 align-top min-h-[60px] max-w-[85px]"
+                          >
+                            <div className="h-full min-h-[50px] flex flex-col gap-1 p-0.5">
+                              {storeShifts.map(shift => {
+                                const segments = shift.segments?.filter(seg => seg.store === store) || [];
+                                const isTrainee = staffList.find(sl => sl.id === shift.staff_id)?.is_trainee;
+                                
+                                return (
+                                  <div 
+                                    key={shift.id} 
+                                    className={`p-1 rounded border text-[9px] leading-tight transition-all text-left bg-white
+                                      ${isReadOnly ? '' : 'cursor-pointer hover:ring-1 hover:ring-slate-400'}
+                                      ${isTrainee ? 'border-dashed border-slate-300 opacity-80' : getStoreBadgeClasses(store).replace('bg-', 'border-').replace('100', '200')}
+                                    `}
+                                    onClick={() => handleEditShift(shift)}
+                                  >
+                                    <div className="font-bold truncate text-[10px] mb-0.5 text-slate-700 flex items-center gap-1">
+                                      {shift.staff_name}
+                                      {isTrainee && <span className="text-[8px] bg-slate-100 px-1 rounded text-slate-400 font-black">新人</span>}
+                                    </div>
+                                    {segments.map((seg, idx) => (
+                                      <div key={idx} className="text-slate-500 font-mono">
+                                        {seg.start_time}-{seg.end_time}
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })}
+                              {storeShifts.length === 0 && !isReadOnly && (
+                                <div 
+                                  className="w-full h-full min-h-[40px] opacity-0 hover:opacity-100 flex items-center justify-center text-slate-300 cursor-pointer rounded hover:bg-slate-50"
+                                  onClick={() => handleAddShift(dateStr)}
+                                >
+                                  <Plus size={14} />
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

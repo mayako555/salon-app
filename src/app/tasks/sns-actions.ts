@@ -39,10 +39,15 @@ export async function getDailySNSPosts(date: string): Promise<SNSPost[]> {
     const colRef = collection(db, SNS_POSTS_COLLECTION);
     const q = query(colRef, where("target_date", "==", date));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as SNSPost[];
+    return snapshot.docs.map(d => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        created_at: data.created_at?.toMillis?.() || data.created_at || null,
+        updated_at: data.updated_at?.toMillis?.() || data.updated_at || null
+      };
+    }) as SNSPost[];
   } catch (error) {
     console.error("Error fetching SNS posts:", error);
     return [];

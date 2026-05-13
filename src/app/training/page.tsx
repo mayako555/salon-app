@@ -36,7 +36,7 @@ export default function TrainingDashboard() {
         getCurriculum()
       ]);
       
-      setStaff(sList.filter(s => s.is_active)); // Show all active staff for now
+      setStaff(sList.filter(s => s.is_active && s.is_trainee)); // Show only active trainees
       setCurriculum(cList);
       
       const pMap: Record<string, StaffTrainingProgress[]> = {};
