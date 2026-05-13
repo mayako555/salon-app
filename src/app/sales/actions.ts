@@ -194,7 +194,7 @@ export async function addCheckout(formData: FormData) {
         notes: "会計時に自動登録されました"
       });
       if (newCustomerRes.success) {
-        customerId = newCustomerRes.id;
+        customerId = newCustomerRes.id || null;
       }
     }
 
