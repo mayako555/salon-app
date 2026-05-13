@@ -244,7 +244,7 @@ export default function TransportationPage() {
                       
                       <div className="bg-slate-50 p-4 rounded-2xl group-hover:bg-blue-50/50 transition-colors">
                         <p className="text-sm text-slate-600 font-bold line-clamp-2">
-                          {item.target_details?.context || item.details || "詳細なし"}
+                          {item.target_details?.context || (item as any).details || item.notes || "詳細なし"}
                         </p>
                       </div>
 
