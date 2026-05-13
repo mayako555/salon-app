@@ -102,7 +102,7 @@ export default function AdvancedCharts() {
                 <Tooltip 
                   cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
-                  formatter={(value: number, name: string, props: any) => {
+                  formatter={(value: any, name: any, props: any) => {
                     const data = props.payload;
                     if (name === "通常売上") {
                       return [`¥${value.toLocaleString()} (単価: ¥${(data.avgRegular || 0).toLocaleString()})`, name];
@@ -352,11 +352,11 @@ export default function AdvancedCharts() {
                   tick={{ fontSize: 10, fill: '#94a3b8' }}
                   tickFormatter={(value) => `¥${(value / 10000).toLocaleString()}万`}
                 />
-                <Tooltip 
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
-                  formatter={(value: number) => [`¥${value.toLocaleString()}`, ""]}
-                />
+                  <Tooltip 
+                    cursor={{ fill: '#f8fafc' }}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
+                    formatter={(value: any) => [`¥${value?.toLocaleString()}`, ""]}
+                  />
                 <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '20px' }} />
                 
                 <Bar name="六甲:通常" dataKey="stores.六甲.regular" stackId="rokko" fill="#10b981" />
