@@ -14,6 +14,7 @@ export default function AttendanceScannerPage() {
   const [status, setStatus] = useState<"idle" | "scanning" | "success" | "error">("idle");
   const [message, setMessage] = useState<string>("");
   const [staffName, setStaffName] = useState<string>("");
+  const [actionType, setActionType] = useState<"IN" | "OUT" | null>(null);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const scannerRef = useRef<any>(null);
 
