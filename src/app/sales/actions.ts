@@ -331,7 +331,7 @@ export async function updateCheckout(id: string, formData: FormData) {
         notes: "会計更新時に自動登録されました"
       });
       if (newCustomerRes.success) {
-        customerId = newCustomerRes.id;
+        customerId = newCustomerRes.id || null;
       }
     }
 

@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { LogOut, User, LayoutDashboard, Users, Receipt, Calendar, Database, Settings, Train } from "lucide-react";
+import { LogOut, User, LayoutDashboard, Users, Receipt, Calendar, Database, Settings, Train, Clock, ClipboardPaste } from "lucide-react";
 import Link from "next/link";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
@@ -46,7 +46,9 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
     { name: "シフト確認", href: "/staff-portal/shifts", icon: Calendar },
     ...(isAdminOrManager ? [
       { name: "メニュー・商品設定", href: "/staff-portal/sales/master", icon: Database },
+      { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste },
     ] : []),
+    { name: "タイムカード", href: "/attendance", icon: Clock },
     { name: "交通費申請", href: "/staff-portal/transportation", icon: Train },
   ];
 

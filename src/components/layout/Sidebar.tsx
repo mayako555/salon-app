@@ -17,7 +17,8 @@ import {
   QrCode,
   Database,
   BookOpen,
-  GraduationCap
+  GraduationCap,
+  ClipboardPaste
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -41,6 +42,7 @@ const managementNav = [
   { name: "監査ログ", href: "/audit", icon: Settings, role: "admin" },
   { name: "打刻スキャナー", href: "/attendance/scanner", icon: QrCode, role: "admin" },
   { name: "新人教育", href: "/training", icon: GraduationCap, role: "staff" },
+  { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste, role: "manager" },
 ];
 
 const staffNav = [
