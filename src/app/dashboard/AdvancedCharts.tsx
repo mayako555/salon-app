@@ -29,7 +29,7 @@ export default function AdvancedCharts() {
     async function load() {
       try {
         const res = await getAdvancedAnalytics();
-        if (res.success) {
+        if (res.success && res.data) {
           setData(res.data);
         } else {
           console.error("Analytics fetch failed:", res.error);

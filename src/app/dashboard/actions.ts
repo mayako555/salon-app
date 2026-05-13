@@ -41,6 +41,9 @@ export async function getDashboardStats() {
       where("date", "<=", `${currentMonthPrefix}-31`)
     );
     const monthlySalesSnap = await getDocs(monthlySalesQuery);
+    let monthlyTotal = 0;
+    let monthlyMinimoTotal = 0;
+    let monthlyRegularTotal = 0;
     let monthlyMinimoVisits = 0;
     let monthlyRegularVisits = 0;
     
@@ -132,7 +135,7 @@ export async function getDashboardStats() {
   }
 }
 
-export async function getAdvancedAnalytics() {
+export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?: any[]; error?: string }> {
   try {
     const now = new Date();
     const months = Array.from({ length: 6 }, (_, i) => {
