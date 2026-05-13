@@ -17,17 +17,17 @@ export async function importCustomersFromSalonBoard(customers: any[]) {
       const kanaParts = (c.name_kana || "").split(/\s+/);
 
       batch.set(newDocRef, {
-        name: c.name,
+        name: c.name || "",
         last_name: kanjiParts[0] || "",
         first_name: kanjiParts.slice(1).join(" ") || "",
-        name_kana: c.name_kana,
+        name_kana: c.name_kana || "",
         last_name_kana: kanaParts[0] || "",
         first_name_kana: kanaParts.slice(1).join(" ") || "",
         customer_no: c.customer_no || "",
         gender: c.gender === "男性" ? "male" : "female",
-        occupation: c.occupation !== "-" ? c.occupation : "",
+        occupation: c.occupation && c.occupation !== "-" ? c.occupation : "",
         visit_count: parseInt(c.visit_count) || 0,
-        last_visit_date: c.last_visit_date !== "-" ? c.last_visit_date : null,
+        last_visit_date: c.last_visit_date && c.last_visit_date !== "-" ? c.last_visit_date : null,
         phone: "", // Missing from list view
         allergies: [],
         has_allergy: false,
