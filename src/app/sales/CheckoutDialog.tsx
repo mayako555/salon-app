@@ -15,6 +15,11 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// ひらがなをカタカナに自動変換するヘルパー関数
+const toKatakana = (str: string) => {
+  return str.replace(/[\u3041-\u3096]/g, match => String.fromCharCode(match.charCodeAt(0) + 0x60));
+};
+
 export default function CheckoutDialog({ 
   defaultStaffName = "", 
   defaultStoreName = "六甲",
@@ -32,6 +37,7 @@ export default function CheckoutDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Selection state
+  const [majorTab, setMajorTab] = useState<string>('メニュー');
   const [tab, setTab] = useState<string>('アイブロウメニュー');
   const [menuSearch, setMenuSearch] = useState("");
 
@@ -47,7 +53,8 @@ export default function CheckoutDialog({
   // States for live fee calculation
   const [techSales, setTechSales] = useState(initialData?.tech_sales || 0);
   const [productSales, setProductSales] = useState(initialData?.product_sales || 0);
-  const [route, setRoute] = useState(initialData?.reservation_route || "ホットペッパーネット");
+  const [discount, setDiscount] = useState(initialData?.discount || 0);
+  const [route, setRoute] = useState(initialData?.reservation_route || "電話（HOT PEPPER Beauty）");
   const [portalFee, setPortalFee] = useState(initialData?.portal_fee || 0);
 
   // Staff list state
@@ -60,6 +67,7 @@ export default function CheckoutDialog({
 
   // Menu and Option states to trigger price changes
   const [menuCourse, setMenuCourse] = useState(initialData?.menu_course || "");
+  const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
   const [noNextBooking, setNoNextBooking] = useState(!initialData?.next_booking_date);
 
   useEffect(() => {
@@ -88,9 +96,87 @@ export default function CheckoutDialog({
   }, [isOpen, selectedStore, defaultStaffName, initialData]);
 
   const handleItemSelect = (item: SalesMasterItem) => {
-    setMenuCourse(item.name);
-    setTechSales(item.price);
-    handleFeeCalculation(route, item.price + productSales);
+    const currentMenus = menuCourse ? menuCourse.split(' + ') : [];
+    const newMenus = [...currentMenus, item.name];
+    setMenuCourse(newMenus.join(' + '));
+    
+    // Calculate new totals from all items
+    let newTechPrice = 0;
+    let newProductPrice = 0;
+    let newDiscount = 0;
+    
+    newMenus.forEach(n => {
+      const masterItem = storeMasterData.find(m => m.name === n);
+      const isProduct = masterItem?.category === '店販' || masterItem?.itemType === 'product';
+      const isDiscount = masterItem?.itemType === 'discount' || masterItem?.category === '割引';
+      
+      const p = n === item.name && customPrices[n] === undefined ? item.price : (customPrices[n] !== undefined ? customPrices[n] : (masterItem?.price || 0));
+      
+      if (isProduct) newProductPrice += p;
+      else if (isDiscount) newDiscount += p;
+      else newTechPrice += p;
+    });
+    
+    setTechSales(newTechPrice);
+    setProductSales(newProductPrice);
+    setDiscount(newDiscount);
+    handleFeeCalculation(route, newTechPrice + newProductPrice - newDiscount);
+  };
+
+  const handleRemoveItem = (index: number) => {
+    const currentMenus = menuCourse ? menuCourse.split(' + ') : [];
+    const removedName = currentMenus[index];
+    const newMenus = [...currentMenus];
+    newMenus.splice(index, 1);
+    
+    if (!newMenus.includes(removedName)) {
+      setCustomPrices(prev => {
+        const next = { ...prev };
+        delete next[removedName];
+        return next;
+      });
+    }
+
+    let newTechPrice = 0;
+    let newProductPrice = 0;
+    
+    newMenus.forEach(n => {
+      const masterItem = storeMasterData.find(m => m.name === n);
+      const isProduct = masterItem?.category === '店販' || masterItem?.itemType === 'product';
+      const defaultPrice = masterItem?.price || 0;
+      const p = customPrices[n] !== undefined ? customPrices[n] : defaultPrice;
+
+      if (isProduct) newProductPrice += p;
+      else newTechPrice += p;
+    });
+    
+    setMenuCourse(newMenus.join(' + '));
+    setTechSales(newTechPrice);
+    setProductSales(newProductPrice);
+    handleFeeCalculation(route, newTechPrice + newProductPrice);
+  };
+
+  const handlePriceChange = (name: string, newPrice: number) => {
+    setCustomPrices(prev => ({ ...prev, [name]: newPrice }));
+    const currentMenus = menuCourse ? menuCourse.split(' + ') : [];
+    let newTechPrice = 0;
+    let newProductPrice = 0;
+    let newDiscount = 0;
+    currentMenus.forEach(n => {
+      const masterItem = storeMasterData.find(m => m.name === n);
+      const isProduct = masterItem?.category === '店販' || masterItem?.itemType === 'product';
+      const isDiscount = masterItem?.itemType === 'discount' || masterItem?.category === '割引';
+      const defaultPrice = masterItem?.price || 0;
+      const p = n === name ? newPrice : (customPrices[n] !== undefined ? customPrices[n] : defaultPrice);
+      
+      if (isProduct) newProductPrice += p;
+      else if (isDiscount) newDiscount += p;
+      else newTechPrice += p;
+    });
+    setTechSales(newTechPrice);
+    setProductSales(newProductPrice);
+    setDiscount(newDiscount);
+    handleFeeCalculation(route, newTechPrice + newProductPrice - newDiscount);
   };
 
   const handleFeeCalculation = (currentRoute: string, salesTotal: number) => {
@@ -151,16 +237,56 @@ export default function CheckoutDialog({
   };
 
   const filteredMaster = storeMasterData.filter(item => {
+    if (item.isActive === false) return false;
     if (tab === 'アイブロウメニュー') if (item.category !== 'アイブロウメニュー') return false;
     if (tab === 'マツエクメニュー') if (item.category !== 'マツエクメニュー') return false;
     if (tab === 'まつ毛パーマメニュー') if (item.category !== 'まつ毛パーマメニュー') return false;
     if (tab === '毛質変更') if (item.category !== '毛質変更') return false;
     if (tab === 'オプション・その他') if (item.category !== 'その他オプション' && item.category !== 'その他') return false;
     if (tab === '付け替えオフ') if (item.category !== '付け替えオフ') return false;
-    if (tab === 'クーポン') if (item.itemType !== 'coupon' && item.itemType !== 'messageCoupon') return false;
+    if (tab === 'クーポン') if (item.itemType !== 'coupon') return false;
+    if (tab === 'メッセージクーポン') if (item.itemType !== 'messageCoupon') return false;
+    if (tab === '割引') if (item.itemType !== 'discount' && item.category !== '割引') return false;
+    if (tab === '店販') if (item.itemType !== 'product' && item.category !== '店販') return false;
     if (menuSearch) return item.name.includes(menuSearch) || item.category.includes(menuSearch);
     return true;
+  }).sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+
+  const allTabs = (selectedStore === '六甲' || selectedStore === '神戸') 
+    ? ['マツエクメニュー', 'まつ毛パーマメニュー', 'アイブロウメニュー', '毛質変更', 'オプション・その他', '付け替えオフ', 'クーポン', 'メッセージクーポン', '店販']
+    : ['アイブロウメニュー', 'マツエクメニュー', 'まつ毛パーマメニュー', '毛質変更', 'オプション・その他', '付け替えオフ', 'クーポン', 'メッセージクーポン', '店販'];
+
+  const majorTabs = ['メニュー', 'オプション', '店販', '割引・クーポン'];
+  const majorTabMapping: Record<string, string[]> = {
+    'メニュー': ['マツエクメニュー', 'まつ毛パーマメニュー', 'アイブロウメニュー', '付け替えオフ'],
+    'オプション': ['毛質変更', 'オプション・その他'],
+    '店販': ['店販'],
+    '割引・クーポン': ['クーポン', 'メッセージクーポン', '割引']
+  };
+
+  const tabs = allTabs.filter(t => majorTabMapping[majorTab]?.includes(t));
+
+  // 大分類が切り替わった際に、小分類の初期値を設定する
+  useEffect(() => {
+    const availableTabs = majorTabMapping[majorTab] || [];
+    if (availableTabs.length > 0 && !availableTabs.includes(tab)) {
+      setTab(availableTabs[0]);
+    }
+  }, [majorTab]);
+
+  // 選択済みのメニュー情報を取得
+  const currentMenus = menuCourse ? menuCourse.split(' + ') : [];
+  const selectedItemsData = currentMenus.map(name => {
+    const master = storeMasterData.find(item => item.name === name) || { id: name, name, category: '手入力', price: 0, itemType: 'menu' };
+    const price = customPrices[name] !== undefined ? customPrices[name] : master.price;
+    return { ...master, price };
   });
+
+  // 予約経路マスタの取得（マスタ未登録の場合は初期リストを使用）
+  const routeMaster = storeMasterData.filter(m => m.itemType === 'reservationRoute');
+  const defaultRoutes = ['電話（自社）', '電話（HOT PEPPER Beauty）', '直接来店', 'ミニモ', '次回予約', 'スレッズ', '公式LINE', '自社サイト', 'Instagram'];
+  const routes = routeMaster.length > 0 ? routeMaster.map(m => m.name) : defaultRoutes;
+  const allRoutes = [...new Set([route, ...routes].filter(Boolean))];
 
   return (
     <>
@@ -234,11 +360,11 @@ export default function CheckoutDialog({
                     <div className="grid grid-cols-2 gap-2">
                       <div className="relative">
                         <span className="absolute left-2 top-2.5 text-[10px] text-slate-400 font-bold pointer-events-none">姓カナ</span>
-                        <input type="text" name="last_name_kana" autoComplete="off" placeholder="ヤマダ" value={lastNameKana} onChange={(e) => { setLastNameKana(e.target.value); setShowCustomerResults(true); if (selectedCustomer) setSelectedCustomer(null); }} onFocus={() => setShowCustomerResults(true)} className="w-full h-9 pl-10 pr-3 border border-slate-300 rounded-md text-[11px] font-bold bg-slate-50" />
+                        <input type="text" name="last_name_kana" autoComplete="off" placeholder="ヤマダ" value={lastNameKana} onChange={(e) => { setLastNameKana(toKatakana(e.target.value)); setShowCustomerResults(true); if (selectedCustomer) setSelectedCustomer(null); }} onFocus={() => setShowCustomerResults(true)} className="w-full h-9 pl-10 pr-3 border border-slate-300 rounded-md text-[11px] font-bold bg-slate-50" />
                       </div>
                       <div className="relative">
                         <span className="absolute left-2 top-2.5 text-[10px] text-slate-400 font-bold pointer-events-none">名カナ</span>
-                        <input type="text" name="first_name_kana" autoComplete="off" placeholder="ハナコ" value={firstNameKana} onChange={(e) => { setFirstNameKana(e.target.value); setShowCustomerResults(true); if (selectedCustomer) setSelectedCustomer(null); }} onFocus={() => setShowCustomerResults(true)} className="w-full h-9 pl-10 pr-3 border border-slate-300 rounded-md text-[11px] font-bold bg-slate-50" />
+                        <input type="text" name="first_name_kana" autoComplete="off" placeholder="ハナコ" value={firstNameKana} onChange={(e) => { setFirstNameKana(toKatakana(e.target.value)); setShowCustomerResults(true); if (selectedCustomer) setSelectedCustomer(null); }} onFocus={() => setShowCustomerResults(true)} className="w-full h-9 pl-10 pr-3 border border-slate-300 rounded-md text-[11px] font-bold bg-slate-50" />
                       </div>
                     </div>
                     <input type="hidden" name="customer_id" value={selectedCustomer?.id || ""} />
@@ -270,15 +396,84 @@ export default function CheckoutDialog({
               </div>
 
               <div className="border-t border-slate-100 pt-4">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-slate-700">メニュー・クーポン選択</label>
-                  <div className="flex bg-slate-100 p-1 rounded-lg gap-1 overflow-x-auto no-scrollbar">
-                    {['アイブロウメニュー', 'マツエクメニュー', 'まつ毛パーマメニュー', '毛質変更', 'オプション・その他', '付け替えオフ', 'クーポン'].map(cat => (
-                      <button key={cat} type="button" onClick={() => setTab(cat)} className={cn("px-3 py-1.5 rounded-md text-[10px] font-black transition-all whitespace-nowrap", tab === cat ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700")}>
-                        {cat.replace('メニュー', '')}
+                <label className="block text-sm font-medium text-slate-700 mb-2">選択済みメニュー・クーポン</label>
+                <div className="bg-slate-50 border border-slate-200 rounded-lg mb-4 overflow-hidden">
+                  {selectedItemsData.length === 0 ? (
+                    <div className="p-4 text-center text-slate-400 text-xs font-bold">メニューが選択されていません</div>
+                  ) : (
+                    <table className="w-full text-left text-[10px] sm:text-xs">
+                      <thead className="bg-slate-100 text-slate-500 font-bold border-b border-slate-200">
+                        <tr>
+                          <th className="py-2 px-3 whitespace-nowrap">カテゴリ</th>
+                          <th className="py-2 px-3">メニュー・割引・オプション</th>
+                          <th className="py-2 px-3 text-right whitespace-nowrap">金額</th>
+                          <th className="py-2 px-2 text-center w-10"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {selectedItemsData.map((item, idx) => (
+                          <tr key={idx} className="bg-white hover:bg-slate-50">
+                            <td className="py-2 px-3 text-slate-500 truncate max-w-[80px] sm:max-w-[120px]">{item.category}</td>
+                            <td className="py-2 px-3 font-bold text-slate-800">{item.name}</td>
+                            <td className="py-2 px-3 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1 text-emerald-600 font-bold">
+                                <span>{item.itemType === 'discount' || item.category === '割引' ? '-¥' : '¥'}</span>
+                                <input 
+                                  type="number" 
+                                  value={item.price}
+                                  onChange={(e) => handlePriceChange(item.name, parseInt(e.target.value) || 0)}
+                                  className="w-[72px] sm:w-20 h-7 text-right px-1 border border-slate-200 rounded text-sm font-bold bg-white focus:ring-1 focus:ring-emerald-500"
+                                />
+                              </div>
+                            </td>
+                            <td className="py-2 px-2 text-center">
+                              <button 
+                                type="button"
+                                onClick={() => handleRemoveItem(idx)}
+                                className="text-slate-300 hover:text-rose-500 transition-colors p-1"
+                              >
+                                <X size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  <div className="bg-slate-100 px-4 py-2 flex justify-between items-center border-t border-slate-200">
+                    <span className="text-xs font-bold text-slate-600">合算 小計（技術・店販）</span>
+                    <span className="text-sm font-black text-slate-800">¥{(techSales + productSales - discount).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3 mb-4">
+                  <div className="flex bg-slate-200/50 p-1 rounded-xl gap-1">
+                    {majorTabs.map(m => (
+                      <button 
+                        key={m} 
+                        type="button" 
+                        onClick={() => setMajorTab(m)}
+                        className={cn(
+                          "flex-1 py-2 text-xs font-black rounded-lg transition-all",
+                          majorTab === m 
+                            ? "bg-white text-blue-600 shadow-sm" 
+                            : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
+                        )}
+                      >
+                        {m}
                       </button>
                     ))}
                   </div>
+
+                  {majorTab !== '店販' && tabs.length > 1 && (
+                    <div className="flex bg-slate-100 p-1 rounded-lg gap-1 overflow-x-auto no-scrollbar">
+                      {tabs.map(cat => (
+                        <button key={cat} type="button" onClick={() => setTab(cat)} className={cn("px-3 py-1.5 rounded-md text-[10px] font-black transition-all whitespace-nowrap", tab === cat ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700")}>
+                          {cat.replace('メニュー', '')}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="bg-slate-50 border border-slate-200 rounded-lg overflow-hidden flex flex-col h-[280px]">
                   <div className="p-2 bg-white border-b border-slate-200">
@@ -289,28 +484,25 @@ export default function CheckoutDialog({
                   </div>
                   <div className="overflow-y-auto p-2 space-y-1">
                     {filteredMaster.map(item => (
-                      <button key={item.id} type="button" onClick={() => handleItemSelect(item)} className={`w-full text-left p-3 rounded-lg border transition-all flex justify-between items-center ${menuCourse === item.name ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-white border-slate-100 hover:border-slate-200'}`}>
+                      <button key={item.id} type="button" onClick={() => handleItemSelect(item)} className="w-full text-left p-3 rounded-lg border bg-white border-slate-200 hover:border-blue-200 hover:shadow-sm transition-all flex justify-between items-center">
                         <div className="flex flex-col">
                           <span className="text-xs text-slate-400 font-medium mb-0.5">{item.category}</span>
                           <span className="text-sm font-semibold text-slate-700">{item.name}</span>
                         </div>
-                        <span className={`text-sm font-bold ${menuCourse === item.name ? 'text-emerald-700' : 'text-slate-500'}`}>¥{item.price.toLocaleString()}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-bold text-slate-600">¥{item.price.toLocaleString()}</span>
+                          <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center">
+                            <Plus size={14} />
+                          </div>
+                        </div>
                       </button>
                     ))}
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-100 pt-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">メニュー名（編集可）</label>
-                  <input required type="text" name="menu_course" value={menuCourse} onChange={(e) => setMenuCourse(e.target.value)} className="w-full h-10 px-3 border border-slate-300 rounded-md text-sm font-semibold" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">毛質・オプション備考</label>
-                  <input type="text" name="hair_material" placeholder="セーブル / カラー等" className="w-full h-10 px-3 border border-slate-300 rounded-md text-sm" />
-                </div>
-              </div>
+              <input type="hidden" name="menu_course" value={menuCourse} />
+              <input type="hidden" name="hair_material" value="" />
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-slate-100 pt-4">
                 <div className="col-span-2">
@@ -327,14 +519,23 @@ export default function CheckoutDialog({
                 </div>
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-sm font-medium text-slate-700 mb-1 text-rose-600">店舗割引</label>
-                  <input required min="0" type="number" name="discount" defaultValue={initialData?.discount || 0} className="w-full h-9 px-3 border border-rose-200 rounded-md text-sm" />
+                  <input required min="0" type="number" name="discount" value={discount} onChange={(e) => {
+                    const v = parseInt(e.target.value) || 0;
+                    setDiscount(v);
+                    handleFeeCalculation(route, techSales + productSales - v);
+                  }} className="w-full h-9 px-3 border border-rose-200 rounded-md text-sm font-bold text-rose-700" />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-slate-700 mb-1">予約経路</label>
-                  <input required type="text" name="reservation_route" list="reservation-routes" value={route} onChange={(e) => { const r = e.target.value; setRoute(r); handleFeeCalculation(r, techSales + productSales); }} className="w-full h-9 px-3 border border-slate-300 rounded-md text-sm" />
-                  <datalist id="reservation-routes">
-                    {['ホットペッパーネット', '電話', '次回予約', 'ミニモ', 'インスタ', 'その他'].map(r => <option key={r} value={r} />)}
-                  </datalist>
+                  <select 
+                    required 
+                    name="reservation_route" 
+                    value={route} 
+                    onChange={(e) => { const r = e.target.value; setRoute(r); handleFeeCalculation(r, techSales + productSales); }} 
+                    className="w-full h-9 px-3 border border-slate-300 rounded-md text-sm bg-white"
+                  >
+                    {allRoutes.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-slate-700 mb-1">支払方法</label>

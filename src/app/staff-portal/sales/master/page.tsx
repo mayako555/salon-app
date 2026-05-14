@@ -31,7 +31,8 @@ import {
   Zap,
   MoreVertical,
   ChevronRight,
-  Clock
+  Clock,
+  Tag
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -180,6 +181,7 @@ export default function MasterManagementPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [storeFilter, setStoreFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [editingItem, setEditingItem] = useState<Partial<SalesMasterItem> | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
@@ -328,11 +330,30 @@ export default function MasterManagementPage() {
     }
   };
 
-  const filteredItems = items.filter(item => 
-    item.name.toLowerCase().includes(search.toLowerCase()) ||
-    item.category.toLowerCase().includes(search.toLowerCase()) ||
-    item.hpbName?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredItems = items.filter(item => {
+    if (storeFilter !== "all" && item.store !== storeFilter) return false;
+    
+    if (typeFilter !== "all") {
+      if (typeFilter === "menu") {
+        const menuTypes = ["menu", "coupon", "messageCoupon", "option", "discount", "fee"];
+        if (!menuTypes.includes(item.itemType)) return false;
+      } else if (typeFilter === "product") {
+        if (item.itemType !== "product") return false;
+      } else if (typeFilter === "reservationRoute") {
+        if (item.itemType !== "reservationRoute") return false;
+      }
+    }
+
+    if (search) {
+      const s = search.toLowerCase();
+      return (
+        item.name.toLowerCase().includes(s) ||
+        item.category?.toLowerCase().includes(s) ||
+        item.hpbName?.toLowerCase().includes(s)
+      );
+    }
+    return true;
+  }).sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8 bg-slate-50/50 min-h-screen">
@@ -414,13 +435,60 @@ export default function MasterManagementPage() {
             </DialogContent>
           </Dialog>
 
-          <Button onClick={() => {
-            setEditingItem({ store: "共通", itemType: "menu", isActive: true });
-            setIsDialogOpen(true);
-          }} className="rounded-xl bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200 font-black text-white px-6">
-            <Plus size={18} className="mr-1" /> 新規作成
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => {
+              setEditingItem({ store: "共通", itemType: "menu", isActive: true });
+              setTypeFilter("menu");
+              setIsDialogOpen(true);
+            }} className="rounded-xl bg-blue-600 hover:bg-blue-700 shadow-md font-black text-white px-4 h-11">
+              <Plus size={16} className="mr-1" /> メニュー追加
+            </Button>
+            <Button onClick={() => {
+              setEditingItem({ store: "共通", itemType: "product", category: "店販", isActive: true });
+              setTypeFilter("product");
+              setIsDialogOpen(true);
+            }} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 shadow-md font-black text-white px-4 h-11">
+              <Zap size={16} className="mr-1" /> 商品追加
+            </Button>
+            <Button onClick={() => {
+              setEditingItem({ store: "共通", itemType: "reservationRoute", category: "予約経路", price: 0, isActive: true });
+              setTypeFilter("reservationRoute");
+              setIsDialogOpen(true);
+            }} className="rounded-xl bg-amber-600 hover:bg-amber-700 shadow-md font-black text-white px-4 h-11">
+              <Database size={16} className="mr-1" /> 予約経路追加
+            </Button>
+            <Button onClick={() => {
+              setEditingItem({ store: "共通", itemType: "discount", category: "割引", isActive: true });
+              setTypeFilter("menu");
+              setIsDialogOpen(true);
+            }} className="rounded-xl bg-rose-500 hover:bg-rose-600 shadow-md font-black text-white px-4 h-11">
+              <Tag size={16} className="mr-1" /> 割引追加
+            </Button>
+          </div>
         </div>
+      </div>
+
+      <div className="flex gap-2 mb-6 bg-slate-100 p-1 rounded-2xl w-fit">
+        {[
+          { id: "all", label: "すべて", icon: Database },
+          { id: "menu", label: "メニュー・クーポン", icon: Plus },
+          { id: "product", label: "店販商品", icon: Zap },
+          { id: "reservationRoute", label: "予約経路", icon: ArrowUpDown },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setTypeFilter(tab.id)}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-black transition-all",
+              typeFilter === tab.id 
+                ? "bg-white text-slate-900 shadow-sm" 
+                : "text-slate-500 hover:text-slate-700"
+            )}
+          >
+            <tab.icon size={14} />
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -514,7 +582,15 @@ export default function MasterManagementPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl rounded-3xl border-none shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black tracking-tight">{editingItem?.id ? "アイテムを編集" : "新規アイテム作成"}</DialogTitle>
+            <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-2">
+              {editingItem?.itemType === 'product' ? <Zap className="text-emerald-500" /> : 
+               editingItem?.itemType === 'reservationRoute' ? <Database className="text-amber-500" /> : 
+               <Plus className="text-blue-500" />}
+              {editingItem?.id ? "アイテムを編集" : 
+               editingItem?.itemType === 'product' ? "店販商品を新規作成" :
+               editingItem?.itemType === 'reservationRoute' ? "予約経路を新規作成" :
+               "メニューを新規作成"}
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSave} className="space-y-6 py-4">
             <div className="grid grid-cols-2 gap-4">
@@ -531,97 +607,118 @@ export default function MasterManagementPage() {
                   <option value="元町">元町</option>
                 </select>
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Item Type</label>
-                <select 
-                  className="w-full h-12 bg-slate-50 border-none rounded-2xl px-4 font-bold text-sm"
-                  value={editingItem?.itemType}
-                  onChange={(e) => setEditingItem({ ...editingItem!, itemType: e.target.value as any })}
-                >
-                  <option value="menu">通常メニュー</option>
-                  <option value="coupon">クーポン</option>
-                  <option value="messageCoupon">メッセージクーポン</option>
-                  <option value="option">オプション</option>
-                  <option value="discount">割引</option>
-                  <option value="fee">キャンセル料</option>
-                </select>
-              </div>
+              {(editingItem?.itemType === 'menu' || editingItem?.itemType === 'coupon' || editingItem?.itemType === 'messageCoupon' || editingItem?.id) && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Item Type</label>
+                  <select 
+                    className="w-full h-12 bg-slate-50 border-none rounded-2xl px-4 font-bold text-sm"
+                    value={editingItem?.itemType}
+                    onChange={(e) => setEditingItem({ ...editingItem!, itemType: e.target.value as any })}
+                  >
+                    <option value="menu">通常メニュー</option>
+                    <option value="coupon">クーポン</option>
+                    <option value="messageCoupon">メッセージクーポン</option>
+                    <option value="product">店販商品</option>
+                    <option value="option">オプション</option>
+                    <option value="discount">割引</option>
+                    <option value="fee">キャンセル料</option>
+                    <option value="reservationRoute">予約経路</option>
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Name</label>
               <Input 
-                value={editingItem?.name} 
+                value={editingItem?.name || ""} 
                 onChange={(e) => setEditingItem({ ...editingItem!, name: e.target.value })}
                 className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
+                placeholder={editingItem?.itemType === 'reservationRoute' ? "例：ホットペッパー、インスタなど" : "名前を入力"}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Category</label>
-                <select 
-                  className="w-full h-12 bg-slate-50 border-none rounded-2xl px-4 font-bold text-sm"
-                  value={editingItem?.category}
-                  onChange={(e) => setEditingItem({ ...editingItem!, category: e.target.value })}
-                >
-                  <option value="">選択してください</option>
-                  <option value="アイブロウメニュー">アイブロウメニュー</option>
-                  <option value="マツエクメニュー">マツエクメニュー</option>
-                  <option value="まつ毛パーマメニュー">まつ毛パーマメニュー</option>
-                  <option value="毛質変更">毛質変更</option>
-                  <option value="付け替えオフ">付け替えオフ</option>
-                  <option value="その他オプション">その他オプション</option>
-                  <option value="その他">その他</option>
-                </select>
+            {editingItem?.itemType !== 'reservationRoute' && (
+              <div className="grid grid-cols-2 gap-4">
+                {editingItem?.itemType !== 'product' && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Category</label>
+                    <select 
+                      className="w-full h-12 bg-slate-50 border-none rounded-2xl px-4 font-bold text-sm"
+                      value={editingItem?.category}
+                      onChange={(e) => setEditingItem({ ...editingItem!, category: e.target.value })}
+                    >
+                      <option value="">選択してください</option>
+                      <option value="アイブロウメニュー">アイブロウメニュー</option>
+                      <option value="マツエクメニュー">マツエクメニュー</option>
+                      <option value="まつ毛パーマメニュー">まつ毛パーマメニュー</option>
+                      <option value="毛質変更">毛質変更</option>
+                      <option value="付け替えオフ">付け替えオフ</option>
+                      <option value="その他オプション">その他オプション</option>
+                      <option value="店販">店販</option>
+                      <option value="予約経路">予約経路</option>
+                      <option value="その他">その他</option>
+                    </select>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Price</label>
+                  <Input 
+                    type="number"
+                    value={editingItem?.price ?? 0} 
+                    onChange={(e) => setEditingItem({ ...editingItem!, price: parseInt(e.target.value) || 0 })}
+                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Price</label>
-                <Input 
-                  type="number"
-                  value={editingItem?.price} 
-                  onChange={(e) => setEditingItem({ ...editingItem!, price: parseInt(e.target.value) || 0 })}
-                  className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
-                />
-              </div>
-            </div>
+            )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duration (所要時間)</label>
-                <Input 
-                  value={editingItem?.duration} 
-                  onChange={(e) => setEditingItem({ ...editingItem!, duration: e.target.value })}
-                  className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">HPB Name</label>
-                <Input 
-                  value={editingItem?.hpbName} 
-                  onChange={(e) => setEditingItem({ ...editingItem!, hpbName: e.target.value })}
-                  className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
-                />
-              </div>
-            </div>
+            {(editingItem?.itemType === 'menu' || editingItem?.itemType === 'coupon' || editingItem?.itemType === 'messageCoupon') && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  {editingItem?.itemType !== 'reservationRoute' && editingItem?.itemType !== 'discount' && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duration (所要時間)</label>
+                      <Input 
+                        value={editingItem?.duration || ""} 
+                        onChange={(e) => setEditingItem({ ...editingItem!, duration: e.target.value })}
+                        className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
+                        placeholder="例：1時間、90分など"
+                      />
+                    </div>
+                  )}
+                  {editingItem?.itemType !== 'reservationRoute' && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">HPB Name</label>
+                      <Input 
+                        value={editingItem?.hpbName || ""} 
+                        onChange={(e) => setEditingItem({ ...editingItem!, hpbName: e.target.value })}
+                        className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
+                        placeholder="ホットペッパー上の名前"
+                      />
+                    </div>
+                  )}
+                </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Restrictions (制約)</label>
-              <Input 
-                value={editingItem?.restrictions} 
-                onChange={(e) => setEditingItem({ ...editingItem!, restrictions: e.target.value })}
-                className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
-              />
-            </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Restrictions (制約)</label>
+                  <Input 
+                    value={editingItem?.restrictions || ""} 
+                    onChange={(e) => setEditingItem({ ...editingItem!, restrictions: e.target.value })}
+                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Notes</label>
-              <Input 
-                value={editingItem?.notes} 
-                onChange={(e) => setEditingItem({ ...editingItem!, notes: e.target.value })}
-                className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
-              />
-            </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Notes</label>
+                  <Input 
+                    value={editingItem?.notes || ""} 
+                    onChange={(e) => setEditingItem({ ...editingItem!, notes: e.target.value })}
+                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
+                  />
+                </div>
+              </>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

@@ -23,6 +23,7 @@ export default function SalonBoardImportPage() {
   const [parsedData, setParsedData] = useState<any[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [step, setStep] = useState(1); // 1: Paste, 2: Preview
+  const [storeName, setStoreName] = useState("六甲");
 
   const handleParse = () => {
     if (!pasteData.trim()) {
@@ -46,7 +47,8 @@ export default function SalonBoardImportPage() {
           gender: cols[3]?.trim(),
           occupation: cols[4]?.trim(),
           visit_count: cols[5]?.trim(),
-          last_visit_date: cols[6]?.trim()
+          last_visit_date: cols[6]?.trim(),
+          main_store: storeName
         };
       }).filter(Boolean);
 
@@ -68,7 +70,7 @@ export default function SalonBoardImportPage() {
     try {
       const res = await importCustomersFromSalonBoard(parsedData);
       if (res.success) {
-        toast.success(`${res.count}件の顧客を登録しました！`);
+        toast.success(`新規登録: ${res.count}件 / 更新: ${res.updateCount}件 完了しました！`);
         setStep(3);
       } else {
         toast.error(`登録エラー: ${res.error}`);
@@ -139,6 +141,26 @@ export default function SalonBoardImportPage() {
                 </div>
               </CardHeader>
               <CardContent className="p-8">
+                <div className="mb-6">
+                  <label className="text-sm font-bold text-slate-700 block mb-3">取り込み先の店舗を選択してください：</label>
+                  <div className="flex gap-3">
+                    {["六甲", "元町", "神戸"].map((s) => (
+                      <Button
+                        key={s}
+                        variant={storeName === s ? "default" : "outline"}
+                        onClick={() => setStoreName(s)}
+                        className={`h-12 px-6 rounded-xl font-bold transition-all ${
+                          storeName === s 
+                            ? "bg-rose-600 text-white shadow-md shadow-rose-200 hover:bg-rose-700" 
+                            : "text-slate-500 border-slate-200 hover:bg-slate-50"
+                        }`}
+                      >
+                        {s}店
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
                 <Textarea 
                   placeholder="ここにデータを貼り付けてください&#10;例：オカダ カオルコ	岡田 薫子	a-40	女性	-	36	2026/03/18"
                   className="min-h-[300px] rounded-[1.5rem] bg-slate-50 border-none font-mono text-xs p-6 focus-visible:ring-rose-500"
@@ -182,7 +204,14 @@ export default function SalonBoardImportPage() {
                       <tr key={i} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-6 py-4 font-medium text-slate-400">{row.name_kana}</td>
                         <td className="px-6 py-4 font-bold text-slate-900">{row.name}</td>
-                        <td className="px-6 py-4 font-mono text-slate-500 text-xs">{row.customer_no}</td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-slate-500 text-xs">{row.customer_no}</span>
+                            {row.customer_no && row.customer_no.toLowerCase().includes("min") && (
+                              <span className="bg-rose-100 text-rose-600 text-[9px] font-black px-2 py-0.5 rounded-full">ミニモ</span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-6 py-4 text-slate-600">{row.gender}</td>
                         <td className="px-6 py-4 text-slate-600 font-bold">{row.visit_count}回</td>
                         <td className="px-6 py-4 text-slate-400 text-xs">{row.last_visit_date}</td>

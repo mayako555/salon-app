@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getCustomerById, Customer } from "@/lib/customers";
+import { getCustomerById, Customer, updateCustomer, deleteCustomer } from "@/lib/customers";
 import { getCounselingByCustomer, CounselingResponse } from "@/lib/counseling";
 import { getKarteByCustomer, KarteRecord } from "@/lib/karte";
 import { Button } from "@/components/ui/button";
@@ -29,13 +29,13 @@ import {
   CheckCircle2,
   Plus,
   Smartphone,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Trash2
 } from "lucide-react";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 import Link from "next/link";
 import { toast } from "sonner";
-import { updateCustomer } from "@/lib/customers";
 import { 
   Dialog, 
   DialogContent, 
@@ -131,6 +131,21 @@ export default function CustomerDetailPage() {
     setIsSaving(false);
   };
 
+  const handleDeleteCustomer = async () => {
+    if (typeof id !== 'string') return;
+    if (!confirm("本当にこのお客様情報を削除しますか？\n（この操作は取り消せません）")) return;
+    
+    setIsSaving(true);
+    const res = await deleteCustomer(id);
+    if (res.success) {
+      toast.success("お客様情報を削除しました");
+      router.push("/staff-portal/customers");
+    } else {
+      toast.error("削除に失敗しました: " + res.error);
+      setIsSaving(false);
+    }
+  };
+
   const handleShowLinkQr = () => {
     // LINEアプリが直接立ち上がるようにLIFF URLを使用
     const liffId = process.env.NEXT_PUBLIC_LIFF_ID || "2009912937-1KgShdZB";
@@ -179,15 +194,25 @@ export default function CustomerDetailPage() {
         customer.risk_level === 'yellow' ? 'bg-gradient-to-br from-amber-600 to-amber-500' :
         'bg-gradient-to-br from-slate-900 to-slate-800'
       }`}>
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto flex items-center justify-between mb-6">
           <Button 
             variant="ghost" 
-            className="text-white hover:bg-white/10 -ml-2 mb-6"
+            className="text-white hover:bg-white/10 -ml-2"
             onClick={() => router.back()}
           >
             <ChevronLeft size={20} className="mr-1" /> 戻る
           </Button>
+          <Button 
+            variant="ghost" 
+            className="text-white hover:bg-rose-500/20 hover:text-rose-200"
+            onClick={handleDeleteCustomer}
+            disabled={isSaving}
+          >
+            <Trash2 size={16} className="mr-2" /> 削除
+          </Button>
+        </div>
           
+        <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-6">
             <div className="relative">
               <div className="w-24 h-24 rounded-3xl bg-white/20 backdrop-blur-md flex items-center justify-center text-4xl font-black border border-white/30 shadow-2xl">

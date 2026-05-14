@@ -90,7 +90,11 @@ export async function resetSalesMasterData() {
 export async function getStoreMasterData(store: string): Promise<SalesMasterItem[]> {
   try {
     const colRef = collection(db, "sales_master");
-    const q = query(colRef, where("store", "==", store), where("isActive", "==", true));
+    const q = query(
+      colRef, 
+      where("isActive", "==", true),
+      where("store", "in", [store, "共通"])
+    );
     const snapshot = await getDocs(q);
     
     if (snapshot.empty) {

@@ -48,7 +48,8 @@ export default function StaffCustomersPage() {
                          (c.phone || "").includes(search);
     
     if (selectedStore === "すべて") return matchesSearch;
-    return matchesSearch && c.store_name === selectedStore;
+    const store = c.store_name || (c as any).main_store;
+    return matchesSearch && store === selectedStore;
   });
 
   const stores = ["すべて", "神戸", "六甲", "元町"];
@@ -139,9 +140,9 @@ export default function StaffCustomersPage() {
                     <div className="flex items-center gap-1">
                       <Phone size={12} className="text-slate-300" /> {customer.phone}
                     </div>
-                    {customer.store_name && (
+                    {(customer.store_name || (customer as any).main_store) && (
                       <div className="bg-slate-100 text-slate-500 text-[10px] px-1.5 py-0.5 rounded-md font-bold">
-                        {customer.store_name}
+                        {customer.store_name || (customer as any).main_store}
                       </div>
                     )}
                     {customer.latest_counseling && (

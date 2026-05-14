@@ -26,7 +26,9 @@ const ITEM_TYPES = [
   { id: "menu", label: "通常メニュー" },
   { id: "coupon", label: "クーポン" },
   { id: "messageCoupon", label: "メッセージクーポン" },
-  { id: "karteTemplate", label: "カルテテンプレート" }
+  { id: "product", label: "店販商品" },
+  { id: "karteTemplate", label: "カルテテンプレート" },
+  { id: "reservationRoute", label: "予約経路" }
 ];
 
 export default function MasterDataPage() {

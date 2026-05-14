@@ -145,3 +145,15 @@ export async function updateCustomer(id: string, data: Partial<Customer>) {
     return { success: false, error: error.message };
   }
 }
+
+export async function deleteCustomer(id: string) {
+  try {
+    const { doc, deleteDoc } = await import("firebase/firestore");
+    const docRef = doc(db, CUSTOMERS_COLLECTION, id);
+    await deleteDoc(docRef);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting customer:", error);
+    return { success: false, error: error.message };
+  }
+}

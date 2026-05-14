@@ -28,6 +28,7 @@ export default function SalesPage({
   searchParams: Promise<{ month?: string }>
 }) {
   const params = use(searchParams);
+  const { profile } = useAuth();
   const targetDateStr = params.month || format(new Date(), "yyyy-MM");
   const [yearNum, monthNum] = targetDateStr.split("-").map(Number);
   const year = yearNum;
@@ -253,12 +254,16 @@ export default function SalesPage({
                 <SalesExportCSVButton sales={sales} />
                 <DailyCloseDialog />
                 <CheckoutDialog staffList={staffNames} />
-                <CSVUploadButton />
-                <Button variant="outline" size="sm" onClick={handleClearImports} className="text-rose-600 border-rose-200 hover:bg-rose-50 h-10 px-3">
-                  <Trash2 size={16} className="mr-1" />
-                  CSVクリア
-                </Button>
-                <Link href="/admin/master-data">
+                {profile?.role === 'admin' && (
+                  <>
+                    <CSVUploadButton />
+                    <Button variant="outline" size="sm" onClick={handleClearImports} className="text-rose-600 border-rose-200 hover:bg-rose-50 h-10 px-3">
+                      <Trash2 size={16} className="mr-1" />
+                      CSVクリア
+                    </Button>
+                  </>
+                )}
+                <Link href="/staff-portal/sales/master">
                   <Button variant="outline" size="icon" className="h-10 w-10 border-slate-200">
                     <Settings size={20} className="text-slate-500" />
                   </Button>
@@ -504,7 +509,7 @@ export default function SalesPage({
                 </div>
                 
                 <div className="flex gap-4 items-center">
-                  {selectedIds.size > 0 && (
+                  {profile?.role === 'admin' && selectedIds.size > 0 && (
                     <Button 
                       variant="destructive" 
                       size="sm" 
@@ -515,7 +520,7 @@ export default function SalesPage({
                     </Button>
                   )}
                   
-                  {filteredSales.length > 0 && (selectedStaffs.size > 0 || selectedStores.size > 0 || searchQuery) && (
+                  {profile?.role === 'admin' && filteredSales.length > 0 && (selectedStaffs.size > 0 || selectedStores.size > 0 || searchQuery) && (
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -656,9 +661,11 @@ export default function SalesPage({
                               ¥{Math.max(0, saleTotal).toLocaleString()}
                             </TableCell>
                             <TableCell>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-500" onClick={() => handleDeleteSale(sale.id)}>
-                                <Trash2 size={14} />
-                              </Button>
+                              {profile?.role === 'admin' && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-500" onClick={() => handleDeleteSale(sale.id)}>
+                                  <Trash2 size={14} />
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         );
