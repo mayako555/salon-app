@@ -4,7 +4,7 @@ import { collection, writeBatch, doc } from "firebase/firestore";
 export type SalesMasterItem = {
   id?: string;
   store: "六甲" | "神戸" | "元町" | "共通";
-  itemType: "menu" | "coupon" | "messageCoupon" | "option" | "discount" | "fee" | "karteTemplate";
+  itemType: "menu" | "coupon" | "messageCoupon" | "option" | "discount" | "fee" | "karteTemplate" | "product" | "reservationRoute";
   category: string;
   name: string;
   internalName?: string;
@@ -18,6 +18,7 @@ export type SalesMasterItem = {
   staffAssignable?: boolean;
   equipmentAssignable?: boolean;
   sortOrder?: number;
+  trackInventory?: boolean;
   created_at?: any;
   updated_at?: any;
 };
@@ -128,13 +129,16 @@ export async function seedSalesMasterData() {
     ...ROKKO_DATA.map(d => ({ ...d, store: "六甲", isActive: true }))
   ];
 
-  allData.forEach((item) => {
+  allData.forEach((data) => {
     const newDocRef = doc(colRef);
     batch.set(newDocRef, {
-      ...item,
-      staffAssignable: false,
-      equipmentAssignable: false,
-      created_at: new Date()
+      ...data,
+      sortOrder: data.sortOrder !== undefined ? data.sortOrder : 999,
+      trackInventory: !!data.trackInventory,
+      staffAssignable: !!data.staffAssignable,
+      equipmentAssignable: !!data.equipmentAssignable,
+      created_at: data.created_at || serverTimestamp(),
+      updated_at: serverTimestamp()
     });
   });
 

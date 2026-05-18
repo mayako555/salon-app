@@ -35,6 +35,7 @@ export type StaffProfile = {
   is_trainee: boolean;
   is_active: boolean;
   monthly_sales_target?: number;
+  nomination_fee?: number; // 指名手当単価
   sns_accounts?: string[];
   sort_order?: number;
   created_at?: any;
@@ -103,6 +104,7 @@ export async function addStaff(formData: FormData) {
     const max_holiday_requests = parseInt(formData.get("max_holiday_requests") as string || "3", 10);
     const role = (formData.get("role") as StaffRole) || "staff";
     const monthly_sales_target = parseInt(formData.get("monthly_sales_target") as string || "0", 10);
+    const nomination_fee = parseInt(formData.get("nomination_fee") as string || "300", 10);
 
     if (!name || !email || !password) {
       return { success: false, error: "名前、メールアドレス、パスワードは必須です" };
@@ -143,6 +145,7 @@ export async function addStaff(formData: FormData) {
       max_holiday_requests,
       is_active: true,
       monthly_sales_target,
+      nomination_fee,
       sns_accounts: formData.getAll("sns_accounts") as string[],
       created_at: serverTimestamp()
     };
@@ -189,6 +192,7 @@ export async function editStaff(id: string, formData: FormData) {
     const max_holiday_requests = parseInt(formData.get("max_holiday_requests") as string || "3", 10);
     const role = (formData.get("role") as StaffRole) || "staff";
     const monthly_sales_target = parseInt(formData.get("monthly_sales_target") as string || "0", 10);
+    const nomination_fee = parseInt(formData.get("nomination_fee") as string || "300", 10);
 
     const is_trainee = formData.get("is_trainee") === "true";
 
@@ -211,6 +215,7 @@ export async function editStaff(id: string, formData: FormData) {
       is_trainee,
       max_holiday_requests,
       monthly_sales_target,
+      nomination_fee,
       sns_accounts: formData.getAll("sns_accounts") as string[],
       updated_at: serverTimestamp()
     };

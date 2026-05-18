@@ -113,6 +113,7 @@ export default function SalaryGradesPage() {
                   <TableHead className="text-right">業務手当</TableHead>
                   <TableHead className="text-right">皆勤手当</TableHead>
                   <TableHead className="text-right">勤務手当</TableHead>
+                  <TableHead className="text-right font-bold text-blue-600 bg-blue-50/50">合計月給</TableHead>
                   <TableHead className="w-24 text-right pr-6">操作</TableHead>
                 </TableRow>
               </TableHeader>
@@ -138,9 +139,20 @@ export default function SalaryGradesPage() {
                       <TableCell className="text-right font-mono">¥{grade.hourly.toLocaleString()}</TableCell>
                       <TableCell className="text-right font-mono">¥{grade.base.toLocaleString()}</TableCell>
                       <TableCell className="text-right font-mono">¥{grade.role.toLocaleString()}</TableCell>
-                      <TableCell className="text-right font-mono">¥{grade.attendance.toLocaleString()}</TableCell>
-                      <TableCell className="text-right font-mono">¥{grade.service.toLocaleString()}</TableCell>
-                      <TableCell className="text-right pr-6">
+                      <TableCell className="text-right font-mono text-slate-600">¥{grade.attendance.toLocaleString()}</TableCell>
+                       <TableCell className="text-right font-mono text-slate-600">¥{grade.service.toLocaleString()}</TableCell>
+                       <TableCell className="text-right font-bold text-blue-700 bg-blue-50/30">
+                         {(() => {
+                           const customTotal = (grade.custom_allowances || []).reduce((sum, a) => sum + (a.amount || 0), 0);
+                           return `¥${(grade.base + grade.role + grade.attendance + grade.service + customTotal).toLocaleString()}`;
+                         })()}
+                         {(grade.custom_allowances || []).length > 0 && (
+                           <div className="text-[9px] font-normal text-slate-400 mt-0.5">
+                             他 {(grade.custom_allowances || []).length} 項目
+                           </div>
+                         )}
+                       </TableCell>
+                       <TableCell className="text-right pr-6">
                         <div className="flex justify-end gap-2">
                           <Button 
                             variant="ghost" 
@@ -248,6 +260,71 @@ export default function SalaryGradesPage() {
                       value={editingGrade.display_order || 0} 
                       onChange={(e) => setEditingGrade({ ...editingGrade, display_order: parseInt(e.target.value) || 0 })}
                     />
+                  </div>
+                </div>
+
+                <div className="mt-6 space-y-4 pt-6 border-t border-slate-100">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-sm font-bold text-slate-800">個別手当の追加</h4>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        const current = editingGrade.custom_allowances || [];
+                        setEditingGrade({ ...editingGrade, custom_allowances: [...current, { name: "", amount: 0 }] });
+                      }}
+                      className="h-7 text-[10px] font-bold border-emerald-200 text-emerald-600 hover:bg-emerald-50 px-2"
+                    >
+                      <Plus size={12} className="mr-1" />
+                      手当を追加
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {(editingGrade.custom_allowances || []).map((adj, idx) => (
+                      <div key={idx} className="flex gap-2 items-center">
+                        <Input 
+                          placeholder="手当名 (例: SNS手当)" 
+                          value={adj.name} 
+                          onChange={e => {
+                            const next = [...(editingGrade.custom_allowances || [])];
+                            next[idx] = { ...next[idx], name: e.target.value };
+                            setEditingGrade({ ...editingGrade, custom_allowances: next });
+                          }}
+                          className="flex-1 h-9 text-xs" 
+                        />
+                        <div className="relative w-28">
+                          <Input 
+                            type="number" 
+                            placeholder="金額" 
+                            value={adj.amount} 
+                            onChange={e => {
+                              const next = [...(editingGrade.custom_allowances || [])];
+                              next[idx] = { ...next[idx], amount: parseInt(e.target.value) || 0 };
+                              setEditingGrade({ ...editingGrade, custom_allowances: next });
+                            }}
+                            className="w-full h-9 text-xs pr-6" 
+                          />
+                          <span className="absolute right-2 top-2.5 text-[10px] text-slate-400 font-bold">¥</span>
+                        </div>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => {
+                            const next = (editingGrade.custom_allowances || []).filter((_, i) => i !== idx);
+                            setEditingGrade({ ...editingGrade, custom_allowances: next });
+                          }}
+                          className="h-9 w-9 text-slate-300 hover:text-rose-500"
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
+                    ))}
+                    {(editingGrade.custom_allowances || []).length === 0 && (
+                      <p className="text-[10px] text-slate-400 italic text-center py-2">個別手当はありません</p>
+                    )}
                   </div>
                 </div>
               </CardContent>

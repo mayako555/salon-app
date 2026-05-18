@@ -72,6 +72,7 @@ export async function upsertMasterItem(data: Partial<SalesMasterItem>) {
       imageUrl: data.imageUrl || "",
       isActive: data.isActive !== undefined ? data.isActive : true,
       sortOrder: data.sortOrder !== undefined ? data.sortOrder : 999,
+      trackInventory: !!data.trackInventory,
       staffAssignable: !!data.staffAssignable,
       equipmentAssignable: !!data.equipmentAssignable,
       updated_at: serverTimestamp()
@@ -103,6 +104,28 @@ export async function upsertMasterItem(data: Partial<SalesMasterItem>) {
         new_data: payload,
         actor: "管理者"
       });
+
+      // --- Inventory Sync Trigger ---
+      if (payload.trackInventory && payload.store !== "共通") {
+        const invQ = query(
+          collection(db, "inventory"),
+          where("storeName", "==", payload.store),
+          where("name", "==", payload.name)
+        );
+        const invSnap = await getDocs(invQ);
+        if (invSnap.empty) {
+          await addDoc(collection(db, "inventory"), {
+            name: payload.name,
+            storeName: payload.store,
+            category: payload.itemType === "product" ? "product" : "lash",
+            subCategory: payload.category,
+            currentStock: 0,
+            threshold: 3,
+            unit: payload.itemType === "product" ? "本" : "ケース",
+            lastUpdated: serverTimestamp()
+          });
+        }
+      }
     };
 
     await Promise.race([
@@ -178,6 +201,42 @@ export async function toggleItemStatus(id: string, active: boolean) {
     return { success: true };
   } catch (error: any) {
     console.error("Error updating order:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function duplicateMasterItem(id: string) {
+  try {
+    const colRef = collection(db, MASTER_COLLECTION);
+    const docRef = doc(db, MASTER_COLLECTION, id);
+    const snap = await getDocs(query(colRef, where("__name__", "==", id)));
+    
+    if (snap.empty) return { success: false, error: "Item not found" };
+    
+    const data = snap.docs[0].data();
+    const { id: _, created_at: __, updated_at: ___, ...rest } = data;
+    
+    const newPayload = {
+      ...rest,
+      name: `${rest.name} (コピー)`,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp()
+    };
+    
+    const res = await addDoc(colRef, newPayload);
+    
+    await addAuditLog({
+      table_name: MASTER_COLLECTION,
+      record_id: res.id,
+      action: "INSERT",
+      old_data: { duplicatedFrom: id },
+      new_data: newPayload,
+      actor: "管理者"
+    });
+
+    return { success: true, id: res.id };
+  } catch (error: any) {
+    console.error("Error duplicating master item:", error);
     return { success: false, error: error.message };
   }
 }

@@ -23,6 +23,7 @@ export type SalaryGrade = {
   role: number;
   attendance: number;
   service: number;
+  custom_allowances?: { name: string; amount: number }[];
   display_order: number;
 };
 
@@ -55,6 +56,7 @@ export async function upsertSalaryGrade(data: SalaryGrade) {
       role: Number(data.role) || 0,
       attendance: Number(data.attendance) || 0,
       service: Number(data.service) || 0,
+      custom_allowances: data.custom_allowances || [],
       display_order: Number(data.display_order) || 0,
       updated_at: serverTimestamp()
     };

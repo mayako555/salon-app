@@ -16,7 +16,7 @@ import { revalidatePath } from "next/cache";
 import { sendLineMessage } from "@/lib/line";
 import { getCustomerById } from "@/lib/customers";
 
-export type TaskType = "booking_change_request" | "general_inquiry";
+export type TaskType = "booking_change_request" | "general_inquiry" | "staff_evaluation";
 
 export type TaskRecord = {
   id: string;

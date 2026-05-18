@@ -15,26 +15,50 @@ type AllowanceTaskDialogProps = {
 export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }: AllowanceTaskDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
-  
-  // States for each allowance type (Review, Blog, SNS, Treatment)
-  const [reviewCount, setReviewCount] = useState("");
+
+  const STORES = ["六甲", "元町", "神戸"];
+
+  // Pre-fill store breakdown counts for Reviews and Nominations
+  const initialReviewCounts: Record<string, string> = {};
+  const initialNominationCounts: Record<string, string> = {};
+
+  STORES.forEach(store => {
+    const autoReviewCount = task.review_store_breakdown?.[store] || 0;
+    const hasRegisteredReview = task.allowances.some(a => a.type === "review" && a.store_name === store);
+    initialReviewCounts[store] = hasRegisteredReview ? "" : (autoReviewCount || "").toString();
+
+    const autoNominationCount = task.nomination_store_breakdown?.[store] || 0;
+    const hasRegisteredNomination = task.allowances.some(a => a.type === "nomination" && a.store_name === store);
+    initialNominationCounts[store] = hasRegisteredNomination ? "" : (autoNominationCount || "").toString();
+  });
+
+  const [reviewStoreCounts, setReviewStoreCounts] = useState<Record<string, string>>(initialReviewCounts);
+  const [nominationStoreCounts, setNominationStoreCounts] = useState<Record<string, string>>(initialNominationCounts);
+
+  // Other one-off allowances (SNS, Blog, Treatment)
   const [blogCount, setBlogCount] = useState("");
   const [snsCount, setSnsCount] = useState("");
   const [treatmentCount, setTreatmentCount] = useState("");
   
-  const [reviewStore, setReviewStore] = useState("六甲");
   const [blogStore, setBlogStore] = useState("六甲");
   const [snsStore, setSnsStore] = useState("六甲");
   const [treatmentStore, setTreatmentStore] = useState("六甲");
 
-  const STORES = ["六甲", "元町", "神戸"];
-
   const calculateAmount = (type: AllowanceType, countStr: string) => {
     const count = parseInt(countStr || "0", 10);
     if (type === "review" || type === "sns") return count * 500;
+    if (type === "nomination") return count * (task.nomination_fee_unit || 300);
     if (type === "blog") return count >= 5 ? 3000 : 0;
     if (type === "treatment") return count >= 10 ? 5000 : 0;
     return 0;
+  };
+
+  const handleReviewStoreCountChange = (store: string, val: string) => {
+    setReviewStoreCounts(prev => ({ ...prev, [store]: val }));
+  };
+
+  const handleNominationStoreCountChange = (store: string, val: string) => {
+    setNominationStoreCounts(prev => ({ ...prev, [store]: val }));
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -44,9 +68,32 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
     try {
       const allowances = [];
       
-      const rAmount = calculateAmount("review", reviewCount);
-      if (rAmount > 0) allowances.push({ type: "review" as AllowanceType, amount: rAmount, store_name: reviewStore, target_details: { count: parseInt(reviewCount) } });
-      
+      // Store-breakdown Review & Nomination allowances
+      STORES.forEach(store => {
+        const reviewCountStr = reviewStoreCounts[store];
+        const rAmount = calculateAmount("review", reviewCountStr);
+        if (rAmount > 0) {
+          allowances.push({
+            type: "review" as AllowanceType,
+            amount: rAmount,
+            store_name: store,
+            target_details: { count: parseInt(reviewCountStr) }
+          });
+        }
+
+        const nominationCountStr = nominationStoreCounts[store];
+        const nAmount = calculateAmount("nomination", nominationCountStr);
+        if (nAmount > 0) {
+          allowances.push({
+            type: "nomination" as AllowanceType,
+            amount: nAmount,
+            store_name: store,
+            target_details: { count: parseInt(nominationCountStr) }
+          });
+        }
+      });
+
+      // Blog, SNS, Treatment
       const bAmount = calculateAmount("blog", blogCount);
       if (bAmount > 0) allowances.push({ type: "blog" as AllowanceType, amount: bAmount, store_name: blogStore, target_details: { count: parseInt(blogCount) } });
       
@@ -80,7 +127,7 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
     try {
       const res = await deleteAllowance(id);
       if (res.success) {
-        onSuccess(); // Refresh parent data
+        onSuccess(); 
       } else {
         alert(res.error);
       }
@@ -107,6 +154,8 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
     }
   };
 
+  const hasAnyInput = STORES.some(s => reviewStoreCounts[s] || nominationStoreCounts[s]) || blogCount || snsCount || treatmentCount;
+
   if (!isOpen) return null;
 
   return (
@@ -114,8 +163,8 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg my-auto animate-in fade-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50">
            <div>
-             <h3 className="font-bold text-lg text-slate-800">{task.staff_name} の手当入力</h3>
-             <p className="text-xs text-slate-500">{task.target_month}分</p>
+              <h3 className="font-bold text-lg text-slate-800">{task.staff_name} の手当入力</h3>
+              <p className="text-xs text-slate-500">{task.target_month}分</p>
            </div>
            <button 
              onClick={onClose}
@@ -134,12 +183,13 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
                   <div key={a.id} className="flex justify-between items-center bg-white p-2 border border-slate-100 rounded-md text-sm">
                     <span className="font-medium flex items-center gap-2">
                       {a.type === 'review' && <MessageSquare size={14} className="text-pink-500" />}
+                      {a.type === 'nomination' && <span className="text-emerald-500 font-bold">★</span>}
                       {a.type === 'blog' && <Edit3 size={14} className="text-blue-500" />}
                       {a.type === 'sns' && <Megaphone size={14} className="text-cyan-500" />}
                       {a.type === 'treatment' && <HelpCircle size={14} className="text-amber-500" />}
                       {a.type === 'transport' && <span className="text-slate-500">🚆</span>}
                       {a.type === 'other' && <span className="text-slate-500">📦</span>}
-                      {a.type === 'review' ? '口コミ' : a.type === 'blog' ? 'ブログ' : a.type === 'sns' ? 'SNS' : a.type === 'treatment' ? 'トリートメント' : a.type === 'transport' ? '交通費申請' : 'その他'}
+                      {a.type === 'review' ? '口コミ手当' : a.type === 'nomination' ? '指名手当' : a.type === 'blog' ? 'ブログ' : a.type === 'sns' ? 'SNS' : a.type === 'treatment' ? 'トリートメント' : a.type === 'transport' ? '交通費申請' : 'その他'}
                       {a.store_name && (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 ml-1">
                           {a.store_name}
@@ -164,28 +214,86 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
             </div>
           )}
 
-          <form id="allowance-form" onSubmit={handleSave} className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
-              {/* Review */}
-              <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-lg p-3">
-                <div className="flex-1">
-                  <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                    <MessageSquare size={16} className="text-pink-500" />
-                    口コミ手当
-                  </label>
-                  <p className="text-xs text-slate-500 mt-0.5">星5の件数 × 500円</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <select value={reviewStore} onChange={e => setReviewStore(e.target.value)} className="h-10 px-2 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-emerald-500/20">
-                    {STORES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                  <input type="number" min="0" value={reviewCount} onChange={e => setReviewCount(e.target.value)} placeholder="0" className="w-16 h-10 px-2 border border-slate-300 rounded-md text-center font-bold" />
-                  <span className="text-sm font-medium text-slate-600">件</span>
-                </div>
-                <div className="w-20 text-right font-bold text-emerald-600">
-                  ¥{calculateAmount("review", reviewCount).toLocaleString()}
-                </div>
+          <form id="allowance-form" onSubmit={handleSave} className="space-y-6">
+            
+            {/* Store breakdown grid for reviews and nominations */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+              <div className="px-4 py-3 border-b border-slate-200 bg-slate-100/80">
+                <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider">店舗別手当自動集計・入力</h4>
               </div>
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-white border-b border-slate-200">
+                    <th className="px-4 py-3 font-bold text-slate-500 w-[90px]">対象店舗</th>
+                    <th className="px-4 py-3 font-bold text-slate-500">
+                      <div className="flex items-center gap-1.5">
+                        <MessageSquare size={14} className="text-pink-500" />
+                        <span>口コミ手当 (★5数)</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-normal mt-0.5 block">1件 500円</span>
+                    </th>
+                    <th className="px-4 py-3 font-bold text-slate-500">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-emerald-500 font-black text-sm">★</span>
+                        <span>指名手当 (指名数)</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-normal mt-0.5 block">1件 {task.nomination_fee_unit || 300}円</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {STORES.map(store => {
+                    const reviewCountVal = reviewStoreCounts[store] || "";
+                    const nominationCountVal = nominationStoreCounts[store] || "";
+                    
+                    const reviewAmt = calculateAmount("review", reviewCountVal);
+                    const nominationAmt = calculateAmount("nomination", nominationCountVal);
+                    
+                    return (
+                      <tr key={store} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-3 font-black text-slate-800 text-sm">{store}店</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <input 
+                              type="number" 
+                              min="0" 
+                              value={reviewCountVal} 
+                              onChange={e => handleReviewStoreCountChange(store, e.target.value)} 
+                              placeholder="0" 
+                              className="w-14 h-9 px-2 border border-slate-200 rounded-md text-center font-bold focus:ring-2 focus:ring-pink-500/20 outline-none transition-all text-xs" 
+                            />
+                            <span className="text-slate-500 font-medium shrink-0">件</span>
+                            <span className="font-bold text-emerald-600 text-[10px] shrink-0 ml-1 w-[45px] text-right">
+                              {reviewAmt > 0 ? `¥${reviewAmt.toLocaleString()}` : "—"}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <input 
+                              type="number" 
+                              min="0" 
+                              value={nominationCountVal} 
+                              onChange={e => handleNominationStoreCountChange(store, e.target.value)} 
+                              placeholder="0" 
+                              className="w-14 h-9 px-2 border border-slate-200 rounded-md text-center font-bold focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all text-xs" 
+                            />
+                            <span className="text-slate-500 font-medium shrink-0">件</span>
+                            <span className="font-bold text-emerald-600 text-[10px] shrink-0 ml-1 w-[55px] text-right">
+                              {nominationAmt > 0 ? `¥${nominationAmt.toLocaleString()}` : "—"}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Other allowances */}
+            <div className="space-y-4">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">その他の手当</h4>
 
               {/* SNS */}
               <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-lg p-3">
@@ -249,8 +357,8 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
                   ¥{calculateAmount("treatment", treatmentCount).toLocaleString()}
                 </div>
               </div>
-
             </div>
+
           </form>
         </div>
 
@@ -268,7 +376,7 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
           <Button 
             form="allowance-form"
             type="submit" 
-            disabled={isSubmitting || (!reviewCount && !blogCount && !snsCount && !treatmentCount)} 
+            disabled={isSubmitting || !hasAnyInput} 
             className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
           >
             <CheckCircle2 size={16} />

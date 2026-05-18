@@ -6,7 +6,7 @@ import { getMonthlySales, SalesRecord, deleteSale, clearMonthlyCsvImports } from
 import { getStaffList, StaffProfile } from "../staff/actions";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Download, ChevronLeft, ChevronRight, Search, FileUp, Settings, Lock, Trash2 } from "lucide-react";
+import { Plus, Download, ChevronLeft, ChevronRight, Search, FileUp, Settings, Lock, Trash2, Calendar } from "lucide-react";
 import Link from "next/link";
 import { format, isSameMonth } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -14,6 +14,7 @@ import CSVUploadButton from "./CSVUploadButton";
 import CheckoutDialog from "./CheckoutDialog";
 import DailyCloseDialog from "./DailyCloseDialog";
 import SalesExportCSVButton from "./SalesExportCSVButton";
+import DailyScheduleView from "./DailyScheduleView";
 import AuthGuard from "@/components/AuthGuard";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -63,6 +64,11 @@ export default function SalesPage({
   };
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isScheduleView, setIsScheduleView] = useState(false);
+  const [checkoutInitialStaff, setCheckoutInitialStaff] = useState("");
+  const [checkoutInitialTime, setCheckoutInitialTime] = useState("");
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [editingSale, setEditingSale] = useState<SalesRecord | undefined>(undefined);
 
   const handleToggleSelectAll = () => {
     if (selectedIds.size === filteredSales.length) {
@@ -238,13 +244,26 @@ export default function SalesPage({
     setSelectedIds(new Set());
   };
 
+  const handleAddClick = (staff: string, time: string) => {
+    setCheckoutInitialStaff(staff);
+    setCheckoutInitialTime(time);
+    setEditingSale(undefined);
+    setIsCheckoutOpen(true);
+  };
+
+  const handleEditClick = (sale: SalesRecord) => {
+    setEditingSale(sale);
+    setIsCheckoutOpen(false); // Reset then set to trigger effect? No, let's just set.
+    setTimeout(() => setIsCheckoutOpen(true), 10);
+  };
+
   return (
     <AuthGuard requireRole="admin">
       <div className="space-y-6 animate-in fade-in duration-300">
         {loading ? (
           <div className="flex items-center justify-center py-20 text-slate-500">読み込み中...</div>
         ) : (
-          <>
+          <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-slate-900">売上管理</h1>
@@ -253,7 +272,22 @@ export default function SalesPage({
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                 <SalesExportCSVButton sales={sales} />
                 <DailyCloseDialog />
-                <CheckoutDialog staffList={staffNames} />
+                <Button 
+                  variant={isScheduleView ? "default" : "outline"}
+                  onClick={() => setIsScheduleView(!isScheduleView)}
+                  className="h-10 px-4 font-bold gap-2"
+                >
+                  {isScheduleView ? <Search size={16} /> : <Calendar size={16} />}
+                  {isScheduleView ? "リスト表示" : "スケジュール表示"}
+                </Button>
+                <CheckoutDialog 
+                  staffList={staffNames} 
+                  isOpenControlled={isCheckoutOpen}
+                  onOpenChangeControlled={setIsCheckoutOpen}
+                  defaultStaffName={checkoutInitialStaff}
+                  initialTime={checkoutInitialTime}
+                  initialData={editingSale}
+                />
                 {profile?.role === 'admin' && (
                   <>
                     <CSVUploadButton />
@@ -369,7 +403,18 @@ export default function SalesPage({
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+
+            {isScheduleView ? (
+              <DailyScheduleView 
+                date={targetDateStr}
+                sales={sales.filter(s => s.date === (params.month || format(new Date(), "yyyy-MM-dd")))}
+                staffNames={staffNames}
+                onAddClick={handleAddClick}
+                onEditClick={handleEditClick}
+              />
+            ) : (
+              <div className="space-y-6">
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
               <div className="bg-slate-50 border-b border-slate-100 p-4 flex justify-between items-center">
                 <h2 className="font-bold text-slate-800">店舗・スタッフ別 集計マトリックス</h2>
               </div>
@@ -675,7 +720,9 @@ export default function SalesPage({
                 </Table>
               </div>
             </div>
-          </>
+            </div>
+            )}
+          </div>
         )}
       </div>
     </AuthGuard>

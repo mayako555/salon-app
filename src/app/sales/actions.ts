@@ -1,6 +1,7 @@
 "use server";
 
 import Papa from "papaparse";
+import { revalidatePath } from "next/cache";
 import { db } from "@/lib/firebase";
 import { 
   collection, 
@@ -18,8 +19,8 @@ import {
 } from "firebase/firestore";
 import { SalesMasterItem, seedSalesMasterData } from "./seeds";
 import { addAuditLog } from "../audit/actions";
-import { revalidatePath } from "next/cache";
 import { addCustomer } from "@/lib/customers";
+import { syncInventoryFromSale } from "../inventory/inventory-actions";
 
 export type SalesSource = "checkout" | "hotpepper" | "manual";
 
@@ -117,6 +118,31 @@ export async function getStoreMasterData(store: string): Promise<SalesMasterItem
   } catch (error) {
     console.error("Error fetching store master data:", error);
     return [];
+  }
+}
+
+export async function duplicateSalesMasterItem(id: string) {
+  try {
+    const docRef = doc(db, MASTER_COLLECTION, id);
+    const snap = await getDocs(query(collection(db, MASTER_COLLECTION), where("__name__", "==", id)));
+    if (snap.empty) return { success: false, error: "Item not found" };
+    
+    const data = snap.docs[0].data();
+    const { id: _, created_at: __, updated_at: ___, ...rest } = data;
+    
+    const newPayload = {
+      ...rest,
+      name: `${rest.name} (コピー)`,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp()
+    };
+    
+    const res = await addDoc(collection(db, MASTER_COLLECTION), newPayload);
+    revalidatePath("/staff-portal/sales/master");
+    return { success: true, id: res.id };
+  } catch (error: any) {
+    console.error("Error duplicating master item:", error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -278,6 +304,9 @@ export async function addCheckout(formData: FormData) {
         );
       }
     }
+
+    // --- Inventory Sync ---
+    await syncInventoryFromSale({ id: docRef.id, ...payload }, "deduct");
 
     await addAuditLog({
       table_name: SALES_COLLECTION,
@@ -530,7 +559,13 @@ export async function closeDailySales(date: string) {
 
 export async function deleteSale(id: string) {
   try {
-    await deleteDoc(doc(db, SALES_COLLECTION, id));
+    const docRef = doc(db, SALES_COLLECTION, id);
+    const snap = await getDocs(query(collection(db, SALES_COLLECTION), where("__name__", "==", id)));
+    if (!snap.empty) {
+      const saleData = { id: snap.docs[0].id, ...snap.docs[0].data() };
+      await syncInventoryFromSale(saleData, "return");
+    }
+    await deleteDoc(docRef);
     revalidatePath("/staff-portal/sales");
     return { success: true };
   } catch (error: any) {

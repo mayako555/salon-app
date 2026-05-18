@@ -16,8 +16,9 @@ import {
 import { addAuditLog } from "@/app/audit/actions";
 import { getStaffList } from "@/app/staff/actions";
 import { getMonthlySales, SalesRecord } from "@/app/sales/actions";
+import { getMonthlyReviews } from "@/app/admin/reviews/actions";
 
-export type AllowanceType = "review" | "blog" | "sns" | "treatment" | "transport" | "other";
+export type AllowanceType = "review" | "blog" | "sns" | "treatment" | "transport" | "nomination" | "other";
 
 // ... existing code ...
 
@@ -102,6 +103,10 @@ export type AllowanceTaskStatus = {
   allowances: AllowanceRecord[];
   nomination_count: number;
   nominations: SalesRecord[];
+  nomination_fee_unit: number;
+  review_count_auto: number;
+  nomination_store_breakdown?: Record<string, number>;
+  review_store_breakdown?: Record<string, number>;
 };
 
 export async function getMonthlyAllowanceTasks(year: number, month: number): Promise<AllowanceTaskStatus[]> {
@@ -133,7 +138,10 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
     // 4. その月の全売上取得（指名数カウント用）
     const monthlySales = await getMonthlySales(year, month);
 
-    // 5. スタッフごとに集計
+    // 5. その月の全口コミ取得（★5自動カウント用）
+    const monthlyReviews = await getMonthlyReviews(year, month);
+
+    // 6. スタッフごとに集計
     const tasks: AllowanceTaskStatus[] = staffList.map(staff => {
       // 古いデータは staff_id が staff-名前 だったりするので名前でもマッチさせる
       const staffAllowances = allAllowances.filter(a => a.staff_id === staff.id || a.staff_name === staff.name);
@@ -151,6 +159,35 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
         return saleStaffNameNormal === staffNameNormal && s.is_nominated;
       });
 
+      // ★5口コミを抽出（返信テキストやスタッフ名でマッチング）
+      const staffReviews = monthlyReviews.filter(r => {
+        if (r.rating !== 5) return false;
+        if (r.staff_name === staff.name) return true;
+        // fallback to checking reply_text for staff name or katakana
+        if (r.reply_text) {
+          const kanji = staffNameNormal;
+          const kana = (staff.name_kana || "").replace(/\s+/g, "");
+          if (kanji && r.reply_text.includes(kanji)) return true;
+          if (kana && r.reply_text.includes(kana)) return true;
+          if (staff.last_name && r.reply_text.includes(staff.last_name)) return true;
+        }
+        return false;
+      });
+
+      // Group nominations by store
+      const nominationStoreBreakdown: Record<string, number> = {};
+      staffNominations.forEach(s => {
+        const store = s.store_name || "不明";
+        nominationStoreBreakdown[store] = (nominationStoreBreakdown[store] || 0) + 1;
+      });
+
+      // Group reviews by store
+      const reviewStoreBreakdown: Record<string, number> = {};
+      staffReviews.forEach(r => {
+        const store = r.store_name || "不明";
+        reviewStoreBreakdown[store] = (reviewStoreBreakdown[store] || 0) + 1;
+      });
+
       return {
         staff_id: staff.id,
         staff_name: staff.name,
@@ -159,7 +196,11 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
         total_amount: totalAmount,
         allowances: staffAllowances,
         nomination_count: staffNominations.length,
-        nominations: staffNominations
+        nominations: staffNominations,
+        nomination_fee_unit: staff.nomination_fee || 300,
+        review_count_auto: staffReviews.length,
+        nomination_store_breakdown: nominationStoreBreakdown,
+        review_store_breakdown: reviewStoreBreakdown
       };
     });
 

@@ -25,15 +25,24 @@ export default function CheckoutDialog({
   defaultStoreName = "六甲",
   staffList = [],
   initialData,
-  trigger
+  trigger,
+  isOpenControlled,
+  onOpenChangeControlled,
+  initialTime = ""
 }: { 
   defaultStaffName?: string, 
   defaultStoreName?: string,
   staffList?: string[],
   initialData?: SalesRecord,
-  trigger?: React.ReactNode
+  trigger?: React.ReactNode,
+  isOpenControlled?: boolean,
+  onOpenChangeControlled?: (open: boolean) => void,
+  initialTime?: string
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isOpen = isOpenControlled !== undefined ? isOpenControlled : internalOpen;
+  const setIsOpen = onOpenChangeControlled !== undefined ? onOpenChangeControlled : setInternalOpen;
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Selection state
@@ -253,8 +262,8 @@ export default function CheckoutDialog({
   }).sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
 
   const allTabs = (selectedStore === '六甲' || selectedStore === '神戸') 
-    ? ['マツエクメニュー', 'まつ毛パーマメニュー', 'アイブロウメニュー', '毛質変更', 'オプション・その他', '付け替えオフ', 'クーポン', 'メッセージクーポン', '店販']
-    : ['アイブロウメニュー', 'マツエクメニュー', 'まつ毛パーマメニュー', '毛質変更', 'オプション・その他', '付け替えオフ', 'クーポン', 'メッセージクーポン', '店販'];
+    ? ['マツエクメニュー', 'まつ毛パーマメニュー', 'アイブロウメニュー', '毛質変更', 'オプション・その他', '付け替えオフ', 'クーポン', 'メッセージクーポン', '割引', '店販']
+    : ['アイブロウメニュー', 'マツエクメニュー', 'まつ毛パーマメニュー', '毛質変更', 'オプション・その他', '付け替えオフ', 'クーポン', 'メッセージクーポン', '割引', '店販'];
 
   const majorTabs = ['メニュー', 'オプション', '店販', '割引・クーポン'];
   const majorTabMapping: Record<string, string[]> = {
@@ -320,7 +329,7 @@ export default function CheckoutDialog({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">時間</label>
-                  <input required type="time" name="time" defaultValue={initialData?.time || "10:00"} className="w-full h-9 px-3 border border-slate-300 rounded-md text-sm" />
+                  <input required type="time" name="time" defaultValue={initialData?.time || initialTime || "10:00"} className="w-full h-9 px-3 border border-slate-300 rounded-md text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">対象店舗</label>
@@ -490,7 +499,9 @@ export default function CheckoutDialog({
                           <span className="text-sm font-semibold text-slate-700">{item.name}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-sm font-bold text-slate-600">¥{item.price.toLocaleString()}</span>
+                          <span className="text-sm font-bold text-slate-600">
+                            {item.itemType === 'discount' ? '-¥' : '¥'}{item.price.toLocaleString()}
+                          </span>
                           <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center">
                             <Plus size={14} />
                           </div>

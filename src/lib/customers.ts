@@ -157,3 +157,65 @@ export async function deleteCustomer(id: string) {
     return { success: false, error: error.message };
   }
 }
+
+export async function bulkDeleteCustomers(ids: string[]) {
+  try {
+    const { writeBatch, doc } = await import("firebase/firestore");
+    const batch = writeBatch(db);
+    ids.forEach(id => {
+      const docRef = doc(db, CUSTOMERS_COLLECTION, id);
+      batch.delete(docRef);
+    });
+    await batch.commit();
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error bulk deleting customers:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function mergeCustomers(masterId: string, duplicateIds: string[], mergedData?: Partial<Customer>) {
+  try {
+    const { writeBatch, doc, collection, query, where, getDocs, updateDoc } = await import("firebase/firestore");
+    const batch = writeBatch(db);
+    
+    // 0. Update Master Data if provided
+    if (mergedData) {
+      // Filter out ID and timestamps from mergedData
+      const { id, created_at, updated_at, ...cleanData } = mergedData as any;
+      const masterRef = doc(db, CUSTOMERS_COLLECTION, masterId);
+      batch.update(masterRef, { ...cleanData, updated_at: serverTimestamp() });
+    }
+
+    // 1. Migrate Karte Records
+    const karteCol = collection(db, "karte_records");
+    for (const dupId of duplicateIds) {
+      const q = query(karteCol, where("customer_id", "==", dupId));
+      const snap = await getDocs(q);
+      snap.docs.forEach(d => {
+        batch.update(doc(db, "karte_records", d.id), { customer_id: masterId });
+      });
+    }
+
+    // 2. Migrate Sales Records
+    const salesCol = collection(db, "sales");
+    for (const dupId of duplicateIds) {
+      const q = query(salesCol, where("customerId", "==", dupId));
+      const snap = await getDocs(q);
+      snap.docs.forEach(d => {
+        batch.update(doc(db, "sales", d.id), { customerId: masterId });
+      });
+    }
+
+    // 3. Delete Duplicate Customers
+    for (const dupId of duplicateIds) {
+      batch.delete(doc(db, CUSTOMERS_COLLECTION, dupId));
+    }
+
+    await batch.commit();
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error merging customers:", error);
+    return { success: false, error: error.message };
+  }
+}

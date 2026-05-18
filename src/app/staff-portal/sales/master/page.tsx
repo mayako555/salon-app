@@ -6,7 +6,8 @@ import {
   upsertMasterItem, 
   deleteMasterItem, 
   toggleItemStatus,
-  updateMasterItemOrder
+  updateMasterItemOrder,
+  duplicateMasterItem
 } from "@/app/sales/master-actions";
 import { resetSalesMasterData } from "@/app/sales/actions";
 import { SalesMasterItem } from "@/app/sales/seeds";
@@ -32,7 +33,8 @@ import {
   MoreVertical,
   ChevronRight,
   Clock,
-  Tag
+  Tag,
+  Copy
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -70,7 +72,8 @@ function SortableItem({
   filteredCount, 
   onToggle, 
   onEdit, 
-  onDelete 
+  onDelete,
+  onDuplicate
 }: { 
   item: SalesMasterItem; 
   index: number; 
@@ -78,6 +81,7 @@ function SortableItem({
   onToggle: (id: string, current: boolean) => void;
   onEdit: (item: SalesMasterItem) => void;
   onDelete: (id: string) => void;
+  onDuplicate: (id: string) => void;
 }) {
   const {
     attributes,
@@ -113,6 +117,7 @@ function SortableItem({
             item.itemType === 'menu' ? 'bg-blue-400' :
             item.itemType === 'coupon' ? 'bg-rose-400' :
             item.itemType === 'messageCoupon' ? 'bg-amber-400' :
+            item.itemType === 'discount' ? 'bg-rose-500' :
             'bg-slate-300'
           )} />
           
@@ -131,7 +136,9 @@ function SortableItem({
           </div>
 
           <div className="text-right flex flex-col items-end gap-1 px-4 border-l border-slate-50">
-            <p className="text-lg font-black text-slate-900 tracking-tight">¥{item.price.toLocaleString()}</p>
+            <p className="text-lg font-black text-slate-900 tracking-tight">
+              {item.itemType === 'discount' ? '-¥' : '¥'}{item.price.toLocaleString()}
+            </p>
             {item.duration && <p className="text-[10px] font-black text-slate-400 flex items-center gap-1"><Clock size={10} /> {item.duration}</p>}
           </div>
 
@@ -154,6 +161,15 @@ function SortableItem({
               onClick={() => onEdit(item)}
             >
               <Edit2 size={16} />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="rounded-xl h-10 w-10 text-slate-400 hover:text-emerald-600 hover:bg-slate-50"
+              onClick={() => onDuplicate(item.id!)}
+              title="複製する"
+            >
+              <Copy size={16} />
             </Button>
             <Button 
               variant="ghost" 
@@ -341,6 +357,8 @@ export default function MasterManagementPage() {
         if (item.itemType !== "product") return false;
       } else if (typeFilter === "reservationRoute") {
         if (item.itemType !== "reservationRoute") return false;
+      } else if (typeFilter === "discount") {
+        if (item.itemType !== "discount") return false;
       }
     }
 
@@ -474,6 +492,7 @@ export default function MasterManagementPage() {
           { id: "menu", label: "メニュー・クーポン", icon: Plus },
           { id: "product", label: "店販商品", icon: Zap },
           { id: "reservationRoute", label: "予約経路", icon: ArrowUpDown },
+          { id: "discount", label: "割引", icon: Tag },
         ].map(tab => (
           <button
             key={tab.id}
@@ -570,6 +589,15 @@ export default function MasterManagementPage() {
                         setIsDialogOpen(true);
                       }}
                       onDelete={handleDelete}
+                      onDuplicate={async (id) => {
+                        const res = await duplicateMasterItem(id);
+                        if (res.success) {
+                          toast.success("アイテムを複製しました");
+                          loadItems();
+                        } else {
+                          toast.error("複製に失敗しました");
+                        }
+                      }}
                     />
                   ))}
                 </SortableContext>
@@ -655,6 +683,7 @@ export default function MasterManagementPage() {
                       <option value="毛質変更">毛質変更</option>
                       <option value="付け替えオフ">付け替えオフ</option>
                       <option value="その他オプション">その他オプション</option>
+                      <option value="割引">割引</option>
                       <option value="店販">店販</option>
                       <option value="予約経路">予約経路</option>
                       <option value="その他">その他</option>
@@ -676,28 +705,24 @@ export default function MasterManagementPage() {
             {(editingItem?.itemType === 'menu' || editingItem?.itemType === 'coupon' || editingItem?.itemType === 'messageCoupon') && (
               <>
                 <div className="grid grid-cols-2 gap-4">
-                  {editingItem?.itemType !== 'reservationRoute' && editingItem?.itemType !== 'discount' && (
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duration (所要時間)</label>
-                      <Input 
-                        value={editingItem?.duration || ""} 
-                        onChange={(e) => setEditingItem({ ...editingItem!, duration: e.target.value })}
-                        className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
-                        placeholder="例：1時間、90分など"
-                      />
-                    </div>
-                  )}
-                  {editingItem?.itemType !== 'reservationRoute' && (
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">HPB Name</label>
-                      <Input 
-                        value={editingItem?.hpbName || ""} 
-                        onChange={(e) => setEditingItem({ ...editingItem!, hpbName: e.target.value })}
-                        className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
-                        placeholder="ホットペッパー上の名前"
-                      />
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Duration (所要時間)</label>
+                    <Input 
+                      value={editingItem?.duration || ""} 
+                      onChange={(e) => setEditingItem({ ...editingItem!, duration: e.target.value })}
+                      className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
+                      placeholder="例：1時間、90分など"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">HPB Name</label>
+                    <Input 
+                      value={editingItem?.hpbName || ""} 
+                      onChange={(e) => setEditingItem({ ...editingItem!, hpbName: e.target.value })}
+                      className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
+                      placeholder="ホットペッパー上の名前"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -738,7 +763,16 @@ export default function MasterManagementPage() {
                     onChange={(e) => setEditingItem({ ...editingItem!, isActive: e.target.checked })}
                     className="w-5 h-5 rounded-lg border-slate-200"
                   />
-                  <span className="text-sm font-bold text-slate-700">有効（表示する）</span>
+                  <span className="text-sm font-bold text-slate-700">有効</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={editingItem?.trackInventory} 
+                    onChange={(e) => setEditingItem({ ...editingItem!, trackInventory: e.target.checked })}
+                    className="w-5 h-5 rounded-lg border-slate-200"
+                  />
+                  <span className="text-sm font-bold text-slate-700">在庫連動する</span>
                 </label>
               </div>
             </div>

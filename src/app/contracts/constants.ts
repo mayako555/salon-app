@@ -24,6 +24,8 @@ export type StaffContract = {
   deduction_nomination_fee: boolean;
   valid_from: string;
   valid_to: string | null;
+  is_probation?: boolean; // 試用期間フラグ
+  menu_specific_rates?: { menu_name: string; ratio: number }[]; // メニュー別歩合設定
   custom_allowances?: { name: string; amount: number }[];
   created_at?: any;
 };

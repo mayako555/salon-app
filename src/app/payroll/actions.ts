@@ -122,16 +122,23 @@ export async function generateStatements(year: number, month: number) {
     return { success: false, error: "すでに締め処理が完了している月です。再計算できません。" };
   }
 
-  // 2. Fetch existing draft statements to preserve manual adjustments
+  // 2. Fetch existing draft statements to preserve manual adjustments and hours
   const qDraft = query(colRef, where("target_month", "==", targetMonth), where("status", "==", "draft"));
   const draftSnapshot = await getDocs(qDraft);
   
-  const adjustmentMap: Record<string, MonthlyStatement["adjustments"]> = {};
+  const preservationMap: Record<string, { 
+    adjustments: MonthlyStatement["adjustments"],
+    worked_hours?: number,
+    worked_days?: number
+  }> = {};
+
   draftSnapshot.docs.forEach(d => {
     const data = d.data() as MonthlyStatement;
-    if (data.adjustments) {
-      adjustmentMap[data.staff_id] = data.adjustments;
-    }
+    preservationMap[data.staff_id] = {
+      adjustments: data.adjustments,
+      worked_hours: data.details.metrics.worked_hours,
+      worked_days: data.details.metrics.worked_days
+    };
   });
 
   const batch = writeBatch(db);
@@ -163,8 +170,9 @@ export async function generateStatements(year: number, month: number) {
     const staffAllowances = allowances.filter((a: any) => a.staff_name === contract.staff_name);
     const staffAttendances = attendances.filter((a: AttendanceRecord) => a.staff_name === contract.staff_name);
 
-    // Get preserved adjustments
-    const preservedAdjusts = adjustmentMap[contract.staff_id];
+    // Get preserved adjustments and metrics
+    const preserved = preservationMap[contract.staff_id];
+    const preservedAdjusts = preserved?.adjustments;
 
     // Track custom contract allowances
     const contractCustomAllowanceTotal = (contract.custom_allowances || []).reduce((acc: number, curr: any) => acc + curr.amount, 0);
@@ -192,8 +200,9 @@ export async function generateStatements(year: number, month: number) {
 
     workedHours = Math.round(workedHours * 10) / 10;
     
-    const finalWorkedDays = workedDays > 0 ? workedDays : 21;
-    const finalWorkedHours = workedHours > 0 ? workedHours : (contract.contract_type === "hourly" ? 80 : 168);
+    // Use preserved values if no real attendance exists or if preserved exists
+    const finalWorkedDays = workedDays > 0 ? workedDays : (preserved?.worked_days ?? 21);
+    let finalWorkedHours = workedHours > 0 ? workedHours : (preserved?.worked_hours ?? (contract.contract_type === "hourly" ? 0 : 168));
 
     if (contract.contract_type === "hourly") {
       let totalMinutesWorked = 0;
@@ -207,8 +216,9 @@ export async function generateStatements(year: number, month: number) {
         }
       }
 
-      const totalHours = totalMinutesWorked / 60;
+      const totalHours = totalMinutesWorked > 0 ? (totalMinutesWorked / 60) : (preserved?.worked_hours ?? 0);
       const baseHourlySalary = Math.floor(totalHours * (contract.hourly_wage || 0));
+      finalWorkedHours = totalHours;
 
       const allowanceTotal = staffAllowances.reduce((acc, curr) => acc + curr.amount, 0) + contractCustomAllowanceTotal;
       const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);

@@ -44,14 +44,19 @@ export async function getContractsList(): Promise<StaffContract[]> {
       staffMap.set(doc.id, doc.data().name);
     });
 
-    return snapshot.docs.map((doc: any) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        staff_name: staffMap.get(data.staff_id) || "不明"
-      } as StaffContract;
-    });
+    return snapshot.docs
+      .filter((doc: any) => doc.data().deleted !== true)
+      .map((doc: any) => {
+        const data = doc.data();
+        // Convert dates/timestamps to serializable types or remove them if not needed
+        return {
+          ...data,
+          id: doc.id,
+          staff_name: staffMap.get(data.staff_id) || "不明",
+          created_at: data.created_at?.toDate?.()?.toISOString() || null,
+          updated_at: data.updated_at?.toDate?.()?.toISOString() || null,
+        } as StaffContract;
+      });
   } catch (error: any) {
     console.error("Error fetching contracts from Firestore:", error);
     return [];
@@ -86,6 +91,8 @@ export async function upsertContract(data: Partial<StaffContract>, saveMode: "ad
       deduction_nomination_fee: !!data.deduction_nomination_fee,
       valid_from: data.valid_from || new Date().toISOString().split('T')[0],
       valid_to: data.valid_to || null,
+      is_probation: !!data.is_probation,
+      menu_specific_rates: data.menu_specific_rates || [],
       custom_allowances: data.custom_allowances || [],
       updated_at: serverTimestamp()
     };
@@ -146,9 +153,40 @@ export async function upsertContract(data: Partial<StaffContract>, saveMode: "ad
       )
     ]);
 
+    const { revalidatePath } = await import("next/cache");
+    revalidatePath("/contracts");
+
     return { success: true };
   } catch (error: any) {
     console.error("Error upserting contract in Firestore:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteContract(contractId: string) {
+  try {
+    const docRef = doc(db, CONTRACTS_COLLECTION, contractId);
+    const snapshot = await getDoc(docRef);
+    const oldData = snapshot.exists() ? snapshot.data() : null;
+
+    await updateDoc(docRef, { deleted: true, updated_at: serverTimestamp() }); // Soft delete
+    
+    // Audit Log
+    await addAuditLog({
+      table_name: CONTRACTS_COLLECTION,
+      record_id: contractId,
+      action: "DELETE",
+      old_data: oldData,
+      new_data: { deleted: true },
+      actor: "管理者"
+    });
+
+    const { revalidatePath } = await import("next/cache");
+    revalidatePath("/contracts");
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting contract from Firestore:", error);
     return { success: false, error: error.message };
   }
 }

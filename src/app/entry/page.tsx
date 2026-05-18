@@ -376,6 +376,7 @@ function CustomerEntryFormContent() {
               <div className="grid grid-cols-1 gap-3">
                 {[
                   { id: 'eyelash_ext', label: 'まつ毛エクステ', desc: 'Eyelash Extensions', icon: <Sparkles className="text-amber-400" size={20}/> },
+                  { id: 'led_ext', label: 'LEDエクステ', desc: 'LED Eyelash Extensions', icon: <Sparkles className="text-violet-400" size={20}/> },
                   { id: 'lash_lift', label: 'まつ毛パーマ', desc: 'Lash Lift', icon: <Heart className="text-rose-400" size={20}/> },
                   { id: 'eyebrow', label: 'アイブロウ（眉）', desc: 'Eye Brow Wax', icon: <Scissors className="text-emerald-400" size={20}/> },
                   { id: 'and_healthy', label: '&Healthy（アンドヘルシー）', desc: 'Lash Ext + Lift', icon: <ShieldCheck className="text-blue-400" size={20}/> },
@@ -521,6 +522,14 @@ function CustomerEntryFormContent() {
                     <RadioGroup label="現在ピーリング製品を使用中ですか？" options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]} value={formData.answers.peeling_history} onChange={(val: any) => updateAnswers('peeling_history', val)} />
                   </div>
                 )}
+                {selectedServices.includes('led_ext') && (
+                  <div className="space-y-6 border-l-4 border-violet-400 pl-4 py-2">
+                    <h3 className="font-black text-slate-800">LEDエクステについて</h3>
+                    <RadioGroup label="光線過敏症・紫外線アレルギーなど何らかのアレルギーをお持ちですか？" options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]} value={formData.answers.uv_allergy} onChange={(val: any) => updateAnswers('uv_allergy', val)} />
+                    <RadioGroup label="白内障、緑内障などの治療を受けたことがありますか？" options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]} value={formData.answers.glaucoma_history} onChange={(val: any) => updateAnswers('glaucoma_history', val)} />
+                    <RadioGroup label="ドライアイと診断され治療を受けたことがありますか？" options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]} value={formData.answers.dry_eye_history} onChange={(val: any) => updateAnswers('dry_eye_history', val)} />
+                  </div>
+                )}
                 <div className="bg-rose-50 p-5 rounded-2xl border border-rose-100">
                   <RadioGroup label="アレルギーはありますか？" options={[{id:'yes', label:'はい'}, {id:'no', label:'いいえ'}]} value={formData.answers.allergies_present} onChange={(val: any) => updateAnswers('allergies_present', val)} />
                   {formData.answers.allergies_present === 'yes' && (
@@ -559,6 +568,17 @@ function CustomerEntryFormContent() {
               <div className="bg-white p-6 rounded-3xl shadow-inner border border-slate-100 max-h-[300px] overflow-y-auto text-xs space-y-4 text-slate-600">
                 <p className="font-bold text-slate-900">事前説明書・同意書</p>
                 <p>体質や体調により、充血、腫れ、痒み等の症状が出る可能性があります。故意または重過失を除き、当店は一切の責任を負いかねます。</p>
+                {selectedServices.includes('led_ext') && (
+                  <div className="mt-4 pt-4 border-t border-slate-100 space-y-2">
+                    <p className="font-bold text-violet-900">【LEDエクステ同意事項（松風LED版）】</p>
+                    <ul className="list-disc pl-4 space-y-2">
+                      <li>当サロンでは、安全性の高い松風LEDライトを使用しています。LEDライトと専用の接着剤で、まつげエクステを2〜3秒で完全硬化させます。</li>
+                      <li>使用するライトは安全基準を満たしており、通常の使用で目や皮膚への影響はありません。ただし、光線過敏症や紫外線アレルギーの方は事前にお知らせください。</li>
+                      <li>施術中は、専用の目元アイパッチにてライト照射時のまぶしさを軽減しますが人によっては多少のまぶしさを感じられたり、照射により温かく感じたりすることがございます。</li>
+                      <li>ごく稀にアレルギー反応が起こる可能性もございます。万が一、施術中に異常を感じられた場合は、速やかにスタッフまでお申し付けください。</li>
+                    </ul>
+                  </div>
+                )}
               </div>
               <div className="space-y-4">
                 <label className="text-sm font-bold text-slate-700 block ml-1 flex items-center gap-2"><Signature size={18} className="text-rose-500" /> ご署名</label>

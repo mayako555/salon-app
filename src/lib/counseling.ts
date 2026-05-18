@@ -9,7 +9,7 @@ import {
   serverTimestamp 
 } from "firebase/firestore";
 
-export type ServiceType = 'eyelash_ext' | 'lash_lift' | 'eyebrow' | 'and_healthy' | 'brow_gym_men';
+export type ServiceType = 'eyelash_ext' | 'lash_lift' | 'eyebrow' | 'and_healthy' | 'brow_gym_men' | 'led_ext';
 
 export type CounselingResponse = {
   id: string;
@@ -41,6 +41,7 @@ export function calculateRiskFlags(answers: Record<string, any>, serviceTypes: S
   if (answers.condition_poor === 'yes') redFlags.push('本日体調不良');
   if (answers.patch_test_request === 'yes') redFlags.push('パッチテスト希望');
   if (answers.past_trouble === 'yes') redFlags.push('過去に施術トラブルあり');
+  if (answers.uv_allergy === 'yes') redFlags.push('光線過敏症・紫外線アレルギー');
 
   // 黄アラート条件
   if (answers.pregnancy === 'yes' || answers.pregnancy === 'している') yellowFlags.push('妊娠中');
@@ -55,6 +56,8 @@ export function calculateRiskFlags(answers: Record<string, any>, serviceTypes: S
   if (answers.art_make === 'yes' || answers.surgery_content?.includes('アートメイク')) yellowFlags.push('アートメイク歴あり');
   if (answers.important_event === 'yes') yellowFlags.push('ブライダル・イベント前');
   if (answers.post_visit_plans === 'yes') yellowFlags.push('施術後に予定あり');
+  if (answers.glaucoma_history === 'yes') yellowFlags.push('白内障・緑内障治療歴あり');
+  if (answers.dry_eye_history === 'yes') yellowFlags.push('ドライアイ治療歴あり');
 
   const riskLevel: 'red' | 'yellow' | 'none' = redFlags.length > 0 ? 'red' : yellowFlags.length > 0 ? 'yellow' : 'none';
   const riskFlags = [...redFlags, ...yellowFlags];

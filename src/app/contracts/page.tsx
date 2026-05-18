@@ -9,6 +9,8 @@ import { Plus, Edit2, AlertCircle, Settings } from "lucide-react";
 import { format } from "date-fns";
 import ContractFormDialog from "./ContractFormDialog";
 import ContractHistoryDialog from "./ContractHistoryDialog";
+import ContractDetailDialog from "./ContractDetailDialog";
+import { Eye } from "lucide-react";
 import Link from "next/link";
 import AuthGuard from "@/components/AuthGuard";
 
@@ -16,6 +18,7 @@ export default function ContractsPage() {
   const [contracts, setContracts] = useState<StaffContract[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<StaffContract | undefined>();
   const [historyStaffId, setHistoryStaffId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,11 +49,28 @@ export default function ContractsPage() {
     setIsHistoryDialogOpen(true);
   };
 
-  // Group contracts by staff and get the latest
+  const handleOpenDetail = (contract: StaffContract) => {
+    setSelectedContract(contract);
+    setIsDetailOpen(true);
+  };
+
+  // Group contracts by staff and get the latest (based on valid_from then created_at)
   const latestContractsMap = new Map<string, StaffContract>();
-  contracts.forEach(contract => {
-    const existing = latestContractsMap.get(contract.staff_id);
-    if (!existing || new Date(contract.valid_from).getTime() > new Date(existing.valid_from).getTime()) {
+  
+  // First, sort all contracts to ensure the most "current" ones come first
+  const sortedContracts = [...contracts].sort((a, b) => {
+    const timeA = new Date(a.valid_from).getTime();
+    const timeB = new Date(b.valid_from).getTime();
+    if (timeA !== timeB) return timeB - timeA;
+    
+    // If same date, use creation timestamp
+    const createdA = a.created_at?.toMillis?.() || a.created_at || 0;
+    const createdB = b.created_at?.toMillis?.() || b.created_at || 0;
+    return createdB - createdA;
+  });
+
+  sortedContracts.forEach(contract => {
+    if (!latestContractsMap.has(contract.staff_id)) {
       latestContractsMap.set(contract.staff_id, contract);
     }
   });
@@ -95,7 +115,16 @@ export default function ContractsPage() {
             <TableBody>
               {displayContracts.map((contract) => (
                 <TableRow key={contract.id}>
-                  <TableCell className="font-bold text-slate-900">{contract.staff_name}</TableCell>
+                  <TableCell className="font-bold text-slate-900 min-w-[140px]">
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                      {contract.staff_name}
+                      {contract.is_probation && (
+                        <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-black border border-amber-200 animate-pulse whitespace-nowrap">
+                          試用期間
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
                       <span className="text-sm font-semibold text-slate-800">{contract.grade || "なし"}</span>
@@ -113,15 +142,30 @@ export default function ContractsPage() {
                        contract.contract_type === 'monthly' ? '月給' : '月給+歩合'}
                     </span>
                   </TableCell>
-                  <TableCell className="text-slate-700">
-                    {contract.contract_type === 'hourly' ? (
-                      <span className="font-bold">{contract.hourly_wage?.toLocaleString()}円/時</span>
+                  <TableCell>
+                    {contract.contract_type === "hourly" ? (
+                      <div className="font-bold text-slate-800">
+                        {contract.hourly_wage?.toLocaleString()}円 / 時
+                      </div>
                     ) : (
-                      <div className="flex flex-col">
-                        <span className="font-bold">{contract.monthly_base_salary?.toLocaleString()}円</span>
-                        {(contract.business_allowance || 0) + (contract.attendance_allowance || 0) + (contract.service_year_allowance || 0) > 0 && (
-                          <span className="text-[10px] text-slate-500">手当: +{((contract.business_allowance || 0) + (contract.attendance_allowance || 0) + (contract.service_year_allowance || 0)).toLocaleString()}円</span>
-                        )}
+                      <div>
+                        {(() => {
+                          const base = contract.monthly_base_salary || 0;
+                          const fixedAllowances = (contract.business_allowance || 0) + (contract.attendance_allowance || 0) + (contract.service_year_allowance || 0);
+                          const customAllowancesTotal = (contract.custom_allowances || []).reduce((sum, a) => sum + (a.amount || 0), 0);
+                          const total = base + fixedAllowances + customAllowancesTotal;
+                          
+                          return (
+                            <>
+                              <div className="font-bold text-slate-900 text-base">
+                                {total.toLocaleString()}円
+                              </div>
+                              <div className="text-[10px] text-slate-500 font-medium">
+                                基本: {base.toLocaleString()}円 / 手当: {(fixedAllowances + customAllowancesTotal).toLocaleString()}円
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
                   </TableCell>
@@ -139,6 +183,15 @@ export default function ContractsPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0 text-slate-500 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 rounded-lg"
+                        onClick={() => handleOpenDetail(contract)}
+                        title="詳細を表示"
+                      >
+                        <Eye size={16} />
+                      </Button>
                       <Button 
                         variant="ghost" 
                         size="sm" 
@@ -196,6 +249,12 @@ export default function ContractsPage() {
             contracts={contracts.filter(c => c.staff_id === historyStaffId)}
           />
         )}
+
+        <ContractDetailDialog 
+          contract={selectedContract || null}
+          isOpen={isDetailOpen}
+          onClose={() => setIsDetailOpen(false)}
+        />
       </div>
     </AuthGuard>
   );

@@ -148,6 +148,12 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1 font-bold text-emerald-700">1件あたりの指名手当 (¥)</label>
+            <input required type="number" name="nomination_fee" defaultValue={staff?.nomination_fee ?? 300} min="0" step="100" className="w-full h-10 px-3 border-2 border-emerald-100 rounded-md shadow-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none font-bold" />
+            <p className="text-[10px] text-slate-400 mt-1">※ 手当管理での指名手当自動計算に使用されます</p>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">希望休上限（日）</label>
             <input required type="number" name="max_holiday_requests" defaultValue={staff?.max_holiday_requests ?? 3} min="0" className="w-full h-10 px-3 border border-slate-300 rounded-md shadow-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none" />
           </div>

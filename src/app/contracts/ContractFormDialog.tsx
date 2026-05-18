@@ -23,6 +23,7 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
     contract?.contract_type || "outsourcing"
   );
   const [saveMode, setSaveMode] = useState<"add_history" | "overwrite">("add_history");
+  const [staffId, setStaffId] = useState(contract?.staff_id || "");
 
   // Auto-fill states
   const [grade, setGrade] = useState(contract?.grade || "");
@@ -35,6 +36,7 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
   const [techSalesThreshold, setTechSalesThreshold] = useState(contract?.tech_sales_threshold || 500000);
   const [techSalesRatio, setTechSalesRatio] = useState(contract?.tech_sales_ratio || (contract?.contract_type === 'outsourcing' ? 50 : 0));
   const [customAllowances, setCustomAllowances] = useState<{name: string, amount: number}[]>(contract?.custom_allowances || []);
+  const [menuSpecificRates, setMenuSpecificRates] = useState<{menu_name: string, ratio: number}[]>(contract?.menu_specific_rates || []);
 
   useEffect(() => {
     if (isOpen) {
@@ -56,6 +58,7 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
       setRoleAllowance(data.role);
       setAttendanceAllowance(data.attendance);
       setServiceAllowance(data.service);
+      setCustomAllowances(data.custom_allowances || []);
       
       // Default Tech Ratio settings for standard grades
       if (contractType === 'outsourcing') {
@@ -85,6 +88,20 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
     setCustomAllowances(customAllowances.filter((_, i) => i !== index));
   };
 
+  const addMenuSpecificRate = () => {
+    setMenuSpecificRates([...menuSpecificRates, { menu_name: "", ratio: 0 }]);
+  };
+
+  const updateMenuSpecificRate = (index: number, field: 'menu_name' | 'ratio', value: string | number) => {
+    const newList = [...menuSpecificRates];
+    newList[index] = { ...newList[index], [field]: value };
+    setMenuSpecificRates(newList);
+  };
+
+  const removeMenuSpecificRate = (index: number) => {
+    setMenuSpecificRates(menuSpecificRates.filter((_, i) => i !== index));
+  };
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -95,7 +112,7 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
       const formData = new FormData(e.currentTarget);
       const data: Partial<StaffContract> = {
         id: contract?.id,
-        staff_id: formData.get("staff_id") as string,
+        staff_id: staffId,
         contract_type: formData.get("contract_type") as any,
         grade: grade,
         job_title: jobTitle,
@@ -118,7 +135,9 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
         deduction_nomination_fee: formData.get("deduction_nomination_fee") === "on",
         valid_from: formData.get("valid_from") as string,
         valid_to: (formData.get("valid_to") as string) || null,
+        is_probation: formData.get("is_probation") === "on",
         custom_allowances: customAllowances,
+        menu_specific_rates: menuSpecificRates,
       };
 
       const res = await upsertContract(data, saveMode);
@@ -162,7 +181,14 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">対象スタッフ</label>
-              <select name="staff_id" required defaultValue={contract?.staff_id} className="w-full h-10 px-3 border border-slate-300 rounded-md bg-white outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
+              <select 
+                name="staff_id" 
+                required 
+                value={staffId} 
+                onChange={(e) => setStaffId(e.target.value)}
+                disabled={!!contract}
+                className="w-full h-10 px-3 border border-slate-300 rounded-md bg-white outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm disabled:bg-slate-50 disabled:text-slate-500"
+              >
                 <option value="">選択してください</option>
                 {staffList.map(s => (
                   <option key={s.id} value={s.id}>{s.name}</option>
@@ -183,6 +209,21 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
                 <option value="tier_monthly">月給＋歩合（固定＋出来高）</option>
               </select>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2 px-1">
+            <label className="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer group">
+              <input 
+                type="checkbox" 
+                name="is_probation" 
+                defaultChecked={contract?.is_probation} 
+                className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 transition-all group-hover:border-emerald-400" 
+              />
+              <span className="flex items-center gap-1.5">
+                試用期間として設定する
+                <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-medium">給与明細等に表示されます</span>
+              </span>
+            </label>
           </div>
 
           {contractType !== "outsourcing" && (
@@ -230,32 +271,83 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
             <h4 className="font-bold text-sm text-slate-900 border-b border-slate-200 pb-2 mb-4">基本報酬・給与設定</h4>
             
             <div className="grid grid-cols-2 gap-4">
-              {(contractType === "hourly") && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">基本時給（円）</label>
-                  <input type="number" value={hourlyWage} onChange={(e) => setHourlyWage(Number(e.target.value))} className="w-full h-10 px-3 border border-slate-300 rounded-md outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
+              {contractType === "hourly" && (
+                <div className="space-y-1">
+                  <div className="flex justify-between items-end mb-1">
+                    <label className="block text-sm font-medium text-slate-700">基本時給（円）</label>
+                    {grade && dbGrades.find(g => g.code === grade)?.hourly !== hourlyWage && (
+                      <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded flex items-center gap-1 animate-in fade-in zoom-in-95">
+                        <Settings size={8} /> 基準値から調整中
+                        <button 
+                          type="button"
+                          onClick={() => setHourlyWage(dbGrades.find(g => g.code === grade)?.hourly || 0)}
+                          className="underline hover:text-amber-800 ml-1"
+                        >
+                          戻す
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                  <input type="number" value={hourlyWage} onChange={(e) => setHourlyWage(Number(e.target.value))} className="w-full h-10 px-3 border border-slate-300 rounded-md outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold" />
                 </div>
               )}
               
               {(contractType === "monthly" || contractType === "tier_monthly") && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">ベース給（円）</label>
-                  <input type="number" value={baseSalary} onChange={(e) => setBaseSalary(Number(e.target.value))} className="w-full h-10 px-3 border border-slate-300 rounded-md outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
+                <div className="space-y-1">
+                  <div className="flex justify-between items-end mb-1">
+                    <label className="block text-sm font-medium text-slate-700">ベース給（円）</label>
+                    {grade && dbGrades.find(g => g.code === grade)?.base !== baseSalary && (
+                      <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded flex items-center gap-1 animate-in fade-in zoom-in-95">
+                        <Settings size={8} /> 基準値から調整中
+                        <button 
+                          type="button"
+                          onClick={() => setBaseSalary(dbGrades.find(g => g.code === grade)?.base || 0)}
+                          className="underline hover:text-amber-800 ml-1"
+                        >
+                          戻す
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                  <input type="number" value={baseSalary} onChange={(e) => setBaseSalary(Number(e.target.value))} className="w-full h-10 px-3 border border-slate-300 rounded-md outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold" />
                 </div>
               )}
 
               {(contractType === "monthly" || contractType === "tier_monthly") && (
                 <>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">業務手当（役職等）</label>
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-end mb-1">
+                      <label className="block text-sm font-medium text-slate-700">業務手当（役職等）</label>
+                      {grade && dbGrades.find(g => g.code === grade)?.role !== roleAllowance && (
+                        <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded flex items-center gap-1 animate-in fade-in zoom-in-95">
+                          調整中 <button type="button" onClick={() => setRoleAllowance(dbGrades.find(g => g.code === grade)?.role || 0)} className="underline ml-1">戻す</button>
+                        </span>
+                      )}
+                    </div>
                     <input type="number" value={roleAllowance} onChange={(e) => setRoleAllowance(Number(e.target.value))} className="w-full h-10 px-3 border border-slate-300 rounded-md outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">皆勤手当</label>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-end mb-1">
+                      <label className="block text-sm font-medium text-slate-700">皆勤手当</label>
+                      {grade && dbGrades.find(g => g.code === grade)?.attendance !== attendanceAllowance && (
+                        <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded flex items-center gap-1 animate-in fade-in zoom-in-95">
+                          調整中 <button type="button" onClick={() => setAttendanceAllowance(dbGrades.find(g => g.code === grade)?.attendance || 0)} className="underline ml-1">戻す</button>
+                        </span>
+                      )}
+                    </div>
                     <input type="number" value={attendanceAllowance} onChange={(e) => setAttendanceAllowance(Number(e.target.value))} className="w-full h-10 px-3 border border-slate-300 rounded-md outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">勤務年数手当</label>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-end mb-1">
+                      <label className="block text-sm font-medium text-slate-700">勤務年数手当</label>
+                      {grade && dbGrades.find(g => g.code === grade)?.service !== serviceAllowance && (
+                        <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded flex items-center gap-1 animate-in fade-in zoom-in-95">
+                          調整中 <button type="button" onClick={() => setServiceAllowance(dbGrades.find(g => g.code === grade)?.service || 0)} className="underline ml-1">戻す</button>
+                        </span>
+                      )}
+                    </div>
                     <input type="number" value={serviceAllowance} onChange={(e) => setServiceAllowance(Number(e.target.value))} className="w-full h-10 px-3 border border-slate-300 rounded-md outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
                   </div>
                 </>
@@ -272,6 +364,58 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
                     <input type="number" value={techSalesThreshold} onChange={(e) => setTechSalesThreshold(Number(e.target.value))} placeholder="500,000" className="w-full h-10 px-3 border border-slate-300 rounded-md outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
                   </div>
                 </>
+              )}
+              
+              {(contractType === "outsourcing" || contractType === "tier_monthly") && (
+                <div className="col-span-2 space-y-3 mt-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">メニュー別特別歩合設定 (例外ルール)</label>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={addMenuSpecificRate}
+                      className="h-6 text-[9px] font-bold text-blue-600 hover:bg-blue-50 px-1.5 rounded"
+                    >
+                      <Plus size={10} className="mr-1" />
+                      メニューを追加
+                    </Button>
+                  </div>
+                  
+                  {menuSpecificRates.length > 0 && (
+                    <div className="space-y-2">
+                      {menuSpecificRates.map((rate, index) => (
+                        <div key={index} className="flex gap-2 items-center bg-white p-2 rounded-lg border border-slate-200 shadow-sm animate-in slide-in-from-right-2 duration-200">
+                          <input 
+                            type="text" 
+                            placeholder="メニュー名 (例: メイクレッスン)" 
+                            value={rate.menu_name}
+                            onChange={(e) => updateMenuSpecificRate(index, 'menu_name', e.target.value)}
+                            className="flex-1 h-8 px-2 border border-slate-100 rounded text-xs outline-none focus:ring-2 focus:ring-blue-500/10"
+                          />
+                          <div className="relative w-20">
+                            <input 
+                              type="number" 
+                              value={rate.ratio}
+                              onChange={(e) => updateMenuSpecificRate(index, 'ratio', Number(e.target.value))}
+                              className="w-full h-8 px-2 border border-slate-100 rounded text-xs outline-none focus:ring-2 focus:ring-blue-500/10 pr-5 font-bold text-blue-600"
+                            />
+                            <span className="absolute right-2 top-2 text-[10px] text-slate-400 font-bold">%</span>
+                          </div>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => removeMenuSpecificRate(index)}
+                            className="h-8 w-8 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md"
+                          >
+                            <Trash2 size={12} />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
               
               <div>

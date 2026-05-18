@@ -9,9 +9,15 @@ import Link from "next/link";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { motion } from "framer-motion";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export default function StaffPortalLayout({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, selectedStore, setSelectedStore } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -50,14 +56,15 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
       { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste },
     ] : []),
     { name: "タイムカード", href: "/attendance", icon: Clock },
+    { name: "在庫・発注", href: "/staff-portal/inventory", icon: Database },
     { name: "交通費申請", href: "/staff-portal/transportation", icon: Train },
   ];
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
       {/* Sidebar for Desktop */}
-      <aside className="hidden lg:flex w-64 bg-slate-900 text-white flex-col sticky top-0 h-screen">
-        <div className="p-8">
+      <aside className="hidden lg:flex w-64 bg-slate-900 text-white flex-col sticky top-0 h-screen overflow-hidden">
+        <div className="p-8 pb-4">
           <div className="flex items-center gap-3 mb-8">
             <div className="bg-blue-600 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20">
               <span className="text-xl font-black italic">S</span>
@@ -65,21 +72,40 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
             <h1 className="text-xl font-black tracking-tighter">SALON PORTAL</h1>
           </div>
 
-          <nav className="space-y-1">
-            {navItems.map((item) => (
-              <Link 
-                key={item.href} 
-                href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${
-                  pathname === item.href ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <item.icon size={18} />
-                {item.name}
-              </Link>
-            ))}
-          </nav>
+          <div className="mb-4">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2 px-2">勤務店舗</label>
+            <div className="grid grid-cols-1 gap-1">
+              {["六甲", "神戸", "元町"].map(store => (
+                <button
+                  key={store}
+                  onClick={() => setSelectedStore(store)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-2 rounded-xl transition-all font-bold text-xs",
+                    selectedStore === store ? "bg-white/10 text-white" : "text-slate-500 hover:text-slate-300"
+                  )}
+                >
+                  <div className={cn("w-2 h-2 rounded-full", selectedStore === store ? "bg-emerald-400 animate-pulse" : "bg-slate-700")} />
+                  {store}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
+
+        <nav className="flex-1 overflow-y-auto px-8 space-y-1 no-scrollbar pb-8">
+          {navItems.map((item) => (
+            <Link 
+              key={item.href} 
+              href={item.href}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${
+                pathname === item.href ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <item.icon size={18} />
+              {item.name}
+            </Link>
+          ))}
+        </nav>
 
         <div className="mt-auto p-6 border-t border-white/5">
           <div className="bg-white/5 rounded-2xl p-4 mb-4 flex items-center gap-3">
@@ -122,6 +148,13 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
           <span className="text-sm font-black tracking-tighter">SALON PORTAL</span>
         </div>
         <div className="flex items-center gap-3">
+          <select 
+            value={selectedStore} 
+            onChange={(e) => setSelectedStore(e.target.value)}
+            className="bg-slate-800 text-[10px] font-black px-2 py-1 rounded border-none outline-none text-blue-400"
+          >
+            {["六甲", "神戸", "元町"].map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
           {isAdminOrManager && (
             <Link href="/dashboard" className="text-blue-400">
               <Settings size={18} />
@@ -138,19 +171,21 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
       </main>
 
       {/* Mobile Nav */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex justify-around p-2 z-40 pb-safe">
-        {navItems.map((item) => (
-          <Link 
-            key={item.href} 
-            href={item.href}
-            className={`flex flex-col items-center gap-1 p-2 transition-all ${
-              pathname === item.href ? 'text-blue-600' : 'text-slate-400'
-            }`}
-          >
-            <item.icon size={20} />
-            <span className="text-[10px] font-black">{item.name}</span>
-          </Link>
-        ))}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex overflow-x-auto z-40 pb-safe no-scrollbar">
+        <div className="flex min-w-full justify-start px-2">
+          {navItems.map((item) => (
+            <Link 
+              key={item.href} 
+              href={item.href}
+              className={`flex flex-col items-center gap-1 p-3 transition-all min-w-[72px] shrink-0 ${
+                pathname === item.href ? 'text-blue-600' : 'text-slate-400'
+              }`}
+            >
+              <item.icon size={20} />
+              <span className="text-[10px] font-black whitespace-nowrap">{item.name}</span>
+            </Link>
+          ))}
+        </div>
       </nav>
     </div>
   );

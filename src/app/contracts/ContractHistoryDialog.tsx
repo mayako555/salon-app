@@ -3,7 +3,10 @@
 import { StaffContract } from "./constants";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
-import { Sparkles, CalendarDays, TrendingUp } from "lucide-react";
+import { Sparkles, CalendarDays, TrendingUp, Trash2 } from "lucide-react";
+import { deleteContract } from "./actions";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 interface ContractHistoryDialogProps {
   isOpen: boolean;
@@ -17,6 +20,18 @@ export default function ContractHistoryDialog({ isOpen, onClose, staffName, cont
   const sortedContracts = [...contracts].sort((a, b) => 
     new Date(b.valid_from).getTime() - new Date(a.valid_from).getTime()
   );
+
+  const handleDelete = async (id: string) => {
+    if (!id) return;
+    if (window.confirm("この契約履歴を削除してもよろしいですか？\n削除すると元に戻せません。")) {
+      const res = await deleteContract(id);
+      if (res.success) {
+        window.location.reload();
+      } else {
+        alert("削除に失敗しました: " + res.error);
+      }
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -61,14 +76,25 @@ export default function ContractHistoryDialog({ isOpen, onClose, staffName, cont
                         <span className="text-slate-400">〜</span>
                         <span>{hasEndDate ? format(new Date(contract.valid_to!), "yyyy年MM月dd日") : "現在"}</span>
                       </div>
-                      <div className={`text-xs font-bold px-2 py-1 rounded ${
-                        contract.contract_type === 'outsourcing' ? 'bg-emerald-100 text-emerald-800' :
-                        contract.contract_type === 'hourly' ? 'bg-blue-100 text-blue-800' :
-                        'bg-purple-100 text-purple-800'
-                      }`}>
-                        {contract.contract_type === 'outsourcing' ? '業務委託' :
-                         contract.contract_type === 'hourly' ? '時給' :
-                         contract.contract_type === 'monthly' ? '月給' : '月給+歩合'}
+                      <div className="flex items-center gap-2">
+                        <div className={`text-xs font-bold px-2 py-1 rounded ${
+                          contract.contract_type === 'outsourcing' ? 'bg-emerald-100 text-emerald-800' :
+                          contract.contract_type === 'hourly' ? 'bg-blue-100 text-blue-800' :
+                          'bg-purple-100 text-purple-800'
+                        }`}>
+                          {contract.contract_type === 'outsourcing' ? '業務委託' :
+                           contract.contract_type === 'hourly' ? '時給' :
+                           contract.contract_type === 'monthly' ? '月給' : '月給+歩合'}
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleDelete(contract.id!)}
+                          className="h-7 w-7 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md"
+                          title="履歴を削除"
+                        >
+                          <Trash2 size={14} />
+                        </Button>
                       </div>
                     </div>
 

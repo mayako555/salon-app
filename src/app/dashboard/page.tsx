@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { 
   Users, 
   FileText, 
@@ -14,7 +15,8 @@ import {
   ArrowRight,
   MessageSquare,
   X,
-  TrendingUp
+  TrendingUp,
+  Award
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import Link from "next/link";
@@ -31,6 +33,7 @@ import { motion } from "framer-motion";
 import { format } from "date-fns";
 import AdvancedCharts from "./AdvancedCharts";
 import SNSTaskSection from "@/app/tasks/SNSTaskSection";
+import { getEvaluationReminders } from "@/app/evaluations/actions";
 
 export default function DashboardPage() {
   const { profile, isAdmin, isManager } = useAuth();
@@ -41,6 +44,14 @@ export default function DashboardPage() {
   const [generatedReply, setGeneratedReply] = useState("");
   const [isEditingTargets, setIsEditingTargets] = useState(false);
   const [editingTargetData, setEditingTargetData] = useState<Record<string, number>>({});
+  const [evalReminders, setEvalReminders] = useState<{id: string, name: string}[]>([]);
+
+  const currentQuarter = (() => {
+    const now = new Date();
+    const month = now.getMonth();
+    const q = Math.floor(month / 3) + 1;
+    return `${now.getFullYear()}Q${q}`;
+  })();
 
   useEffect(() => {
     if (!loading && !isAdmin && !isManager) {
@@ -56,13 +67,15 @@ export default function DashboardPage() {
         if (res.success) {
           setStats(res.data);
         }
+        const evalRes = await getEvaluationReminders(currentQuarter);
+        setEvalReminders(evalRes);
       }
       const tRes = await getAllPendingTasks();
       setTasks(tRes);
       setLoading(false);
     }
     load();
-  }, [isAdmin, isManager, profile?.id]);
+  }, [isAdmin, isManager, profile?.id, currentQuarter]);
 
   const handleGenerateReply = async (task: TaskRecord) => {
     // For demo: pretend we picked these slots
@@ -342,6 +355,45 @@ export default function DashboardPage() {
                   <p className="text-xs text-slate-500 mt-1">セキュリティ保護済み</p>
                 </CardContent>
               </Card>
+
+              {evalReminders.length > 0 && (
+                <Card className="col-span-full bg-white border-none shadow-xl ring-2 ring-purple-500/20 overflow-hidden relative group">
+                  <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform pointer-events-none">
+                    <Award size={100} />
+                  </div>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-black uppercase tracking-widest text-purple-600 flex items-center gap-2">
+                        <Award size={16} /> 四半期評価のリマインダー
+                      </CardTitle>
+                      <Badge className="bg-purple-600 text-white border-none text-[9px] font-black h-5 px-2">
+                        {currentQuarter.replace('Q', '年 第')}四半期
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6">
+                    <div className="space-y-1">
+                      <p className="text-lg font-black text-slate-900">
+                        未完了のスタッフが <span className="text-purple-600 text-2xl underline decoration-purple-200 underline-offset-4">{evalReminders.length}名</span> います
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {evalReminders.slice(0, 5).map(s => (
+                          <span key={s.id} className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">
+                            {s.name}
+                          </span>
+                        ))}
+                        {evalReminders.length > 5 && <span className="text-[10px] font-bold text-slate-400">...他 {evalReminders.length - 5}名</span>}
+                      </div>
+                    </div>
+                    <Link href="/evaluations">
+                      <Button className="bg-slate-900 hover:bg-purple-700 text-white font-black px-8 h-12 rounded-2xl shadow-lg transition-all group/btn">
+                        評価を実施する
+                        <ArrowRight size={18} className="ml-2 group-hover/btn:translate-x-1 transition-transform" />
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              )}
 
               <Link href="/dashboard/performance" className="col-span-full md:col-span-1">
                 <Card className="bg-emerald-900 text-white border-none shadow-xl hover:bg-emerald-800 transition-all group cursor-pointer h-full relative overflow-hidden">

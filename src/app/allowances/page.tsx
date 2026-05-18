@@ -193,12 +193,14 @@ export default function AllowancesPage({
                         task.allowances.map(a => (
                           <span key={a.id} className="text-[10px] flex items-center gap-1 font-bold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-sm">
                             {a.type === 'review' && <MessageSquare size={10} className="text-pink-500" />}
+                            {a.type === 'nomination' && <span className="text-emerald-500 font-bold">★</span>}
                             {a.type === 'blog' && <Edit3 size={10} className="text-blue-500" />}
                             {a.type === 'sns' && <Megaphone size={10} className="text-cyan-500" />}
                             {a.type === 'treatment' && <HelpCircle size={10} className="text-amber-500" />}
                             {a.type === 'transport' && <span className="text-slate-500">🚆</span>}
                             {a.type === 'other' && <span className="text-slate-500">📦</span>}
-                            {a.type === 'review' ? '口コミ' : a.type === 'blog' ? 'ブログ' : a.type === 'sns' ? 'SNS' : a.type === 'treatment' ? 'トリートメント' : a.type === 'transport' ? '交通費' : 'その他'}
+                            {a.type === 'review' ? '口コミ' : a.type === 'nomination' ? '指名手当' : a.type === 'blog' ? 'ブログ' : a.type === 'sns' ? 'SNS' : a.type === 'treatment' ? 'トリートメント' : a.type === 'transport' ? '交通費' : 'その他'}
+                            {a.store_name && <span className="text-slate-400 font-normal ml-0.5">({a.store_name})</span>}
                             {a.amount > 0 && <span className="text-slate-400 ml-1">¥{a.amount.toLocaleString()}</span>}
                           </span>
                         ))
