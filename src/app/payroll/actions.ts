@@ -60,6 +60,7 @@ export type MonthlyStatement = {
       resident_tax: number;
       childcare?: number;
     };
+    hourly_wage?: number;
     metrics: {
       total_tech_sales: number;
       total_product_sales: number;
@@ -931,6 +932,7 @@ export async function updateManualStatement(id: string, data: {
   total_deductions: number;
   final_paid_amount: number;
   work_location?: string;
+  status?: "draft" | "closed";
   details: MonthlyStatement["details"];
 }) {
   try {
@@ -939,9 +941,11 @@ export async function updateManualStatement(id: string, data: {
     if (snap.empty) return { success: false, error: "データが見つかりません" };
     
     const currentData = snap.docs[0].data() as MonthlyStatement;
-    if (currentData.status === "closed") return { success: false, error: "確定済みのデータは編集できません" };
+    if (currentData.status === "closed" && data.status !== "draft") {
+      return { success: false, error: "確定済みのデータは編集できません" };
+    }
 
-    await updateDoc(docRef, {
+    const updatePayload: any = {
       base_amount: data.base_amount,
       total_allowances: data.total_allowances,
       total_deductions: data.total_deductions,
@@ -949,20 +953,55 @@ export async function updateManualStatement(id: string, data: {
       work_location: data.work_location ?? "",
       details: data.details,
       updated_at: serverTimestamp()
-    });
+    };
+
+    if (data.status) {
+      updatePayload.status = data.status;
+    }
+
+    await updateDoc(docRef, updatePayload);
 
     await addAuditLog({
       table_name: "monthly_statements",
       record_id: id,
       action: "UPDATE",
-      old_data: { staff_name: currentData.staff_name, target_month: currentData.target_month },
-      new_data: { staff_name: currentData.staff_name, target_month: currentData.target_month },
+      old_data: { staff_name: currentData.staff_name, target_month: currentData.target_month, status: currentData.status },
+      new_data: { staff_name: currentData.staff_name, target_month: currentData.target_month, status: data.status || currentData.status },
       actor: "管理者"
     });
 
     return { success: true };
   } catch (error: any) {
     console.error("Error updating manual statement:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateStatementStatus(id: string, status: "draft" | "closed") {
+  try {
+    const docRef = doc(db, STATEMENTS_COLLECTION, id);
+    const snap = await getDocs(query(collection(db, STATEMENTS_COLLECTION), where("__name__", "==", id)));
+    if (snap.empty) return { success: false, error: "データが見つかりません" };
+    
+    const currentData = snap.docs[0].data() as MonthlyStatement;
+
+    await updateDoc(docRef, {
+      status,
+      updated_at: serverTimestamp()
+    });
+    
+    await addAuditLog({
+      table_name: "monthly_statements",
+      record_id: id,
+      action: "UPDATE",
+      old_data: { staff_name: currentData.staff_name, target_month: currentData.target_month, status: currentData.status },
+      new_data: { staff_name: currentData.staff_name, target_month: currentData.target_month, status },
+      actor: "管理者"
+    });
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating statement status:", error);
     return { success: false, error: error.message };
   }
 }

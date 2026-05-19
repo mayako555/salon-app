@@ -39,6 +39,7 @@ export default function CreateStatementDialog({
   const [transportAllowance, setTransportAllowance] = useState("");
   const [nominationAllowance, setNominationAllowance] = useState("");
   const [reviewAllowance, setReviewAllowance] = useState("");
+  const [blogAllowance, setBlogAllowance] = useState("");
   const [executiveAllowance, setExecutiveAllowance] = useState("");
   const [taxAddition, setTaxAddition] = useState("");
 
@@ -66,6 +67,7 @@ export default function CreateStatementDialog({
       setTransportAllowance("");
       setNominationAllowance("");
       setReviewAllowance("");
+      setBlogAllowance("");
       setExecutiveAllowance("");
       setTaxAddition("");
       setHealth("");
@@ -103,6 +105,7 @@ export default function CreateStatementDialog({
           setTransportAllowance((d.transportAllowance || 0).toString());
           setNominationAllowance((d.nominationAllowance || 0).toString());
           setReviewAllowance((d.reviewAllowance || 0).toString());
+          setBlogAllowance((d.blogAllowance || 0).toString());
           setExecutiveAllowance((d.executiveAllowance || 0).toString());
           setTaxAddition(d.taxAddition.toString());
           
@@ -123,6 +126,7 @@ export default function CreateStatementDialog({
           setTransportAllowance("");
           setNominationAllowance("");
           setReviewAllowance("");
+          setBlogAllowance("");
           setExecutiveAllowance("");
           setTaxAddition("");
           setHealth("");
@@ -149,8 +153,9 @@ export default function CreateStatementDialog({
   const numTransport = Number(transportAllowance) || 0;
   const numNomination = Number(nominationAllowance) || 0;
   const numReview = Number(reviewAllowance) || 0;
+  const numBlog = Number(blogAllowance) || 0;
   const numExecutive = Number(executiveAllowance) || 0;
-  const numAllowance = numTransport + numNomination + numReview + numExecutive;
+  const numAllowance = numTransport + numNomination + numReview + numBlog + numExecutive;
 
   const numTaxAdd = Number(taxAddition) || 0;
 
@@ -192,6 +197,7 @@ export default function CreateStatementDialog({
           nomination_reward: numNomination,
           transport_fee: numTransport,
           review_allowance: numReview,
+          blog_allowance: numBlog,
           executive_allowance: numExecutive,
           cashless_deduction: 0,
           tax_addition: numTaxAdd,
@@ -224,6 +230,7 @@ export default function CreateStatementDialog({
         setTransportAllowance("");
         setNominationAllowance("");
         setReviewAllowance("");
+        setBlogAllowance("");
         setExecutiveAllowance("");
         setTaxAddition("");
         setHealth("");
@@ -392,12 +399,22 @@ export default function CreateStatementDialog({
                     />
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[9px] text-slate-400 font-bold block">口コミ・ブログ</span>
+                    <span className="text-[9px] text-slate-400 font-bold block">口コミ手当</span>
                     <Input 
                       type="number" 
                       placeholder="口コミ"
                       value={reviewAllowance} 
                       onChange={(e) => setReviewAllowance(e.target.value)}
+                      className="h-8 text-xs rounded font-bold border-slate-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[9px] text-slate-400 font-bold block">ブログ手当</span>
+                    <Input 
+                      type="number" 
+                      placeholder="ブログ手当"
+                      value={blogAllowance} 
+                      onChange={(e) => setBlogAllowance(e.target.value)}
                       className="h-8 text-xs rounded font-bold border-slate-200"
                     />
                   </div>

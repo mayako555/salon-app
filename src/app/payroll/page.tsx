@@ -9,6 +9,7 @@ import StatementDialog from "./StatementDialog";
 import EditStatementDialog from "./EditStatementDialog";
 import CreateStatementDialog from "./CreateStatementDialog";
 import DeleteStatementButton from "./DeleteStatementButton";
+import StatusToggleButton from "./StatusToggleButton";
 import { getStaffList } from "../staff/actions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Banknote, UserCircle2, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
@@ -134,7 +135,8 @@ export default async function PayrollPage({
                   <TableHead className="text-right">手当合計</TableHead>
                   <TableHead className="text-right text-emerald-600">消費税加算</TableHead>
                   <TableHead className="text-right">差引支給額 / 最終請求額</TableHead>
-                  <TableHead className="text-right w-32">アクション</TableHead>
+                  <TableHead className="text-center w-28">状態</TableHead>
+                  <TableHead className="text-right w-36">アクション</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -166,14 +168,27 @@ export default async function PayrollPage({
                     <TableCell className="text-right text-lg font-bold text-slate-800 bg-slate-50/50">
                       ¥{stmt.final_paid_amount.toLocaleString()}
                     </TableCell>
+                    <TableCell className="text-center">
+                      <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm ${
+                        stmt.status === "closed" 
+                          ? "bg-emerald-50 border-emerald-200 text-emerald-700" 
+                          : "bg-amber-50 border-amber-200 text-amber-700"
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          stmt.status === "closed" ? "bg-emerald-500" : "bg-amber-500"
+                        }`} />
+                        {stmt.status === "closed" ? "確定済み" : "一時保存"}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end items-center gap-1">
-                        {!isClosed && (
+                      <div className="flex justify-end items-center gap-1.5">
+                        {stmt.status !== "closed" ? (
                           <>
                             <EditStatementDialog stmt={stmt} />
                             <DeleteStatementButton id={stmt.id} staffName={stmt.staff_name} />
                           </>
-                        )}
+                        ) : null}
+                        <StatusToggleButton id={stmt.id} status={stmt.status} staffName={stmt.staff_name} />
                         <StatementDialog stmt={stmt} />
                       </div>
                     </TableCell>

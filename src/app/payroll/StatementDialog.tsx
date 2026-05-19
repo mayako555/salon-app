@@ -267,9 +267,17 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
                    {/* @ts-ignore */}
                    {stmt.details.review_allowance > 0 && (
                      <div className="flex justify-between text-xs">
-                       <span>口コミ・ブログ手当</span>
+                       <span>口コミ手当</span>
                        {/* @ts-ignore */}
                        <span>{stmt.details.review_allowance.toLocaleString()}</span>
+                     </div>
+                   )}
+                   {/* @ts-ignore */}
+                   {stmt.details.blog_allowance > 0 && (
+                     <div className="flex justify-between text-xs">
+                       <span>ブログ手当</span>
+                       {/* @ts-ignore */}
+                       <span>{stmt.details.blog_allowance.toLocaleString()}</span>
                      </div>
                    )}
                    {/* @ts-ignore */}

@@ -217,19 +217,26 @@ export default function AdminExpensesDashboard() {
     try {
       const reader = new FileReader();
       reader.onload = async () => {
-        const base64Data = reader.result as string;
-        let mime = file.type;
-        if (!mime && file.name.endsWith(".txt")) mime = "text/plain";
-        if (!mime && file.name.endsWith(".csv")) mime = "text/csv";
-        const res = await parseYayoiPdfAction(base64Data, mime || "application/pdf");
-        if (res.success && res.data) {
-          setParsedTransactions(res.data);
-          toast.success("取引履歴をAIで解析しました！");
-        } else {
-          setImportError(res.error || "取引履歴の解析に失敗しました");
+        try {
+          const base64Data = reader.result as string;
+          let mime = file.type;
+          if (!mime && file.name.endsWith(".txt")) mime = "text/plain";
+          if (!mime && file.name.endsWith(".csv")) mime = "text/csv";
+          const res = await parseYayoiPdfAction(base64Data, mime || "application/pdf");
+          if (res.success && res.data) {
+            setParsedTransactions(res.data);
+            toast.success("取引履歴をAIで解析しました！");
+          } else {
+            setImportError(res.error || "取引履歴の解析に失敗しました");
+            toast.error("解析エラーが発生しました");
+          }
+        } catch (err: any) {
+          console.error("Asynchronous error during transaction parsing:", err);
+          setImportError(err.message || "解析中に予期せぬエラーが発生しました");
           toast.error("解析エラーが発生しました");
+        } finally {
+          setIsParsingPdf(false);
         }
-        setIsParsingPdf(false);
       };
       reader.onerror = () => {
         toast.error("ファイルの読み込み中にエラーが発生しました");

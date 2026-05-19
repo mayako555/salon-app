@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { recordClockIn, recordClockOut, getDailyAttendance, handleQRScan } from "../actions";
+import { recordClockIn, recordClockOut, getDailyAttendance, handleQRScan, verifyStaffPassword } from "../actions";
 import Scanner from "react-qr-scanner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,6 +36,9 @@ function KioskContent() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showScanner, setShowScanner] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [authStaff, setAuthStaff] = useState<{ id: string; name: string; isClockedIn: boolean } | null>(null);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -70,7 +73,7 @@ function KioskContent() {
     }
   }
 
-  const handleClockAction = async (staffId: string, staffName: string, isClockedIn: boolean) => {
+  const executeClockAction = async (staffId: string, staffName: string, isClockedIn: boolean) => {
     setProcessing(staffId);
     try {
       if (isClockedIn) {
@@ -89,6 +92,36 @@ function KioskContent() {
       toast.error("エラーが発生しました");
     } finally {
       setProcessing(null);
+    }
+  };
+
+  const handleClockAction = async (staffId: string, staffName: string, isClockedIn: boolean) => {
+    const staff = staffList.find(s => s.id === staffId);
+    if (staff && staff.employment_type === "part_time") {
+      setAuthStaff({ id: staffId, name: staffName, isClockedIn });
+      setPasswordInput("");
+      return;
+    }
+    await executeClockAction(staffId, staffName, isClockedIn);
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authStaff) return;
+    setVerifying(true);
+    try {
+      const res = await verifyStaffPassword(authStaff.id, passwordInput);
+      if (res.success) {
+        const targetStaff = authStaff;
+        setAuthStaff(null);
+        await executeClockAction(targetStaff.id, targetStaff.name, targetStaff.isClockedIn);
+      } else {
+        toast.error(res.error || "パスワードが正しくありません");
+      }
+    } catch (error) {
+      toast.error("認証中にエラーが発生しました");
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -301,6 +334,67 @@ function KioskContent() {
               >
                 キャンセル
               </Button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* パスワード入力モーダル */}
+      <AnimatePresence>
+        {authStaff && (
+          <div className="fixed inset-0 z-50 bg-slate-950/80 flex flex-col items-center justify-center p-6 backdrop-blur-md">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 flex flex-col gap-6 shadow-2xl"
+            >
+              <div className="text-center space-y-2">
+                <h3 className="text-xl font-black text-white">本人確認（パスワード認証）</h3>
+                <p className="text-xs font-semibold text-slate-400">
+                  {authStaff.name} 様、打刻（{authStaff.isClockedIn ? "退勤" : "出勤"}）を行います。<br />
+                  アカウントのパスワードを入力してください。
+                </p>
+              </div>
+
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                <div className="space-y-1">
+                  <input
+                    type="password"
+                    required
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    placeholder="パスワードを入力"
+                    className="w-full h-14 px-4 bg-white/5 border border-white/10 rounded-xl text-white font-bold text-center placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-lg"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <Button 
+                    type="button"
+                    onClick={() => setAuthStaff(null)}
+                    variant="ghost"
+                    className="flex-1 h-12 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 font-bold"
+                  >
+                    キャンセル
+                  </Button>
+                  <Button 
+                    type="submit"
+                    disabled={verifying || !passwordInput}
+                    className="flex-1 h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-1.5"
+                  >
+                    {verifying ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        認証中...
+                      </>
+                    ) : (
+                      "認証して打刻"
+                    )}
+                  </Button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

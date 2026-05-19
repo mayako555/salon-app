@@ -31,6 +31,8 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   // @ts-ignore
   const [reviewAllowance, setReviewAllowance] = useState((stmt.details.review_allowance || 0).toString());
   // @ts-ignore
+  const [blogAllowance, setBlogAllowance] = useState((stmt.details.blog_allowance || 0).toString());
+  // @ts-ignore
   const [executiveAllowance, setExecutiveAllowance] = useState((stmt.details.executive_allowance || 0).toString());
   const [taxAddition, setTaxAddition] = useState((stmt.details.tax_addition || 0).toString());
 
@@ -45,6 +47,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   // Metrics State
   const [workedDays, setWorkedDays] = useState(stmt.details.metrics?.worked_days?.toString() || "0");
   const [workedHours, setWorkedHours] = useState(stmt.details.metrics?.worked_hours?.toString() || "0");
+  const [hourlyWage, setHourlyWage] = useState(stmt.details.hourly_wage?.toString() || "0");
   const [workLocation, setWorkLocation] = useState(stmt.work_location || "");
 
   // Calculations
@@ -52,8 +55,9 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const numTransport = Number(transportAllowance) || 0;
   const numNomination = Number(nominationAllowance) || 0;
   const numReview = Number(reviewAllowance) || 0;
+  const numBlog = Number(blogAllowance) || 0;
   const numExecutive = Number(executiveAllowance) || 0;
-  const numAllowance = numTransport + numNomination + numReview + numExecutive;
+  const numAllowance = numTransport + numNomination + numReview + numBlog + numExecutive;
 
   const numTaxAdd = Number(taxAddition) || 0;
 
@@ -67,8 +71,21 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const totalDeductions = numHealth + numPension + numEmployment + numIncomeTax + numResidentTax + numChildcare;
   const finalPaidAmount = numBase + numAllowance + numTaxAdd - totalDeductions;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleHourlyWageChange = (val: string) => {
+    setHourlyWage(val);
+    const wage = Number(val) || 0;
+    const hours = Number(workedHours) || 0;
+    setBaseAmount(Math.floor(wage * hours).toString());
+  };
+
+  const handleWorkedHoursChange = (val: string) => {
+    setWorkedHours(val);
+    const wage = Number(hourlyWage) || 0;
+    const hours = Number(val) || 0;
+    setBaseAmount(Math.floor(wage * hours).toString());
+  };
+
+  const handleSave = async (status: "draft" | "closed") => {
     setIsSubmitting(true);
     try {
       const payload = {
@@ -77,6 +94,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
         total_deductions: totalDeductions,
         final_paid_amount: finalPaidAmount,
         work_location: workLocation,
+        status: status,
         details: {
           ...stmt.details,
           base_tech_salary: stmt.type === "reward" ? numBase : 0,
@@ -85,8 +103,11 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
           // @ts-ignore
           review_allowance: numReview,
           // @ts-ignore
+          blog_allowance: numBlog,
+          // @ts-ignore
           executive_allowance: numExecutive,
           tax_addition: numTaxAdd,
+          hourly_wage: Number(hourlyWage) || 0,
           social_insurance: stmt.type === "salary" ? {
             health: numHealth,
             pension: numPension,
@@ -105,7 +126,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
 
       const res = await updateManualStatement(stmt.id, payload);
       if (res.success) {
-        toast.success(`${stmt.staff_name}様の明細書を更新しました！`);
+        toast.success(`${stmt.staff_name}様の明細書を${status === "closed" ? "確定" : "一時保存"}しました！`);
         setIsOpen(false);
         router.refresh();
       } else {
@@ -137,7 +158,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+        <form onSubmit={(e) => e.preventDefault()} className="space-y-6 mt-4">
           
           {/* Target Month & Staff (Disabled) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100 opacity-80">
@@ -155,6 +176,53 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
               <Input value={stmt.staff_name} disabled className="h-9 text-xs rounded-lg font-bold bg-slate-100 border-slate-200" />
             </div>
           </div>
+
+          {/* 時給計算アシスタント */}
+          {stmt.type === "salary" && (
+            <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-blue-100/60 pb-2">
+                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-blue-600 animate-pulse" />
+                  時給計算アシスタント（パート・時給制スタッフ用）
+                </h4>
+                <span className="text-[9px] font-black text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  Hourly Auto-Calc
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 block">時給 (円)</label>
+                  <Input 
+                    type="number" 
+                    value={hourlyWage} 
+                    onChange={(e) => handleHourlyWageChange(e.target.value)}
+                    placeholder="例: 1000"
+                    className="h-9 text-xs rounded-lg font-bold border-slate-200 bg-white"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 block">労働時間 (時間)</label>
+                  <Input 
+                    type="number" 
+                    step="0.1"
+                    value={workedHours} 
+                    onChange={(e) => handleWorkedHoursChange(e.target.value)}
+                    placeholder="例: 80.5"
+                    className="h-9 text-xs rounded-lg font-bold border-slate-200 bg-white"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 block">自動計算された基本給 (円)</label>
+                  <div className="h-9 flex items-center justify-start px-3 bg-slate-100 border border-slate-200 rounded-lg text-xs font-extrabold text-slate-700 tabular-nums">
+                    ¥{Math.floor((Number(hourlyWage) || 0) * (Number(workedHours) || 0)).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+              <p className="text-[9px] text-slate-400 font-medium">
+                ※ 時給または労働時間を入力すると、下の「基本給 / 歩合報酬ベース」が自動的に連動して更新されます。
+              </p>
+            </div>
+          )}
 
           {/* Earnings Grid */}
           <div className="space-y-3">
@@ -208,16 +276,26 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                     />
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[9px] text-slate-400 font-bold block">口コミ・ブログ</span>
+                    <span className="text-[9px] text-slate-400 font-bold block">口コミ手当</span>
                     <Input 
                       type="number" 
-                      placeholder="口コミ"
+                      placeholder="口コミ手当"
                       value={reviewAllowance} 
                       onChange={(e) => setReviewAllowance(e.target.value)}
                       className="h-8 text-xs rounded font-bold border-slate-200"
                     />
                   </div>
                   <div className="space-y-1">
+                    <span className="text-[9px] text-slate-400 font-bold block">ブログ手当</span>
+                    <Input 
+                      type="number" 
+                      placeholder="ブログ手当"
+                      value={blogAllowance} 
+                      onChange={(e) => setBlogAllowance(e.target.value)}
+                      className="h-8 text-xs rounded font-bold border-slate-200"
+                    />
+                  </div>
+                  <div className="space-y-1 col-span-2">
                     <span className="text-[9px] text-slate-400 font-bold block">役職・その他</span>
                     <Input 
                       type="number" 
@@ -356,7 +434,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 sm:justify-end flex-wrap">
             <Button 
               type="button" 
               variant="outline" 
@@ -367,9 +445,11 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
               キャンセル
             </Button>
             <Button 
-              type="submit" 
+              type="button" 
+              variant="outline"
+              onClick={() => handleSave("draft")}
               disabled={isSubmitting}
-              className="h-10 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs gap-1.5"
+              className="h-10 rounded-lg border-slate-300 text-slate-700 bg-white hover:bg-slate-50 font-bold text-xs gap-1.5"
             >
               {isSubmitting ? (
                 <>
@@ -378,8 +458,26 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                 </>
               ) : (
                 <>
-                  <Save size={14} />
-                  変更を保存
+                  <Save size={14} className="text-slate-500" />
+                  一時保存
+                </>
+              )}
+            </Button>
+            <Button 
+              type="button" 
+              onClick={() => handleSave("closed")}
+              disabled={isSubmitting}
+              className="h-10 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-1.5"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  保存中...
+                </>
+              ) : (
+                <>
+                  <ShieldCheck size={14} />
+                  確定（ロック）する
                 </>
               )}
             </Button>

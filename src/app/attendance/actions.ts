@@ -307,3 +307,33 @@ export async function bulkImportAttendanceRecords(records: Omit<AttendanceRecord
     return { success: false, error: error.message };
   }
 }
+
+export async function verifyStaffPassword(staffId: string, password: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const staffDocSnap = await getDocs(query(collection(db, "staff_profiles"), where("__name__", "==", staffId)));
+    if (staffDocSnap.empty) {
+      return { success: false, error: "スタッフが見つかりません" };
+    }
+    const staffData = staffDocSnap.docs[0].data();
+    const email = staffData.email;
+    if (!email) {
+      return { success: false, error: "メールアドレスが設定されていません" };
+    }
+
+    const apiKey = "AIzaSyBox-c3ZDIe0TNoAR3wDNlypyP-HA1tF98";
+    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, returnSecureToken: true }),
+    });
+
+    if (!res.ok) {
+      return { success: false, error: "パスワードが正しくありません" };
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error in verifyStaffPassword:", error);
+    return { success: false, error: "通信エラーが発生しました" };
+  }
+}

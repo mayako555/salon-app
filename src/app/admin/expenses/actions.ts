@@ -468,11 +468,18 @@ export async function parseYayoiPdfAction(base64File: string, mimeType: string) 
       };
     }
 
-    const jsonMatch = jsonResultText.match(/\[[\s\S]*\]/);
-    const jsonStr = jsonMatch ? jsonMatch[0] : jsonResultText;
-    const parsedData = JSON.parse(jsonStr);
-
-    return { success: true, data: parsedData };
+    try {
+      const jsonMatch = jsonResultText.match(/\[[\s\S]*\]/);
+      const jsonStr = jsonMatch ? jsonMatch[0] : jsonResultText;
+      const parsedData = JSON.parse(jsonStr);
+      return { success: true, data: parsedData };
+    } catch (parseErr: any) {
+      console.error("JSON parse error on Gemini output:", parseErr, jsonResultText);
+      return {
+        success: false,
+        error: `AIの出力解析に失敗しました。ファイルの内容が適切にJSONとして読み取れませんでした。もう一度お試しいただくか、別のファイルをアップロードしてください。`
+      };
+    }
   } catch (error: any) {
     console.error("parseYayoiPdfAction Error:", error);
     return { success: false, error: error.message };
