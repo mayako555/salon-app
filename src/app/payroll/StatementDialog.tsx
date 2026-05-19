@@ -154,20 +154,6 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
               </DialogDescription>
             </div>
             <div className="flex items-center gap-3 print:hidden">
-              {stmt.work_location && (
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700">
-                  <input 
-                    type="checkbox" 
-                    id={`toggle-loc-${stmt.id}`}
-                    checked={showLocation} 
-                    onChange={(e) => setShowLocation(e.target.checked)} 
-                    className="rounded border-slate-300 text-rose-600 focus:ring-rose-500 h-4 w-4 cursor-pointer"
-                  />
-                  <label htmlFor={`toggle-loc-${stmt.id}`} className="cursor-pointer select-none">
-                    出勤場所を表示する
-                  </label>
-                </div>
-              )}
               <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-700" onClick={() => window.print()}>
                  <Download size={16} />
               </Button>
@@ -205,11 +191,6 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
                 <p className="font-bold border-b border-black w-48 mb-2 pb-1">{stmt.target_month.replace("-", "年")}月分 給与・報酬</p>
                 <div className="flex justify-between items-baseline pr-4">
                   <span>Jasmine Lash</span>
-                  {showLocation && stmt.work_location && (
-                    <span className="text-[10px] bg-slate-100 border border-slate-300 px-1 py-0.5 rounded font-black text-slate-700">
-                      勤務場所: {stmt.work_location}
-                    </span>
-                  )}
                 </div>
                 <p className="font-bold text-lg">{stmt.staff_name} 様</p>
               </div>
@@ -262,7 +243,7 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
                      <div className="flex justify-between text-xs"><span>指名手当</span><span>{stmt.details.nomination_reward.toLocaleString()}</span></div>
                    )}
                    {stmt.details.transport_fee > 0 && (
-                     <div className="flex justify-between text-xs"><span>交通費</span><span>{stmt.details.transport_fee.toLocaleString()}</span></div>
+                     <div className="flex justify-between text-xs"><span>通勤手当</span><span>{stmt.details.transport_fee.toLocaleString()}</span></div>
                    )}
                    {/* @ts-ignore */}
                    {stmt.details.review_allowance > 0 && (

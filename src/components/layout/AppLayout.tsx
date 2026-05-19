@@ -1,15 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { Sidebar } from "./Sidebar";
-import { Bell, Search, User, LogOut } from "lucide-react";
+import { Bell, Search, User, LogOut, Menu, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
+import { motion, AnimatePresence } from "framer-motion";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, profile, loading } = useAuth();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isLoginPage = pathname === "/login";
 
   if (isLoginPage) {
@@ -32,10 +35,65 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen w-full bg-slate-50 overflow-hidden text-slate-900">
-      <Sidebar />
+      {/* Desktop Sidebar */}
+      <div className="hidden md:flex md:flex-shrink-0">
+        <Sidebar />
+      </div>
+
+      {/* Mobile Drawer (Sidebar overlay) */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <div className="relative z-50 md:hidden">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+
+            {/* Drawer Container */}
+            <div className="fixed inset-0 flex">
+              <motion.div
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                className="relative flex w-full max-w-xs flex-1 flex-col bg-white"
+              >
+                {/* Close Button */}
+                <div className="absolute right-3 top-3 z-10">
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="rounded-xl p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Sidebar Drawer Body */}
+                <div className="h-full overflow-y-auto" onClick={() => setIsMobileMenuOpen(false)}>
+                  <Sidebar />
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-8 shadow-sm z-10">
-          <div className="flex flex-1">
+        <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 md:px-8 shadow-sm z-10">
+          <div className="flex flex-1 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="rounded-xl p-2 text-slate-500 hover:bg-slate-50 hover:text-slate-900 md:hidden transition-colors"
+              aria-label="メニューを開く"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
             <form className="flex w-full md:ml-0" action="#" method="GET">
               <label htmlFor="search-field" className="sr-only">Search</label>
               <div className="relative w-full text-slate-400 focus-within:text-slate-600">
@@ -76,7 +134,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex-1 overflow-y-auto focus:outline-none">
-          <div className="py-8 px-8 max-w-7xl mx-auto w-full">
+          <div className="py-8 px-4 md:px-8 max-w-7xl mx-auto w-full">
             {children}
           </div>
         </main>

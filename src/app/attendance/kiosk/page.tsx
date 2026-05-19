@@ -3,8 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { recordClockIn, recordClockOut, getDailyAttendance, handleQRScan, verifyStaffPassword } from "../actions";
-import Scanner from "react-qr-scanner";
+import { recordClockIn, recordClockOut, getDailyAttendance } from "../actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
@@ -16,13 +15,13 @@ import {
   LogIn,
   Sparkles,
   Loader2,
-  MapPin
+  MapPin,
+  X
 } from "lucide-react";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { QrCode, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
 function KioskContent() {
@@ -34,11 +33,8 @@ function KioskContent() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [showScanner, setShowScanner] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
   const [authStaff, setAuthStaff] = useState<{ id: string; name: string; isClockedIn: boolean } | null>(null);
   const [passwordInput, setPasswordInput] = useState("");
-  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -96,64 +92,28 @@ function KioskContent() {
   };
 
   const handleClockAction = async (staffId: string, staffName: string, isClockedIn: boolean) => {
-    const staff = staffList.find(s => s.id === staffId);
-    if (staff && staff.employment_type === "part_time") {
-      setAuthStaff({ id: staffId, name: staffName, isClockedIn });
-      setPasswordInput("");
-      return;
-    }
-    await executeClockAction(staffId, staffName, isClockedIn);
+    setAuthStaff({ id: staffId, name: staffName, isClockedIn });
+    setPasswordInput("");
   };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!authStaff) return;
-    setVerifying(true);
-    try {
-      const res = await verifyStaffPassword(authStaff.id, passwordInput);
-      if (res.success) {
-        const targetStaff = authStaff;
-        setAuthStaff(null);
-        await executeClockAction(targetStaff.id, targetStaff.name, targetStaff.isClockedIn);
-      } else {
-        toast.error(res.error || "パスワードが正しくありません");
-      }
-    } catch (error) {
-      toast.error("認証中にエラーが発生しました");
-    } finally {
-      setVerifying(false);
+    
+    // Find the staff in memory
+    const staff = staffList.find(s => s.id === authStaff.id);
+    const requiredPasscode = staff?.passcode || "1234";
+    
+    if (passwordInput === requiredPasscode) {
+      const targetStaff = authStaff;
+      setAuthStaff(null);
+      await executeClockAction(targetStaff.id, targetStaff.name, targetStaff.isClockedIn);
+    } else {
+      toast.error("暗証番号（パスコード）が正しくありません");
     }
   };
 
-  const onScan = async (data: any) => {
-    if (data && !isScanning) {
-      setIsScanning(true);
-      const staffId = data.text;
-      try {
-        const res = await handleQRScan(staffId, storeName);
-        if (res.success) {
-          if (res.action === "IN") {
-            toast.success(`${res.name}さん、おはようございます！ (${storeName}店)`);
-          } else {
-            toast.success(`${res.name}さん、お疲れ様でした！`);
-          }
-          setShowScanner(false);
-          await loadData();
-        } else {
-          toast.error(res.error || "スキャンに失敗しました");
-        }
-      } catch (error) {
-        toast.error("スキャン処理中にエラーが発生しました");
-      } finally {
-        setTimeout(() => setIsScanning(false), 2000);
-      }
-    }
-  };
-
-  const onError = (err: any) => {
-    console.error(err);
-    toast.error("カメラの起動に失敗しました");
-  };
+  // Scanner removed as requested
 
   if (loading) {
     return (
@@ -197,14 +157,6 @@ function KioskContent() {
             <div className="text-emerald-400 font-black tracking-wider">
               {format(currentTime, "yyyy.MM.dd (E)", { locale: ja })}
             </div>
-            
-            <Button 
-              onClick={() => setShowScanner(true)}
-              className="mt-4 bg-white text-slate-900 rounded-2xl h-14 px-8 font-black flex items-center gap-2 shadow-2xl hover:bg-slate-100 transition-all active:scale-95"
-            >
-              <QrCode size={20} className="text-blue-500" />
-              QRコードで打刻
-            </Button>
           </div>
         </div>
 
@@ -297,49 +249,9 @@ function KioskContent() {
         </div>
       </div>
 
-      {/* QR Scanner Modal */}
-      <AnimatePresence>
-        {showScanner && (
-          <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center p-6">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-md bg-white/5 border border-white/10 rounded-[3rem] p-8 flex flex-col items-center gap-8 backdrop-blur-3xl"
-            >
-              <div className="text-center">
-                <h3 className="text-2xl font-black text-white mb-2">QR SCANNER</h3>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">個人端末のQRコードをかざしてください</p>
-              </div>
 
-              <div className="relative w-full aspect-square bg-black rounded-[2rem] overflow-hidden border-4 border-emerald-500/30">
-                <Scanner
-                  delay={300}
-                  onError={onError}
-                  onScan={onScan}
-                  style={{ width: '100%', height: '100%' }}
-                />
-                <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none" />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-48 h-48 border-2 border-emerald-500 rounded-3xl relative">
-                    <div className="absolute inset-x-0 top-0 h-0.5 bg-emerald-500 animate-scan" />
-                  </div>
-                </div>
-              </div>
 
-              <Button 
-                onClick={() => setShowScanner(false)}
-                variant="ghost"
-                className="w-full h-14 rounded-2xl text-white hover:bg-white/10 font-black"
-              >
-                キャンセル
-              </Button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* パスワード入力モーダル */}
+      {/* 暗証番号入力モーダル */}
       <AnimatePresence>
         {authStaff && (
           <div className="fixed inset-0 z-50 bg-slate-950/80 flex flex-col items-center justify-center p-6 backdrop-blur-md">
@@ -350,10 +262,10 @@ function KioskContent() {
               className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 flex flex-col gap-6 shadow-2xl"
             >
               <div className="text-center space-y-2">
-                <h3 className="text-xl font-black text-white">本人確認（パスワード認証）</h3>
+                <h3 className="text-xl font-black text-white">暗証番号（PIN）の入力</h3>
                 <p className="text-xs font-semibold text-slate-400">
                   {authStaff.name} 様、打刻（{authStaff.isClockedIn ? "退勤" : "出勤"}）を行います。<br />
-                  アカウントのパスワードを入力してください。
+                  ご自身の暗証番号を入力してください。
                 </p>
               </div>
 
@@ -361,11 +273,13 @@ function KioskContent() {
                 <div className="space-y-1">
                   <input
                     type="password"
+                    pattern="[0-9]*"
+                    inputMode="numeric"
                     required
                     value={passwordInput}
                     onChange={(e) => setPasswordInput(e.target.value)}
-                    placeholder="パスワードを入力"
-                    className="w-full h-14 px-4 bg-white/5 border border-white/10 rounded-xl text-white font-bold text-center placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-lg"
+                    placeholder="暗証番号を入力"
+                    className="w-full h-14 px-4 bg-white/5 border border-white/10 rounded-xl text-white font-black text-center placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-2xl tracking-widest"
                     autoFocus
                   />
                 </div>
@@ -381,17 +295,10 @@ function KioskContent() {
                   </Button>
                   <Button 
                     type="submit"
-                    disabled={verifying || !passwordInput}
-                    className="flex-1 h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-1.5"
+                    disabled={!passwordInput}
+                    className="flex-1 h-12 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold"
                   >
-                    {verifying ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        認証中...
-                      </>
-                    ) : (
-                      "認証して打刻"
-                    )}
+                    認証して打刻
                   </Button>
                 </div>
               </form>

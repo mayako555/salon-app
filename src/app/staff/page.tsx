@@ -107,6 +107,16 @@ function SortableStaffItem({
             </div>
           </div>
 
+          <div className="hidden md:flex flex-col items-end gap-1 px-4 border-l border-slate-50 min-w-[90px]">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">基本時給</p>
+            <p className="text-sm font-black text-emerald-600 bg-emerald-50 border border-emerald-100 rounded px-2.5 py-0.5 tracking-wider tabular-nums">¥{(staff.hourly_wage ?? 0).toLocaleString()}</p>
+          </div>
+
+          <div className="hidden md:flex flex-col items-end gap-1 px-4 border-l border-slate-50 min-w-[100px]">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">暗証番号 (PIN)</p>
+            <p className="text-sm font-black text-blue-600 bg-blue-50 border border-blue-100 rounded px-2.5 py-0.5 tracking-wider tabular-nums">{staff.passcode || "1234"}</p>
+          </div>
+
           <div className="hidden md:flex flex-col items-end gap-1 px-4 border-l border-slate-50">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">希望休上限</p>
             <p className="text-lg font-black text-slate-900 tracking-tight">{staff.max_holiday_requests ?? 3}日</p>

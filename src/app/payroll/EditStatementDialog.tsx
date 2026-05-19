@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,9 @@ import {
 } from "lucide-react";
 import { MonthlyStatement, updateManualStatement } from "./actions";
 import { toast } from "sonner";
+import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { calculatePayrollTaxes } from "@/lib/tax-calculator";
 
 export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }) {
   const router = useRouter();
@@ -49,6 +52,78 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const [workedHours, setWorkedHours] = useState(stmt.details.metrics?.worked_hours?.toString() || "0");
   const [hourlyWage, setHourlyWage] = useState(stmt.details.hourly_wage?.toString() || "0");
   const [workLocation, setWorkLocation] = useState(stmt.work_location || "");
+  const [contractType, setContractType] = useState<string>("");
+
+  // Prefill hourly wage from staff profile and fetch contract type on open
+  useEffect(() => {
+    if (isOpen && stmt.staff_id) {
+      const fetchStaffWageAndContract = async () => {
+        try {
+          const docRef = doc(db, "staff_profiles", stmt.staff_id);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            // If statement hourly_wage is 0/empty, prefill with staff profile hourly_wage!
+            const savedWageOnStmt = Number(stmt.details.hourly_wage) || 0;
+            if (savedWageOnStmt === 0 && data.hourly_wage) {
+              setHourlyWage(data.hourly_wage.toString());
+              
+              // Also update the base basic pay if workedHours is already set
+              const hours = Number(workedHours) || 0;
+              if (hours > 0) {
+                setBaseAmount(Math.floor(data.hourly_wage * hours).toString());
+              }
+            }
+          }
+
+          // Fetch contract type
+          const contractsSnap = await getDocs(query(collection(db, "contracts"), where("staff_id", "==", stmt.staff_id)));
+          if (!contractsSnap.empty) {
+            const contractData = contractsSnap.docs[0].data();
+            setContractType(contractData.contract_type || "");
+          }
+        } catch (err) {
+          console.error("Error fetching staff wage or contract:", err);
+        }
+      };
+      fetchStaffWageAndContract();
+    }
+  }, [isOpen, stmt.staff_id]);
+
+  // Dynamic client-side tax auto-calculation
+  useEffect(() => {
+    if (stmt.type !== "salary") {
+      // Clear deductions for outsourcing/reward types
+      setHealth("0");
+      setPension("0");
+      setEmployment("0");
+      setIncomeTax("0");
+      setChildcare("0");
+      return;
+    }
+
+    const baseVal = Number(baseAmount) || 0;
+    const transportVal = Number(transportAllowance) || 0;
+    const otherAllowances = (Number(nominationAllowance) || 0) + 
+                            (Number(reviewAllowance) || 0) + 
+                            (Number(blogAllowance) || 0) + 
+                            (Number(executiveAllowance) || 0);
+
+    if (baseVal <= 0) return; // Don't calculate if no base pay is set yet
+
+    const taxes = calculatePayrollTaxes({
+      baseSalary: baseVal,
+      allowances: otherAllowances,
+      transportFee: transportVal,
+      dependentsCount: 0
+    });
+
+    setHealth(taxes.healthInsurance.toString());
+    setPension(taxes.pension.toString());
+    setEmployment(taxes.employmentInsurance.toString());
+    setIncomeTax(taxes.incomeTax.toString());
+    setChildcare(taxes.childcareSupport ? taxes.childcareSupport.toString() : "0");
+  }, [baseAmount, transportAllowance, nominationAllowance, reviewAllowance, blogAllowance, executiveAllowance, stmt.type]);
 
   // Calculations
   const numBase = Number(baseAmount) || 0;
@@ -178,7 +253,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
           </div>
 
           {/* 時給計算アシスタント */}
-          {stmt.type === "salary" && (
+          {stmt.type === "salary" && contractType !== "monthly" && contractType !== "tier_monthly" && (
             <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 shadow-sm space-y-3">
               <div className="flex items-center justify-between border-b border-blue-100/60 pb-2">
                 <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -229,7 +304,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
             <h3 className="text-xs font-bold text-slate-700 border-b pb-1.5 flex items-center gap-1">
               <span className="w-1.5 h-3.5 bg-blue-500 rounded-sm"></span> 支給・支払額の入力
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 block">基本給 / 歩合報酬ベース (円)</label>
                 <Input 
@@ -242,24 +317,13 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 block">出勤場所 / 店舗</label>
-                <Input 
-                  type="text" 
-                  value={workLocation} 
-                  onChange={(e) => setWorkLocation(e.target.value)}
-                  placeholder="例: 六甲・神戸"
-                  className="h-10 text-xs rounded-lg font-bold border-slate-200 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="space-y-1 md:col-span-2">
                 <label className="text-[10px] font-bold text-slate-500 block mb-1">手当の内訳 (円)</label>
                 <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
                   <div className="space-y-1">
-                    <span className="text-[9px] text-slate-400 font-bold block">交通費</span>
+                    <span className="text-[9px] text-slate-400 font-bold block">通勤手当</span>
                     <Input 
                       type="number" 
-                      placeholder="交通費"
+                      placeholder="通勤手当"
                       value={transportAllowance} 
                       onChange={(e) => setTransportAllowance(e.target.value)}
                       className="h-8 text-xs rounded font-bold border-slate-200"

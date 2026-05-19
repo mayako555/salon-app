@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getAllCustomers, Customer } from "@/lib/customers";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { 
   ReceiptText, 
   CalendarHeart, 
@@ -27,7 +28,7 @@ import { useAuth } from "@/lib/auth-context";
 import { getMonthlySales } from "@/app/sales/actions";
 import { getDailyAttendance, recordClockIn, recordClockOut } from "@/app/attendance/actions";
 import { getAllPendingTasks, TaskRecord, generateBookingReply, sendReplyAndCompleteTask } from "@/app/tasks/actions";
-import { getStaffList, StaffProfile } from "@/app/staff/actions";
+import { getStaffList, StaffProfile, updateStaffPasscode } from "@/app/staff/actions";
 import { getDashboardStats } from "@/app/dashboard/actions";
 import { getMonthlyShifts } from "@/app/shifts/actions";
 import { Progress } from "@/components/ui/progress";
@@ -222,6 +223,26 @@ export default function StaffDashboardPage() {
       </div>
 
       <div className="-mt-6 px-4 space-y-6">
+        {/* 暗証番号（タイムカード用パスコード）の設定 */}
+        <Card className="p-5 rounded-[2rem] border-slate-100 shadow-sm bg-white space-y-4">
+          <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-blue-50/80 flex items-center justify-center text-blue-600">
+                <Sparkles size={16} className="animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800">打刻用暗証番号の設定</h3>
+                <p className="text-[10px] text-slate-400 font-bold">Timecard PIN Settings</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-black text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
+              4桁の数字
+            </span>
+          </div>
+
+          <PasscodeChangeSection staffId={profile?.id} currentPasscode={profile?.passcode} />
+        </Card>
+
         {/* Alerts Section */}
         {riskAlerts.length > 0 && (
           <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 shadow-sm">
@@ -575,6 +596,76 @@ export default function StaffDashboardPage() {
           </motion.div>
         </div>
       )}
+    </div>
+  );
+}
+
+function PasscodeChangeSection({ staffId, currentPasscode }: { staffId?: string, currentPasscode?: string }) {
+  const [passcode, setPasscode] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleUpdate = async () => {
+    if (!staffId) return;
+    if (!/^\d{4}$/.test(passcode)) {
+      toast.error("暗証番号は4桁の数字で入力してください");
+      return;
+    }
+    setIsUpdating(true);
+    try {
+      const res = await updateStaffPasscode(staffId, passcode);
+      if (res.success) {
+        toast.success("暗証番号を変更しました");
+        setPasscode("");
+      } else {
+        toast.error(res.error || "変更に失敗しました");
+      }
+    } catch (e) {
+      toast.error("エラーが発生しました");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl border border-slate-100">
+        <div>
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">現在の暗証番号</p>
+          <p className="text-sm font-extrabold text-slate-700 tracking-widest mt-0.5">
+            {showPass ? (currentPasscode || "未設定") : "••••"}
+          </p>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => setShowPass(!showPass)}
+          className="text-[10px] font-bold text-blue-600 h-8 rounded-lg hover:bg-white"
+        >
+          {showPass ? "隠す" : "表示する"}
+        </Button>
+      </div>
+
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Input 
+            type="password"
+            maxLength={4}
+            pattern="\d*"
+            placeholder="新しい4桁の暗証番号"
+            value={passcode}
+            onChange={(e) => setPasscode(e.target.value.replace(/\D/g, ""))}
+            className="h-11 text-xs rounded-xl font-bold border-slate-200"
+          />
+        </div>
+        <Button 
+          onClick={handleUpdate}
+          disabled={isUpdating || passcode.length !== 4}
+          className="h-11 px-5 rounded-xl bg-slate-900 text-white font-black text-xs shadow-md transition-all active:scale-95"
+        >
+          {isUpdating ? "更新中..." : "変更する"}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -21,12 +21,21 @@ export default function StaffLoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      toast.success("ログインしました");
-      router.push("/staff-portal");
+      // 1. Try with passcode suffix first
+      try {
+        await signInWithEmailAndPassword(auth, email, password + "_salon");
+        toast.success("ログインしました");
+        router.push("/staff-portal");
+        return;
+      } catch (suffixErr) {
+        // 2. Fallback to raw password (for standard password logins)
+        await signInWithEmailAndPassword(auth, email, password);
+        toast.success("ログインしました");
+        router.push("/staff-portal");
+      }
     } catch (error: any) {
       console.error(error);
-      toast.error("ログインに失敗しました。メールアドレスまたはパスワードを確認してください。");
+      toast.error("ログインに失敗しました。メールアドレスまたは暗証番号を確認してください。");
     } finally {
       setLoading(false);
     }
@@ -75,12 +84,12 @@ export default function StaffLoginPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Password</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Password / Passcode (PIN)</label>
                 <div className="relative">
                   <Key className="absolute left-4 top-4 text-slate-500" size={18} />
                   <Input 
                     type="password" 
-                    placeholder="••••••••"
+                    placeholder="パスワード または 4桁の暗証番号"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required

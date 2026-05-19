@@ -661,6 +661,14 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
     if (!contract) {
       return { success: false, error: "該当スタッフの契約情報が登録されていません。" };
     }
+
+    // Retrieve staff profile to get fallback hourly_wage
+    const staffSnap = await getDocs(query(collection(db, "staff_profiles"), where("__name__", "==", staffId)));
+    let staffProfileHourlyWage = 0;
+    if (!staffSnap.empty) {
+      staffProfileHourlyWage = staffSnap.docs[0].data().hourly_wage || 0;
+    }
+    const finalHourlyWage = contract.hourly_wage || staffProfileHourlyWage || 0;
     
     const sales = await getMonthlySales(year, month);
     const allowances = await getMonthlyAllowances(year, month);
@@ -757,7 +765,21 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
         }
       }
       const totalHours = totalMinutesWorked > 0 ? (totalMinutesWorked / 60) : 0;
-      base_amount = Math.floor(totalHours * (contract.hourly_wage || 0));
+      base_amount = Math.floor(totalHours * finalHourlyWage);
+
+      const totalAllowancesTmp = transportAllowance + nominationAllowance + reviewAllowance + blogAllowance + executiveAllowance;
+      const taxes = calculatePayrollTaxes({
+        baseSalary: base_amount,
+        allowances: totalAllowancesTmp - transportAllowance,
+        transportFee: transportAllowance,
+        dependentsCount: 0
+      });
+      health = taxes.healthInsurance;
+      pension = taxes.pension;
+      employment = taxes.employmentInsurance;
+      incomeTax = taxes.incomeTax;
+      residentTax = taxes.residentTax;
+      childcare = taxes.childcareSupport || 0;
     } else if (contract.contract_type === "monthly") {
       let totalTechSales = 0;
       let totalProductSales = 0;
@@ -874,6 +896,7 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
       success: true,
       data: {
         type,
+        contract_type: contract.contract_type,
         base_amount,
         total_allowances,
         transportAllowance,
@@ -890,6 +913,7 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
         childcare,
         workedDays: finalWorkedDays,
         workedHours: finalWorkedHours,
+        hourly_wage: finalHourlyWage,
         work_location: storeLocation
       }
     };

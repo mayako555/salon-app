@@ -5,9 +5,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Calculator, Calendar, User, ShieldAlert, BadgeCheck } from "lucide-react";
+import { Plus, Calculator, Calendar, User, ShieldAlert, BadgeCheck, Clock } from "lucide-react";
 import { createManualStatement, getStaffPayrollDefaultValues } from "./actions";
 import { toast } from "sonner";
+import { calculatePayrollTaxes } from "@/lib/tax-calculator";
 
 type StaffProfileSimple = {
   id: string;
@@ -54,7 +55,10 @@ export default function CreateStatementDialog({
   // Metrics State
   const [workedDays, setWorkedDays] = useState("");
   const [workedHours, setWorkedHours] = useState("");
+  const [hourlyWage, setHourlyWage] = useState("");
   const [workLocation, setWorkLocation] = useState("");
+
+  const [contractType, setContractType] = useState<string>("");
 
   // Contract Warning Banner State
   const [contractWarning, setContractWarning] = useState<string | null>(null);
@@ -62,6 +66,7 @@ export default function CreateStatementDialog({
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
     if (!open) {
+      setContractType("");
       setStaffId("");
       setBaseAmount("");
       setTransportAllowance("");
@@ -78,6 +83,7 @@ export default function CreateStatementDialog({
       setChildcare("");
       setWorkedDays("");
       setWorkedHours("");
+      setHourlyWage("");
       setWorkLocation("");
       setContractWarning(null);
     }
@@ -101,6 +107,8 @@ export default function CreateStatementDialog({
         if (res.success && res.data) {
           const d = res.data;
           setType(d.type);
+          // @ts-ignore
+          setContractType(d.contract_type || "");
           setBaseAmount(d.base_amount.toString());
           setTransportAllowance((d.transportAllowance || 0).toString());
           setNominationAllowance((d.nominationAllowance || 0).toString());
@@ -118,10 +126,12 @@ export default function CreateStatementDialog({
           
           setWorkedDays(d.workedDays.toString());
           setWorkedHours(d.workedHours.toString());
+          setHourlyWage(d.hourly_wage ? d.hourly_wage.toString() : "0");
           setWorkLocation(d.work_location || "");
           toast.success("スタッフの当月実績と契約データから初期値を自動入力しました（編集可能です）");
         } else if (res.error) {
           // Gracefully reset forms so they can key in manually from scratch
+          setContractType("");
           setBaseAmount("");
           setTransportAllowance("");
           setNominationAllowance("");
@@ -137,6 +147,7 @@ export default function CreateStatementDialog({
           setChildcare("");
           setWorkedDays("");
           setWorkedHours("");
+          setHourlyWage("");
           setWorkLocation("");
           setContractWarning("該当スタッフの契約情報が登録されていません。");
         }
@@ -147,6 +158,41 @@ export default function CreateStatementDialog({
     
     loadDefaults();
   }, [staffId, targetYear, targetMonth]);
+
+  // Dynamic client-side tax auto-calculation
+  useEffect(() => {
+    if (type !== "salary") {
+      // Clear deductions for outsourcing/reward types
+      setHealth("0");
+      setPension("0");
+      setEmployment("0");
+      setIncomeTax("0");
+      setChildcare("0");
+      return;
+    }
+
+    const baseVal = Number(baseAmount) || 0;
+    const transportVal = Number(transportAllowance) || 0;
+    const otherAllowances = (Number(nominationAllowance) || 0) + 
+                            (Number(reviewAllowance) || 0) + 
+                            (Number(blogAllowance) || 0) + 
+                            (Number(executiveAllowance) || 0);
+
+    if (baseVal <= 0) return; // Don't calculate if no base pay is set yet
+
+    const taxes = calculatePayrollTaxes({
+      baseSalary: baseVal,
+      allowances: otherAllowances,
+      transportFee: transportVal,
+      dependentsCount: 0
+    });
+
+    setHealth(taxes.healthInsurance.toString());
+    setPension(taxes.pension.toString());
+    setEmployment(taxes.employmentInsurance.toString());
+    setIncomeTax(taxes.incomeTax.toString());
+    setChildcare(taxes.childcareSupport ? taxes.childcareSupport.toString() : "0");
+  }, [baseAmount, transportAllowance, nominationAllowance, reviewAllowance, blogAllowance, executiveAllowance, type]);
 
   // Calculations
   const numBase = Number(baseAmount) || 0;
@@ -168,6 +214,20 @@ export default function CreateStatementDialog({
 
   const totalDeductions = numHealth + numPension + numEmployment + numIncomeTax + numResidentTax + numChildcare;
   const finalPaidAmount = numBase + numAllowance + numTaxAdd - totalDeductions;
+
+  const handleHourlyWageChange = (val: string) => {
+    setHourlyWage(val);
+    const wage = Number(val) || 0;
+    const hours = Number(workedHours) || 0;
+    setBaseAmount(Math.floor(wage * hours).toString());
+  };
+
+  const handleWorkedHoursChange = (val: string) => {
+    setWorkedHours(val);
+    const wage = Number(hourlyWage) || 0;
+    const hours = Number(val) || 0;
+    setBaseAmount(Math.floor(wage * hours).toString());
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,6 +261,7 @@ export default function CreateStatementDialog({
           executive_allowance: numExecutive,
           cashless_deduction: 0,
           tax_addition: numTaxAdd,
+          hourly_wage: Number(hourlyWage) || 0,
           social_insurance: type === "salary" ? {
             health: numHealth,
             pension: numPension,
@@ -346,12 +407,59 @@ export default function CreateStatementDialog({
             </div>
           </div>
 
+          {/* 時給計算アシスタント */}
+          {type === "salary" && contractType !== "monthly" && contractType !== "tier_monthly" && (
+            <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-blue-100/60 pb-2">
+                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-blue-600 animate-pulse" />
+                  時給計算アシスタント（パート・時給制スタッフ用）
+                </h4>
+                <span className="text-[9px] font-black text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  Hourly Auto-Calc
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 block">時給 (円)</label>
+                  <Input 
+                    type="number" 
+                    value={hourlyWage} 
+                    onChange={(e) => handleHourlyWageChange(e.target.value)}
+                    placeholder="例: 1000"
+                    className="h-9 text-xs rounded-lg font-bold border-slate-200 bg-white"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 block">労働時間 (時間)</label>
+                  <Input 
+                    type="number" 
+                    step="0.1"
+                    value={workedHours} 
+                    onChange={(e) => handleWorkedHoursChange(e.target.value)}
+                    placeholder="例: 80.5"
+                    className="h-9 text-xs rounded-lg font-bold border-slate-200 bg-white"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 block">自動計算された基本給 (円)</label>
+                  <div className="h-9 flex items-center justify-start px-3 bg-slate-100 border border-slate-200 rounded-lg text-xs font-extrabold text-slate-700 tabular-nums">
+                    ¥{Math.floor((Number(hourlyWage) || 0) * (Number(workedHours) || 0)).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-400 font-semibold italic">
+                ※ 時給または労働時間を入力すると、下の「基本給 / 歩合報酬ベース」が自動的に連動して更新されます。
+              </p>
+            </div>
+          )}
+
           {/* Earnings */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-slate-700 border-b pb-1.5 flex items-center gap-1">
               <span className="w-1.5 h-3.5 bg-rose-500 rounded-sm"></span> 支給・支払額の入力
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 block">基本給 / 歩合報酬ベース (円)</label>
                 <Input 
@@ -365,24 +473,13 @@ export default function CreateStatementDialog({
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 block">出勤場所 / 店舗</label>
-                <Input 
-                  type="text" 
-                  placeholder="例: 六甲・神戸"
-                  value={workLocation} 
-                  onChange={(e) => setWorkLocation(e.target.value)}
-                  className="h-10 text-xs rounded-lg font-bold border-slate-200 focus:ring-rose-500"
-                />
-              </div>
-
-              <div className="space-y-1 md:col-span-2">
                 <label className="text-[10px] font-bold text-slate-500 block mb-1">手当の内訳 (円)</label>
                 <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
                   <div className="space-y-1">
-                    <span className="text-[9px] text-slate-400 font-bold block">交通費</span>
+                    <span className="text-[9px] text-slate-400 font-bold block">通勤手当</span>
                     <Input 
                       type="number" 
-                      placeholder="交通費"
+                      placeholder="通勤手当"
                       value={transportAllowance} 
                       onChange={(e) => setTransportAllowance(e.target.value)}
                       className="h-8 text-xs rounded font-bold border-slate-200"

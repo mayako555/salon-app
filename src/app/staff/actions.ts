@@ -9,6 +9,7 @@ import {
   deleteDoc,
   doc,
   query, 
+  where,
   orderBy, 
   writeBatch,
   serverTimestamp
@@ -36,8 +37,10 @@ export type StaffProfile = {
   is_active: boolean;
   monthly_sales_target?: number;
   nomination_fee?: number; // 指名手当単価
+  hourly_wage?: number; // 時給
   sns_accounts?: string[];
   sort_order?: number;
+  passcode?: string; // Kiosk & Portal Passcode
   created_at?: any;
 };
 
@@ -105,9 +108,11 @@ export async function addStaff(formData: FormData) {
     const role = (formData.get("role") as StaffRole) || "staff";
     const monthly_sales_target = parseInt(formData.get("monthly_sales_target") as string || "0", 10);
     const nomination_fee = parseInt(formData.get("nomination_fee") as string || "300", 10);
+    const hourly_wage = parseInt(formData.get("hourly_wage") as string || "0", 10);
+    const passcode = (formData.get("passcode") as string) || "1234";
 
-    if (!name || !email || !password) {
-      return { success: false, error: "名前、メールアドレス、パスワードは必須です" };
+    if (!name || !email) {
+      return { success: false, error: "名前、メールアドレスは必須です" };
     }
 
     const is_trainee = formData.get("is_trainee") === "true";
@@ -117,7 +122,7 @@ export async function addStaff(formData: FormData) {
     try {
       const userRecord = await adminAuth.createUser({
         email,
-        password,
+        password: passcode + "_salon",
         displayName: name,
       });
       uid = userRecord.uid;
@@ -146,6 +151,8 @@ export async function addStaff(formData: FormData) {
       is_active: true,
       monthly_sales_target,
       nomination_fee,
+      hourly_wage,
+      passcode,
       sns_accounts: formData.getAll("sns_accounts") as string[],
       created_at: serverTimestamp()
     };
@@ -193,11 +200,29 @@ export async function editStaff(id: string, formData: FormData) {
     const role = (formData.get("role") as StaffRole) || "staff";
     const monthly_sales_target = parseInt(formData.get("monthly_sales_target") as string || "0", 10);
     const nomination_fee = parseInt(formData.get("nomination_fee") as string || "300", 10);
+    const hourly_wage = parseInt(formData.get("hourly_wage") as string || "0", 10);
+    const passcode = formData.get("passcode") as string;
 
     const is_trainee = formData.get("is_trainee") === "true";
 
     if (!name || !email) {
       return { success: false, error: "名前、メールアドレスは必須です" };
+    }
+
+    // Get current profile to check uid
+    const snap = await getDocs(query(collection(db, STAFF_COLLECTION), where("__name__", "==", id)));
+    let currentUid = "";
+    if (!snap.empty) {
+      currentUid = snap.docs[0].data().uid;
+    }
+
+    // Sync passcode to Firebase Auth password under the hood using admin SDK
+    if (currentUid && passcode) {
+      try {
+        await adminAuth.updateUser(currentUid, { password: passcode + "_salon" });
+      } catch (authError) {
+        console.warn("Failed to sync passcode to Firebase Auth password:", authError);
+      }
     }
 
     const colRef = doc(db, STAFF_COLLECTION, id);
@@ -216,6 +241,8 @@ export async function editStaff(id: string, formData: FormData) {
       max_holiday_requests,
       monthly_sales_target,
       nomination_fee,
+      hourly_wage,
+      ...(passcode !== null && passcode !== undefined ? { passcode } : {}),
       sns_accounts: formData.getAll("sns_accounts") as string[],
       updated_at: serverTimestamp()
     };
@@ -286,5 +313,51 @@ export async function updateStaffOrder(orderedIds: string[]) {
   } catch (error: any) {
     console.error("Error updating staff order:", error);
     return { success: false, error: error.message };
+  }
+}
+
+export async function updateStaffPasscode(staffId: string, passcode: string) {
+  try {
+    if (!staffId || !passcode) {
+      return { success: false, error: "無効な入力データです" };
+    }
+
+    const docRef = doc(db, STAFF_COLLECTION, staffId);
+    
+    // Retrieve current profile to get uid
+    const snap = await getDocs(query(collection(db, STAFF_COLLECTION), where("__name__", "==", staffId)));
+    let currentUid = "";
+    if (!snap.empty) {
+      currentUid = snap.docs[0].data().uid;
+    }
+
+    // Sync passcode to Firebase Auth password under the hood using admin SDK
+    if (currentUid) {
+      try {
+        await adminAuth.updateUser(currentUid, { password: passcode + "_salon" });
+      } catch (authError) {
+        console.warn("Failed to sync passcode to Firebase Auth password:", authError);
+      }
+    }
+
+    await updateDoc(docRef, {
+      passcode,
+      updated_at: serverTimestamp()
+    });
+
+    await addAuditLog({
+      table_name: STAFF_COLLECTION,
+      record_id: staffId,
+      action: "UPDATE",
+      old_data: null,
+      new_data: { passcode: "UPDATED_BY_STAFF" },
+      actor: "スタッフ本人"
+    });
+
+    revalidatePath("/staff");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error in updateStaffPasscode:", error);
+    return { success: false, error: error.message || "暗証番号の変更に失敗しました" };
   }
 }
