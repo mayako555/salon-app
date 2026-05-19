@@ -14,9 +14,10 @@ import {
   ArrowRight,
   Loader2
 } from "lucide-react";
-import { importCustomersFromSalonBoard } from "./actions";
+import { importCustomersFromSalonBoard, getLastCustomerImportDate } from "./actions";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { useEffect } from "react";
 
 export default function SalonBoardImportPage() {
   const [pasteData, setPasteData] = useState("");
@@ -24,6 +25,17 @@ export default function SalonBoardImportPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [step, setStep] = useState(1); // 1: Paste, 2: Preview
   const [storeName, setStoreName] = useState("六甲");
+  const [lastImportDate, setLastImportDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchLastDate = async () => {
+      const res = await getLastCustomerImportDate();
+      if (res.success && res.date) {
+        setLastImportDate(res.date);
+      }
+    };
+    fetchLastDate();
+  }, []);
 
   const handleParse = () => {
     if (!pasteData.trim()) {
@@ -71,6 +83,7 @@ export default function SalonBoardImportPage() {
       const res = await importCustomersFromSalonBoard(parsedData);
       if (res.success) {
         toast.success(`新規登録: ${res.count}件 / 更新: ${res.updateCount}件 完了しました！`);
+        setLastImportDate(new Date().toISOString());
         setStep(3);
       } else {
         toast.error(`登録エラー: ${res.error}`);
@@ -92,7 +105,14 @@ export default function SalonBoardImportPage() {
             </div>
             SalonBoard 一括インポート
           </h1>
-          <p className="text-slate-500 font-medium">サロンボードの顧客一覧をコピペで取り込みます</p>
+          <div className="flex flex-wrap items-center gap-3 mt-1">
+            <p className="text-slate-500 font-medium">サロンボードの顧客一覧をコピペで取り込みます</p>
+            {lastImportDate && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-bold text-[10px] bg-slate-100 text-slate-600 border border-slate-200">
+                最終取り込み: {new Date(lastImportDate).toLocaleString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

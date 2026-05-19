@@ -37,8 +37,11 @@ export function calculatePayrollTaxes(params: {
   // 健康保険 (兵庫県・協会けんぽ基準 約5.06%) / 厚生年金 (全国一律 9.15%)
   const healthInsurance = Math.round(standardRemuneration * 0.0506); 
   const pension = Math.round(standardRemuneration * 0.0915);
+  
+  // 子ども・子育て支援金 (2026年4月開始 労使折半により個人負担分 0.115%)
+  const childcareSupport = Math.round(standardRemuneration * 0.00115);
 
-  const totalSocialInsurances = employmentInsurance + healthInsurance + pension;
+  const totalSocialInsurances = employmentInsurance + healthInsurance + pension + childcareSupport;
 
   // --- 所得税 (Income Tax - Withholding/源泉徴収税額) ---
   // 課税対象額 = (基本給 + 手当類) - 社会保険料合計 (※通勤手当は所得税法上非課税)
@@ -59,7 +62,7 @@ export function calculatePayrollTaxes(params: {
   if (incomeTax < 0) incomeTax = 0;
 
   // 住民税 (Resident Tax)
-  // 住民税は前年度の所得に基づくため自動計算不可能。
+  // 住民税は前年度 of 所得に基づくため自動計算不可能。
   // 本システムでは一律0(またはマスタ値)とし、経理担当からのCSVインポート時に更新させる前提とする。
   const residentTax = 0; 
 
@@ -67,6 +70,7 @@ export function calculatePayrollTaxes(params: {
     employmentInsurance,
     healthInsurance,
     pension,
+    childcareSupport,
     incomeTax,
     residentTax,
     totalSocialInsurances

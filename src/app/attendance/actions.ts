@@ -254,3 +254,56 @@ export async function updateAttendanceRecord(id: string, data: Partial<Attendanc
     return { success: false, error: error.message };
   }
 }
+
+export async function getAllStaffProfiles() {
+  try {
+    const colRef = collection(db, "staff_profiles");
+    const snap = await getDocs(colRef);
+    return {
+      success: true,
+      data: snap.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name,
+        role: doc.data().role || "staff"
+      }))
+    };
+  } catch (error: any) {
+    console.error("Error fetching staff profiles:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function bulkImportAttendanceRecords(records: Omit<AttendanceRecord, "id">[]) {
+  try {
+    const colRef = collection(db, ATTENDANCE_COLLECTION);
+    const batchPromises = records.map(async (r) => {
+      const q = query(
+        colRef, 
+        where("staff_id", "==", r.staff_id), 
+        where("date", "==", r.date)
+      );
+      const snap = await getDocs(q);
+      
+      const payload = {
+        ...r,
+        created_at: serverTimestamp()
+      };
+
+      if (!snap.empty) {
+        const docRef = doc(db, ATTENDANCE_COLLECTION, snap.docs[0].id);
+        await updateDoc(docRef, {
+          ...payload,
+          updated_at: serverTimestamp()
+        });
+      } else {
+        await addDoc(colRef, payload);
+      }
+    });
+
+    await Promise.all(batchPromises);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error bulk importing attendance:", error);
+    return { success: false, error: error.message };
+  }
+}

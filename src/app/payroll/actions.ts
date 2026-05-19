@@ -32,6 +32,7 @@ export type MonthlyStatement = {
   total_deductions: number;
   final_paid_amount: number;
   status: "draft" | "closed";
+  work_location?: string;
   adjustments?: {
     tech_cashless_sales_override?: number;
     retail_cashless_sales_override?: number;
@@ -41,6 +42,7 @@ export type MonthlyStatement = {
     employment_insurance_override?: number;
     income_tax_override?: number;
     resident_tax_override?: number;
+    childcare_support_override?: number;
     custom_adjustments?: { name: string; amount: number }[];
   };
   details: {
@@ -56,6 +58,7 @@ export type MonthlyStatement = {
       pension: number;
       income_tax: number;
       resident_tax: number;
+      childcare?: number;
     };
     metrics: {
       total_tech_sales: number;
@@ -170,6 +173,15 @@ export async function generateStatements(year: number, month: number) {
     const staffAllowances = allowances.filter((a: any) => a.staff_name === contract.staff_name);
     const staffAttendances = attendances.filter((a: AttendanceRecord) => a.staff_name === contract.staff_name);
 
+    const storesWorkedSet = new Set<string>();
+    staffAttendances.forEach((att: any) => {
+      if (att.store) {
+        storesWorkedSet.add(att.store);
+      }
+    });
+    const storesWorked = Array.from(storesWorkedSet).filter(Boolean);
+    const storeLocation = storesWorked.length > 0 ? storesWorked.join("・") : "";
+
     // Get preserved adjustments and metrics
     const preserved = preservationMap[contract.staff_id];
     const preservedAdjusts = preserved?.adjustments;
@@ -177,15 +189,36 @@ export async function generateStatements(year: number, month: number) {
     // Track custom contract allowances
     const contractCustomAllowanceTotal = (contract.custom_allowances || []).reduce((acc: number, curr: any) => acc + curr.amount, 0);
 
+    // Categorized Database Allowances
+    const transportAllowanceDb = staffAllowances
+      .filter((a: any) => a.type === "transport")
+      .reduce((acc: number, curr: any) => acc + curr.amount, 0);
+
+    const nominationAllowanceDb = staffAllowances
+      .filter((a: any) => a.type === "nomination")
+      .reduce((acc: number, curr: any) => acc + curr.amount, 0);
+
+    const reviewAllowanceDb = staffAllowances
+      .filter((a: any) => a.type === "review")
+      .reduce((acc: number, curr: any) => acc + curr.amount, 0);
+
+    const blogAllowanceDb = staffAllowances
+      .filter((a: any) => ["blog", "sns"].includes(a.type))
+      .reduce((acc: number, curr: any) => acc + curr.amount, 0);
+
+    const otherAllowanceDb = staffAllowances
+      .filter((a: any) => ["other", "treatment"].includes(a.type))
+      .reduce((acc: number, curr: any) => acc + curr.amount, 0);
+
     // Track real attendance data
     const workedDays = staffAttendances.length;
     let workedHours = 0;
 
     staffAttendances.forEach((record: AttendanceRecord) => {
-       if (record.clock_in && record.clock_out) {
-          const inTime = new Date(record.clock_in);
-          const outTime = new Date(record.clock_out);
-          const diffMs = outTime.getTime() - inTime.getTime();
+       const start = record.effective_clock_in ? new Date(record.effective_clock_in) : (record.clock_in ? new Date(new Date(record.clock_in).getTime() + 30 * 60 * 1000) : null);
+       const end = record.effective_clock_out ? new Date(record.effective_clock_out) : (record.clock_out ? new Date(record.clock_out) : null);
+       if (start && end) {
+          const diffMs = end.getTime() - start.getTime();
           let diffMins = Math.floor(diffMs / 60000);
           
           diffMins -= (record.break_minutes || 0);
@@ -207,9 +240,11 @@ export async function generateStatements(year: number, month: number) {
     if (contract.contract_type === "hourly") {
       let totalMinutesWorked = 0;
       for (const att of staffAttendances) {
-        if (att.clock_in && att.clock_out && att.status === "normal") {
-          const inMs = new Date(att.clock_in).getTime();
-          const outMs = new Date(att.clock_out).getTime();
+        const start = att.effective_clock_in ? new Date(att.effective_clock_in) : (att.clock_in ? new Date(new Date(att.clock_in).getTime() + 30 * 60 * 1000) : null);
+        const end = att.effective_clock_out ? new Date(att.effective_clock_out) : (att.clock_out ? new Date(att.clock_out) : null);
+        if (start && end && att.status === "normal") {
+          const inMs = start.getTime();
+          const outMs = end.getTime();
           const workedMinsRaw = Math.floor((outMs - inMs) / 60000);
           const workedMinsNet = Math.max(0, workedMinsRaw - att.break_minutes);
           totalMinutesWorked += workedMinsNet;
@@ -220,7 +255,7 @@ export async function generateStatements(year: number, month: number) {
       const baseHourlySalary = Math.floor(totalHours * (contract.hourly_wage || 0));
       finalWorkedHours = totalHours;
 
-      const allowanceTotal = staffAllowances.reduce((acc, curr) => acc + curr.amount, 0) + contractCustomAllowanceTotal;
+      const allowanceTotal = transportAllowanceDb + nominationAllowanceDb + reviewAllowanceDb + blogAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
       const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
 
       const intermediatePaidAmount = baseHourlySalary + allowanceTotal + customAdjustTotal;
@@ -238,13 +273,17 @@ export async function generateStatements(year: number, month: number) {
         final_paid_amount: finalPaidAmount,
         status: "draft",
         adjustments: preservedAdjusts,
+        work_location: storeLocation,
         details: {
           base_tech_salary: 0,
           base_product_salary: 0,
-          nomination_reward: 0,
-          transport_fee: preservedAdjusts?.transport_fee_override ?? 0,
+          nomination_reward: nominationAllowanceDb,
+          transport_fee: preservedAdjusts?.transport_fee_override ?? transportAllowanceDb,
           cashless_deduction: 0,
           tax_addition: taxAddition,
+          review_allowance: reviewAllowanceDb,
+          blog_allowance: blogAllowanceDb,
+          executive_allowance: otherAllowanceDb + contractCustomAllowanceTotal,
           metrics: {
             total_tech_sales: 0,
             total_product_sales: 0, 
@@ -303,7 +342,7 @@ export async function generateStatements(year: number, month: number) {
       
       const baseMonthlySalary = contract.monthly_base_salary || 0;
       const totalCommission = techCommission + productCommission + nominationReward;
-      const allowanceTotal = staffAllowances.reduce((acc: any, curr: any) => acc + curr.amount, 0) + contractCustomAllowanceTotal;
+      const allowanceTotal = transportAllowanceDb + nominationAllowanceDb + reviewAllowanceDb + blogAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
       const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
 
       const base_amount = baseMonthlySalary + totalCommission;
@@ -322,8 +361,9 @@ export async function generateStatements(year: number, month: number) {
       const employment = preservedAdjusts?.employment_insurance_override ?? taxes.employmentInsurance;
       const incomeTax = preservedAdjusts?.income_tax_override ?? taxes.incomeTax;
       const residentTax = preservedAdjusts?.resident_tax_override ?? taxes.residentTax;
+      const childcare = preservedAdjusts?.childcare_support_override ?? (taxes.childcareSupport || 0);
 
-      const totalDeductions = health + pension + employment + incomeTax + residentTax;
+      const totalDeductions = health + pension + employment + incomeTax + residentTax + childcare;
       const final_paid = base_amount + allowanceTotal + transportFee + customAdjustTotal - totalDeductions;
 
       const statementPayload = {
@@ -337,6 +377,7 @@ export async function generateStatements(year: number, month: number) {
         final_paid_amount: final_paid,
         status: "draft",
         adjustments: preservedAdjusts,
+        work_location: storeLocation,
         details: {
           base_tech_salary: techCommission,
           base_product_salary: productCommission,
@@ -345,8 +386,11 @@ export async function generateStatements(year: number, month: number) {
           cashless_deduction: 0,
           tax_addition: 0,
           social_insurance: {
-             employment, health, pension, income_tax: incomeTax, resident_tax: residentTax
+             employment, health, pension, income_tax: incomeTax, resident_tax: residentTax, childcare
           },
+          review_allowance: reviewAllowanceDb,
+          blog_allowance: blogAllowanceDb,
+          executive_allowance: otherAllowanceDb + contractCustomAllowanceTotal,
           metrics: {
             total_tech_sales: totalTechSales,
             total_product_sales: totalProductSales, 
@@ -376,7 +420,7 @@ export async function generateStatements(year: number, month: number) {
       }
       
       const nominationReward = nominationCount * contract.nomination_fee;
-      const allowanceTotal = staffAllowances.reduce((acc: any, curr: any) => acc + curr.amount, 0) + contractCustomAllowanceTotal;
+      const allowanceTotal = transportAllowanceDb + nominationAllowanceDb + reviewAllowanceDb + blogAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
       const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
 
       const intermediatePaidAmount = baseMonthlySalary + incentive + nominationReward + allowanceTotal + customAdjustTotal;
@@ -393,13 +437,17 @@ export async function generateStatements(year: number, month: number) {
         final_paid_amount: finalPaidAmount,
         status: "draft",
         adjustments: preservedAdjusts,
+        work_location: storeLocation,
         details: {
           base_tech_salary: incentive,
           base_product_salary: 0,
           nomination_reward: nominationReward,
-          transport_fee: preservedAdjusts?.transport_fee_override ?? 0,
+          transport_fee: preservedAdjusts?.transport_fee_override ?? transportAllowanceDb,
           cashless_deduction: 0,
           tax_addition: 0,
+          review_allowance: reviewAllowanceDb,
+          blog_allowance: blogAllowanceDb,
+          executive_allowance: otherAllowanceDb + contractCustomAllowanceTotal,
           metrics: {
             total_tech_sales: totalTechSales,
             total_product_sales: totalProductSales, 
@@ -433,7 +481,7 @@ export async function generateStatements(year: number, month: number) {
     const nominationReward = nominationCount * contract.nomination_fee;
     let baseAmount = baseTechSalary + baseProductSalary + nominationReward;
 
-    const allowanceTotal = staffAllowances.reduce((acc, curr) => acc + curr.amount, 0) + contractCustomAllowanceTotal;
+    const allowanceTotal = transportAllowanceDb + nominationAllowanceDb + reviewAllowanceDb + blogAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
     const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
 
     let intermediatePaidAmount = baseAmount + allowanceTotal + customAdjustTotal;
@@ -455,14 +503,18 @@ export async function generateStatements(year: number, month: number) {
       final_paid_amount: finalPaidAmount,
       status: "draft",
       adjustments: preservedAdjusts,
+      work_location: storeLocation,
       details: {
         base_tech_salary: baseTechSalary,
         base_product_salary: baseProductSalary,
         nomination_reward: nominationReward,
-        transport_fee: preservedAdjusts?.transport_fee_override ?? 0,
+        transport_fee: preservedAdjusts?.transport_fee_override ?? transportAllowanceDb,
         cashless_deduction: techCashlessFee + productCashlessFee,
         tax_addition: taxAddition,
         social_insurance: undefined,
+        review_allowance: reviewAllowanceDb,
+        blog_allowance: blogAllowanceDb,
+        executive_allowance: otherAllowanceDb + contractCustomAllowanceTotal,
         metrics: {
           total_tech_sales: totalTechSales,
           total_product_sales: totalProductSales,
@@ -539,9 +591,10 @@ export async function updateStatementMetrics(
       employment: newAdjustments?.employment_insurance_override ?? currentData.details.social_insurance.employment,
       income_tax: newAdjustments?.income_tax_override ?? currentData.details.social_insurance.income_tax,
       resident_tax: newAdjustments?.resident_tax_override ?? currentData.details.social_insurance.resident_tax,
+      childcare: newAdjustments?.childcare_support_override ?? currentData.details.social_insurance.childcare ?? 0,
     } : undefined;
 
-    const totalDeductions = social ? (social.health + social.pension + social.employment + social.income_tax + social.resident_tax) : currentData.total_deductions;
+    const totalDeductions = social ? (social.health + social.pension + social.employment + social.income_tax + social.resident_tax + (social.childcare || 0)) : currentData.total_deductions;
     const customAdjustTotal = (newAdjustments?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
 
     const finalPaidAmount = baseAmount + currentData.total_allowances + customAdjustTotal - totalDeductions + (currentData.details.tax_addition || 0);
@@ -560,6 +613,356 @@ export async function updateStatementMetrics(
     return { success: true };
   } catch (error: any) {
     console.error("Error updating statement:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function createManualStatement(data: {
+  staff_id: string;
+  staff_name: string;
+  target_month: string;
+  type: "salary" | "reward";
+  base_amount: number;
+  total_allowances: number;
+  total_deductions: number;
+  final_paid_amount: number;
+  work_location?: string;
+  details: MonthlyStatement["details"];
+}) {
+  try {
+    const colRef = collection(db, STATEMENTS_COLLECTION);
+    const docRef = await addDoc(colRef, {
+      ...data,
+      status: "draft",
+      created_at: serverTimestamp()
+    });
+
+    await addAuditLog({
+      table_name: "monthly_statements",
+      record_id: docRef.id,
+      action: "INSERT",
+      old_data: null,
+      new_data: { staff_name: data.staff_name, target_month: data.target_month },
+      actor: "管理者"
+    });
+
+    return { success: true, id: docRef.id };
+  } catch (error: any) {
+    console.error("Error creating manual statement:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getStaffPayrollDefaultValues(staffId: string, year: number, month: number) {
+  try {
+    const contracts = await getContractsList();
+    const contract = contracts.find(c => c.staff_id === staffId);
+    if (!contract) {
+      return { success: false, error: "該当スタッフの契約情報が登録されていません。" };
+    }
+    
+    const sales = await getMonthlySales(year, month);
+    const allowances = await getMonthlyAllowances(year, month);
+    const attendances = await getMonthlyAttendance(year, month);
+    
+    const staffSales = sales.filter((s: any) => s.staff_name === contract.staff_name);
+    const staffAllowances = allowances.filter((a: any) => a.staff_name === contract.staff_name);
+    const staffAttendances = attendances.filter((a: any) => a.staff_name === contract.staff_name);
+
+    const storesWorkedSet = new Set<string>();
+    staffAttendances.forEach((att: any) => {
+      if (att.store) {
+        storesWorkedSet.add(att.store);
+      }
+    });
+    const storesWorked = Array.from(storesWorkedSet).filter(Boolean);
+    const storeLocation = storesWorked.length > 0 ? storesWorked.join("・") : "";
+
+    // Calculate worked days & hours
+    const workedDays = staffAttendances.length;
+    let workedHours = 0;
+    staffAttendances.forEach((record: any) => {
+       const start = record.effective_clock_in ? new Date(record.effective_clock_in) : (record.clock_in ? new Date(new Date(record.clock_in).getTime() + 30 * 60 * 1000) : null);
+       const end = record.effective_clock_out ? new Date(record.effective_clock_out) : (record.clock_out ? new Date(record.clock_out) : null);
+       if (start && end) {
+          const diffMs = end.getTime() - start.getTime();
+          let diffMins = Math.floor(diffMs / 60000);
+          diffMins -= (record.break_minutes || 0);
+          if (diffMins > 480) diffMins = 480;
+          workedHours += (diffMins / 60);
+       }
+    });
+    workedHours = Math.round(workedHours * 10) / 10;
+    const finalWorkedDays = workedDays > 0 ? workedDays : 21;
+    const finalWorkedHours = workedHours > 0 ? workedHours : (contract.contract_type === "hourly" ? 0 : 168);
+
+    const contractCustomAllowanceTotal = (contract.custom_allowances || []).reduce((acc: number, curr: any) => acc + curr.amount, 0);
+
+    const type: "salary" | "reward" = contract.contract_type === "outsourcing" ? "reward" : "salary";
+    let base_amount = 0;
+    let taxAddition = 0;
+    
+    let health = 0;
+    let pension = 0;
+    let employment = 0;
+    let incomeTax = 0;
+    let residentTax = 0;
+    let childcare = 0;
+
+    // Categorized Database Allowances
+    const transportAllowanceDb = staffAllowances
+      .filter((a: any) => a.type === "transport")
+      .reduce((acc: number, curr: any) => acc + curr.amount, 0);
+    
+    const nominationAllowanceDb = staffAllowances
+      .filter((a: any) => a.type === "nomination")
+      .reduce((acc: number, curr: any) => acc + curr.amount, 0);
+
+    const reviewAllowanceDb = staffAllowances
+      .filter((a: any) => a.type === "review")
+      .reduce((acc: number, curr: any) => acc + curr.amount, 0);
+
+    const blogAllowanceDb = staffAllowances
+      .filter((a: any) => ["blog", "sns"].includes(a.type))
+      .reduce((acc: number, curr: any) => acc + curr.amount, 0);
+
+    const otherAllowanceDb = staffAllowances
+      .filter((a: any) => ["other", "treatment"].includes(a.type))
+      .reduce((acc: number, curr: any) => acc + curr.amount, 0);
+
+    let nominationCount = 0;
+    for (const sale of staffSales) {
+      if (sale.is_nominated) nominationCount += 1;
+    }
+    const nominationReward = nominationCount * (contract.nomination_fee || 0);
+
+    let transportAllowance = transportAllowanceDb;
+    let nominationAllowance = nominationAllowanceDb + nominationReward;
+    let reviewAllowance = reviewAllowanceDb;
+    let blogAllowance = blogAllowanceDb;
+    let executiveAllowance = otherAllowanceDb + contractCustomAllowanceTotal;
+
+    if (contract.contract_type === "hourly") {
+      let totalMinutesWorked = 0;
+      for (const att of staffAttendances) {
+        const start = att.effective_clock_in ? new Date(att.effective_clock_in) : (att.clock_in ? new Date(new Date(att.clock_in).getTime() + 30 * 60 * 1000) : null);
+        const end = att.effective_clock_out ? new Date(att.effective_clock_out) : (att.clock_out ? new Date(att.clock_out) : null);
+        if (start && end && att.status === "normal") {
+          const inMs = start.getTime();
+          const outMs = end.getTime();
+          const workedMinsRaw = Math.floor((outMs - inMs) / 60000);
+          const workedMinsNet = Math.max(0, workedMinsRaw - att.break_minutes);
+          totalMinutesWorked += workedMinsNet;
+        }
+      }
+      const totalHours = totalMinutesWorked > 0 ? (totalMinutesWorked / 60) : 0;
+      base_amount = Math.floor(totalHours * (contract.hourly_wage || 0));
+    } else if (contract.contract_type === "monthly") {
+      let totalTechSales = 0;
+      let totalProductSales = 0;
+      
+      for (const sale of staffSales) {
+        const netTechSales = Math.max(0, sale.tech_sales - (sale.discount || 0));
+        totalTechSales += netTechSales;
+        totalProductSales += sale.product_sales;
+      }
+
+      const techSalesTaxFree = Math.floor(totalTechSales / 1.1);
+      const productSalesTaxFree = Math.floor(totalProductSales / 1.1);
+      
+      const quota = contract.tech_sales_quota || 0;
+      let techCommission = 0;
+      if (techSalesTaxFree > quota) {
+         techCommission = Math.floor((techSalesTaxFree - quota) * (contract.tech_sales_ratio / 100));
+      }
+      
+      const productCommission = Math.floor(productSalesTaxFree * (contract.product_sales_ratio / 100));
+      
+      base_amount = (contract.monthly_base_salary || 0) + techCommission + productCommission;
+      transportAllowance = 17950; // Standard transport fee for monthly contracts
+
+      const totalAllowancesTmp = transportAllowance + nominationAllowance + reviewAllowance + blogAllowance + executiveAllowance;
+      const taxes = calculatePayrollTaxes({
+        baseSalary: base_amount,
+        allowances: totalAllowancesTmp - transportAllowance,
+        transportFee: transportAllowance,
+        dependentsCount: 0
+      });
+      health = taxes.healthInsurance;
+      pension = taxes.pension;
+      employment = taxes.employmentInsurance;
+      incomeTax = taxes.incomeTax;
+      residentTax = taxes.residentTax;
+      childcare = taxes.childcareSupport || 0;
+    } else if (contract.contract_type === "tier_monthly") {
+      let totalTechSales = 0;
+      let totalProductSales = 0;
+      
+      for (const sale of staffSales) {
+        const netTechSales = Math.max(0, sale.tech_sales - (sale.discount || 0));
+        totalTechSales += netTechSales;
+        totalProductSales += sale.product_sales;
+      }
+
+      const techSalesTaxFree = Math.floor(totalTechSales / 1.1);
+      const productSalesTaxFree = Math.floor(totalProductSales / 1.1);
+      const personalTaxFreeSales = techSalesTaxFree + productSalesTaxFree;
+      const baseMonthlySalary = contract.monthly_base_salary || 280000;
+      
+      let incentive = 0;
+      if (personalTaxFreeSales >= 400000) {
+          incentive = Math.floor(personalTaxFreeSales / 50000) * 5000 - 35000;
+      }
+      
+      base_amount = baseMonthlySalary + incentive;
+      transportAllowance = 17950; // Standard transport fee
+
+      const totalAllowancesTmp = transportAllowance + nominationAllowance + reviewAllowance + blogAllowance + executiveAllowance;
+      const taxes = calculatePayrollTaxes({
+        baseSalary: base_amount,
+        allowances: totalAllowancesTmp - transportAllowance,
+        transportFee: transportAllowance,
+        dependentsCount: 0
+      });
+      health = taxes.healthInsurance;
+      pension = taxes.pension;
+      employment = taxes.employmentInsurance;
+      incomeTax = taxes.incomeTax;
+      residentTax = taxes.residentTax;
+      childcare = taxes.childcareSupport || 0;
+    } else if (contract.contract_type === "outsourcing") {
+      let totalTechSales = 0;
+      let totalProductSales = 0;
+      let cashlessTechSales = 0;
+      let cashlessProductSales = 0;
+      let totalPortalFees = 0;
+      
+      for (const sale of staffSales) {
+        const netTechSales = Math.max(0, sale.tech_sales - (sale.discount || 0));
+        totalTechSales += netTechSales;
+        totalProductSales += sale.product_sales;
+        totalPortalFees += (sale.portal_fee || 0);
+        if (sale.payment_method !== "現金" && sale.payment_method !== "不明") {
+           cashlessTechSales += netTechSales;
+           cashlessProductSales += sale.product_sales;
+        }
+      }
+
+      const techTaxDeduction = Math.floor(totalTechSales * 0.1); 
+      const techCashlessFee = contract.deduction_cashless_ratio > 0 ? Math.floor(cashlessTechSales * (contract.deduction_cashless_ratio / 100)) : 0;
+      const commissionableTechSales = Math.max(0, totalTechSales - techTaxDeduction - techCashlessFee - totalPortalFees);
+      const baseTechSalary = Math.floor(commissionableTechSales * (contract.tech_sales_ratio / 100));
+
+      const productTaxDeduction = Math.floor(totalProductSales * 0.1);
+      const productCashlessFee = contract.deduction_cashless_ratio > 0 ? Math.floor(cashlessProductSales * (contract.deduction_cashless_ratio / 100)) : 0;
+      const commissionableProductSales = Math.max(0, totalProductSales - productTaxDeduction - productCashlessFee);
+      const baseProductSalary = Math.floor(commissionableProductSales * (contract.product_sales_ratio / 100));
+      
+      base_amount = baseTechSalary + baseProductSalary;
+
+      const totalAllowancesTmp = transportAllowance + nominationAllowance + reviewAllowance + blogAllowance + executiveAllowance;
+      const intermediatePaidAmount = base_amount + totalAllowancesTmp;
+      if (!contract.deduction_consumption_tax) {
+         taxAddition = Math.floor(intermediatePaidAmount * 0.1); 
+      }
+    }
+
+    const total_allowances = transportAllowance + nominationAllowance + reviewAllowance + blogAllowance + executiveAllowance;
+
+    return {
+      success: true,
+      data: {
+        type,
+        base_amount,
+        total_allowances,
+        transportAllowance,
+        nominationAllowance,
+        reviewAllowance,
+        blogAllowance,
+        executiveAllowance,
+        taxAddition,
+        health,
+        pension,
+        employment,
+        incomeTax,
+        residentTax,
+        childcare,
+        workedDays: finalWorkedDays,
+        workedHours: finalWorkedHours,
+        work_location: storeLocation
+      }
+    };
+  } catch (error: any) {
+    console.error("Error generating default payslip values:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteStatement(id: string) {
+  try {
+    const docRef = doc(db, STATEMENTS_COLLECTION, id);
+    const snap = await getDocs(query(collection(db, STATEMENTS_COLLECTION), where("__name__", "==", id)));
+    if (snap.empty) return { success: false, error: "データが見つかりません" };
+    
+    const currentData = snap.docs[0].data() as MonthlyStatement;
+    if (currentData.status === "closed") return { success: false, error: "確定済みのデータは削除できません" };
+
+    await deleteDoc(docRef);
+
+    await addAuditLog({
+      table_name: "monthly_statements",
+      record_id: id,
+      action: "DELETE",
+      old_data: { staff_name: currentData.staff_name, target_month: currentData.target_month },
+      new_data: null,
+      actor: "管理者"
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting statement:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateManualStatement(id: string, data: {
+  base_amount: number;
+  total_allowances: number;
+  total_deductions: number;
+  final_paid_amount: number;
+  work_location?: string;
+  details: MonthlyStatement["details"];
+}) {
+  try {
+    const docRef = doc(db, STATEMENTS_COLLECTION, id);
+    const snap = await getDocs(query(collection(db, STATEMENTS_COLLECTION), where("__name__", "==", id)));
+    if (snap.empty) return { success: false, error: "データが見つかりません" };
+    
+    const currentData = snap.docs[0].data() as MonthlyStatement;
+    if (currentData.status === "closed") return { success: false, error: "確定済みのデータは編集できません" };
+
+    await updateDoc(docRef, {
+      base_amount: data.base_amount,
+      total_allowances: data.total_allowances,
+      total_deductions: data.total_deductions,
+      final_paid_amount: data.final_paid_amount,
+      work_location: data.work_location ?? "",
+      details: data.details,
+      updated_at: serverTimestamp()
+    });
+
+    await addAuditLog({
+      table_name: "monthly_statements",
+      record_id: id,
+      action: "UPDATE",
+      old_data: { staff_name: currentData.staff_name, target_month: currentData.target_month },
+      new_data: { staff_name: currentData.staff_name, target_month: currentData.target_month },
+      actor: "管理者"
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating manual statement:", error);
     return { success: false, error: error.message };
   }
 }

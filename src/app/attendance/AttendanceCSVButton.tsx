@@ -20,6 +20,11 @@ export default function AttendanceCSVButton({
     if (!timeStr) return "";
     let dateObj = parseISO(timeStr);
     
+    // Add 30 minutes delay for clock-in (preparation time outside working hours)
+    if (type === 'in') {
+      dateObj = new Date(dateObj.getTime() + 30 * 60 * 1000);
+    }
+    
     // シフト時間によるキャップ処理 (所定労働時間内のみ計算)
     if (shiftTime) {
       const [sh, sm] = shiftTime.split(":").map(Number);

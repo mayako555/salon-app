@@ -162,10 +162,10 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
       let treatmentCount = 0;
       let totalNextBookings = 0;
       let totalNextBookingVisits = 0;
-      const storeSales: Record<string, { total: number, minimo: number, nextBookings: number, nextBookingVisits: number, count: number, minimoVisits: number, regularVisits: number }> = { 
-        "六甲": { total: 0, minimo: 0, nextBookings: 0, nextBookingVisits: 0, count: 0, minimoVisits: 0, regularVisits: 0 }, 
-        "元町": { total: 0, minimo: 0, nextBookings: 0, nextBookingVisits: 0, count: 0, minimoVisits: 0, regularVisits: 0 }, 
-        "神戸": { total: 0, minimo: 0, nextBookings: 0, nextBookingVisits: 0, count: 0, minimoVisits: 0, regularVisits: 0 } 
+      const storeSales: Record<string, { total: number, minimo: number, nextBookings: number, nextBookingVisits: number, count: number, minimoVisits: number, regularVisits: number, regularNewVisits: number, minimoNewVisits: number }> = { 
+        "六甲": { total: 0, minimo: 0, nextBookings: 0, nextBookingVisits: 0, count: 0, minimoVisits: 0, regularVisits: 0, regularNewVisits: 0, minimoNewVisits: 0 }, 
+        "元町": { total: 0, minimo: 0, nextBookings: 0, nextBookingVisits: 0, count: 0, minimoVisits: 0, regularVisits: 0, regularNewVisits: 0, minimoNewVisits: 0 }, 
+        "神戸": { total: 0, minimo: 0, nextBookings: 0, nextBookingVisits: 0, count: 0, minimoVisits: 0, regularVisits: 0, regularNewVisits: 0, minimoNewVisits: 0 } 
       };
       
       salesSnap.forEach(doc => {
@@ -208,6 +208,14 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
         if (storeSales[storeKey] !== undefined && (data.tech_sales || 0) > 0) {
           storeSales[storeKey].total += amount;
           storeSales[storeKey].count++;
+          
+          if (data.customer_type === "新規") {
+            if (isMinimo) {
+              storeSales[storeKey].minimoNewVisits++;
+            } else {
+              storeSales[storeKey].regularNewVisits++;
+            }
+          }
           
           if (isMinimo) {
             storeSales[storeKey].minimo += amount;

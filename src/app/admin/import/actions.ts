@@ -70,10 +70,36 @@ export async function importCustomersFromSalonBoard(customers: any[]) {
     });
 
     await batch.commit();
+
+    try {
+      const { doc, setDoc } = await import("firebase/firestore");
+      const importMetaRef = doc(db, "system_settings", "customer_import");
+      await setDoc(importMetaRef, {
+        last_imported_at: new Date().toISOString()
+      }, { merge: true });
+    } catch (metaErr) {
+      console.warn("Failed to save import metadata:", metaErr);
+    }
+
     revalidatePath("/staff-portal/customers");
     return { success: true, count: newCount, updateCount };
   } catch (error: any) {
     console.error("Import Error:", error);
     return { success: false, error: error.message };
+  }
+}
+
+export async function getLastCustomerImportDate() {
+  try {
+    const { doc, getDoc } = await import("firebase/firestore");
+    const docRef = doc(db, "system_settings", "customer_import");
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return { success: true, date: snap.data().last_imported_at as string };
+    }
+    return { success: true, date: null };
+  } catch (err: any) {
+    console.error("Error getting last import date:", err);
+    return { success: false, error: err.message };
   }
 }

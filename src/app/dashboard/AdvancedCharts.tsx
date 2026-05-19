@@ -54,6 +54,8 @@ export default function AdvancedCharts() {
         nextBookingVisits: vals.nextBookingVisits || 0,
         regularVisits: vals.regularVisits || 0,
         minimoVisits: vals.minimoVisits || 0,
+        regularNewVisits: vals.regularNewVisits || 0,
+        minimoNewVisits: vals.minimoNewVisits || 0,
         totalVisits: (vals.regularVisits || 0) + (vals.nextBookingVisits || 0) + (vals.minimoVisits || 0),
         avgRegular: vals.avgRegular || 0,
         avgMinimo: vals.avgMinimo || 0,
@@ -139,10 +141,12 @@ export default function AdvancedCharts() {
             <Users size={24} className="text-indigo-500" />
             店舗別 来店客数内訳 (通常・次回・ミニモ)
           </CardTitle>
-          <div className="flex gap-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
             <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-[#10b981] rounded-full" /> 通常</div>
             <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-[#fbbf24] rounded-full" /> 次回予約</div>
             <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-[#6366f1] rounded-full" /> ミニモ</div>
+            <div className="flex items-center gap-1 text-sky-500 font-extrabold"><span className="text-xs">👥</span> 通常新規</div>
+            <div className="flex items-center gap-1 text-purple-500 font-extrabold"><span className="text-xs">👥</span> ミニモ新規</div>
           </div>
         </CardHeader>
         <CardContent>
@@ -168,7 +172,38 @@ export default function AdvancedCharts() {
                       />
                       <Tooltip 
                         cursor={{ fill: '#f8fafc' }}
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '10px', fontSize: '12px' }}
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const item = payload[0].payload;
+                            const storeData = item.stores?.[store] || {};
+                            return (
+                              <div className="bg-white p-3 rounded-2xl shadow-lg border border-slate-100 text-xs font-bold space-y-1.5 text-slate-700">
+                                <p className="text-slate-400 font-extrabold text-[10px] uppercase border-b border-slate-50 pb-1 mb-1">{item.month}</p>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-[#10b981] rounded-full" /> 通常:</span>
+                                  <span className="text-slate-800">{storeData.regularVisits || 0}人</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-[#fbbf24] rounded-full" /> 次回予約:</span>
+                                  <span className="text-slate-800">{storeData.nextBookingVisits || 0}人</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-[#6366f1] rounded-full" /> ミニモ:</span>
+                                  <span className="text-slate-800">{storeData.minimoVisits || 0}人</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4 pt-1 mt-1 border-t border-slate-100 font-black text-sky-600 bg-sky-50/50 px-1.5 py-0.5 rounded-md">
+                                  <span className="flex items-center gap-1.5">👥 通常新規:</span>
+                                  <span>{storeData.regularNewVisits || 0}人</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4 font-black text-purple-600 bg-purple-50/50 px-1.5 py-0.5 rounded-md">
+                                  <span className="flex items-center gap-1.5">👥 ミニモ新規:</span>
+                                  <span>{storeData.minimoNewVisits || 0}人</span>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
                       />
                       <Bar name="通常" dataKey={`stores.${store}.regularVisits`} stackId="st" fill="#10b981" />
                       <Bar name="次回予約" dataKey={`stores.${store}.nextBookingVisits`} stackId="st" fill="#fbbf24" />
@@ -183,23 +218,35 @@ export default function AdvancedCharts() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                {/* Store Specific Unit Price Info */}
+                {/* Store Specific Unit Price & New Customer Info */}
                 <div className="grid grid-cols-2 gap-2">
                   {(() => {
                     // Find latest month with actual visits for this store
                     const latestData = [...chartData].reverse().find(d => d.stores[store]?.totalVisits > 0)?.stores[store];
                     return (
                       <>
-                        <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-100 text-center">
-                          <p className="text-[10px] font-black text-emerald-600 uppercase mb-1">通常単価</p>
-                          <p className="text-sm font-black text-emerald-700">
+                        <div className="p-2 bg-emerald-50 rounded-xl border border-emerald-100 text-center flex flex-col justify-center min-h-[58px]">
+                          <p className="text-[9px] font-black text-emerald-600 uppercase mb-0.5 leading-tight">通常単価</p>
+                          <p className="text-xs font-black text-emerald-700">
                             ¥{(latestData?.avgRegular || 0).toLocaleString()}
                           </p>
                         </div>
-                        <div className="p-3 bg-indigo-50 rounded-2xl border border-indigo-100 text-center">
-                          <p className="text-[10px] font-black text-indigo-600 uppercase mb-1">ミニモ単価</p>
-                          <p className="text-sm font-black text-indigo-700">
+                        <div className="p-2 bg-indigo-50 rounded-xl border border-indigo-100 text-center flex flex-col justify-center min-h-[58px]">
+                          <p className="text-[9px] font-black text-indigo-600 uppercase mb-0.5 leading-tight">ミニモ単価</p>
+                          <p className="text-xs font-black text-indigo-700">
                             ¥{(latestData?.avgMinimo || 0).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="p-2 bg-sky-50 rounded-xl border border-sky-100 text-center flex flex-col justify-center min-h-[58px]">
+                          <p className="text-[9px] font-black text-sky-600 uppercase mb-0.5 leading-tight">通常新規</p>
+                          <p className="text-xs font-black text-sky-700">
+                            {(latestData?.regularNewVisits || 0)}人
+                          </p>
+                        </div>
+                        <div className="p-2 bg-purple-50 rounded-xl border border-purple-100 text-center flex flex-col justify-center min-h-[58px]">
+                          <p className="text-[9px] font-black text-purple-600 uppercase mb-0.5 leading-tight">ミニモ新規</p>
+                          <p className="text-xs font-black text-purple-700">
+                            {(latestData?.minimoNewVisits || 0)}人
                           </p>
                         </div>
                       </>

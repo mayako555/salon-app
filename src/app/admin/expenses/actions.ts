@@ -364,3 +364,117 @@ export async function getExpensesDashboardData(year: number, month: number) {
     return { success: false, error: error.message };
   }
 }
+
+export async function parseYayoiPdfAction(base64File: string, mimeType: string) {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is not configured in environment variables.");
+    }
+
+    const cleanBase64 = base64File.includes(",") ? base64File.split(",")[1] : base64File;
+
+    const prompt = `
+あなたは優秀な美容サロン専門の税理士・会計コンサルタントです。
+添付されたファイルは、弥生会計の「取引帳」または「取引履歴」のPDF、CSVテキスト、またはスクリーンショット画像です。
+この画像または書類に記載されているすべての取引行を正確に抽出し、以下のルールに従って解析してJSON形式の配列で返してください。
+
+【解析・重複検出・振替分類ルール】
+1. 各行の取引日、借方勘定科目、貸方勘定科目、金額、摘要を正確に抽出してください。
+2. 売上の二重計上防止チェック:
+   - 勘定科目が「売上」「売掛金」「雑収入」となっている行、または摘要に「ＰＡＹＰＡＹ」「PayPay」「ﾘｸﾙｰﾄ ﾍﾟｲﾒﾝﾄ」「リクルート」「ﾒﾙﾍﾟｲ」「メルペイ」「Square」「スクエア」「Stripe」「ストライプ」「カード」などの文字が含まれ、分類が「売上」となっている行は、日報売上（サロンアプリ側）と重複しているため、 is_duplicate_sales を true にし、日本のサロンオーナー向けに分かりやすい具体的な警告・仕訳アドバイス理由（reason）を添えてください。
+3. 口座間振替・資金移動（経費ではない取引）のチェック:
+   - 借方と貸方の両方が資産口座（例：「普通預金」⇔「普通預金」、「普通預金」⇔「現金」、「クレジットカード」の返済）となっている取引、または摘要に「パソコン振替」「セブンATM出金」「カード (302)」「通帳 (709)」などの資金移動を示す文言がある場合、あるいは「借入金返済 (ご返済　ｾｲｻｸｺｳｺ)」などの財務活動による支出の場合は、経費ではなく資金の移動に過ぎないため、 is_transfer を true にしてください。それ以外（消耗品費、水道光熱費、通信費、広告宣伝費、地代家賃、税理士報酬、給料賃金、支払手数料など）は is_transfer を false にし、 classification を "経費" にしてください。
+4. 金額はカンマを除いた数値型（number）で出力してください。
+
+【期待するJSON構造】
+[
+  {
+    "no": 1,
+    "date": "YYYY-MM-DD",
+    "classification": "売上" | "経費" | "振替",
+    "category": "勘定科目名",
+    "description": "摘要欄の内容",
+    "payment_method": "取引手段の内容",
+    "amount": 金額（数値）,
+    "is_duplicate_sales": true | false,
+    "is_transfer": true | false,
+    "reason": "重複や振替の警告理由、または空欄"
+  }
+]
+`;
+
+    console.log(`[Yayoi Parser] Sending file to Gemini (MIME: ${mimeType})...`);
+    
+    const modelIds = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest"];
+    let lastError = null;
+    let jsonResultText = null;
+
+    for (const modelId of modelIds) {
+      try {
+        console.log(`[Yayoi Parser] Attempting parse with model: ${modelId}`);
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: prompt
+                    },
+                    {
+                      inlineData: {
+                        mimeType: mimeType,
+                        data: cleanBase64
+                      }
+                    }
+                  ]
+                }
+              ]
+            }),
+            signal: AbortSignal.timeout(60000)
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.warn(`[Yayoi Parser] Model ${modelId} failed:`, errorData.error?.message || response.status);
+          lastError = errorData.error?.message || response.status;
+          continue;
+        }
+
+        const json = await response.json();
+        jsonResultText = json.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (jsonResultText) {
+          console.log(`[Yayoi Parser] Success with model: ${modelId}`);
+          break;
+        }
+      } catch (err: any) {
+        console.error(`[Yayoi Parser] Error fetching from ${modelId}:`, err.message);
+        lastError = err.message;
+        continue;
+      }
+    }
+
+    if (!jsonResultText) {
+      return { 
+        success: false, 
+        error: `弥生PDFの読み取りに失敗しました（エラー: ${lastError || "レスポンス空" }）。ファイルの鮮明度や形式をご確認ください。` 
+      };
+    }
+
+    const jsonMatch = jsonResultText.match(/\[[\s\S]*\]/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : jsonResultText;
+    const parsedData = JSON.parse(jsonStr);
+
+    return { success: true, data: parsedData };
+  } catch (error: any) {
+    console.error("parseYayoiPdfAction Error:", error);
+    return { success: false, error: error.message };
+  }
+}

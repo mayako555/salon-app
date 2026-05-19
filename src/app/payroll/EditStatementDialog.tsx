@@ -1,86 +1,118 @@
 "use client";
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { useRouter } from "next/navigation";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { 
   Edit3, 
   Clock, 
   Calendar, 
   Save, 
   Loader2, 
-  TrendingDown, 
-  TrendingUp, 
   ShieldCheck, 
-  Plus, 
-  Trash2,
-  Wallet
+  Wallet,
+  Calculator,
+  User
 } from "lucide-react";
-import { MonthlyStatement, updateStatementMetrics } from "./actions";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MonthlyStatement, updateManualStatement } from "./actions";
+import { toast } from "sonner";
 
-export default function EditStatementDialog({ stmt, onUpdate }: { stmt: MonthlyStatement, onUpdate: () => void }) {
+export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Attendance States
-  const [hours, setHours] = useState(stmt.details.metrics?.worked_hours?.toString() || "0");
-  const [days, setDays] = useState(stmt.details.metrics?.worked_days?.toString() || "0");
-  
-  // Override States
-  const [techCashless, setTechCashless] = useState(stmt.adjustments?.tech_cashless_sales_override?.toString() || "");
-  const [retailCashless, setRetailCashless] = useState(stmt.adjustments?.retail_cashless_sales_override?.toString() || "");
-  const [transportFee, setTransportFee] = useState(stmt.adjustments?.transport_fee_override?.toString() || "");
-  
-  // Deduction States
-  const [health, setHealth] = useState(stmt.adjustments?.health_insurance_override?.toString() || "");
-  const [pension, setPension] = useState(stmt.adjustments?.pension_override?.toString() || "");
-  const [employment, setEmployment] = useState(stmt.adjustments?.employment_insurance_override?.toString() || "");
-  const [incomeTax, setIncomeTax] = useState(stmt.adjustments?.income_tax_override?.toString() || "");
-  const [residentTax, setResidentTax] = useState(stmt.adjustments?.resident_tax_override?.toString() || "");
-  
-  // Custom Adjustments
-  const [customAdjusts, setCustomAdjusts] = useState<{name: string, amount: number}[]>(stmt.adjustments?.custom_adjustments || []);
 
-  const addCustomAdjust = () => setCustomAdjusts([...customAdjusts, { name: "", amount: 0 }]);
-  const removeCustomAdjust = (i: number) => setCustomAdjusts(customAdjusts.filter((_, idx) => idx !== i));
-  const updateCustomAdjust = (i: number, field: 'name' | 'amount', val: any) => {
-    const next = [...customAdjusts];
-    next[i] = { ...next[i], [field]: val };
-    setCustomAdjusts(next);
-  };
+  // States prefilled with the stmt values
+  const [baseAmount, setBaseAmount] = useState(stmt.base_amount.toString());
+  const [transportAllowance, setTransportAllowance] = useState((stmt.details.transport_fee || 0).toString());
+  const [nominationAllowance, setNominationAllowance] = useState((stmt.details.nomination_reward || 0).toString());
+  // @ts-ignore
+  const [reviewAllowance, setReviewAllowance] = useState((stmt.details.review_allowance || 0).toString());
+  // @ts-ignore
+  const [executiveAllowance, setExecutiveAllowance] = useState((stmt.details.executive_allowance || 0).toString());
+  const [taxAddition, setTaxAddition] = useState((stmt.details.tax_addition || 0).toString());
+
+  // Deductions State (Salary only)
+  const [health, setHealth] = useState(stmt.details.social_insurance?.health.toString() || "0");
+  const [pension, setPension] = useState(stmt.details.social_insurance?.pension.toString() || "0");
+  const [employment, setEmployment] = useState(stmt.details.social_insurance?.employment.toString() || "0");
+  const [incomeTax, setIncomeTax] = useState(stmt.details.social_insurance?.income_tax.toString() || "0");
+  const [residentTax, setResidentTax] = useState(stmt.details.social_insurance?.resident_tax.toString() || "0");
+  const [childcare, setChildcare] = useState(stmt.details.social_insurance?.childcare?.toString() || "0");
+
+  // Metrics State
+  const [workedDays, setWorkedDays] = useState(stmt.details.metrics?.worked_days?.toString() || "0");
+  const [workedHours, setWorkedHours] = useState(stmt.details.metrics?.worked_hours?.toString() || "0");
+  const [workLocation, setWorkLocation] = useState(stmt.work_location || "");
+
+  // Calculations
+  const numBase = Number(baseAmount) || 0;
+  const numTransport = Number(transportAllowance) || 0;
+  const numNomination = Number(nominationAllowance) || 0;
+  const numReview = Number(reviewAllowance) || 0;
+  const numExecutive = Number(executiveAllowance) || 0;
+  const numAllowance = numTransport + numNomination + numReview + numExecutive;
+
+  const numTaxAdd = Number(taxAddition) || 0;
+
+  const numHealth = stmt.type === "salary" ? (Number(health) || 0) : 0;
+  const numPension = stmt.type === "salary" ? (Number(pension) || 0) : 0;
+  const numEmployment = stmt.type === "salary" ? (Number(employment) || 0) : 0;
+  const numIncomeTax = stmt.type === "salary" ? (Number(incomeTax) || 0) : 0;
+  const numResidentTax = stmt.type === "salary" ? (Number(residentTax) || 0) : 0;
+  const numChildcare = stmt.type === "salary" ? (Number(childcare) || 0) : 0;
+
+  const totalDeductions = numHealth + numPension + numEmployment + numIncomeTax + numResidentTax + numChildcare;
+  const finalPaidAmount = numBase + numAllowance + numTaxAdd - totalDeductions;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
     try {
-      const adjustments = {
-        tech_cashless_sales_override: techCashless ? parseFloat(techCashless) : undefined,
-        retail_cashless_sales_override: retailCashless ? parseFloat(retailCashless) : undefined,
-        transport_fee_override: transportFee ? parseInt(transportFee) : undefined,
-        health_insurance_override: health ? parseInt(health) : undefined,
-        pension_override: pension ? parseInt(pension) : undefined,
-        employment_insurance_override: employment ? parseInt(employment) : undefined,
-        income_tax_override: incomeTax ? parseInt(incomeTax) : undefined,
-        resident_tax_override: residentTax ? parseInt(residentTax) : undefined,
-        custom_adjustments: customAdjusts.filter(a => a.name && a.amount !== 0)
+      const payload = {
+        base_amount: numBase,
+        total_allowances: numAllowance,
+        total_deductions: totalDeductions,
+        final_paid_amount: finalPaidAmount,
+        work_location: workLocation,
+        details: {
+          ...stmt.details,
+          base_tech_salary: stmt.type === "reward" ? numBase : 0,
+          nomination_reward: numNomination,
+          transport_fee: numTransport,
+          // @ts-ignore
+          review_allowance: numReview,
+          // @ts-ignore
+          executive_allowance: numExecutive,
+          tax_addition: numTaxAdd,
+          social_insurance: stmt.type === "salary" ? {
+            health: numHealth,
+            pension: numPension,
+            employment: numEmployment,
+            income_tax: numIncomeTax,
+            resident_tax: numResidentTax,
+            childcare: numChildcare
+          } : undefined,
+          metrics: {
+            ...stmt.details.metrics,
+            worked_days: Number(workedDays) || undefined,
+            worked_hours: Number(workedHours) || undefined
+          }
+        }
       };
 
-      const res = await updateStatementMetrics(stmt.id, {
-        worked_hours: parseFloat(hours),
-        worked_days: parseInt(days),
-        adjustments
-      });
-      
+      const res = await updateManualStatement(stmt.id, payload);
       if (res.success) {
+        toast.success(`${stmt.staff_name}様の明細書を更新しました！`);
         setIsOpen(false);
-        onUpdate();
+        router.refresh();
       } else {
-        alert(res.error);
+        toast.error(`更新エラー: ${res.error}`);
       }
     } catch (err) {
-      alert("更新中にエラーが発生しました");
+      toast.error("更新中にエラーが発生しました");
     } finally {
       setIsSubmitting(false);
     }
@@ -94,144 +126,266 @@ export default function EditStatementDialog({ stmt, onUpdate }: { stmt: MonthlyS
           <span className="sr-only">詳細編集</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-hidden flex flex-col p-0">
-        <DialogHeader className="p-6 pb-2">
-          <DialogTitle className="flex items-center gap-2 text-xl font-black">
-            <Wallet size={20} className="text-blue-600" />
-            明細の詳細編集 <span className="text-sm font-normal text-slate-400">({stmt.staff_name})</span>
+      <DialogContent className="sm:max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-800">
+            <Calculator className="text-blue-500 w-5 h-5 animate-pulse" />
+            給与・報酬明細の編集
           </DialogTitle>
+          <DialogDescription className="text-slate-500 text-xs">
+            対象スタッフ：{stmt.staff_name} 様 ({stmt.target_month.replace("-", "年")}月度 / {stmt.type === "salary" ? "正社員・パート給与" : "業務委託報酬"})
+          </DialogDescription>
         </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-2 space-y-6">
-          <Tabs defaultValue="attendance" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-6">
-              <TabsTrigger value="attendance" className="font-bold">勤怠・売上</TabsTrigger>
-              <TabsTrigger value="deductions" className="font-bold">控除・税金</TabsTrigger>
-              <TabsTrigger value="adjustments" className="font-bold">その他調整</TabsTrigger>
-            </TabsList>
 
-            <TabsContent value="attendance" className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-                    <Calendar size={12} />
-                    出勤日数
-                  </label>
-                  <div className="relative">
-                    <input type="number" value={days} onChange={e => setDays(e.target.value)} className="w-full h-10 px-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 outline-none font-bold" />
-                    <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">日</span>
+        <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+          
+          {/* Target Month & Staff (Disabled) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100 opacity-80">
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-slate-400 block flex items-center gap-1">
+                <Calendar size={12} /> 対象月（編集不可）
+              </span>
+              <Input value={stmt.target_month} disabled className="h-9 text-xs rounded-lg font-bold bg-slate-100 border-slate-200" />
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-slate-400 block flex items-center gap-1">
+                <User size={12} /> 対象スタッフ（編集不可）
+              </span>
+              <Input value={stmt.staff_name} disabled className="h-9 text-xs rounded-lg font-bold bg-slate-100 border-slate-200" />
+            </div>
+          </div>
+
+          {/* Earnings Grid */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-slate-700 border-b pb-1.5 flex items-center gap-1">
+              <span className="w-1.5 h-3.5 bg-blue-500 rounded-sm"></span> 支給・支払額の入力
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 block">基本給 / 歩合報酬ベース (円)</label>
+                <Input 
+                  type="number" 
+                  value={baseAmount} 
+                  onChange={(e) => setBaseAmount(e.target.value)}
+                  className="h-10 text-xs rounded-lg font-bold border-slate-200 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 block">出勤場所 / 店舗</label>
+                <Input 
+                  type="text" 
+                  value={workLocation} 
+                  onChange={(e) => setWorkLocation(e.target.value)}
+                  placeholder="例: 六甲・神戸"
+                  className="h-10 text-xs rounded-lg font-bold border-slate-200 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-[10px] font-bold text-slate-500 block mb-1">手当の内訳 (円)</label>
+                <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                  <div className="space-y-1">
+                    <span className="text-[9px] text-slate-400 font-bold block">交通費</span>
+                    <Input 
+                      type="number" 
+                      placeholder="交通費"
+                      value={transportAllowance} 
+                      onChange={(e) => setTransportAllowance(e.target.value)}
+                      className="h-8 text-xs rounded font-bold border-slate-200"
+                    />
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-                    <Clock size={12} />
-                    労働時間
-                  </label>
-                  <div className="relative">
-                    <input type="number" step="0.1" value={hours} onChange={e => setHours(e.target.value)} className="w-full h-10 px-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 outline-none font-bold" />
-                    <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">時間</span>
+                  <div className="space-y-1">
+                    <span className="text-[9px] text-slate-400 font-bold block">指名手当</span>
+                    <Input 
+                      type="number" 
+                      placeholder="指名手当"
+                      value={nominationAllowance} 
+                      onChange={(e) => setNominationAllowance(e.target.value)}
+                      className="h-8 text-xs rounded font-bold border-slate-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[9px] text-slate-400 font-bold block">口コミ・ブログ</span>
+                    <Input 
+                      type="number" 
+                      placeholder="口コミ"
+                      value={reviewAllowance} 
+                      onChange={(e) => setReviewAllowance(e.target.value)}
+                      className="h-8 text-xs rounded font-bold border-slate-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[9px] text-slate-400 font-bold block">役職・その他</span>
+                    <Input 
+                      type="number" 
+                      placeholder="その他"
+                      value={executiveAllowance} 
+                      onChange={(e) => setExecutiveAllowance(e.target.value)}
+                      className="h-8 text-xs rounded font-bold border-slate-200"
+                    />
                   </div>
                 </div>
               </div>
 
-              {stmt.type === "reward" && (
-                <div className="bg-slate-50 p-4 rounded-xl space-y-4 border border-slate-100">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <TrendingDown size={14} className="text-rose-500" />
-                    売上手動補正（キャッシュレス分）
-                  </h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600">技術キャッシュレス (¥)</label>
-                      <input type="number" value={techCashless} onChange={e => setTechCashless(e.target.value)} placeholder={stmt.details.metrics.cashless_sales_total.toString()} className="w-full h-9 px-3 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-blue-500/10 text-sm" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600">店販キャッシュレス (¥)</label>
-                      <input type="number" value={retailCashless} onChange={e => setRetailCashless(e.target.value)} placeholder="0" className="w-full h-9 px-3 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-blue-500/10 text-sm" />
-                    </div>
+              {stmt.type === "reward" ? (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 block">消費税加算額 (10%) (円)</label>
+                  <Input 
+                    type="number" 
+                    value={taxAddition} 
+                    onChange={(e) => setTaxAddition(e.target.value)}
+                    className="h-10 text-xs rounded-lg font-bold border-slate-200"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 block">出勤実績（任意入力）</label>
+                  <div className="flex gap-2">
+                    <Input 
+                      type="number" 
+                      placeholder="日数"
+                      value={workedDays} 
+                      onChange={(e) => setWorkedDays(e.target.value)}
+                      className="h-10 text-xs rounded-lg text-center"
+                    />
+                    <Input 
+                      type="number" 
+                      placeholder="時間"
+                      value={workedHours} 
+                      onChange={(e) => setWorkedHours(e.target.value)}
+                      className="h-10 text-xs rounded-lg text-center"
+                    />
                   </div>
-                  <p className="text-[10px] text-slate-400 italic">※ 入力がない場合は自動計算された値が使用されます</p>
                 </div>
               )}
-            </TabsContent>
+            </div>
+          </div>
 
-            <TabsContent value="deductions" className="space-y-6">
-              <div className="bg-rose-50/50 p-4 rounded-xl border border-rose-100 space-y-4">
-                <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
-                  <ShieldCheck size={14} />
-                  法定控除・税金の上書き
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">健康保険 (¥)</label>
-                    <input type="number" value={health} onChange={e => setHealth(e.target.value)} placeholder={stmt.details.social_insurance?.health.toString() || "0"} className="w-full h-9 px-3 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-rose-500/10 text-sm" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">厚生年金 (¥)</label>
-                    <input type="number" value={pension} onChange={e => setPension(e.target.value)} placeholder={stmt.details.social_insurance?.pension.toString() || "0"} className="w-full h-9 px-3 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-rose-500/10 text-sm" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">雇用保険 (¥)</label>
-                    <input type="number" value={employment} onChange={e => setEmployment(e.target.value)} placeholder={stmt.details.social_insurance?.employment.toString() || "0"} className="w-full h-9 px-3 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-rose-500/10 text-sm" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">所得税 (¥)</label>
-                    <input type="number" value={incomeTax} onChange={e => setIncomeTax(e.target.value)} placeholder={stmt.details.social_insurance?.income_tax.toString() || "0"} className="w-full h-9 px-3 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-rose-500/10 text-sm" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600">住民税 (¥)</label>
-                    <input type="number" value={residentTax} onChange={e => setResidentTax(e.target.value)} placeholder={stmt.details.social_insurance?.resident_tax.toString() || "0"} className="w-full h-9 px-3 border border-slate-200 rounded-md outline-none focus:ring-2 focus:ring-rose-500/10 text-sm" />
-                  </div>
+          {/* Social Insurance Deductions (Salary only) */}
+          {stmt.type === "salary" && (
+            <div className="space-y-3 animate-in slide-in-from-top-3 duration-200">
+              <h3 className="text-xs font-bold text-slate-700 border-b pb-1.5 flex items-center gap-1">
+                <span className="w-1.5 h-3.5 bg-blue-500 rounded-sm"></span> 社会保険・法定控除の入力 (円)
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 block">健康保険料</label>
+                  <Input 
+                    type="number" 
+                    value={health} 
+                    onChange={(e) => setHealth(e.target.value)}
+                    className="h-10 text-xs rounded-lg font-bold border-slate-200"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 block">厚生年金保険料</label>
+                  <Input 
+                    type="number" 
+                    value={pension} 
+                    onChange={(e) => setPension(e.target.value)}
+                    className="h-10 text-xs rounded-lg font-bold border-slate-200"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 block">雇用保険料</label>
+                  <Input 
+                    type="number" 
+                    value={employment} 
+                    onChange={(e) => setEmployment(e.target.value)}
+                    className="h-10 text-xs rounded-lg font-bold border-slate-200"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 block">所得税（源泉徴収）</label>
+                  <Input 
+                    type="number" 
+                    value={incomeTax} 
+                    onChange={(e) => setIncomeTax(e.target.value)}
+                    className="h-10 text-xs rounded-lg font-bold border-slate-200"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 block">住民税</label>
+                  <Input 
+                    type="number" 
+                    value={residentTax} 
+                    onChange={(e) => setResidentTax(e.target.value)}
+                    className="h-10 text-xs rounded-lg font-bold border-slate-200"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 block text-blue-600 flex items-center gap-1 font-bold">
+                    子ども・子育て支援金
+                  </label>
+                  <Input 
+                    type="number" 
+                    value={childcare} 
+                    onChange={(e) => setChildcare(e.target.value)}
+                    className="h-10 text-xs rounded-lg font-bold border-blue-200 bg-blue-50/20 text-blue-900"
+                  />
                 </div>
               </div>
-            </TabsContent>
+            </div>
+          )}
 
-            <TabsContent value="adjustments" className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase">交通費の上書き (¥)</label>
-                <input type="number" value={transportFee} onChange={e => setTransportFee(e.target.value)} placeholder={stmt.details.transport_fee.toString()} className="w-full h-10 px-3 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 font-bold" />
+          {/* Real-time Calculation Summary */}
+          <div className="bg-slate-900 text-white p-5 rounded-2xl space-y-3 shadow-lg">
+            <h4 className="text-xs font-bold tracking-wider text-slate-400 border-b border-slate-800 pb-2">計算結果のプレビュー</h4>
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-slate-400">総支給額 (基本給 + 手当合計 + 消費税):</span>
+              <span className="font-bold text-slate-200">
+                ¥{(numBase + numAllowance + numTaxAdd).toLocaleString()}
+              </span>
+            </div>
+            {stmt.type === "salary" && (
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">控除額合計 (社会保険・税等):</span>
+                <span className="font-bold text-red-400">-¥{totalDeductions.toLocaleString()}</span>
               </div>
+            )}
+            <div className="flex justify-between items-center pt-2 border-t border-slate-800">
+              <span className="text-sm font-bold text-slate-300">
+                差し引き支給額 (差引支給額/振込総額):
+              </span>
+              <span className="text-2xl font-black text-emerald-400">
+                ¥{finalPaidAmount.toLocaleString()}
+              </span>
+            </div>
+          </div>
 
-              <div className="space-y-4">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <TrendingUp size={14} className="text-emerald-500" />
-                    個別調整項目
-                  </h4>
-                  <Button type="button" variant="outline" size="sm" onClick={addCustomAdjust} className="h-7 text-[10px] font-bold border-emerald-200 text-emerald-600 hover:bg-emerald-50 px-2">
-                    <Plus size={12} className="mr-1" />
-                    項目を追加
-                  </Button>
-                </div>
-                
-                <div className="space-y-2">
-                  {customAdjusts.map((adj, idx) => (
-                    <div key={idx} className="flex gap-2 items-center">
-                      <input type="text" placeholder="項目名 (例: 掃除手当)" value={adj.name} onChange={e => updateCustomAdjust(idx, 'name', e.target.value)} className="flex-1 h-9 px-3 border border-slate-200 rounded-md text-xs outline-none focus:ring-2 focus:ring-blue-500/10" />
-                      <div className="relative w-28">
-                        <input type="number" placeholder="金額" value={adj.amount} onChange={e => updateCustomAdjust(idx, 'amount', parseInt(e.target.value))} className="w-full h-9 px-3 border border-slate-200 rounded-md text-xs outline-none focus:ring-2 focus:ring-blue-500/10 pr-6" />
-                        <span className="absolute right-2 top-2.5 text-[10px] text-slate-400 font-bold">¥</span>
-                      </div>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeCustomAdjust(idx)} className="h-9 w-9 text-slate-300 hover:text-rose-500">
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
+          <DialogFooter className="gap-2">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setIsOpen(false)}
+              disabled={isSubmitting}
+              className="h-10 rounded-lg text-xs"
+            >
+              キャンセル
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={isSubmitting}
+              className="h-10 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs gap-1.5"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  保存中...
+                </>
+              ) : (
+                <>
+                  <Save size={14} />
+                  変更を保存
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+
         </form>
-
-        <DialogFooter className="p-6 bg-slate-50 border-t border-slate-100 mt-auto">
-          <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={isSubmitting}>
-            キャンセル
-          </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white min-w-[140px] gap-2 font-bold shadow-lg shadow-blue-900/20">
-            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            {isSubmitting ? "保存中..." : "明細を更新"}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

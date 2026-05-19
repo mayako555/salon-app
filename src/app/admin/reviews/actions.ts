@@ -90,3 +90,23 @@ export async function getMonthlyReviews(year: number, month: number, storeName?:
     return [];
   }
 }
+
+export async function deleteReviewAction(id: string) {
+  try {
+    const docRef = doc(db, REVIEWS_COLLECTION, id);
+    const { deleteDoc } = await import("firebase/firestore");
+    await deleteDoc(docRef);
+    await addAuditLog({
+      table_name: REVIEWS_COLLECTION,
+      record_id: id,
+      action: "DELETE",
+      old_data: { id },
+      new_data: null,
+      actor: "Admin"
+    });
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error deleting review:", err);
+    return { success: false, error: err.message };
+  }
+}

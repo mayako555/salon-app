@@ -1,4 +1,5 @@
 "use client";
+export const maxDuration = 60;
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
@@ -8,6 +9,7 @@ import {
   deleteExpense, 
   generateAiManagementAdvice, 
   getYayoiCsvData,
+  parseYayoiPdfAction,
   ExpenseRecord 
 } from "@/app/admin/expenses/actions";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -59,6 +61,12 @@ export default function AdminExpensesDashboard() {
   // AI Advisor States
   const [aiReport, setAiReport] = useState<string | null>(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+
+  // Yayoi PDF Import States
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isParsingPdf, setIsParsingPdf] = useState(false);
+  const [parsedTransactions, setParsedTransactions] = useState<any[]>([]);
+  const [importError, setImportError] = useState<string | null>(null);
 
   // New Expense Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -193,6 +201,80 @@ export default function AdminExpensesDashboard() {
     }
   };
 
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("ファイルサイズは10MB以下にしてください");
+      return;
+    }
+
+    setIsParsingPdf(true);
+    setImportError(null);
+    setParsedTransactions([]);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result as string;
+        let mime = file.type;
+        if (!mime && file.name.endsWith(".txt")) mime = "text/plain";
+        if (!mime && file.name.endsWith(".csv")) mime = "text/csv";
+        const res = await parseYayoiPdfAction(base64Data, mime || "application/pdf");
+        if (res.success && res.data) {
+          setParsedTransactions(res.data);
+          toast.success("取引履歴をAIで解析しました！");
+        } else {
+          setImportError(res.error || "取引履歴の解析に失敗しました");
+          toast.error("解析エラーが発生しました");
+        }
+        setIsParsingPdf(false);
+      };
+      reader.onerror = () => {
+        toast.error("ファイルの読み込み中にエラーが発生しました");
+        setIsParsingPdf(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error(err);
+      setImportError(err.message);
+      toast.error("エラーが発生しました");
+      setIsParsingPdf(false);
+    }
+  };
+
+  const handleApplyImportedExpenses = () => {
+    const validExpenses = parsedTransactions.filter(tx => !tx.is_duplicate_sales && tx.classification === "経費");
+    if (validExpenses.length === 0) {
+      toast.error("反映可能な経費取引が見つかりませんでした");
+      return;
+    }
+
+    let rentSum = 0;
+    let salariesSum = 0;
+    let marketingSum = 0;
+
+    validExpenses.forEach(tx => {
+      const category = tx.category || "";
+      const desc = tx.description || "";
+      if (category.includes("地代家賃") || category.includes("家賃") || desc.includes("家賃")) {
+        rentSum += tx.amount || 0;
+      } else if (category.includes("給料") || category.includes("人件費") || desc.includes("給与") || desc.includes("人件費")) {
+        salariesSum += tx.amount || 0;
+      } else if (category.includes("広告") || category.includes("宣伝") || desc.includes("広告") || desc.includes("ミクシィ") || desc.includes("ﾘｸﾙｰﾄ")) {
+        marketingSum += tx.amount || 0;
+      }
+    });
+
+    if (rentSum > 0) setRent(rentSum.toString());
+    if (salariesSum > 0) setSalaries(salariesSum.toString());
+    if (marketingSum > 0) setMarketing(marketingSum.toString());
+    
+    toast.success(`解析された経費 (地代家賃 ¥${rentSum.toLocaleString()}, 人件費 ¥${salariesSum.toLocaleString()}, 広告宣伝費 ¥${marketingSum.toLocaleString()}) をP&L固定費シミュレータに反映しました！`);
+    setIsImportModalOpen(false);
+  };
+
   // Calculations
   const customRent = parseInt(rent, 10) || 0;
   const customSalaries = parseInt(salaries, 10) || 0;
@@ -303,6 +385,14 @@ export default function AdminExpensesDashboard() {
                 {STORES.map(s => <SelectItem key={s} value={s}>{s}店</SelectItem>)}
               </SelectContent>
             </Select>
+
+            <Button 
+              onClick={() => setIsImportModalOpen(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 rounded-xl px-4 gap-2 text-xs"
+            >
+              <Brain size={14} className="text-amber-300" />
+              弥生取引帳PDF・画像インポート
+            </Button>
 
             <Button 
               onClick={handleExportCsv} 
@@ -680,6 +770,167 @@ export default function AdminExpensesDashboard() {
                   </Button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Yayoi PDF/Image Import */}
+        {isImportModalOpen && (
+          <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl my-auto animate-in fade-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[85vh]">
+              <div className="flex justify-between items-center px-5 py-4 border-b border-slate-100 bg-slate-50">
+                 <div>
+                    <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
+                      <Brain className="text-emerald-600 w-5 h-5" />
+                      弥生取引帳PDF・画像インポート（AI解析）
+                    </h3>
+                    <p className="text-[10px] text-slate-500">PDFや画像から取引データを一瞬で抽出し、売上重複をチェックします。</p>
+                 </div>
+                 <button 
+                   onClick={() => {
+                     setIsImportModalOpen(false);
+                     setParsedTransactions([]);
+                     setImportError(null);
+                   }}
+                   className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-md hover:bg-slate-200 bg-white shadow-sm"
+                 >
+                   <X size={18} />
+                 </button>
+              </div>
+
+              <div className="p-5 overflow-y-auto space-y-4 flex-1">
+                {/* Uploader Box */}
+                {!isParsingPdf && parsedTransactions.length === 0 && (
+                  <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center bg-slate-50 hover:bg-slate-100/50 hover:border-emerald-300 transition-all cursor-pointer relative group">
+                    <input 
+                      type="file" 
+                      accept="application/pdf,image/png,image/jpeg,text/plain,text/csv"
+                      onChange={handlePdfUpload}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                    <Sparkles className="w-8 h-8 text-emerald-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-bold text-slate-700 block">ここに取引履歴のPDF、テキスト、またはスクリーンショット画像をドロップ</span>
+                    <span className="text-[10px] text-slate-400 block mt-1">対応形式: PDF, TXT, CSV, PNG, JPEG (最大10MB)</span>
+                  </div>
+                )}
+
+                {/* Parsing Status */}
+                {isParsingPdf && (
+                  <div className="flex flex-col items-center justify-center py-16 text-center gap-4 bg-slate-50 rounded-xl border border-slate-100 p-8 animate-pulse">
+                    <Loader2 className="animate-spin text-emerald-600 w-8 h-8" />
+                    <div>
+                      <span className="text-xs font-bold text-slate-700 block">AIが弥生取引履歴を解析中...</span>
+                      <span className="text-[10px] text-slate-400 block mt-1.5 leading-relaxed max-w-sm mx-auto">
+                        画像をOCR処理し、日付、科目、摘要、金額を構造化しています。また、PayPayやAirPAYなどの入金が売上日報と二重カウントされていないか検出中。
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error Banner */}
+                {importError && (
+                  <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-semibold leading-relaxed flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <span>⚠️ 解析エラーが発生しました</span>
+                    </div>
+                    <p className="text-[10px] text-rose-600 font-medium">{importError}</p>
+                    <button 
+                      onClick={() => setImportError(null)}
+                      className="text-rose-700 hover:underline text-[10px] font-bold text-left self-start mt-1"
+                    >
+                      もう一度アップロードする
+                    </button>
+                  </div>
+                )}
+
+                {/* Parsed Transactions List */}
+                {parsedTransactions.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center bg-emerald-50 border border-emerald-100 p-3 rounded-xl">
+                      <div>
+                        <span className="text-[10px] font-bold text-emerald-800 block">🎉 取引抽出が完了しました！</span>
+                        <span className="text-[9px] text-emerald-600 block mt-0.5">
+                          全 {parsedTransactions.length} 件の取引データを検出。売上重複を除外した経費のみをP&Lに反映できます。
+                        </span>
+                      </div>
+                      <button 
+                        onClick={() => setParsedTransactions([])}
+                        className="text-xs font-bold text-emerald-700 hover:underline"
+                      >
+                        再アップロード
+                      </button>
+                    </div>
+
+                    <div className="overflow-x-auto border border-slate-100 rounded-xl">
+                      <table className="w-full text-left text-[10px] border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold">
+                            <th className="px-3 py-2.5">取引日</th>
+                            <th className="px-3 py-2.5">科目</th>
+                            <th className="px-3 py-2.5">摘要</th>
+                            <th className="px-3 py-2.5 text-right">金額</th>
+                            <th className="px-3 py-2.5 text-center">AIチェック状況</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {parsedTransactions.map((tx, index) => (
+                            <tr key={index} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-3 py-2.5 text-slate-700 font-medium whitespace-nowrap">{tx.date}</td>
+                              <td className="px-3 py-2.5 font-bold text-slate-600">{tx.category}</td>
+                              <td className="px-3 py-2.5 text-slate-500 truncate max-w-[150px]" title={tx.description}>
+                                {tx.description}
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-black text-slate-800">¥{tx.amount?.toLocaleString()}</td>
+                              <td className="px-3 py-2.5 text-center">
+                                {tx.is_duplicate_sales ? (
+                                  <span 
+                                    className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-rose-50 text-rose-700 border border-rose-200 inline-block cursor-help animate-pulse"
+                                    title={tx.reason}
+                                  >
+                                    ⚠️ 売上重複検知
+                                  </span>
+                                ) : tx.classification === "経費" ? (
+                                  <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-block">
+                                    経費（反映対象）
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-slate-100 text-slate-500 border border-slate-200 inline-block">
+                                    対象外 ({tx.classification || "振替"})
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="px-5 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => {
+                    setIsImportModalOpen(false);
+                    setParsedTransactions([]);
+                    setImportError(null);
+                  }}
+                  className="h-9 text-xs rounded-lg border-slate-200"
+                >
+                  閉じる
+                </Button>
+                {parsedTransactions.length > 0 && (
+                  <Button 
+                    onClick={handleApplyImportedExpenses}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 text-xs rounded-lg px-4 gap-1.5 shadow-sm"
+                  >
+                    <Sparkles size={12} className="text-amber-300" />
+                    有効な経費のみをP&Lに反映する
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         )}

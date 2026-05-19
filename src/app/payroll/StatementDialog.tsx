@@ -6,8 +6,133 @@ import { Button } from "@/components/ui/button";
 import { Receipt, Download } from "lucide-react";
 import { MonthlyStatement } from "./actions";
 
+function calculatePaymentDate(targetMonth: string): string {
+  const [yearStr, monthStr] = targetMonth.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+
+  if (isNaN(year) || isNaN(month)) return "----/--/--";
+
+  // 支給日は翌月25日
+  let payYear = year;
+  let payMonth = month + 1;
+  if (payMonth > 12) {
+    payMonth = 1;
+    payYear += 1;
+  }
+
+  const date = new Date(payYear, payMonth - 1, 25);
+
+  // 日本の祝日判定ヘルパー
+  const isJapanesePublicHoliday = (d: Date): boolean => {
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const dy = d.getDate();
+
+    // 1. 固定祝日
+    if (m === 1 && dy === 1) return true; // 元日
+    if (m === 2 && dy === 11) return true; // 建国記念の日
+    if (m === 2 && dy === 23) return true; // 天皇誕生日
+    if (m === 4 && dy === 29) return true; // 昭和の日
+    if (m === 5 && dy === 3) return true; // 憲法記念日
+    if (m === 5 && dy === 4) return true; // みどりの日
+    if (m === 5 && dy === 5) return true; // こどもの日
+    if (m === 8 && dy === 11) return true; // 山の日
+    if (m === 11 && dy === 3) return true; // 文化の日
+    if (m === 11 && dy === 23) return true; // 勤労感謝の日
+
+    // 2. ハッピーマンデー (成人の日, 海の日, 敬老の日, スポーツの日)
+    const getNthMonday = (yr: number, mo: number, n: number) => {
+      let count = 0;
+      for (let day = 1; day <= 31; day++) {
+        const dt = new Date(yr, mo - 1, day);
+        if (dt.getDay() === 1) { // 月曜日
+          count++;
+          if (count === n) return day;
+        }
+      }
+      return -1;
+    };
+
+    if (m === 1 && dy === getNthMonday(y, 1, 2)) return true; // 成人の日 (第2月曜)
+    if (m === 7 && dy === getNthMonday(y, 7, 3)) return true; // 海の日 (第3月曜)
+    if (m === 9 && dy === getNthMonday(y, 9, 3)) return true; // 敬老の日 (第3月曜)
+    if (m === 10 && dy === getNthMonday(y, 10, 2)) return true; // スポーツの日 (第2月曜)
+
+    // 3. 春分の日・秋分の日 (計算式による算出)
+    const vernalDay = Math.floor(20.8431 + 0.242194 * (y - 1980) - Math.floor((y - 1980) / 4));
+    if (m === 3 && dy === vernalDay) return true;
+
+    const autumnalDay = Math.floor(23.2488 + 0.242194 * (y - 1980) - Math.floor((y - 1980) / 4));
+    if (m === 9 && dy === autumnalDay) return true;
+
+    // 4. 振替休日
+    const isHolidayBase = (dt: Date) => {
+      const ty = dt.getFullYear();
+      const tm = dt.getMonth() + 1;
+      const td = dt.getDate();
+      if (tm === 1 && td === 1) return true;
+      if (tm === 2 && td === 11) return true;
+      if (tm === 2 && td === 23) return true;
+      if (tm === 4 && td === 29) return true;
+      if (tm === 5 && td === 3) return true;
+      if (tm === 5 && td === 4) return true;
+      if (tm === 5 && td === 5) return true;
+      if (tm === 8 && td === 11) return true;
+      if (tm === 11 && td === 3) return true;
+      if (tm === 11 && td === 23) return true;
+      
+      const mon1 = getNthMonday(ty, 1, 2);
+      const mon7 = getNthMonday(ty, 7, 3);
+      const mon9 = getNthMonday(ty, 9, 3);
+      const mon10 = getNthMonday(ty, 10, 2);
+      if (tm === 1 && td === mon1) return true;
+      if (tm === 7 && td === mon7) return true;
+      if (tm === 9 && td === mon9) return true;
+      if (tm === 10 && td === mon10) return true;
+
+      const vD = Math.floor(20.8431 + 0.242194 * (ty - 1980) - Math.floor((ty - 1980) / 4));
+      if (tm === 3 && td === vD) return true;
+      const aD = Math.floor(23.2488 + 0.242194 * (ty - 1980) - Math.floor((ty - 1980) / 4));
+      if (tm === 9 && td === aD) return true;
+
+      return false;
+    };
+
+    const prev = new Date(y, m - 1, dy - 1);
+    if (prev.getDay() === 0 && isHolidayBase(prev)) return true;
+    
+    let temp = new Date(y, m - 1, dy - 1);
+    while (isHolidayBase(temp)) {
+      if (temp.getDay() === 0) return true;
+      temp.setDate(temp.getDate() - 1);
+    }
+
+    // 5. 国民の休日 (祝日と祝日に挟まれた平日)
+    const next = new Date(y, m - 1, dy + 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6 && isHolidayBase(prev) && isHolidayBase(next)) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // 25日が土日・祝日の場合は、その前日の平日へ遡る
+  while (date.getDay() === 0 || date.getDay() === 6 || isJapanesePublicHoliday(date)) {
+    date.setDate(date.getDate() - 1);
+  }
+
+  const formatY = date.getFullYear();
+  const formatM = String(date.getMonth() + 1).padStart(2, "0");
+  const formatD = String(date.getDate()).padStart(2, "0");
+
+  return `${formatY}/${formatM}/${formatD}`;
+}
+
 export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showLocation, setShowLocation] = useState(true);
+  const paymentDate = calculatePaymentDate(stmt.target_month);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -17,7 +142,7 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
           <span>明細</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex justify-between items-start">
             <div>
@@ -28,20 +153,64 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
                 {stmt.target_month.replace("-", "年")}月度
               </DialogDescription>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-700" onClick={() => window.print()}>
-               <Download size={16} />
-            </Button>
+            <div className="flex items-center gap-3 print:hidden">
+              {stmt.work_location && (
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700">
+                  <input 
+                    type="checkbox" 
+                    id={`toggle-loc-${stmt.id}`}
+                    checked={showLocation} 
+                    onChange={(e) => setShowLocation(e.target.checked)} 
+                    className="rounded border-slate-300 text-rose-600 focus:ring-rose-500 h-4 w-4 cursor-pointer"
+                  />
+                  <label htmlFor={`toggle-loc-${stmt.id}`} className="cursor-pointer select-none">
+                    出勤場所を表示する
+                  </label>
+                </div>
+              )}
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-700" onClick={() => window.print()}>
+                 <Download size={16} />
+              </Button>
+            </div>
           </div>
         </DialogHeader>
 
-        <div className="bg-white p-4 text-sm mt-4 text-slate-900 overflow-x-auto print:m-0 print:p-0">
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            body * {
+              visibility: hidden;
+            }
+            #print-area-${stmt.id}, #print-area-${stmt.id} * {
+              visibility: visible;
+            }
+            #print-area-${stmt.id} {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              background: white !important;
+              color: black !important;
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+          }
+        `}} />
+
+        <div id={`print-area-${stmt.id}`} className="bg-white p-4 text-sm mt-4 text-slate-900 overflow-x-auto print:m-0 print:p-0">
           <div className="min-w-[800px]">
             {/* Header Info */}
             <div className="flex justify-between mb-4 border border-black p-2 max-w-sm">
               <div className="space-y-1">
-                <p>支給日: ----/--/--</p>
+                <p>支給日: {paymentDate}</p>
                 <p className="font-bold border-b border-black w-48 mb-2 pb-1">{stmt.target_month.replace("-", "年")}月分 給与・報酬</p>
-                <p>Jasmine Lash</p>
+                <div className="flex justify-between items-baseline pr-4">
+                  <span>Jasmine Lash</span>
+                  {showLocation && stmt.work_location && (
+                    <span className="text-[10px] bg-slate-100 border border-slate-300 px-1 py-0.5 rounded font-black text-slate-700">
+                      勤務場所: {stmt.work_location}
+                    </span>
+                  )}
+                </div>
                 <p className="font-bold text-lg">{stmt.staff_name} 様</p>
               </div>
               <div className="flex items-end">
@@ -71,10 +240,10 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
               <div className="border-x-2 border-b-2 border-black relative">
                 <div className="text-center font-bold border-b-2 border-black py-1">支給額</div>
                 <div className="flex justify-between font-bold border-b-2 border-black p-2 text-lg">
-                  <span>合計</span><span>{stmt.base_amount.toLocaleString()}</span>
+                  <span>合計</span><span>¥{(stmt.base_amount + stmt.total_allowances + (stmt.details.tax_addition || 0)).toLocaleString()}</span>
                 </div>
                 <div className="text-center text-xs mt-1 border-b border-black pb-1">支給内訳</div>
-                <div className="p-2 space-y-2 h-[200px]">
+                <div className="p-2 space-y-2 h-[200px] overflow-y-auto">
                    {stmt.type === "salary" && (
                      <div className="flex justify-between">
                        <span className="text-xs">基本給</span>
@@ -87,12 +256,42 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
                    {stmt.details.base_product_salary > 0 && (
                      <div className="flex justify-between text-xs"><span>店販歩合</span><span>{stmt.details.base_product_salary.toLocaleString()}</span></div>
                    )}
+                   
+                   {/* Separated Allowances */}
                    {stmt.details.nomination_reward > 0 && (
                      <div className="flex justify-between text-xs"><span>指名手当</span><span>{stmt.details.nomination_reward.toLocaleString()}</span></div>
                    )}
-                   {stmt.total_allowances > 0 && (
-                     <div className="flex justify-between text-xs"><span>各種手当 (口コミ/ブログ等)</span><span>{stmt.total_allowances.toLocaleString()}</span></div>
+                   {stmt.details.transport_fee > 0 && (
+                     <div className="flex justify-between text-xs"><span>交通費</span><span>{stmt.details.transport_fee.toLocaleString()}</span></div>
                    )}
+                   {/* @ts-ignore */}
+                   {stmt.details.review_allowance > 0 && (
+                     <div className="flex justify-between text-xs">
+                       <span>口コミ・ブログ手当</span>
+                       {/* @ts-ignore */}
+                       <span>{stmt.details.review_allowance.toLocaleString()}</span>
+                     </div>
+                   )}
+                   {/* @ts-ignore */}
+                   {stmt.details.executive_allowance > 0 && (
+                     <div className="flex justify-between text-xs">
+                       <span>役職・その他手当</span>
+                       {/* @ts-ignore */}
+                       <span>{stmt.details.executive_allowance.toLocaleString()}</span>
+                     </div>
+                   )}
+
+                   {/* Legacy fallback - if it's an old statement that only has total_allowances but no detailed fields */}
+                   {stmt.total_allowances > 0 && 
+                    !stmt.details.transport_fee && 
+                    !stmt.details.nomination_reward && 
+                    // @ts-ignore
+                    !stmt.details.review_allowance && 
+                    // @ts-ignore
+                    !stmt.details.executive_allowance && (
+                     <div className="flex justify-between text-xs"><span>各種手当</span><span>{stmt.total_allowances.toLocaleString()}</span></div>
+                   )}
+
                    {stmt.details.tax_addition > 0 && (
                      <div className="flex justify-between text-xs"><span>消費税加算額</span><span>{stmt.details.tax_addition.toLocaleString()}</span></div>
                    )}
@@ -108,6 +307,9 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
                    <div className="flex justify-between text-xs"><span>住民税</span><span>{stmt.details.social_insurance?.resident_tax.toLocaleString() || "--"}</span></div>
                    <div className="flex justify-between text-xs mt-4"><span>健康保険料</span><span>{stmt.details.social_insurance?.health.toLocaleString() || "--"}</span></div>
                    <div className="flex justify-between text-xs"><span>厚生年金保険</span><span>{stmt.details.social_insurance?.pension.toLocaleString() || "--"}</span></div>
+                   {(stmt.details.social_insurance?.childcare ?? 0) > 0 && (
+                     <div className="flex justify-between text-xs"><span>子ども・子育て支援金</span><span>{stmt.details.social_insurance?.childcare?.toLocaleString()}</span></div>
+                   )}
                 </div>
                 <div className="absolute bottom-0 w-full flex justify-between font-bold border-t-2 border-black p-2">
                   <span>合計</span><span>{stmt.total_deductions?.toLocaleString() || "0"}</span>

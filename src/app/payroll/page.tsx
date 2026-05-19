@@ -7,10 +7,33 @@ import CloseButton from "./CloseButton";
 import CSVExportButton from "./CSVExportButton";
 import StatementDialog from "./StatementDialog";
 import EditStatementDialog from "./EditStatementDialog";
+import CreateStatementDialog from "./CreateStatementDialog";
+import DeleteStatementButton from "./DeleteStatementButton";
+import { getStaffList } from "../staff/actions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Banknote, UserCircle2, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard";
 import Link from "next/link";
+
+function sanitizeObject(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj !== "object") return obj;
+  if (obj instanceof Date) return obj.toISOString();
+  if (typeof obj.toDate === "function") {
+    return obj.toDate().toISOString();
+  }
+  if (obj.seconds !== undefined && obj.nanoseconds !== undefined) {
+    return new Date(obj.seconds * 1000).toISOString();
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeObject);
+  }
+  const result: any = {};
+  for (const key of Object.keys(obj)) {
+    result[key] = sanitizeObject(obj[key]);
+  }
+  return result;
+}
 
 export default async function PayrollPage({
   searchParams
@@ -22,13 +45,17 @@ export default async function PayrollPage({
   const year = targetDate.getFullYear();
   const month = targetDate.getMonth() + 1;
 
-  const statements = await getMonthlyStatements(year, month);
+  const rawStatements = await getMonthlyStatements(year, month);
+  const statements = sanitizeObject(rawStatements) as typeof rawStatements;
   
-  const isClosed = statements.length > 0 && statements.every(s => s.status === "closed");
-  const totalPaid = statements.reduce((acc, curr) => acc + curr.final_paid_amount, 0);
+  const isClosed = statements.length > 0 && statements.every((s: any) => s.status === "closed");
+  const totalPaid = statements.reduce((acc: number, curr: any) => acc + curr.final_paid_amount, 0);
 
   const prevMonth = format(new Date(year, month - 2, 1), "yyyy-MM");
   const nextMonth = format(new Date(year, month, 1), "yyyy-MM");
+
+  const staffList = await getStaffList();
+  const simpleStaffList = staffList.map(s => ({ id: s.id, name: s.name }));
 
   return (
     <AuthGuard requireRole="admin">
@@ -56,6 +83,7 @@ export default async function PayrollPage({
           </div>
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             <CSVExportButton statements={statements} year={year} month={month} />
+            <CreateStatementDialog staffList={simpleStaffList} defaultYear={year} defaultMonth={month} />
             {!isClosed && <GenerateButton year={year} month={month} />}
             <CloseButton year={year} month={month} hasData={statements.length > 0} disabled={isClosed} />
           </div>
@@ -102,10 +130,10 @@ export default async function PayrollPage({
               <TableHeader>
                 <TableRow className="bg-slate-50/50">
                   <TableHead>スタッフ</TableHead>
-                  <TableHead className="text-right">歩合報酬 (預り金控除後)</TableHead>
+                  <TableHead className="text-right">基本給 / 歩合報酬</TableHead>
                   <TableHead className="text-right">手当合計</TableHead>
                   <TableHead className="text-right text-emerald-600">消費税加算</TableHead>
-                  <TableHead className="text-right">最終請求額</TableHead>
+                  <TableHead className="text-right">差引支給額 / 最終請求額</TableHead>
                   <TableHead className="text-right w-32">アクション</TableHead>
                 </TableRow>
               </TableHeader>
@@ -140,7 +168,12 @@ export default async function PayrollPage({
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end items-center gap-1">
-                        {!isClosed && <EditStatementDialog stmt={stmt} onUpdate={() => {}} />}
+                        {!isClosed && (
+                          <>
+                            <EditStatementDialog stmt={stmt} />
+                            <DeleteStatementButton id={stmt.id} staffName={stmt.staff_name} />
+                          </>
+                        )}
                         <StatementDialog stmt={stmt} />
                       </div>
                     </TableCell>
