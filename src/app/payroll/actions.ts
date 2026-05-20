@@ -926,6 +926,7 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
       data: {
         type,
         contract_type: contract.contract_type,
+        contract,
         base_amount,
         total_allowances,
         transportAllowance,

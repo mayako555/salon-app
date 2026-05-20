@@ -63,6 +63,13 @@ export default function CreateStatementDialog({
   const [workLocation, setWorkLocation] = useState("");
 
   const [contractType, setContractType] = useState<string>("");
+  const [contractData, setContractData] = useState<any>(null);
+
+  // Reward Assistant State
+  const [techSales, setTechSales] = useState("");
+  const [productSales, setProductSales] = useState("");
+  const [techCashless, setTechCashless] = useState("");
+  const [productCashless, setProductCashless] = useState("");
 
   // Contract Warning Banner State
   const [contractWarning, setContractWarning] = useState<string | null>(null);
@@ -90,6 +97,11 @@ export default function CreateStatementDialog({
       setHourlyWage("");
       setWorkLocation("");
       setContractWarning(null);
+      setContractData(null);
+      setTechSales("");
+      setProductSales("");
+      setTechCashless("");
+      setProductCashless("");
     } else if (initialStaffId) {
       setStaffId(initialStaffId);
     }
@@ -115,6 +127,7 @@ export default function CreateStatementDialog({
           setType(d.type);
           // @ts-ignore
           setContractType(d.contract_type || "");
+          setContractData(d.contract || null);
           setBaseAmount(d.base_amount.toString());
           setTransportAllowance((d.transportAllowance || 0).toString());
           setNominationAllowance((d.nominationAllowance || 0).toString());
@@ -155,6 +168,7 @@ export default function CreateStatementDialog({
           setWorkedHours("");
           setHourlyWage("");
           setWorkLocation("");
+          setContractData(null);
           setContractWarning("該当スタッフの契約情報が登録されていません。");
         }
       } catch (err) {
@@ -235,6 +249,30 @@ export default function CreateStatementDialog({
     setBaseAmount(Math.floor(wage * hours).toString());
   };
 
+  const recalculateReward = (ts: string, ps: string, tc: string, pc: string) => {
+    if (!contractData) return;
+    const techSalesNum = Number(ts) || 0;
+    const prodSalesNum = Number(ps) || 0;
+    const techCashlessNum = Number(tc) || 0;
+    const prodCashlessNum = Number(pc) || 0;
+
+    const techRatio = contractData.tech_sales_ratio || 0;
+    const prodRatio = contractData.product_sales_ratio || 0;
+    const cashlessRatio = contractData.deduction_cashless_ratio || 0;
+
+    const techTax = Math.floor(techSalesNum * 0.1);
+    const techCashlessFee = cashlessRatio > 0 ? Math.floor(techCashlessNum * (cashlessRatio / 100)) : 0;
+    const commTech = Math.max(0, techSalesNum - techTax - techCashlessFee);
+    const baseTech = Math.floor(commTech * (techRatio / 100));
+
+    const prodTax = Math.floor(prodSalesNum * 0.1);
+    const prodCashlessFee = cashlessRatio > 0 ? Math.floor(prodCashlessNum * (cashlessRatio / 100)) : 0;
+    const commProd = Math.max(0, prodSalesNum - prodTax - prodCashlessFee);
+    const baseProd = Math.floor(commProd * (prodRatio / 100));
+
+    setBaseAmount((baseTech + baseProd).toString());
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!staffId) {
@@ -277,10 +315,10 @@ export default function CreateStatementDialog({
             childcare: numChildcare
           } : undefined,
           metrics: {
-            total_tech_sales: 0,
-            total_product_sales: 0,
+            total_tech_sales: Number(techSales) || 0,
+            total_product_sales: Number(productSales) || 0,
             nomination_count: 0,
-            cashless_sales_total: 0,
+            cashless_sales_total: (Number(techCashless) || 0) + (Number(productCashless) || 0),
             worked_days: Number(workedDays) || undefined,
             worked_hours: Number(workedHours) || undefined
           }
@@ -458,6 +496,42 @@ export default function CreateStatementDialog({
               </div>
               <p className="text-[10px] text-slate-400 font-semibold italic">
                 ※ 時給または労働時間を入力すると、下の「基本給 / 歩合報酬ベース」が自動的に連動して更新されます。
+              </p>
+            </div>
+          )}
+
+          {/* 業務委託 計算アシスタント */}
+          {type === "reward" && contractData && (
+            <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-emerald-100/60 pb-2">
+                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Calculator className="w-4 h-4 text-emerald-600 animate-pulse" />
+                  業務委託・歩合計算アシスタント
+                </h4>
+                <span className="text-[9px] font-black text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  Commission Auto-Calc
+                </span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 block">技術売上 (総額)</label>
+                  <Input type="number" value={techSales} onChange={(e) => { setTechSales(e.target.value); recalculateReward(e.target.value, productSales, techCashless, productCashless); }} className="h-9 text-xs rounded-lg font-bold border-slate-200 bg-white" placeholder="例: 500000" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 block">うちキャッシュレス</label>
+                  <Input type="number" value={techCashless} onChange={(e) => { setTechCashless(e.target.value); recalculateReward(techSales, productSales, e.target.value, productCashless); }} className="h-9 text-xs rounded-lg font-bold border-slate-200 bg-white" placeholder="0" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 block">商品売上 (総額)</label>
+                  <Input type="number" value={productSales} onChange={(e) => { setProductSales(e.target.value); recalculateReward(techSales, e.target.value, techCashless, productCashless); }} className="h-9 text-xs rounded-lg font-bold border-slate-200 bg-white" placeholder="例: 20000" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 block">うちキャッシュレス</label>
+                  <Input type="number" value={productCashless} onChange={(e) => { setProductCashless(e.target.value); recalculateReward(techSales, productSales, techCashless, e.target.value); }} className="h-9 text-xs rounded-lg font-bold border-slate-200 bg-white" placeholder="0" />
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-400 font-semibold italic">
+                ※ 売上を入力すると、契約情報（技術歩合 {contractData.tech_sales_ratio}% / 商品歩合 {contractData.product_sales_ratio}% / 手数料 {contractData.deduction_cashless_ratio}%）に基づき「歩合報酬ベース」が自動計算されます。
               </p>
             </div>
           )}
