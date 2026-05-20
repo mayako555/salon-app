@@ -44,6 +44,7 @@ export default function StaffDashboardPage() {
   const [todayShifts, setTodayShifts] = useState<any[]>([]);
   const [stats, setStats] = useState({ todaySales: 0, todayCount: 0 });
   const [attendance, setAttendance] = useState<any>(null);
+  const [staffListData, setStaffListData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showMyQr, setShowMyQr] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskRecord | null>(null);
@@ -77,6 +78,7 @@ export default function StaffDashboardPage() {
           return (staffA?.sort_order ?? 999) - (staffB?.sort_order ?? 999);
         });
       setTodayShifts(tShifts);
+      setStaffListData(sList);
       const todaySalesData = sales.filter(s => s.date === today);
       const total = todaySalesData.reduce((acc, s) => acc + (s.tech_sales || 0) + (s.product_sales || 0) - (s.discount || 0), 0);
       
@@ -385,8 +387,13 @@ export default function StaffDashboardPage() {
                     ) : (
                       staffAtStore.map(s => {
                         const seg = s.segments?.find((seg: any) => seg.store === store);
+                        const staffInfo = staffListData.find(sl => sl.id === s.staff_id);
+                        const isTrainee = staffInfo?.is_trainee;
                         return (
-                          <div key={s.id} className="bg-slate-50 border border-slate-100 px-3 py-2 rounded-xl flex flex-col min-w-[80px]">
+                          <div key={s.id} className={`border px-3 py-2 rounded-xl flex flex-col min-w-[80px] relative ${isTrainee ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
+                            {isTrainee && (
+                              <span className="text-[8px] font-black text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full w-fit mb-1">研修中</span>
+                            )}
                             <span className="text-xs font-bold text-slate-700">{s.staff_name}</span>
                             <span className="text-[9px] text-slate-400 font-mono mt-0.5">{seg?.start_time} - {seg?.end_time}</span>
                           </div>

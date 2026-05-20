@@ -70,6 +70,13 @@ export default function CustomerDetailPage() {
   const [isEntryQrOpen, setIsEntryQrOpen] = useState(false); // New: Counseling QR
   const [linkUrl, setLinkUrl] = useState("");
   const [entryUrl, setEntryUrl] = useState(""); // New: Entry URL
+  const [selectedStore, setSelectedStore] = useState<string | null>(null);
+
+  const LINE_OA_IDS: Record<string, string> = {
+    "六甲": process.env.NEXT_PUBLIC_LINE_OA_ROKKO || "@625gnrws",
+    "神戸": process.env.NEXT_PUBLIC_LINE_OA_KOBE || "@935poklc",
+    "元町": process.env.NEXT_PUBLIC_LINE_OA_MOTOMACHI || "@344pdgme",
+  };
 
   useEffect(() => {
     async function load() {
@@ -150,6 +157,7 @@ export default function CustomerDetailPage() {
     // LINEアプリが直接立ち上がるようにLIFF URLを使用
     const liffId = process.env.NEXT_PUBLIC_LIFF_ID || "2009912937-1KgShdZB";
     setLinkUrl(`https://liff.line.me/${liffId}/link-line/${id}`);
+    setSelectedStore(null); // reset store selection
     setIsLinkQrOpen(true);
   };
 
@@ -841,29 +849,73 @@ export default function CustomerDetailPage() {
       </Dialog>
 
       {/* LINE Link QR Dialog */}
-      <Dialog open={isLinkQrOpen} onOpenChange={setIsLinkQrOpen}>
-        <DialogContent className="sm:max-w-xs rounded-[2rem] text-center">
+      <Dialog open={isLinkQrOpen} onOpenChange={(open) => { setIsLinkQrOpen(open); if (!open) setSelectedStore(null); }}>
+        <DialogContent className="sm:max-w-sm rounded-[2rem] text-center">
           <DialogHeader>
-            <DialogTitle className="text-xl font-black">LINE連携用QR</DialogTitle>
+            <DialogTitle className="text-xl font-black text-[#06C755]">LINE連携</DialogTitle>
           </DialogHeader>
-          <div className="py-6 flex flex-col items-center gap-6">
-            <div className="p-4 bg-white rounded-3xl shadow-xl border border-slate-100">
-              <QRCodeSVG 
-                value={linkUrl} 
-                size={200}
-                level="H"
-                includeMargin={false}
-              />
+          <div className="py-4 flex flex-col items-center gap-5">
+            {/* Step 1: Store selection */}
+            <div className="w-full">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">STEP 1 — 店舗を選択して友だち追加</p>
+              <div className="grid grid-cols-3 gap-2">
+                {Object.keys(LINE_OA_IDS).map(store => (
+                  <button
+                    key={store}
+                    onClick={() => setSelectedStore(store)}
+                    className={`py-2 rounded-xl text-sm font-black border-2 transition-all ${
+                      selectedStore === store
+                        ? 'bg-[#06C755] border-[#06C755] text-white'
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-[#06C755]/40'
+                    }`}
+                  >
+                    {store}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="space-y-2">
-              <p className="text-sm font-bold text-slate-700">お客様のスマホで読み取ってください</p>
-              <p className="text-[10px] text-slate-400 leading-relaxed font-bold">
+
+            {selectedStore && (
+              <div className="w-full flex flex-col items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedStore}店 公式LINE 友だち追加QR</p>
+                <div className="p-3 bg-[#06C755]/5 rounded-2xl border-2 border-[#06C755]/20">
+                  <QRCodeSVG 
+                    value={`https://line.me/R/ti/p/${LINE_OA_IDS[selectedStore]}`}
+                    size={140}
+                    level="H"
+                    includeMargin={false}
+                    fgColor="#06C755"
+                  />
+                </div>
+                <p className="text-[9px] text-slate-400 font-bold">{LINE_OA_IDS[selectedStore]}</p>
+              </div>
+            )}
+
+            {/* Divider */}
+            <div className="w-full flex items-center gap-3">
+              <div className="flex-1 h-px bg-slate-100" />
+              <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">友だち追加後</span>
+              <div className="flex-1 h-px bg-slate-100" />
+            </div>
+
+            {/* Step 2: LIFF linking */}
+            <div className="w-full flex flex-col items-center gap-2">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">STEP 2 — このQRでLINE IDを登録</p>
+              <div className="p-3 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                <QRCodeSVG 
+                  value={linkUrl} 
+                  size={140}
+                  level="H"
+                  includeMargin={false}
+                />
+              </div>
+              <p className="text-[9px] text-slate-400 leading-relaxed font-bold text-center">
                 スキャンするとLINEログイン画面が開きます。<br/>
-                連携が完了すると、LINEでのお知らせが可能になります。
+                連携完了後、LINEでのお知らせが自動化されます。
               </p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => setIsLinkQrOpen(false)} className="rounded-xl w-full">
+          <Button variant="outline" onClick={() => { setIsLinkQrOpen(false); setSelectedStore(null); }} className="rounded-xl w-full">
             閉じる
           </Button>
         </DialogContent>
