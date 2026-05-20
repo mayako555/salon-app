@@ -163,21 +163,41 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
 
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
+            html, body {
+              height: auto !important;
+              overflow: visible !important;
+            }
             body * {
-              visibility: hidden;
+              visibility: hidden !important;
             }
             #print-area-${stmt.id}, #print-area-${stmt.id} * {
-              visibility: visible;
+              visibility: visible !important;
             }
             #print-area-${stmt.id} {
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 100%;
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100% !important;
+              height: auto !important;
               background: white !important;
               color: black !important;
               padding: 0 !important;
               margin: 0 !important;
+              overflow: visible !important;
+            }
+            /* Override Radix UI fixed positioning and scroll limits */
+            div[role="dialog"], div[data-state="open"], div.fixed {
+              position: static !important;
+              overflow: visible !important;
+              height: auto !important;
+              max-height: none !important;
+              width: 100% !important;
+              max-width: none !important;
+              border: none !important;
+              box-shadow: none !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              transform: none !important;
             }
           }
         `}} />

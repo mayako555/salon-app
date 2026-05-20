@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { recordClockIn, recordClockOut, getDailyAttendance } from "../actions";
+import { getDailyAttendance, recordClockIn, recordClockOut } from "../actions";
+import { getStaffList } from "@/app/staff/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
@@ -46,12 +45,13 @@ function KioskContent() {
     setLoading(true);
     try {
       const today = format(new Date(), "yyyy-MM-dd");
-      const [staffSnap, attRecords] = await Promise.all([
-        getDocs(query(collection(db, "staff_profiles"), orderBy("name", "asc"))),
+      // Use getStaffList to respect the sort_order set in staff management
+      const [staffData, attRecords] = await Promise.all([
+        getStaffList(),
         getDailyAttendance(today)
       ]);
 
-      const staff = staffSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const staff = staffData.map(s => ({ ...s }));
       const attMap: Record<string, any> = {};
       attRecords.forEach(rec => {
         if (!rec.clock_out) {

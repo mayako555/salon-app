@@ -57,7 +57,8 @@ export default function ContractsPage() {
   // Group contracts by staff and prioritize the currently active contract
   const latestContractsMap = new Map<string, StaffContract>();
   
-  const todayStr = new Date().toISOString().split('T')[0];
+  const d = new Date();
+  const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   
   // 1. Separate active, future, and past contracts
   const activeContractsList = contracts.filter(c => c.valid_from <= todayStr && (!c.valid_to || c.valid_to >= todayStr));

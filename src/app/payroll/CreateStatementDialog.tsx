@@ -19,18 +19,22 @@ export default function CreateStatementDialog({
   staffList,
   defaultYear,
   defaultMonth,
+  initialStaffId,
+  triggerBtn,
   onSuccess 
 }: { 
   staffList: StaffProfileSimple[];
   defaultYear: number;
   defaultMonth: number;
+  initialStaffId?: string;
+  triggerBtn?: React.ReactNode;
   onSuccess?: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Form State
-  const [staffId, setStaffId] = useState("");
+  const [staffId, setStaffId] = useState(initialStaffId || "");
   const [targetYear, setTargetYear] = useState(defaultYear.toString());
   const [targetMonth, setTargetMonth] = useState(String(defaultMonth).padStart(2, "0"));
   const [type, setType] = useState<"salary" | "reward">("salary");
@@ -86,6 +90,8 @@ export default function CreateStatementDialog({
       setHourlyWage("");
       setWorkLocation("");
       setContractWarning(null);
+    } else if (initialStaffId) {
+      setStaffId(initialStaffId);
     }
   };
 
@@ -317,10 +323,12 @@ export default function CreateStatementDialog({
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button className="gap-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold h-10 shadow-md shadow-rose-200">
-          <Plus size={16} />
-          <span>明細を新規作成</span>
-        </Button>
+        {triggerBtn || (
+          <Button className="gap-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold h-10 shadow-md shadow-rose-200">
+            <Plus size={16} />
+            <span>明細を新規作成</span>
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-3xl w-full max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -456,8 +464,14 @@ export default function CreateStatementDialog({
 
           {/* Earnings */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold text-slate-700 border-b pb-1.5 flex items-center gap-1">
-              <span className="w-1.5 h-3.5 bg-rose-500 rounded-sm"></span> 支給・支払額の入力
+            <h3 className="text-xs font-bold text-slate-700 border-b pb-1.5 flex items-center justify-between gap-1">
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-3.5 bg-rose-500 rounded-sm"></span> 支給・支払額の入力
+              </div>
+              <div className="bg-rose-50 text-rose-700 px-3 py-1 rounded-full text-xs font-black border border-rose-100 flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
+                <span>総支給額 (基本給 + 手当):</span>
+                <span className="text-sm font-black text-rose-800">¥{((Number(baseAmount) || 0) + (Number(transportAllowance) || 0) + (Number(nominationAllowance) || 0) + (Number(reviewAllowance) || 0) + (Number(blogAllowance) || 0) + (Number(executiveAllowance) || 0)).toLocaleString()}</span>
+              </div>
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">

@@ -12,7 +12,8 @@ import DeleteStatementButton from "./DeleteStatementButton";
 import StatusToggleButton from "./StatusToggleButton";
 import { getStaffList } from "../staff/actions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Banknote, UserCircle2, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Banknote, UserCircle2, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard";
 import Link from "next/link";
 
@@ -57,6 +58,11 @@ export default async function PayrollPage({
 
   const staffList = await getStaffList();
   const simpleStaffList = staffList.map(s => ({ id: s.id, name: s.name }));
+
+  // Find staff members without a statement in the current month
+  const uncreatedStaff = staffList.filter(staff => {
+    return !statements.some((stmt: any) => stmt.staff_id === staff.id);
+  });
 
   return (
     <AuthGuard requireRole="admin">
@@ -158,8 +164,9 @@ export default async function PayrollPage({
                         <p className="text-[10px] text-slate-400 mt-0.5">技術 ¥{stmt.details.base_tech_salary.toLocaleString()} / 店販 ¥{stmt.details.base_product_salary.toLocaleString()} / 指名 ¥{stmt.details.nomination_reward.toLocaleString()}</p>
                       )}
                     </TableCell>
-                    <TableCell className="text-right text-emerald-600 font-bold">
-                      +¥{stmt.total_allowances.toLocaleString()}
+                    <TableCell className="text-right">
+                      <span className="text-emerald-600 font-bold">+¥{stmt.total_allowances.toLocaleString()}</span>
+                      <p className="text-[10px] text-slate-500 mt-0.5 font-semibold">総支給: ¥{(stmt.base_amount + stmt.total_allowances).toLocaleString()}</p>
                     </TableCell>
                     <TableCell className="text-right text-emerald-600 font-medium">
                       +¥{stmt.details.tax_addition.toLocaleString()}
@@ -198,6 +205,43 @@ export default async function PayrollPage({
             </Table>
           )}
         </div>
+
+        {uncreatedStaff.length > 0 && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                <h2 className="font-bold text-slate-800">給与・報酬明細 未作成のスタッフ</h2>
+              </div>
+              <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                残り {uncreatedStaff.length} 名
+              </span>
+            </div>
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {uncreatedStaff.map(staff => (
+                <div key={staff.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-all">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-700 font-bold text-xs">
+                      {staff.name.charAt(0)}
+                    </div>
+                    <span className="font-bold text-slate-700 text-sm">{staff.name}</span>
+                  </div>
+                  <CreateStatementDialog 
+                    staffList={simpleStaffList} 
+                    defaultYear={year} 
+                    defaultMonth={month} 
+                    initialStaffId={staff.id}
+                    triggerBtn={
+                      <Button size="sm" variant="outline" className="h-8 text-xs font-bold bg-white text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300">
+                        <Plus size={12} className="mr-1" />明細作成
+                      </Button>
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </AuthGuard>
   );

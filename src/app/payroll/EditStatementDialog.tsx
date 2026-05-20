@@ -301,8 +301,14 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
 
           {/* Earnings Grid */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold text-slate-700 border-b pb-1.5 flex items-center gap-1">
-              <span className="w-1.5 h-3.5 bg-blue-500 rounded-sm"></span> 支給・支払額の入力
+            <h3 className="text-xs font-bold text-slate-700 border-b pb-1.5 flex items-center justify-between gap-1">
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-3.5 bg-blue-500 rounded-sm"></span> 支給・支払額の入力
+              </div>
+              <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-black border border-blue-100 flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
+                <span>総支給額 (基本給 + 手当):</span>
+                <span className="text-sm font-black text-blue-800">¥{((Number(baseAmount) || 0) + (Number(transportAllowance) || 0) + (Number(nominationAllowance) || 0) + (Number(reviewAllowance) || 0) + (Number(blogAllowance) || 0) + (Number(executiveAllowance) || 0)).toLocaleString()}</span>
+              </div>
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">

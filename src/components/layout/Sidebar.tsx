@@ -44,7 +44,7 @@ const managementNav = [
   { name: "スタッフ評価", href: "/evaluations", icon: Award, role: "manager" },
   { name: "給与・報酬計算", href: "/payroll", icon: Calculator, role: "admin" },
   { name: "経費・収支管理", href: "/admin/expenses", icon: Wallet, role: "manager" },
-  { name: "業務委託契約", href: "/contracts", icon: FileText, role: "admin" },
+  { name: "雇用・業務委託契約", href: "/contracts", icon: FileText, role: "admin" },
   { name: "手当管理", href: "/allowances", icon: Gift, role: "admin" },
   { name: "監査ログ", href: "/audit", icon: Settings, role: "admin" },
   { name: "店舗用タイムカード", href: "/attendance/setup", icon: Clock, role: "admin" },
