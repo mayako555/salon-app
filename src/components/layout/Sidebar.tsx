@@ -47,7 +47,7 @@ const managementNav = [
   { name: "業務委託契約", href: "/contracts", icon: FileText, role: "admin" },
   { name: "手当管理", href: "/allowances", icon: Gift, role: "admin" },
   { name: "監査ログ", href: "/audit", icon: Settings, role: "admin" },
-  { name: "打刻スキャナー", href: "/attendance/scanner", icon: QrCode, role: "admin" },
+  { name: "店舗用タイムカード", href: "/attendance/setup", icon: Clock, role: "admin" },
   { name: "新人教育", href: "/training", icon: GraduationCap, role: "staff" },
   { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste, role: "manager" },
   { name: "口コミ一括取込", href: "/admin/reviews/import", icon: ClipboardPaste, role: "manager" },

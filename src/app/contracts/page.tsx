@@ -54,26 +54,42 @@ export default function ContractsPage() {
     setIsDetailOpen(true);
   };
 
-  // Group contracts by staff and get the latest (based on valid_from then created_at)
+  // Group contracts by staff and prioritize the currently active contract
   const latestContractsMap = new Map<string, StaffContract>();
   
-  // First, sort all contracts to ensure the most "current" ones come first
-  const sortedContracts = [...contracts].sort((a, b) => {
+  const todayStr = new Date().toISOString().split('T')[0];
+  
+  // 1. Separate active, future, and past contracts
+  const activeContractsList = contracts.filter(c => c.valid_from <= todayStr && (!c.valid_to || c.valid_to >= todayStr));
+  const otherContractsList = contracts.filter(c => !(c.valid_from <= todayStr && (!c.valid_to || c.valid_to >= todayStr)));
+  
+  // Sort function: newest valid_from first, then newest created_at first
+  const sortFunc = (a: StaffContract, b: StaffContract) => {
     const timeA = new Date(a.valid_from).getTime();
     const timeB = new Date(b.valid_from).getTime();
     if (timeA !== timeB) return timeB - timeA;
-    
-    // If same date, use creation timestamp
     const createdA = a.created_at?.toMillis?.() || a.created_at || 0;
     const createdB = b.created_at?.toMillis?.() || b.created_at || 0;
     return createdB - createdA;
-  });
-
-  sortedContracts.forEach(contract => {
+  };
+  
+  const sortedActive = [...activeContractsList].sort(sortFunc);
+  const sortedOthers = [...otherContractsList].sort(sortFunc);
+  
+  // First, pre-fill with sorted active contracts
+  sortedActive.forEach(contract => {
     if (!latestContractsMap.has(contract.staff_id)) {
       latestContractsMap.set(contract.staff_id, contract);
     }
   });
+  
+  // Then, fill remaining staff with the latest of other contracts (past/future)
+  sortedOthers.forEach(contract => {
+    if (!latestContractsMap.has(contract.staff_id)) {
+      latestContractsMap.set(contract.staff_id, contract);
+    }
+  });
+  
   const displayContracts = Array.from(latestContractsMap.values());
 
   return (

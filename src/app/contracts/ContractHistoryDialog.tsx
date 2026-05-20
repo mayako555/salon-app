@@ -48,30 +48,41 @@ export default function ContractHistoryDialog({ isOpen, onClose, staffName, cont
           <div className="absolute left-[28px] top-8 bottom-8 w-0.5 bg-slate-200 z-0"></div>
 
           <div className="space-y-6">
-            {sortedContracts.map((contract, index) => {
-              const isLatest = index === 0;
+             {sortedContracts.map((contract, index) => {
               const hasEndDate = !!contract.valid_to;
+              const todayStr = new Date().toISOString().split('T')[0];
+              const fromDate = contract.valid_from;
+              const toDate = contract.valid_to;
+              
+              let statusBadge = "過去";
+              let badgeStyle = "bg-slate-100 border-slate-300 text-slate-500";
+              let isCurrent = false;
+              
+              if (fromDate > todayStr) {
+                statusBadge = "未来";
+                badgeStyle = "bg-blue-100 border-blue-500 text-blue-700";
+              } else if (!toDate || toDate >= todayStr) {
+                statusBadge = "現在";
+                badgeStyle = "bg-emerald-100 border-emerald-500 text-emerald-700";
+                isCurrent = true;
+              }
               
               return (
                 <div key={contract.id || index} className="relative z-10 flex gap-4">
                   {/* Timeline Dot */}
                   <div className="flex flex-col items-center mt-1">
-                    <div className={`w-14 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 ${
-                      isLatest 
-                        ? "bg-emerald-100 border-emerald-500 text-emerald-700" 
-                        : "bg-slate-100 border-slate-300 text-slate-500"
-                    }`}>
-                      {isLatest ? "現在" : "過去"}
+                    <div className={`w-14 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 ${badgeStyle}`}>
+                      {statusBadge}
                     </div>
                   </div>
-
+ 
                   {/* Contract Details Card */}
                   <div className={`flex-1 rounded-lg border p-4 ${
-                    isLatest ? "bg-white border-emerald-200 shadow-sm ring-1 ring-emerald-500/10" : "bg-slate-50/80 border-slate-200"
+                    isCurrent ? "bg-white border-emerald-200 shadow-sm ring-1 ring-emerald-500/10" : "bg-slate-50/80 border-slate-200"
                   }`}>
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex items-center gap-2 text-sm text-slate-600 font-mono bg-white px-2 py-1 rounded shadow-sm border border-slate-100">
-                        <CalendarDays size={14} className={isLatest ? "text-emerald-500" : "text-slate-400"} />
+                        <CalendarDays size={14} className={isCurrent ? "text-emerald-500" : "text-slate-400"} />
                         <span className="font-bold text-slate-800">{format(new Date(contract.valid_from), "yyyy年MM月dd日")}</span>
                         <span className="text-slate-400">〜</span>
                         <span>{hasEndDate ? format(new Date(contract.valid_to!), "yyyy年MM月dd日") : "現在"}</span>

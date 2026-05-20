@@ -21,6 +21,31 @@ import { getMonthlyAttendance, AttendanceRecord } from "@/app/attendance/actions
 import { addAuditLog } from "@/app/audit/actions";
 import { calculatePayrollTaxes } from "@/lib/tax-calculator";
 
+// Helper function to extract contracts active in a specific month, keeping only the latest one per staff member
+function getActiveContractsForMonth(contracts: any[], year: number, month: number) {
+  const startOfMonthStr = `${year}-${String(month).padStart(2, "0")}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const endOfMonthStr = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+  // 1. Filter to contracts active during the target month
+  const active = contracts.filter(c => {
+    const fromStr = c.valid_from;
+    const toStr = c.valid_to;
+    return fromStr <= endOfMonthStr && (!toStr || toStr >= startOfMonthStr);
+  });
+
+  // 2. Group by staff_id and keep only the latest one (newest valid_from)
+  const latestByStaff: Record<string, any> = {};
+  for (const c of active) {
+    const existing = latestByStaff[c.staff_id];
+    if (!existing || c.valid_from > existing.valid_from) {
+      latestByStaff[c.staff_id] = c;
+    }
+  }
+
+  return Object.values(latestByStaff);
+}
+
 export type MonthlyStatement = {
   id: string;
   staff_id: string;
@@ -155,6 +180,7 @@ export async function generateStatements(year: number, month: number) {
 
   // 3. Fetch dependencies
   const contracts = await getContractsList(); 
+  const activeContracts = getActiveContractsForMonth(contracts, year, month);
   const sales = await getMonthlySales(year, month);
   const allowances = await getMonthlyAllowances(year, month);
   const attendances = await getMonthlyAttendance(year, month);
@@ -164,12 +190,12 @@ export async function generateStatements(year: number, month: number) {
      record_id: `target-${targetMonth}`,
      action: "CALCULATE",
      old_data: null,
-     new_data: { message: `Generated Payroll for ${contracts.length} active staff members` },
+     new_data: { message: `Generated Payroll for ${activeContracts.length} active staff members` },
      actor: "System Administrator"
   });
 
   // 4. Calculate for each contract
-  for (const contract of contracts) {
+  for (const contract of activeContracts) {
     const staffSales = sales.filter((s: any) => s.staff_name === contract.staff_name);
     const staffAllowances = allowances.filter((a: any) => a.staff_name === contract.staff_name);
     const staffAttendances = attendances.filter((a: AttendanceRecord) => a.staff_name === contract.staff_name);
@@ -576,7 +602,9 @@ export async function updateStatementMetrics(
 
     const newAdjustments = data.adjustments || currentData.adjustments;
     const contracts = await getContractsList();
-    const contract = contracts.find(c => c.staff_id === currentData.staff_id);
+    const [targetYear, targetMonth] = currentData.target_month.split("-").map(Number);
+    const activeContracts = getActiveContractsForMonth(contracts, targetYear, targetMonth);
+    const contract = activeContracts.find(c => c.staff_id === currentData.staff_id);
 
     let baseAmount = currentData.base_amount;
     let transportFee = newAdjustments?.transport_fee_override ?? currentData.details.transport_fee;
@@ -657,7 +685,8 @@ export async function createManualStatement(data: {
 export async function getStaffPayrollDefaultValues(staffId: string, year: number, month: number) {
   try {
     const contracts = await getContractsList();
-    const contract = contracts.find(c => c.staff_id === staffId);
+    const activeContracts = getActiveContractsForMonth(contracts, year, month);
+    const contract = activeContracts.find(c => c.staff_id === staffId);
     if (!contract) {
       return { success: false, error: "該当スタッフの契約情報が登録されていません。" };
     }
