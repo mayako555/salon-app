@@ -55,7 +55,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const staffRef = collection(db, "staff_profiles");
           const q = query(staffRef, where("email", "==", firebaseUser.email));
-          const snapshot = await getDocs(q);
+          
+          // Add timeout to prevent infinite hang if Firestore fails to connect
+          const getDocsWithTimeout = Promise.race([
+            getDocs(q),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore auth fetch timeout")), 8000))
+          ]);
+          
+          const snapshot = await getDocsWithTimeout as any;
           
           if (!snapshot.empty) {
             const staffDoc = snapshot.docs[0];
