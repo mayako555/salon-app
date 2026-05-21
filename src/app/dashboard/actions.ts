@@ -7,7 +7,7 @@ import {
   query, 
   where, 
   getCountFromServer 
-} from "@/lib/firestore-server";
+} from "firebase/firestore";
 import { format } from "date-fns";
 import { getStoreTargets } from "../stores/actions";
 import { getMonthlyShifts } from "../shifts/actions";

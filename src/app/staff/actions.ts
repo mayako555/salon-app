@@ -13,7 +13,7 @@ import {
   orderBy, 
   writeBatch,
   serverTimestamp
-} from "@/lib/firestore-server";
+} from "firebase/firestore";
 import { addAuditLog } from "../audit/actions";
 import { revalidatePath } from "next/cache";
 

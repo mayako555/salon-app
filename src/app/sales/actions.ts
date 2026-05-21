@@ -16,7 +16,7 @@ import {
   writeBatch,
   Timestamp,
   serverTimestamp
-} from "@/lib/firestore-server";
+} from "firebase/firestore";
 import { SalesMasterItem, seedSalesMasterData } from "./seeds";
 import { addAuditLog } from "../audit/actions";
 import { addCustomer } from "@/lib/customers";

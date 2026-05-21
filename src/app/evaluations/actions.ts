@@ -12,7 +12,7 @@ import {
   orderBy,
   serverTimestamp,
   updateDoc
-} from "@/lib/firestore-server";
+} from "firebase/firestore";
 import { StaffEvaluation } from "./constants";
 import { addAuditLog } from "@/app/audit/actions";
 import { revalidatePath } from "next/cache";

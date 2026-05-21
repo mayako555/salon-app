@@ -12,7 +12,7 @@ import {
   setDoc,
   writeBatch,
   serverTimestamp 
-} from "@/lib/firestore-server";
+} from "firebase/firestore";
 import { addAuditLog } from "@/app/audit/actions";
 import { getStaffList } from "@/app/staff/actions";
 import { getMonthlySales, SalesRecord } from "@/app/sales/actions";

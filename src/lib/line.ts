@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "./firebase";
-import { doc, getDoc } from "@/lib/firestore-server";
+import { doc, getDoc } from "firebase/firestore";
 
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 

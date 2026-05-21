@@ -13,7 +13,7 @@ import {
   serverTimestamp,
   getDoc,
   updateDoc
-} from "@/lib/firestore-server";
+} from "firebase/firestore";
 
 import { StaffContract } from "./constants";
 import { getStaffList } from "../staff/actions";

@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { MonthlyStatement, updateManualStatement } from "./actions";
 import { toast } from "sonner";
-import { doc, getDoc, collection, getDocs, query, where } from "@/lib/firestore-server";
+import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { calculatePayrollTaxes } from "@/lib/tax-calculator";
 

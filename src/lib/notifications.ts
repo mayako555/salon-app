@@ -12,7 +12,7 @@ import {
   updateDoc, 
   doc, 
   serverTimestamp 
-} from "@/lib/firestore-server";
+} from "firebase/firestore";
 
 export type Notification = {
   id: string;

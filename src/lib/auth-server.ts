@@ -14,7 +14,7 @@ export interface UserContext {
  * すべてのサーバーアクションの先頭で呼び出し、現在のユーザーコンテキストを取得する
  */
 export async function getCurrentUserContext(): Promise<UserContext> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const session = cookieStore.get("session")?.value;
 
   if (!session) {

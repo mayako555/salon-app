@@ -9,7 +9,7 @@ import {
   updateDoc,
   doc,
   serverTimestamp 
-} from "@/lib/firestore-server";
+} from "firebase/firestore";
 import { addAuditLog } from "@/app/audit/actions";
 
 export type AttendanceStatus = "normal" | "leave" | "absence";

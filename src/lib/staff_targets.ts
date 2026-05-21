@@ -9,7 +9,7 @@ import {
   doc, 
   setDoc,
   serverTimestamp 
-} from "@/lib/firestore-server";
+} from "firebase/firestore";
 
 export type StaffTarget = {
   staff_id: string;

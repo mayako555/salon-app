@@ -16,8 +16,9 @@ export async function POST(request: Request) {
     // Firebase Admin で Session Cookie を作成
     const sessionCookie = await adminAuth.createSessionCookie(idToken, { expiresIn });
 
-    // Cookieにセット
-    cookies().set("session", sessionCookie, {
+    // Cookieにセット (Next.js 15+ では await が必要)
+    const cookieStore = await cookies();
+    cookieStore.set("session", sessionCookie, {
       maxAge: expiresIn,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -34,7 +35,8 @@ export async function POST(request: Request) {
 
 export async function DELETE() {
   try {
-    cookies().delete("session");
+    const cookieStore = await cookies();
+    cookieStore.delete("session");
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

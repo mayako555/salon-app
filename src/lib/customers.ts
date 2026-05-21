@@ -12,7 +12,7 @@ import {
   getDoc,
   serverTimestamp,
   Timestamp 
-} from "@/lib/firestore-server";
+} from "firebase/firestore";
 
 export type Customer = {
   id: string;

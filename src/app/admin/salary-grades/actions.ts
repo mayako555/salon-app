@@ -11,7 +11,7 @@ import {
   serverTimestamp,
   addDoc,
   deleteDoc
-} from "@/lib/firestore-server";
+} from "firebase/firestore";
 import { addAuditLog } from "@/app/audit/actions";
 
 export type SalaryGrade = {

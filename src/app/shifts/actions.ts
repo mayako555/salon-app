@@ -12,7 +12,7 @@ import {
   where, 
   orderBy,
   serverTimestamp 
-} from "@/lib/firestore-server";
+} from "firebase/firestore";
 import { addAuditLog } from "@/app/audit/actions";
 import { getStaffList } from "@/app/staff/actions";
 
