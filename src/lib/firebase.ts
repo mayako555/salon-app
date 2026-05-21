@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { Firestore, initializeFirestore, getFirestore } from "firebase/firestore";
+import { Firestore, initializeFirestore, getFirestore } from "@/lib/firestore-server";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 

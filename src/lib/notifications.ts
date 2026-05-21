@@ -1,3 +1,5 @@
+"use server";
+
 import { db } from "./firebase";
 import { 
   collection, 
@@ -10,7 +12,7 @@ import {
   updateDoc, 
   doc, 
   serverTimestamp 
-} from "firebase/firestore";
+} from "@/lib/firestore-server";
 
 export type Notification = {
   id: string;

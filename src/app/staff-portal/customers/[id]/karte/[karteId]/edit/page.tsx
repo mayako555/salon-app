@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
 import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "@/lib/firestore-server";
 
 // --- Drawing Canvas Component ---
 const EyeDiagramCanvas = ({ initialDataUrl, onSave }: { initialDataUrl?: string, onSave: (url: string) => void }) => {

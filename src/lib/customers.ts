@@ -1,3 +1,5 @@
+"use server";
+
 import { db } from "./firebase";
 import { 
   collection, 
@@ -10,7 +12,7 @@ import {
   getDoc,
   serverTimestamp,
   Timestamp 
-} from "firebase/firestore";
+} from "@/lib/firestore-server";
 
 export type Customer = {
   id: string;

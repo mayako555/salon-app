@@ -38,7 +38,7 @@ import {
   InventoryOrder 
 } from "./types";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy, limit } from "@/lib/firestore-server";
 import BulkOrderDialog from "./BulkOrderDialog";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";

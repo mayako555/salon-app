@@ -12,7 +12,7 @@ import {
   serverTimestamp,
   addDoc,
   deleteDoc
-} from "firebase/firestore";
+} from "@/lib/firestore-server";
 import { SalesMasterItem } from "./seeds";
 import { addAuditLog } from "../audit/actions";
 

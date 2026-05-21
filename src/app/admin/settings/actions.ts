@@ -9,7 +9,7 @@ import {
   writeBatch,
   query,
   orderBy
-} from "firebase/firestore";
+} from "@/lib/firestore-server";
 
 export type MasterItem = {
   id: string;

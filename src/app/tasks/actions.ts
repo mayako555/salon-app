@@ -11,7 +11,7 @@ import {
   updateDoc, 
   doc, 
   serverTimestamp 
-} from "firebase/firestore";
+} from "@/lib/firestore-server";
 import { revalidatePath } from "next/cache";
 import { sendLineMessage } from "@/lib/line";
 import { getCustomerById } from "@/lib/customers";

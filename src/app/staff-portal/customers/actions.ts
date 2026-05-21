@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp } from "@/lib/firestore-server";
 import { Customer, addCustomer } from "@/lib/customers";
 import { addCounselingResponse } from "@/lib/counseling";
 import { revalidatePath } from "next/cache";

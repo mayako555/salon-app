@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase";
-import { collection, writeBatch, doc } from "firebase/firestore";
+import { collection, writeBatch, doc } from "@/lib/firestore-server";
 
 export type SalesMasterItem = {
   id?: string;

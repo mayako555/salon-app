@@ -14,7 +14,7 @@ import {
   serverTimestamp,
   getDoc,
   setDoc
-} from "firebase/firestore";
+} from "@/lib/firestore-server";
 import { revalidatePath } from "next/cache";
 
 export type TrainingStatus = "not_started" | "free_model" | "paid_model" | "ready_for_check" | "passed";

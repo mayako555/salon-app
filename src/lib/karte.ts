@@ -1,3 +1,5 @@
+"use server";
+
 import { db } from "./firebase";
 import { 
   collection, 
@@ -8,7 +10,7 @@ import {
   orderBy, 
   serverTimestamp,
   Timestamp 
-} from "firebase/firestore";
+} from "@/lib/firestore-server";
 
 export type KarteRecord = {
   id: string;

@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/firebase";
-import { collection, writeBatch, doc, serverTimestamp } from "firebase/firestore";
+import { collection, writeBatch, doc, serverTimestamp } from "@/lib/firestore-server";
 import { revalidatePath } from "next/cache";
 
 export async function importCustomersFromSalonBoard(customers: any[]) {

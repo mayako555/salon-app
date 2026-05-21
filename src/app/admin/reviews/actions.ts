@@ -1,6 +1,6 @@
 "use server";
 import { db } from "@/lib/firebase";
-import { collection, writeBatch, doc, getDocs, query, where, serverTimestamp } from "firebase/firestore";
+import { collection, writeBatch, doc, getDocs, query, where, serverTimestamp } from "@/lib/firestore-server";
 import { addAuditLog } from "@/app/audit/actions";
 
 export type ReviewRecord = {

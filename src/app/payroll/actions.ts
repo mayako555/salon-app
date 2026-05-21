@@ -13,7 +13,7 @@ import {
   writeBatch,
   serverTimestamp,
   deleteDoc
-} from "firebase/firestore";
+} from "@/lib/firestore-server";
 import { getContractsList } from "@/app/contracts/actions";
 import { getMonthlySales } from "@/app/sales/actions";
 import { getMonthlyAllowances } from "@/app/allowances/actions";

@@ -12,7 +12,7 @@ import {
   doc, 
   deleteDoc,
   serverTimestamp 
-} from "firebase/firestore";
+} from "@/lib/firestore-server";
 import { revalidatePath } from "next/cache";
 import { getAdvancedAnalytics } from "@/app/dashboard/actions";
 import { addAuditLog } from "@/app/audit/actions";

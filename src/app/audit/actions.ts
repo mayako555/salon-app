@@ -6,7 +6,7 @@ import {
   query, 
   orderBy, 
   serverTimestamp 
-} from "firebase/firestore";
+} from "@/lib/firestore-server";
 
 export type AuditLog = {
   id: string;

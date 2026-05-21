@@ -31,6 +31,7 @@ import { getAllPendingTasks, TaskRecord, generateBookingReply, sendReplyAndCompl
 import { getStaffList, StaffProfile, updateStaffPasscode } from "@/app/staff/actions";
 import { getDashboardStats } from "@/app/dashboard/actions";
 import { getMonthlyShifts } from "@/app/shifts/actions";
+import { getContractsList } from "@/app/contracts/actions";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
@@ -51,17 +52,22 @@ export default function StaffDashboardPage() {
   const [generatedReply, setGeneratedReply] = useState("");
   const [isSending, setIsSending] = useState(false);
 
+  // My Dashboard State
+  const [mySales, setMySales] = useState({ techSales: 0, productSales: 0, count: 0, cashlessSales: 0, nominations: 0 });
+  const [myContract, setMyContract] = useState<any>(null);
+
   useEffect(() => {
     async function load() {
       const today = format(new Date(), "yyyy-MM-dd");
-      const [customers, sales, attRecords, tRecords, dashboardRes, mShifts, sList] = await Promise.all([
+      const [customers, sales, attRecords, tRecords, dashboardRes, mShifts, sList, contracts] = await Promise.all([
         getAllCustomers(),
         getMonthlySales(new Date().getFullYear(), new Date().getMonth() + 1),
         getDailyAttendance(today),
         getAllPendingTasks(),
         getDashboardStats(),
         getMonthlyShifts(new Date().getFullYear(), new Date().getMonth() + 1),
-        getStaffList()
+        getStaffList(),
+        getContractsList()
       ]);
       
       setTasks(tRecords);
@@ -89,6 +95,24 @@ export default function StaffDashboardPage() {
 
       if (profile?.id) {
         setAttendance(attRecords.find(a => a.staff_id === profile.id && a.clock_out === null));
+
+        // My Contract
+        const myC = contracts.find(c => c.staff_id === profile.id);
+        setMyContract(myC || null);
+
+        // My Monthly Sales Data
+        const myS = sales.filter(s => s.staff_id === profile.id);
+        const myTech = myS.reduce((acc, s) => acc + (s.tech_sales || 0), 0);
+        const myProd = myS.reduce((acc, s) => acc + (s.product_sales || 0), 0);
+        const myCashless = myS.filter(s => s.payment_method !== "現金").reduce((acc, s) => acc + (s.tech_sales || 0) + (s.product_sales || 0), 0);
+        const myNoms = myS.filter(s => s.is_nominated).length;
+        setMySales({
+          techSales: myTech,
+          productSales: myProd,
+          count: myS.length,
+          cashlessSales: myCashless,
+          nominations: myNoms
+        });
       }
 
       // Sort by created_at desc and take top 5
@@ -225,6 +249,116 @@ export default function StaffDashboardPage() {
       </div>
 
       <div className="-mt-6 px-4 space-y-6">
+        {/* 🔥 マイダッシュボード */}
+        <Card className="p-5 rounded-[2rem] border-slate-100 shadow-sm bg-white overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-rose-50 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+          
+          <div className="flex items-center justify-between border-b pb-3 border-slate-100 mb-4 relative">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-rose-50 flex items-center justify-center text-rose-500">
+                <TrendingUp size={16} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800">🔥 マイダッシュボード</h3>
+                <p className="text-[10px] text-slate-400 font-bold">当月の個人成績・目標進捗</p>
+              </div>
+            </div>
+            {myContract && (
+              <span className="text-[9px] font-black text-slate-500 bg-slate-100 px-2 py-1 rounded-full uppercase">
+                {myContract.contract_type === 'monthly' || myContract.contract_type === 'tier_monthly' ? '月給・正社員' : myContract.contract_type === 'reward' ? '業務委託' : 'パート・時給'}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-4 relative">
+            <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
+              <p className="text-[9px] font-bold text-slate-400 mb-0.5">当月 技術売上</p>
+              <p className="font-black text-lg text-slate-700">¥{mySales.techSales.toLocaleString()}</p>
+            </div>
+            <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
+              <p className="text-[9px] font-bold text-slate-400 mb-0.5">当月 商品売上</p>
+              <p className="font-black text-lg text-slate-700">¥{mySales.productSales.toLocaleString()}</p>
+            </div>
+            <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 flex justify-between items-end">
+              <div>
+                <p className="text-[9px] font-bold text-slate-400 mb-0.5">指名件数</p>
+                <p className="font-black text-lg text-slate-700">{mySales.nominations} <span className="text-xs font-bold text-slate-400">件</span></p>
+              </div>
+              <UserPlus size={16} className="text-slate-300 mb-1" />
+            </div>
+            <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 flex justify-between items-end">
+              <div>
+                <p className="text-[9px] font-bold text-slate-400 mb-0.5">担当客数</p>
+                <p className="font-black text-lg text-slate-700">{mySales.count} <span className="text-xs font-bold text-slate-400">人</span></p>
+              </div>
+              <Users size={16} className="text-slate-300 mb-1" />
+            </div>
+          </div>
+
+          {/* 契約タイプ別の目標進捗・推定計算 */}
+          {myContract && (
+            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-4 rounded-2xl border border-indigo-100/50">
+              {myContract.contract_type === 'monthly' && myContract.tech_sales_quota > 0 && (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-end">
+                    <p className="text-[10px] font-bold text-indigo-800 flex items-center gap-1">
+                      <Sparkles size={12} /> 技術売上ノルマ進捗
+                    </p>
+                    <p className="text-[10px] font-black text-indigo-900">
+                      ¥{mySales.techSales.toLocaleString()} / <span className="text-indigo-400">¥{(myContract.tech_sales_quota).toLocaleString()}</span>
+                    </p>
+                  </div>
+                  <Progress value={Math.min(100, (mySales.techSales / myContract.tech_sales_quota) * 100)} className="h-2 bg-indigo-100 [&>div]:bg-indigo-500" />
+                  {mySales.techSales >= myContract.tech_sales_quota ? (
+                    <p className="text-[9px] text-emerald-600 font-bold mt-1 text-right">🎉 ノルマ達成！超過分に歩合発生中！</p>
+                  ) : (
+                    <p className="text-[9px] text-indigo-400 font-bold mt-1 text-right">達成まであと ¥{(myContract.tech_sales_quota - mySales.techSales).toLocaleString()}</p>
+                  )}
+                </div>
+              )}
+
+              {myContract.contract_type === 'tier_monthly' && (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-end">
+                    <p className="text-[10px] font-bold text-indigo-800 flex items-center gap-1">
+                      <Sparkles size={12} /> ボーナスライン進捗 (40万円〜)
+                    </p>
+                    <p className="text-[10px] font-black text-indigo-900">
+                      ¥{(mySales.techSales + mySales.productSales).toLocaleString()} / <span className="text-indigo-400">¥400,000</span>
+                    </p>
+                  </div>
+                  <Progress value={Math.min(100, ((mySales.techSales + mySales.productSales) / 400000) * 100)} className="h-2 bg-indigo-100 [&>div]:bg-indigo-500" />
+                  {(mySales.techSales + mySales.productSales) >= 400000 ? (
+                    <p className="text-[9px] text-emerald-600 font-bold mt-1 text-right">🎉 ボーナス発生ライン突破！</p>
+                  ) : (
+                    <p className="text-[9px] text-indigo-400 font-bold mt-1 text-right">ボーナス発生まであと ¥{(400000 - (mySales.techSales + mySales.productSales)).toLocaleString()}</p>
+                  )}
+                </div>
+              )}
+
+              {myContract.contract_type === 'reward' && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-indigo-800 flex items-center gap-1 mb-2">
+                    <Sparkles size={12} /> 当月の推定歩合報酬（プレビュー）
+                  </p>
+                  <div className="flex justify-between items-center bg-white/60 p-2.5 rounded-xl border border-indigo-100">
+                    <span className="text-[10px] font-bold text-indigo-400">見込み基本報酬額</span>
+                    <span className="font-black text-lg text-indigo-600 tracking-tight">
+                      ¥{Math.floor(
+                        Math.max(0, mySales.techSales - (mySales.techSales * 0.1) - (mySales.cashlessSales * (myContract.deduction_cashless_ratio || 0) / 100)) * ((myContract.tech_sales_ratio || 0) / 100) +
+                        Math.max(0, mySales.productSales - (mySales.productSales * 0.1)) * ((myContract.product_sales_ratio || 0) / 100)
+                      ).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-[8px] text-indigo-300 font-bold text-right mt-1 px-1">
+                    ※技術{myContract.tech_sales_ratio}% / 商品{myContract.product_sales_ratio}% / 指名等を除くベース概算
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+
         {/* 暗証番号（タイムカード用パスコード）の設定 */}
         <Card className="p-5 rounded-[2rem] border-slate-100 shadow-sm bg-white space-y-4">
           <div className="flex items-center justify-between border-b pb-3 border-slate-100">

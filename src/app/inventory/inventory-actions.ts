@@ -13,7 +13,7 @@ import {
   increment,
   Timestamp,
   limit
-} from "firebase/firestore";
+} from "@/lib/firestore-server";
 import { addNotification } from "@/lib/notifications";
 
 export async function getInventory(storeName: string) {

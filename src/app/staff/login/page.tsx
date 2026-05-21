@@ -21,18 +21,29 @@ export default function StaffLoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
+      let userCredential;
       // 1. Try with passcode suffix first
       try {
-        await signInWithEmailAndPassword(auth, email, password + "_salon");
-        toast.success("ログインしました");
-        router.push("/staff-portal");
-        return;
+        userCredential = await signInWithEmailAndPassword(auth, email, password + "_salon");
       } catch (suffixErr) {
         // 2. Fallback to raw password (for standard password logins)
-        await signInWithEmailAndPassword(auth, email, password);
-        toast.success("ログインしました");
-        router.push("/staff-portal");
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
       }
+      
+      // Get ID token and set session cookie
+      const idToken = await userCredential.user.getIdToken();
+      const sessionRes = await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+      
+      if (!sessionRes.ok) {
+        throw new Error("セッションの作成に失敗しました");
+      }
+
+      toast.success("ログインしました");
+      router.push("/staff-portal");
     } catch (error: any) {
       console.error(error);
       toast.error("ログインに失敗しました。メールアドレスまたは暗証番号を確認してください。");

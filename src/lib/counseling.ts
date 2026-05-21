@@ -1,3 +1,5 @@
+"use server";
+
 import { db } from "./firebase";
 import { 
   collection, 
@@ -7,7 +9,7 @@ import {
   where, 
   orderBy, 
   serverTimestamp 
-} from "firebase/firestore";
+} from "@/lib/firestore-server";
 
 export type ServiceType = 'eyelash_ext' | 'lash_lift' | 'eyebrow' | 'and_healthy' | 'brow_gym_men' | 'led_ext';
 

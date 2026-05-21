@@ -24,7 +24,7 @@ import {
   InventoryOrder 
 } from "../../inventory/types";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy, limit } from "@/lib/firestore-server";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import BulkOrderDialog from "../../inventory/BulkOrderDialog";

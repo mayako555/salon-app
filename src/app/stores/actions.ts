@@ -10,7 +10,7 @@ import {
   setDoc, 
   getDoc,
   serverTimestamp 
-} from "firebase/firestore";
+} from "@/lib/firestore-server";
 import { revalidatePath } from "next/cache";
 
 const STORE_TARGETS_COLLECTION = "monthly_store_targets";

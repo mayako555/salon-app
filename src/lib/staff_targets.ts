@@ -1,3 +1,5 @@
+"use server";
+
 import { db } from "./firebase";
 import { 
   collection, 
@@ -7,7 +9,7 @@ import {
   doc, 
   setDoc,
   serverTimestamp 
-} from "firebase/firestore";
+} from "@/lib/firestore-server";
 
 export type StaffTarget = {
   staff_id: string;

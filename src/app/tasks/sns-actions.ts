@@ -12,7 +12,7 @@ import {
   doc, 
   serverTimestamp,
   limit
-} from "firebase/firestore";
+} from "@/lib/firestore-server";
 import { generateSNSContent as generateAI } from "@/lib/gemini";
 import { revalidatePath } from "next/cache";
 
