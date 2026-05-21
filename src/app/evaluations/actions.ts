@@ -20,6 +20,7 @@ import { getContractsList } from "@/app/contracts/actions";
 import { getMonthlySales } from "@/app/sales/actions";
 import { getStaffList } from "@/app/staff/actions";
 import { getMonthlyReviews } from "@/app/admin/reviews/actions";
+import { getMonthlyStaffTargets } from "@/lib/staff_targets";
 
 const EVALUATIONS_COLLECTION = "staff_evaluations";
 
@@ -147,8 +148,9 @@ export async function getEvaluationMetrics(staffId: string, targetPeriod: string
   try {
     const year = parseInt(targetPeriod.substring(0, 4));
     const quarter = parseInt(targetPeriod.substring(5, 6));
-    const startMonth = (quarter - 1) * 3 + 1;
-    
+    const startMonth = (quarter - 1) * 3 + 1; // Q1=1, Q2=4, Q3=7, Q4=10
+
+    // ── 当期 3ヶ月の売上データを取得 ──
     let allSales: any[] = [];
     for (let m = 0; m < 3; m++) {
       const monthSales = await getMonthlySales(year, startMonth + m);
@@ -156,54 +158,106 @@ export async function getEvaluationMetrics(staffId: string, targetPeriod: string
     }
 
     const staffSales = allSales.filter(s => s.staff_id === staffId);
-    const count = staffSales.length || 1;
+    const visitCount = staffSales.length || 1;
     const totalTech = staffSales.reduce((sum, s) => sum + (s.tech_sales || 0), 0);
     const totalProd = staffSales.reduce((sum, s) => sum + (s.product_sales || 0), 0);
-    
-    const unitPrice = Math.round((totalTech + totalProd) / count);
-    const nominations = staffSales.filter(s => s.is_nominated).length;
-    const nominationRate = Math.round((nominations / count) * 100);
-    const repeats = staffSales.filter(s => s.customer_type === "リピ").length;
-    const repeatRate = Math.round((repeats / count) * 100);
+    const totalRevenue = totalTech + totalProd;
+    const unitPrice = Math.round(totalRevenue / visitCount);
 
-    // Rework Logic: attribute rework to the PREVIOUS staff member
+    // ── ① 目標達成率（当期3ヶ月合計の目標vs実績） ──
+    let quarterlyTarget = 0;
+    for (let m = 0; m < 3; m++) {
+      const monthStr = `${year}-${String(startMonth + m).padStart(2, '0')}`;
+      const targets = await getMonthlyStaffTargets(monthStr);
+      quarterlyTarget += targets[staffId] || 0;
+    }
+    // 目標未設定の場合はデフォルト60万/月×3ヶ月
+    if (quarterlyTarget === 0) quarterlyTarget = 1800000;
+    const achievementRate = Math.round((totalRevenue / quarterlyTarget) * 100);
+
+    // ── ② 客単価：全スタッフ平均との比率 ──
+    const allVisitCount = allSales.length || 1;
+    const allRevenue = allSales.reduce((sum, s) => sum + (s.tech_sales || 0) + (s.product_sales || 0), 0);
+    const avgUnitPrice = Math.round(allRevenue / allVisitCount);
+    // このスタッフの単価が全体平均の何%か
+    const unitPriceRatio = avgUnitPrice > 0 ? Math.round((unitPrice / avgUnitPrice) * 100) : 100;
+
+    // ── ③ 新規からの再来率（当期内：新規来店→リピートに転換した割合） ──
+    // このスタッフに新規で来た顧客IDを抽出
+    const newCustomerIds = new Set(
+      staffSales
+        .filter(s => s.customer_type === "新規" && s.customer_id)
+        .map(s => s.customer_id)
+    );
+    // 同期間内に全店で「リピ」として来店した顧客IDを抽出
+    const repeatCustomerIdsInPeriod = new Set(
+      allSales
+        .filter(s => s.customer_type === "リピ" && s.customer_id)
+        .map(s => s.customer_id)
+    );
+    // 新規→リピートに転換した顧客数
+    const convertedCount = [...newCustomerIds].filter(id => repeatCustomerIdsInPeriod.has(id)).length;
+    const newRepeatRate = newCustomerIds.size > 0
+      ? Math.round((convertedCount / newCustomerIds.size) * 100)
+      : 0;
+
+    // ── ④ リピーター継続率（前四半期のリピ客が今期も来たか） ──
+    // 前四半期の月を計算
+    const prevQuarterStart = startMonth - 3;
+    const prevYear = prevQuarterStart <= 0 ? year - 1 : year;
+    const adjustedPrevStart = prevQuarterStart <= 0 ? prevQuarterStart + 12 : prevQuarterStart;
+
+    let prevAllSales: any[] = [];
+    for (let m = 0; m < 3; m++) {
+      const monthSales = await getMonthlySales(prevYear, adjustedPrevStart + m);
+      prevAllSales = [...prevAllSales, ...monthSales];
+    }
+    // 前四半期にリピートしていた顧客ID
+    const prevRepeatIds = new Set(
+      prevAllSales
+        .filter(s => s.customer_type === "リピ" && s.customer_id)
+        .map(s => s.customer_id)
+    );
+    // 今期も来店した顧客ID（全スタッフ）
+    const currentCustomerIds = new Set(
+      allSales.map(s => s.customer_id).filter(Boolean)
+    );
+    const continuedCount = [...prevRepeatIds].filter(id => currentCustomerIds.has(id)).length;
+    const repeatContinuationRate = prevRepeatIds.size > 0
+      ? Math.round((continuedCount / prevRepeatIds.size) * 100)
+      : 0;
+
+    // ── お直しペナルティ ──
     let reworkPenaltyCount = 0;
-    const reworksInPeriod = allSales.filter(s => 
+    const reworksInPeriod = allSales.filter(s =>
       s.menu_course?.includes("お直し") || s.discount_reason?.includes("お直し")
     );
-
     for (const rw of reworksInPeriod) {
       if (!rw.customer_id) continue;
-      const prevVisits = allSales.filter(s => 
-        s.customer_id === rw.customer_id && s.date < rw.date
-      ).sort((a, b) => b.date.localeCompare(a.date));
-      
+      const prevVisits = allSales
+        .filter(s => s.customer_id === rw.customer_id && s.date < rw.date)
+        .sort((a, b) => b.date.localeCompare(a.date));
       if (prevVisits.length > 0 && prevVisits[0].staff_id === staffId) {
         reworkPenaltyCount++;
       }
     }
 
-    // Review Reply Logic: attribute reply count to the staff member by name
+    // ── 口コミ集計 ──
     let totalReviewsCount = 0;
     let star5ReviewsCount = 0;
-    
     const staffList = await getStaffList();
     const staff = staffList.find(s => s.id === staffId);
-    
     if (staff) {
       const staffNameNormal = staff.name.replace(/\s+/g, "");
       const lastName = staff.last_name || "";
       const nameKana = (staff.name_kana || "").replace(/\s+/g, "");
-      
       for (let m = 0; m < 3; m++) {
         const monthReviews = await getMonthlyReviews(year, startMonth + m);
         const staffMonthReviews = monthReviews.filter(r => {
           if (r.staff_name === staff.name) return true;
           if (r.reply_text) {
-            const kanji = staffNameNormal;
-            const kana = nameKana;
-            if (kanji && r.reply_text.includes(kanji)) return true;
-            if (kana && r.reply_text.includes(kana)) return true;
+            if (staffNameNormal && r.reply_text.includes(staffNameNormal)) return true;
+            if (nameKana && r.reply_text.includes(nameKana)) return true;
             if (lastName && r.reply_text.includes(lastName)) return true;
           }
           return false;
@@ -212,18 +266,23 @@ export async function getEvaluationMetrics(staffId: string, targetPeriod: string
         star5ReviewsCount += staffMonthReviews.filter(r => r.rating === 5).length;
       }
     }
-    
+
     return {
       success: true,
       metrics: {
-        total_sales: totalTech,
-        product_sales: totalProd,
+        total_sales: totalRevenue,
+        quarterly_target: quarterlyTarget,
+        achievement_rate: achievementRate,       // 目標達成率(%)
         unit_price: unitPrice,
-        nomination_rate: nominationRate,
-        repeat_rate: repeatRate,
+        avg_unit_price: avgUnitPrice,
+        unit_price_ratio: unitPriceRatio,         // 全体平均比(%)
+        new_repeat_rate: newRepeatRate,           // 新規からの再来率(%)
+        repeat_continuation_rate: repeatContinuationRate, // リピーター継続率(%)
+        new_customer_count: newCustomerIds.size,
+        prev_repeat_count: prevRepeatIds.size,
         rework_count: reworkPenaltyCount,
         review_replies_count: totalReviewsCount,
-        review_allowance: star5ReviewsCount * 500 // 1件500円として計算
+        review_allowance: star5ReviewsCount * 500
       }
     };
   } catch (error: any) {

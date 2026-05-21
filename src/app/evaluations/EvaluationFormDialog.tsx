@@ -105,10 +105,10 @@ const INITIAL_DETAILS = {
     { id: "svc_trouble", name: "トラブル時の単独対応力", score: 3 },
   ],
   sales: [
-    { id: "sale_total", name: "売上高", score: 3, is_auto: true },
-    { id: "sale_unit", name: "客単価", score: 3, is_auto: true },
-    { id: "sale_nomination", name: "指名率", score: 3, is_auto: true },
-    { id: "sale_repeat", name: "再来率", score: 3, is_auto: true },
+    { id: "sale_total",           name: "売上高（目標達成率）",     score: 3, is_auto: true },
+    { id: "sale_unit",            name: "客単価（全体平均比）",     score: 3, is_auto: true },
+    { id: "sale_new_repeat",      name: "新規からの再来率",         score: 3, is_auto: true },
+    { id: "sale_repeat_continue", name: "リピーター継続率",         score: 3, is_auto: true },
   ],
   behavior: [
     { id: "bhv_attendance", name: "勤怠・時間厳守", score: 3 },
@@ -194,38 +194,48 @@ export default function EvaluationFormDialog({
   useEffect(() => {
     const fetchMetrics = async () => {
       if (!formData.staff_id || !formData.target_period || !isOpen) return;
-      
+
       const res = await getEvaluationMetrics(formData.staff_id, formData.target_period);
       if (res.success && res.metrics) {
         const m = res.metrics;
         const nextDetails = { ...formData.details! };
-        
-        // Update Sales sub-items
+
+        // スコアリング関数
+        const scoreAchievement = (rate: number) =>
+          rate >= 120 ? 5 : rate >= 100 ? 4 : rate >= 80 ? 3 : rate >= 60 ? 2 : 1;
+        const scoreUnitPriceRatio = (ratio: number) =>
+          ratio >= 130 ? 5 : ratio >= 110 ? 4 : ratio >= 90 ? 3 : ratio >= 70 ? 2 : 1;
+        const scoreNewRepeat = (rate: number) =>
+          rate >= 40 ? 5 : rate >= 30 ? 4 : rate >= 20 ? 3 : rate >= 10 ? 2 : 1;
+        const scoreRepeatContinuation = (rate: number) =>
+          rate >= 80 ? 5 : rate >= 65 ? 4 : rate >= 50 ? 3 : rate >= 35 ? 2 : 1;
+
         nextDetails.sales = nextDetails.sales.map(item => {
-          if (item.id === "sale_total") return { ...item, score: m.total_sales > 1000000 ? 5 : m.total_sales > 700000 ? 4 : 3, value: m.total_sales };
-          if (item.id === "sale_unit") return { ...item, score: m.unit_price > 12000 ? 5 : m.unit_price > 10000 ? 4 : 3, value: m.unit_price };
-          if (item.id === "sale_nomination") return { ...item, score: m.nomination_rate > 50 ? 5 : m.nomination_rate > 30 ? 4 : 3, value: m.nomination_rate };
-          if (item.id === "sale_repeat") return { ...item, score: m.repeat_rate > 60 ? 5 : m.repeat_rate > 40 ? 4 : 3, value: m.repeat_rate };
+          if (item.id === "sale_total")
+            return { ...item, score: scoreAchievement(m.achievement_rate), value: m.achievement_rate, label: `達成率 ${m.achievement_rate}%（¥${m.total_sales.toLocaleString()} / 目標¥${m.quarterly_target.toLocaleString()}）` };
+          if (item.id === "sale_unit")
+            return { ...item, score: scoreUnitPriceRatio(m.unit_price_ratio), value: m.unit_price_ratio, label: `¥${m.unit_price.toLocaleString()} （全体平均¥${m.avg_unit_price.toLocaleString()} 比 ${m.unit_price_ratio}%）` };
+          if (item.id === "sale_new_repeat")
+            return { ...item, score: scoreNewRepeat(m.new_repeat_rate), value: m.new_repeat_rate, label: `${m.new_repeat_rate}% （新規${m.new_customer_count}人中 転換）` };
+          if (item.id === "sale_repeat_continue")
+            return { ...item, score: scoreRepeatContinuation(m.repeat_continuation_rate), value: m.repeat_continuation_rate, label: `${m.repeat_continuation_rate}% （前期リピ${m.prev_repeat_count}人中 継続）` };
           return item;
         });
 
-        // Update Service sub-items (review replies)
+        // 接客・技術の自動スコアも更新
         nextDetails.service = nextDetails.service.map(item => {
           if (item.id === "svc_review_reply") return { ...item, score: m.review_replies_count > 5 ? 5 : m.review_replies_count > 0 ? 4 : 3, value: m.review_replies_count };
           return item;
         });
-
-        // Update Technology sub-items (rework penalty)
         nextDetails.technology = nextDetails.technology.map(item => {
-            if (item.id === "tech_accuracy") return { ...item, score: m.rework_count === 0 ? 5 : m.rework_count < 2 ? 4 : 2, value: m.rework_count };
-            return item;
+          if (item.id === "tech_accuracy") return { ...item, score: m.rework_count === 0 ? 5 : m.rework_count < 2 ? 4 : 2, value: m.rework_count };
+          return item;
         });
 
-        // Update Category Scores
         const salesAvg = Math.round((nextDetails.sales.reduce((sum, i) => sum + i.score, 0) / nextDetails.sales.length) * 10) / 10;
         const techAvg = Math.round((nextDetails.technology.reduce((sum, i) => sum + i.score, 0) / nextDetails.technology.length) * 10) / 10;
         const serviceAvg = Math.round((nextDetails.service.reduce((sum, i) => sum + i.score, 0) / nextDetails.service.length) * 10) / 10;
-        
+
         setFormData(prev => ({
           ...prev,
           details: nextDetails,
@@ -235,7 +245,7 @@ export default function EvaluationFormDialog({
             technology: techAvg,
             service: serviceAvg
           },
-          review_allowance: m.review_allowance // Store the calculated allowance
+          review_allowance: m.review_allowance
         } as any));
       }
     };
@@ -498,21 +508,29 @@ export default function EvaluationFormDialog({
 
                       <div className="grid grid-cols-1 gap-6">
                         {formData.details?.[catKey].map((item) => (
-                          <div key={item.id} className="space-y-4 group">
-                            <div className="flex justify-between items-center">
-                              <Label className="text-sm font-black text-slate-700 group-hover:text-purple-600 transition-colors">
-                                {item.name}
-                                {item.is_auto && <span className="ml-2 text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-md font-black italic">AUTO</span>}
-                              </Label>
-                              <div className="flex items-center gap-1.5">
+                          <div key={item.id} className="space-y-3 group">
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1 min-w-0 pr-4">
+                                <Label className="text-sm font-black text-slate-700 group-hover:text-purple-600 transition-colors">
+                                  {item.name}
+                                  {item.is_auto && <span className="ml-2 text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-md font-black italic">AUTO</span>}
+                                </Label>
+                                {/* AUTO項目は実値を表示 */}
+                                {item.is_auto && (item as any).label && (
+                                  <p className="text-[11px] text-slate-400 font-bold mt-1 tabular-nums">
+                                    {(item as any).label}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
                                 {[1, 2, 3, 4, 5].map((lvl) => (
                                   <button
                                     key={lvl}
                                     type="button"
                                     onClick={() => handleSubScoreChange(catKey, item.id, lvl)}
                                     className={`w-9 h-9 rounded-xl font-black transition-all text-xs ${
-                                      item.score === lvl 
-                                        ? "bg-purple-600 text-white shadow-lg shadow-purple-200 scale-110" 
+                                      item.score === lvl
+                                        ? "bg-purple-600 text-white shadow-lg shadow-purple-200 scale-110"
                                         : "bg-slate-50 text-slate-400 hover:bg-slate-100"
                                     }`}
                                   >
@@ -522,7 +540,7 @@ export default function EvaluationFormDialog({
                               </div>
                             </div>
                             <div className="h-1.5 w-full bg-slate-50 rounded-full overflow-hidden">
-                              <div 
+                              <div
                                 className="h-full bg-gradient-to-r from-purple-200 to-purple-600 transition-all duration-500"
                                 style={{ width: `${(item.score / 5) * 100}%` }}
                               />
