@@ -506,11 +506,22 @@ export async function importHotPepperCsv(formData: FormData) {
 
       if (groupRows.some(r => String(r["会計区分"] || "").includes("取り消し")) && (techSales + prodSales === 0)) return;
 
-      let dateFormatted = rawDate.includes("-") ? rawDate : `${rawDate.substring(0, 4)}-${rawDate.substring(4, 6)}-${rawDate.substring(6, 8)}`;
+      let dateFormatted = rawDate;
+      if (rawDate.includes("/")) {
+        const parts = rawDate.split("/");
+        dateFormatted = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      } else if (rawDate.includes("-")) {
+        const parts = rawDate.split("-");
+        dateFormatted = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      } else if (rawDate.length === 8) {
+        dateFormatted = `${rawDate.substring(0, 4)}-${rawDate.substring(4, 6)}-${rawDate.substring(6, 8)}`;
+      }
+
       let timeFormatted = rawTime.includes(":") ? rawTime : `${rawTime.padStart(4, '0').substring(0, 2)}:${rawTime.padStart(4, '0').substring(2, 4)}`;
 
       const docRef = doc(colRef);
       batch.set(docRef, {
+        staff_id: "unknown",
         staff_name: staffName,
         store_name: storeName,
         date: dateFormatted,
