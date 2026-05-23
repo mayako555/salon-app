@@ -10,14 +10,54 @@ import { ChevronLeft, ChevronRight, FileText, Banknote, Calendar } from "lucide-
 import StatementDialog from "@/app/payroll/StatementDialog";
 import AuthGuard from "@/components/AuthGuard";
 
+const getPayday = (targetYear: number, targetMonth: number): Date => {
+  let payYear = targetYear;
+  let payMonth = targetMonth + 1;
+  if (payMonth > 12) {
+    payYear++;
+    payMonth = 1;
+  }
+  const payday = new Date(payYear, payMonth - 1, 25);
+  if (payday.getDay() === 6) payday.setDate(24); // Sat -> Fri
+  if (payday.getDay() === 0) payday.setDate(23); // Sun -> Fri
+  return payday;
+};
+
+const getInitialDate = (): Date => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  for (let i = 0; i < 3; i++) {
+    const targetDate = new Date();
+    targetDate.setMonth(today.getMonth() - i);
+    const year = targetDate.getFullYear();
+    const month = targetDate.getMonth() + 1;
+    
+    const payday = getPayday(year, month);
+    if (today.getTime() >= payday.getTime()) {
+      return targetDate;
+    }
+  }
+  
+  // Fallback to previous month if somehow nothing matches
+  const fallback = new Date();
+  fallback.setMonth(today.getMonth() - 1);
+  return fallback;
+};
+
 export default function StaffPayrollPage() {
   const { profile, loading: authLoading } = useAuth();
   const [statements, setStatements] = useState<MonthlyStatement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState<Date>(getInitialDate());
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
+
+  const payday = getPayday(year, month);
+  const realToday = new Date();
+  realToday.setHours(0, 0, 0, 0);
+  const isAvailable = realToday.getTime() >= payday.getTime();
 
   useEffect(() => {
     if (!authLoading && profile) {
@@ -76,14 +116,26 @@ export default function StaffPayrollPage() {
           <div className="p-0">
             {isLoading ? (
               <div className="py-20 text-center text-slate-400">読み込み中...</div>
+            ) : !isAvailable ? (
+              <div className="py-20 text-center flex flex-col items-center gap-3">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
+                  <Banknote size={32} />
+                </div>
+                <div>
+                  <p className="text-slate-500 font-medium text-lg">{year}年{month}月の明細はまだ公開されていません</p>
+                  <p className="text-slate-400 text-sm mt-2 font-bold bg-amber-50 text-amber-700 px-4 py-1.5 rounded-full inline-block border border-amber-200">
+                    公開予定日: {payday.getMonth() + 1}月{payday.getDate()}日
+                  </p>
+                </div>
+              </div>
             ) : statements.length === 0 ? (
               <div className="py-20 text-center flex flex-col items-center gap-3">
                 <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
                   <FileText size={32} />
                 </div>
                 <div>
-                  <p className="text-slate-500 font-medium">{year}年{month}月の明細はまだ確定していません</p>
-                  <p className="text-slate-400 text-xs mt-1">確定までしばらくお待ちください</p>
+                  <p className="text-slate-500 font-medium">{year}年{month}月の明細データがありません</p>
+                  <p className="text-slate-400 text-xs mt-1">管理者がまだ作成していない可能性があります</p>
                 </div>
               </div>
             ) : (

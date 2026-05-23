@@ -10,6 +10,9 @@ import {
   generateAiManagementAdvice, 
   getYayoiCsvData,
   parseYayoiPdfAction,
+  parseYayoiTextAction,
+  addExpensesBatch,
+  getAnnualPnLData,
   ExpenseRecord 
 } from "@/app/admin/expenses/actions";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -35,6 +38,18 @@ import {
 import { format } from "date-fns";
 import AuthGuard from "@/components/AuthGuard";
 import { toast } from "sonner";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+  ComposedChart,
+  Line
+} from "recharts";
 
 export default function AdminExpensesDashboard() {
   const { profile } = useAuth();
@@ -48,6 +63,7 @@ export default function AdminExpensesDashboard() {
   const [sales, setSales] = useState(0);
   const [cashExpenses, setCashExpenses] = useState(0);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
+  const [financialOutflows, setFinancialOutflows] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   // Custom Fixed Costs States
@@ -58,15 +74,17 @@ export default function AdminExpensesDashboard() {
   // Search Filter
   const [search, setSearch] = useState("");
 
-  // AI Advisor States
+  // AI Advisor & Chart States
   const [aiReport, setAiReport] = useState<string | null>(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [annualData, setAnnualData] = useState<any[]>([]);
 
   // Yayoi PDF Import States
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isParsingPdf, setIsParsingPdf] = useState(false);
   const [parsedTransactions, setParsedTransactions] = useState<any[]>([]);
   const [importError, setImportError] = useState<string | null>(null);
+  const [pasteText, setPasteText] = useState("");
 
   // New Expense Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -92,13 +110,19 @@ export default function AdminExpensesDashboard() {
       if (res.success) {
         setSales(res.totalSales || 0);
         setCashExpenses(res.totalCashExpenses || 0);
+        setFinancialOutflows(res.totalFinancialOutflows || 0);
         setExpenses(res.expensesList || []);
       } else {
         toast.error("データの取得に失敗しました");
       }
+
+      const annualRes = await getAnnualPnLData();
+      if (annualRes.success && annualRes.data) {
+        setAnnualData(annualRes.data);
+      }
     } catch (err) {
       console.error(err);
-      toast.error("エラーが発生しました");
+      toast.error("システムエラーが発生しました");
     } finally {
       setIsLoading(false);
     }
@@ -222,6 +246,8 @@ export default function AdminExpensesDashboard() {
           let mime = file.type;
           if (!mime && file.name.endsWith(".txt")) mime = "text/plain";
           if (!mime && file.name.endsWith(".csv")) mime = "text/csv";
+          if (!mime && file.name.endsWith(".rtf")) mime = "text/rtf";
+          if (mime === "application/rtf") mime = "text/rtf";
           const res = await parseYayoiPdfAction(base64Data, mime || "application/pdf");
           if (res.success && res.data) {
             setParsedTransactions(res.data);
@@ -251,35 +277,67 @@ export default function AdminExpensesDashboard() {
     }
   };
 
-  const handleApplyImportedExpenses = () => {
-    const validExpenses = parsedTransactions.filter(tx => !tx.is_duplicate_sales && tx.classification === "経費");
+  const handlePasteTextUpload = async () => {
+    if (!pasteText.trim()) return;
+
+    setIsParsingPdf(true);
+    setImportError(null);
+    setParsedTransactions([]);
+
+    try {
+      const res = await parseYayoiTextAction(pasteText);
+      if (res.success && res.data) {
+        setParsedTransactions(res.data);
+        toast.success("テキストから取引履歴をAIで解析しました！");
+      } else {
+        setImportError(res.error || "取引履歴の解析に失敗しました");
+        toast.error("解析エラーが発生しました");
+      }
+    } catch (err: any) {
+      console.error("Asynchronous error during transaction parsing:", err);
+      setImportError(err.message || "解析中に予期せぬエラーが発生しました");
+      toast.error("解析エラーが発生しました");
+    } finally {
+      setIsParsingPdf(false);
+    }
+  };
+
+  const handleApplyImportedExpenses = async () => {
+    const validExpenses = parsedTransactions.filter(tx => !tx.is_duplicate_sales && (tx.classification === "経費" || tx.classification === "財務・税務"));
     if (validExpenses.length === 0) {
       toast.error("反映可能な経費取引が見つかりませんでした");
       return;
     }
 
-    let rentSum = 0;
-    let salariesSum = 0;
-    let marketingSum = 0;
+    setIsParsingPdf(true); // Re-use parsing loading state for saving
 
-    validExpenses.forEach(tx => {
-      const category = tx.category || "";
-      const desc = tx.description || "";
-      if (category.includes("地代家賃") || category.includes("家賃") || desc.includes("家賃")) {
-        rentSum += tx.amount || 0;
-      } else if (category.includes("給料") || category.includes("人件費") || desc.includes("給与") || desc.includes("人件費")) {
-        salariesSum += tx.amount || 0;
-      } else if (category.includes("広告") || category.includes("宣伝") || desc.includes("広告") || desc.includes("ミクシィ") || desc.includes("ﾘｸﾙｰﾄ")) {
-        marketingSum += tx.amount || 0;
+    try {
+      // Map to ExpenseRecord format
+      const expensesToSave = validExpenses.map(tx => ({
+        store_name: store === "すべて" ? "六甲" : store, // fallback if needed
+        date: tx.date,
+        category: tx.category,
+        amount: tx.amount,
+        description: tx.description,
+        staff_name: profile?.displayName || "管理者",
+        staff_id: profile?.id || "admin"
+      }));
+
+      const res = await addExpensesBatch(expensesToSave);
+      
+      if (res.success) {
+        toast.success(`${res.count}件の経費をデータベースに登録しました！${res.skipped ? `（${res.skipped}件は重複としてスキップされました）` : ''}`);
+        setIsImportModalOpen(false);
+        setParsedTransactions([]);
+        loadDashboardData(); // Refresh the list and chart
+      } else {
+        toast.error(res.error || "経費の保存に失敗しました");
       }
-    });
-
-    if (rentSum > 0) setRent(rentSum.toString());
-    if (salariesSum > 0) setSalaries(salariesSum.toString());
-    if (marketingSum > 0) setMarketing(marketingSum.toString());
-    
-    toast.success(`解析された経費 (地代家賃 ¥${rentSum.toLocaleString()}, 人件費 ¥${salariesSum.toLocaleString()}, 広告宣伝費 ¥${marketingSum.toLocaleString()}) をP&L固定費シミュレータに反映しました！`);
-    setIsImportModalOpen(false);
+    } catch (error: any) {
+      toast.error(error.message || "予期せぬエラーが発生しました");
+    } finally {
+      setIsParsingPdf(false);
+    }
   };
 
   // Calculations
@@ -419,7 +477,7 @@ export default function AdminExpensesDashboard() {
           <div className="lg:col-span-7 space-y-6">
             
             {/* Quick Cards Grid */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <Card className="bg-white border border-slate-200 shadow-sm rounded-2xl">
                 <CardContent className="p-4 flex flex-col gap-1">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">総売上（実績）</span>
@@ -433,7 +491,7 @@ export default function AdminExpensesDashboard() {
 
               <Card className="bg-white border border-slate-200 shadow-sm rounded-2xl">
                 <CardContent className="p-4 flex flex-col gap-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">現金経費（スタッフ入力）</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">経費</span>
                   {isLoading ? (
                     <Loader2 className="animate-spin text-slate-300 w-5 h-5 mt-1" />
                   ) : (
@@ -444,18 +502,71 @@ export default function AdminExpensesDashboard() {
 
               <Card className="bg-white border border-slate-200 shadow-sm rounded-2xl">
                 <CardContent className="p-4 flex flex-col gap-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">収支差額 (利益残高)</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">借入金・税金等</span>
                   {isLoading ? (
                     <Loader2 className="animate-spin text-slate-300 w-5 h-5 mt-1" />
                   ) : (
-                    <span className={`text-lg font-black flex items-center gap-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {netProfit >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                      ¥{netProfit.toLocaleString()}
+                    <span className="text-lg font-black text-rose-500">¥{financialOutflows.toLocaleString()}</span>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white border border-emerald-200 shadow-sm rounded-2xl bg-emerald-50">
+                <CardContent className="p-4 flex flex-col gap-1">
+                  <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">手元に残る現金</span>
+                  {isLoading ? (
+                    <Loader2 className="animate-spin text-emerald-300 w-5 h-5 mt-1" />
+                  ) : (
+                    <span className={`text-lg font-black flex items-center gap-1 ${(netProfit - financialOutflows) >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                      {(netProfit - financialOutflows) >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+                      ¥{(netProfit - financialOutflows).toLocaleString()}
                     </span>
                   )}
                 </CardContent>
               </Card>
             </div>
+
+            {/* Monthly P&L Chart */}
+            <Card className="bg-white border border-slate-200 shadow-sm rounded-2xl">
+              <CardHeader className="border-b border-slate-100 p-4">
+                <CardTitle className="text-sm font-bold text-slate-800 flex items-center">
+                  <TrendingUp className="mr-2 h-4 w-4 text-emerald-500" />
+                  月次収支トレンド (過去12ヶ月)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="h-56 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={annualData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="month" 
+                        tick={{ fontSize: 10, fill: '#64748b' }} 
+                        tickFormatter={(val) => val.substring(5)} 
+                        axisLine={false} 
+                        tickLine={false} 
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 10, fill: '#64748b' }} 
+                        tickFormatter={(val) => `¥${(val / 10000).toLocaleString()}万`} 
+                        axisLine={false} 
+                        tickLine={false} 
+                      />
+                      <Tooltip 
+                        formatter={(value: number) => `¥${value.toLocaleString()}`}
+                        labelFormatter={(label) => `${label}月`}
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '10px' }} />
+                      <Bar dataKey="expenses" name="経費" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                      <Bar dataKey="financialOutflow" name="借入金・税" fill="#fbbf24" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                      <Line type="monotone" dataKey="sales" name="売上" stroke="#10b981" strokeWidth={3} dot={{ r: 3, strokeWidth: 2 }} />
+                      <Line type="monotone" dataKey="cashFlow" name="最終キャッシュ" stroke="#6366f1" strokeWidth={2} strokeDasharray="3 3" dot={{ r: 3, strokeWidth: 2 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Expenses List */}
             <Card className="bg-white border border-slate-200 shadow-sm rounded-2xl">
@@ -808,16 +919,44 @@ export default function AdminExpensesDashboard() {
               <div className="p-5 overflow-y-auto space-y-4 flex-1">
                 {/* Uploader Box */}
                 {!isParsingPdf && parsedTransactions.length === 0 && (
-                  <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center bg-slate-50 hover:bg-slate-100/50 hover:border-emerald-300 transition-all cursor-pointer relative group">
-                    <input 
-                      type="file" 
-                      accept="application/pdf,image/png,image/jpeg,text/plain,text/csv"
-                      onChange={handlePdfUpload}
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                    />
-                    <Sparkles className="w-8 h-8 text-emerald-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-                    <span className="text-xs font-bold text-slate-700 block">ここに取引履歴のPDF、テキスト、またはスクリーンショット画像をドロップ</span>
-                    <span className="text-[10px] text-slate-400 block mt-1">対応形式: PDF, TXT, CSV, PNG, JPEG (最大10MB)</span>
+                  <div className="space-y-4">
+                    <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center bg-slate-50 hover:bg-slate-100/50 hover:border-emerald-300 transition-all cursor-pointer relative group">
+                      <input 
+                        type="file" 
+                        accept="application/pdf,image/png,image/jpeg,text/plain,text/csv,text/rtf,application/rtf,.rtf,.txt,.csv"
+                        onChange={handlePdfUpload}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                      />
+                      <Sparkles className="w-8 h-8 text-emerald-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
+                      <span className="text-xs font-bold text-slate-700 block">ここに取引履歴のPDF、テキスト、またはスクリーンショット画像をドロップ</span>
+                      <span className="text-[10px] text-slate-400 block mt-1">対応形式: PDF, TXT, RTF, CSV, PNG, JPEG (最大10MB)</span>
+                    </div>
+
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-slate-200" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-white px-2 text-slate-400 font-bold">または</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2 border border-slate-200 rounded-xl p-4 bg-slate-50/50">
+                      <label className="text-[10px] font-bold text-slate-500">テキストを直接貼り付け</label>
+                      <textarea
+                        value={pasteText}
+                        onChange={(e) => setPasteText(e.target.value)}
+                        placeholder="取引履歴のテキストをここにペーストしてください..."
+                        className="w-full h-24 p-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white outline-none resize-none"
+                      />
+                      <Button
+                        onClick={handlePasteTextUpload}
+                        disabled={!pasteText.trim()}
+                        className="self-end bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 text-xs rounded-lg px-4"
+                      >
+                        テキストを解析する
+                      </Button>
+                    </div>
                   </div>
                 )}
 
@@ -931,10 +1070,11 @@ export default function AdminExpensesDashboard() {
                 {parsedTransactions.length > 0 && (
                   <Button 
                     onClick={handleApplyImportedExpenses}
+                    disabled={isParsingPdf}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 text-xs rounded-lg px-4 gap-1.5 shadow-sm"
                   >
-                    <Sparkles size={12} className="text-amber-300" />
-                    有効な経費のみをP&Lに反映する
+                    {isParsingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles size={12} className="text-amber-300" />}
+                    データベースに一括登録する
                   </Button>
                 )}
               </div>

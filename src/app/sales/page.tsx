@@ -63,6 +63,28 @@ export default function SalesPage({
       .replace(/[凛凜]/g, "凛");
   };
 
+  const checkIsMinimo = (sale: SalesRecord) => {
+    const route = String(sale.reservation_route || "");
+    const menu = String(sale.menu_course || "");
+    const menuLower = menu.toLowerCase();
+    return sale.is_minimo === true || 
+           route.includes("ミニモ") || 
+           route.toLowerCase().includes("minimo") ||
+           menu.includes("ミニモ") ||
+           menu.includes("ミニ") ||
+           menu.includes("モデル") ||
+           menuLower.includes("min") ||
+           menuLower.includes("mini");
+  };
+
+  const checkIsNextBooking = (sale: SalesRecord) => {
+    const menu = String(sale.menu_course || "");
+    const discountReason = String(sale.discount_reason || "");
+    return menu.includes("次回") || 
+           menu.includes("店頭クーポン") || 
+           discountReason.includes("次回");
+  };
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isScheduleView, setIsScheduleView] = useState(false);
   const [checkoutInitialStaff, setCheckoutInitialStaff] = useState("");
@@ -668,9 +690,21 @@ export default function SalesPage({
                               {sale.customer_name || "-"}
                             </TableCell>
                             <TableCell className="text-center">
-                              {sale.customer_type === "新規" && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-sm font-bold">新規</span>}
-                              {sale.customer_type === "リピ" && <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-sm font-bold">リピ</span>}
-                              {(!sale.customer_type || sale.customer_type === "不明") && <span className="text-[10px] text-slate-300">-</span>}
+                              <div className="flex flex-col items-center gap-1">
+                                <div className="flex gap-1">
+                                  {sale.customer_type === "新規" && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-sm font-bold">新規</span>}
+                                  {sale.customer_type === "リピ" && <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-sm font-bold">リピ</span>}
+                                  {(!sale.customer_type || sale.customer_type === "不明") && <span className="text-[10px] text-slate-300">-</span>}
+                                </div>
+                                <div className="flex gap-1 flex-wrap justify-center mt-0.5">
+                                  {checkIsMinimo(sale) && (
+                                    <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-sm font-bold border border-purple-200 shadow-sm leading-none">ミニモ</span>
+                                  )}
+                                  {checkIsNextBooking(sale) && (
+                                    <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-sm font-bold border border-amber-200 shadow-sm leading-none">次回予約</span>
+                                  )}
+                                </div>
+                              </div>
                             </TableCell>
                             <TableCell className="text-xs text-slate-600 max-w-[150px] truncate" title={sale.menu_course}>
                               {sale.menu_course || "-"}

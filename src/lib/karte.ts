@@ -131,12 +131,20 @@ export async function getKarteByCustomer(customerId: string): Promise<KarteRecor
     const q = query(colRef, where("customer_id", "==", customerId));
     const snapshot = await getDocs(q);
     
-    const records = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as KarteRecord[];
+    const records = snapshot.docs.map(d => {
+      const data = d.data();
+      return { 
+        id: d.id, 
+        ...data,
+        created_at: data.created_at?.toMillis?.() || data.created_at || null,
+        date: data.date?.toMillis?.() || data.date || null
+      };
+    }) as KarteRecord[];
     
     // Sort in-memory by date descending to avoid composite index requirement
     records.sort((a, b) => {
-      const timeA = a.date?.toMillis ? a.date.toMillis() : new Date(a.date).getTime();
-      const timeB = b.date?.toMillis ? b.date.toMillis() : new Date(b.date).getTime();
+      const timeA = typeof a.date === 'number' ? a.date : new Date(a.date).getTime();
+      const timeB = typeof b.date === 'number' ? b.date : new Date(b.date).getTime();
       return (timeB || 0) - (timeA || 0);
     });
     

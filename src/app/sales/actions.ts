@@ -293,17 +293,7 @@ export async function addCheckout(formData: FormData) {
     const docRef = await addDoc(colRef, payload);
 
     // --- LINE Automation Trigger ---
-    if (customerId && nextBookingDate) {
-      const customer = await getCustomerById(customerId);
-      if (customer?.line_user_id) {
-        await sendBookingConfirmation(
-          customer.name,
-          customer.line_user_id,
-          nextBookingDate,
-          nextBookingTime
-        );
-      }
-    }
+    // Moved to manual preview flow on the client side using sendAndLogLineMessage
 
     // --- Inventory Sync ---
     await syncInventoryFromSale({ id: docRef.id, ...payload }, "deduct");
@@ -321,7 +311,7 @@ export async function addCheckout(formData: FormData) {
     revalidatePath("/staff-portal/sales");
     revalidatePath("/payroll");
     revalidatePath("/audit");
-    return { success: true };
+    return { success: true, id: docRef.id };
   } catch (error: any) {
     console.error("Error adding checkout to Firestore:", error);
     return { success: false, error: error.message };

@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { LogOut, User, LayoutDashboard, Users, Receipt, Calendar, Database, Settings, Train, Clock, ClipboardPaste, Lock } from "lucide-react";
+import { LogOut, User, LayoutDashboard, Users, Receipt, Calendar, Database, Settings, Train, Clock, ClipboardPaste, Lock, BookOpen, Wallet, Calculator } from "lucide-react";
 import Link from "next/link";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
@@ -57,7 +57,11 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
     ] : []),
     { name: "タイムカード", href: "/attendance", icon: Clock },
     { name: "在庫・発注", href: "/staff-portal/inventory", icon: Database },
-    { name: "交通費申請", href: "/staff-portal/transportation", icon: Train },
+    { name: "交通費申請", href: "/staff-portal/transport", icon: Train },
+    { name: "希望休申請", href: "/staff-portal/holidays", icon: Calendar },
+    { name: "給与明細確認", href: "/staff-portal/payroll", icon: Calculator },
+    { name: "経費精算", href: "/staff-portal/expenses", icon: Wallet },
+    { name: "マニュアル", href: "/manuals", icon: BookOpen },
   ];
 
   return (

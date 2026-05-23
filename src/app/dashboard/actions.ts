@@ -53,7 +53,16 @@ export async function getDashboardStats() {
       monthlyTotal += amount;
       
       const route = String(data.reservation_route || "");
-      const isMinimo = data.is_minimo === true || route.includes("ミニモ") || route.toLowerCase().includes("min");
+      const menu = String(data.menu_course || "");
+      const menuLower = menu.toLowerCase();
+      const isMinimo = data.is_minimo === true || 
+                      route.includes("ミニモ") || 
+                      route.toLowerCase().includes("minimo") ||
+                      menu.includes("ミニモ") ||
+                      menu.includes("ミニ") ||
+                      menu.includes("モデル") ||
+                      menuLower.includes("min") ||
+                      menuLower.includes("mini");
 
       if (isMinimo) {
         monthlyMinimoTotal += amount;
@@ -138,7 +147,7 @@ export async function getDashboardStats() {
 export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?: any[]; error?: string }> {
   try {
     const now = new Date();
-    const months = Array.from({ length: 6 }, (_, i) => {
+    const months = Array.from({ length: 36 }, (_, i) => {
       const d = subMonths(now, i);
       return format(d, "yyyy-MM");
     }).reverse();
@@ -175,10 +184,15 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
         
         const route = String(data.reservation_route || "");
         const menu = String(data.menu_course || "");
+        const menuLower = menu.toLowerCase();
         const isMinimo = data.is_minimo === true || 
                         route.includes("ミニモ") || 
-                        route.includes("minimo") ||
-                        menu.includes("ミニモ");
+                        route.toLowerCase().includes("minimo") ||
+                        menu.includes("ミニモ") ||
+                        menu.includes("ミニ") ||
+                        menu.includes("モデル") ||
+                        menuLower.includes("min") ||
+                        menuLower.includes("mini");
         
         if (isMinimo) {
           minimo += amount;
@@ -191,9 +205,9 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
 
         const discountReason = String(data.discount_reason || "");
         const isNextBookingVisit = 
-          menu.includes("次回予約") || 
+          menu.includes("次回") || 
           menu.includes("店頭クーポン") || 
-          discountReason.includes("次回予約");
+          discountReason.includes("次回");
         
         if (isNextBookingVisit) {
           totalNextBookingVisits++;

@@ -157,7 +157,20 @@ export async function getEvaluationMetrics(staffId: string, targetPeriod: string
       allSales = [...allSales, ...monthSales];
     }
 
-    const staffSales = allSales.filter(s => s.staff_id === staffId);
+    const staffList = await getStaffList();
+    const staff = staffList.find(st => st.id === staffId);
+    
+    // Filter sales to match staff by ID or Name (ignoring spaces) for CSV compatibility
+    const staffSales = allSales.filter(s => {
+      if (s.staff_id === staffId) return true;
+      if (s.staff_id === "unknown" && staff) {
+        const sName = (s.staff_name || "").replace(/\s+/g, "").replace(/[凛凜]/g, "凛");
+        const fName = (staff.name || "").replace(/\s+/g, "").replace(/[凛凜]/g, "凛");
+        const lName = (staff.last_name || "").replace(/\s+/g, "").replace(/[凛凜]/g, "凛");
+        return sName === fName || (sName && (fName.includes(sName) || (lName && sName === lName)));
+      }
+      return false;
+    });
     const visitCount = staffSales.length || 1;
     const totalTech = staffSales.reduce((sum, s) => sum + (s.tech_sales || 0), 0);
     const totalProd = staffSales.reduce((sum, s) => sum + (s.product_sales || 0), 0);
@@ -245,8 +258,6 @@ export async function getEvaluationMetrics(staffId: string, targetPeriod: string
     // ── 口コミ集計 ──
     let totalReviewsCount = 0;
     let star5ReviewsCount = 0;
-    const staffList = await getStaffList();
-    const staff = staffList.find(s => s.id === staffId);
     if (staff) {
       const staffNameNormal = staff.name.replace(/\s+/g, "");
       const lastName = staff.last_name || "";

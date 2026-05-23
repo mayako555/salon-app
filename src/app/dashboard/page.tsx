@@ -16,7 +16,9 @@ import {
   MessageSquare,
   X,
   TrendingUp,
-  Award
+  Award,
+  BookOpen,
+  Calculator
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import Link from "next/link";
@@ -123,35 +125,53 @@ export default function DashboardPage() {
           <p className="text-slate-500">本日の状況と重要なタスクを確認します。</p>
         </div>
 
+        {/* Staff Quick Links (Visible to all roles) */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <Link href="/staff-portal/payroll">
+            <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-rose-200 transition-all cursor-pointer text-center py-4 flex flex-col items-center gap-2 group">
+              <div className="p-3 bg-rose-50 text-rose-500 rounded-xl group-hover:scale-110 transition-transform">
+                <Calculator size={24} />
+              </div>
+              <span className="text-xs font-bold text-slate-700">給与明細確認</span>
+            </Card>
+          </Link>
+          <Link href="/staff-portal/holidays">
+            <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all cursor-pointer text-center py-4 flex flex-col items-center gap-2 group">
+              <div className="p-3 bg-blue-50 text-blue-500 rounded-xl group-hover:scale-110 transition-transform">
+                <Calendar size={24} />
+              </div>
+              <span className="text-xs font-bold text-slate-700">希望休申請</span>
+            </Card>
+          </Link>
+          <Link href="/staff-portal/transport">
+            <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all cursor-pointer text-center py-4 flex flex-col items-center gap-2 group">
+              <div className="p-3 bg-emerald-50 text-emerald-500 rounded-xl group-hover:scale-110 transition-transform">
+                <Clock size={24} />
+              </div>
+              <span className="text-xs font-bold text-slate-700">交通費申請</span>
+            </Card>
+          </Link>
+          <Link href="/staff-portal/expenses">
+            <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-amber-200 transition-all cursor-pointer text-center py-4 flex flex-col items-center gap-2 group">
+              <div className="p-3 bg-amber-50 text-amber-500 rounded-xl group-hover:scale-110 transition-transform">
+                <FileText size={24} />
+              </div>
+              <span className="text-xs font-bold text-slate-700">経費精算</span>
+            </Card>
+          </Link>
+          <Link href="/manuals">
+            <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-purple-200 transition-all cursor-pointer text-center py-4 flex flex-col items-center gap-2 group">
+              <div className="p-3 bg-purple-50 text-purple-500 rounded-xl group-hover:scale-110 transition-transform">
+                <BookOpen size={24} />
+              </div>
+              <span className="text-xs font-bold text-slate-700">マニュアル</span>
+            </Card>
+          </Link>
+        </div>
+
         {/* STAFF VIEW */}
         {!isAdmin && !isManager && (
-          <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
-            <Card className="lg:col-span-1 bg-white border-none shadow-sm flex flex-col items-center justify-center p-8 border-t-4 border-t-emerald-500">
-              <CardHeader className="text-center pb-4">
-                <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <QrCode size={20} className="text-emerald-500" />
-                  打刻用QRコード
-                </CardTitle>
-                <p className="text-xs text-slate-400 mt-1">店舗のタブレットにかざしてください</p>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center gap-6">
-                <div className="bg-white p-4 rounded-2xl shadow-inner border border-slate-100">
-                  <QRCodeSVG 
-                    value={`salon-auth:${profile?.id || "unknown"}`} 
-                    size={200}
-                    level="M"
-                    includeMargin={true}
-                    fgColor="#0f172a"
-                  />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-bold text-slate-700">{profile?.name}</p>
-                  <p className="text-[10px] text-slate-400 uppercase tracking-widest">{profile?.id?.substring(0, 8)}</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-3 space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <Card className="bg-emerald-600 text-white border-none shadow-md overflow-hidden relative">
                   <div className="absolute top-0 right-0 p-4 opacity-10">
@@ -252,7 +272,6 @@ export default function DashboardPage() {
               {/* SNS Task Section */}
               <SNSTaskSection assignedAccounts={profile?.sns_accounts} />
             </div>
-          </div>
         )}
 
         {/* Reply Generator Modal */}

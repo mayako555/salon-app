@@ -54,7 +54,6 @@ const managementNav = [
 ];
 
 const staffNav = [
-  { name: "マイQRコード", href: "/staff-portal/my-qr", icon: QrCode },
   { name: "自分の明細を確認", href: "/staff-portal/payroll", icon: Calculator },
   { name: "希望休の提出", href: "/staff-portal/holidays", icon: CalendarDays },
   { name: "交通費の申請", href: "/staff-portal/transport", icon: Train },

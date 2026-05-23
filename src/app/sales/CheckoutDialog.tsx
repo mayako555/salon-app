@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { SalesMasterItem } from "./seeds";
 import { getStaffList, StaffProfile } from "../staff/actions";
 import { getAllCustomers, Customer } from "@/lib/customers";
+import { generateBookingConfirmationText, sendAndLogLineMessage } from "@/lib/line";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -78,6 +79,13 @@ export default function CheckoutDialog({
   const [menuCourse, setMenuCourse] = useState(initialData?.menu_course || "");
   const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
   const [noNextBooking, setNoNextBooking] = useState(!initialData?.next_booking_date);
+  
+  // LINE and Reminder States
+  const [remind2Days, setRemind2Days] = useState(initialData?.next_booking_line_reminder ?? true);
+  const [sendLine, setSendLine] = useState(false);
+  const [showLinePreview, setShowLinePreview] = useState(false);
+  const [previewLineText, setPreviewLineText] = useState("");
+  const [pendingFormData, setPendingFormData] = useState<FormData | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -226,13 +234,43 @@ export default function CheckoutDialog({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    formData.append("next_booking_line_reminder", remind2Days ? "true" : "false");
+
+    // Intercept for LINE Preview if conditions are met
+    if (!initialData?.id && sendLine && selectedCustomer?.line_user_id && !noNextBooking) {
+      const nextDate = formData.get("next_booking_date") as string;
+      const nextTime = formData.get("next_booking_time") as string;
+      if (nextDate && nextTime) {
+        const text = await generateBookingConfirmationText(nextDate, nextTime, selectedStore);
+        setPreviewLineText(text);
+        setPendingFormData(formData);
+        setShowLinePreview(true);
+        return;
+      }
+    }
+    
+    await executeSubmit(formData);
+  };
+
+  const executeSubmit = async (formData: FormData) => {
     setIsSubmitting(true);
     try {
-      const formData = new FormData(e.currentTarget);
       const res = initialData?.id 
         ? await updateCheckout(initialData.id, formData)
         : await addCheckout(formData);
+        
       if (res.success) {
+        // Send LINE if preview was confirmed
+        if (showLinePreview && sendLine && selectedCustomer?.line_user_id && res.id) {
+           await sendAndLogLineMessage({
+             customerId: selectedCustomer.id,
+             accountingId: res.id,
+             lineUserId: selectedCustomer.line_user_id,
+             messageType: "next_reservation_confirm",
+             messageBody: previewLineText
+           });
+        }
         setIsOpen(false);
         window.location.reload();
       } else {
@@ -242,6 +280,7 @@ export default function CheckoutDialog({
       alert("エラーが発生しました");
     } finally {
       setIsSubmitting(false);
+      setShowLinePreview(false);
     }
   };
 
@@ -571,6 +610,19 @@ export default function CheckoutDialog({
                   <>
                     <input type="date" name="next_booking_date" defaultValue={initialData?.next_booking_date || ""} className="w-full h-9 px-3 border border-blue-200 rounded-md text-sm font-bold text-blue-800" />
                     <input type="time" name="next_booking_time" defaultValue={initialData?.next_booking_time || "10:00"} className="w-full h-9 px-3 border border-blue-200 rounded-md text-sm font-bold text-blue-800" />
+                    <div className="col-span-2 space-y-2 mt-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={remind2Days} onChange={(e) => setRemind2Days(e.target.checked)} className="w-4 h-4 rounded text-emerald-600" />
+                        <span className="text-xs font-bold text-slate-700">2日前のLINEリマインド対象にする</span>
+                      </label>
+                      <label className={cn("flex items-center gap-2 cursor-pointer", !selectedCustomer?.line_user_id && "opacity-50")}>
+                        <input type="checkbox" checked={sendLine} onChange={(e) => setSendLine(e.target.checked)} disabled={!selectedCustomer?.line_user_id} className="w-4 h-4 rounded text-emerald-600" />
+                        <span className="text-xs font-bold text-slate-700">会計完了後にLINEで予約確定メッセージを送信する</span>
+                      </label>
+                      {!selectedCustomer?.line_user_id && (
+                        <p className="text-[10px] text-rose-500 font-bold ml-6">※LINE未連携のため送信できません</p>
+                      )}
+                    </div>
                   </>
                 )}
               </div>
@@ -582,6 +634,46 @@ export default function CheckoutDialog({
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* LINE Preview Modal */}
+      {showLinePreview && (
+        <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 duration-200 overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-emerald-50">
+               <h3 className="font-bold text-lg text-emerald-800 flex items-center gap-2">
+                 <MessageSquare size={20} />
+                 LINE送信プレビュー
+               </h3>
+               <button onClick={() => setShowLinePreview(false)} className="text-emerald-400 hover:text-emerald-600 transition-colors p-1 rounded-md hover:bg-emerald-100 bg-white shadow-sm">
+                 <X size={20} />
+               </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[60vh] bg-slate-100">
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 relative whitespace-pre-wrap text-sm text-slate-700 font-medium">
+                {/* Speech bubble tail */}
+                <div className="absolute -left-2 top-4 w-4 h-4 bg-white border-l border-b border-slate-200 transform rotate-45"></div>
+                {previewLineText}
+              </div>
+            </div>
+            
+            <div className="p-4 bg-white flex justify-end gap-3 border-t border-slate-100">
+              <Button type="button" variant="outline" onClick={() => setShowLinePreview(false)} disabled={isSubmitting}>
+                戻る
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (pendingFormData) executeSubmit(pendingFormData);
+                }} 
+                disabled={isSubmitting} 
+                className="bg-[#06C755] hover:bg-[#05b34c] text-white"
+              >
+                {isSubmitting ? "処理中..." : "確認して送信＆保存"}
+              </Button>
+            </div>
           </div>
         </div>
       )}

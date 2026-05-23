@@ -134,6 +134,13 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
   const [showLocation, setShowLocation] = useState(true);
   const paymentDate = calculatePaymentDate(stmt.target_month);
 
+  const [yearStr, monthStr] = stmt.target_month.split("-");
+  const daysInMonth = new Date(Number(yearStr), Number(monthStr), 0).getDate();
+  const workedDays = stmt.details.metrics?.worked_days || 0;
+  // @ts-ignore
+  const paidLeaves = stmt.details.metrics?.paid_leaves || 0;
+  const publicHolidays = daysInMonth - paidLeaves - workedDays;
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -163,9 +170,14 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
 
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
+            @page {
+              size: landscape;
+              margin: 10mm;
+            }
             html, body {
               height: auto !important;
               overflow: visible !important;
+              background: white !important;
             }
             body * {
               visibility: hidden !important;
@@ -174,29 +186,18 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
               visibility: visible !important;
             }
             #print-area-${stmt.id} {
-              position: absolute !important;
+              position: fixed !important;
               left: 0 !important;
               top: 0 !important;
               width: 100% !important;
-              height: auto !important;
               background: white !important;
               color: black !important;
               padding: 0 !important;
               margin: 0 !important;
-              overflow: visible !important;
             }
-            /* Override Radix UI fixed positioning and scroll limits */
-            div[role="dialog"], div[data-state="open"], div.fixed {
+            /* Override Radix UI fixed positioning to prevent it from clipping */
+            div[role="dialog"] {
               position: static !important;
-              overflow: visible !important;
-              height: auto !important;
-              max-height: none !important;
-              width: 100% !important;
-              max-width: none !important;
-              border: none !important;
-              box-shadow: none !important;
-              padding: 0 !important;
-              margin: 0 !important;
               transform: none !important;
             }
           }
@@ -228,10 +229,10 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
               <div className="border-x-2 border-b-2 border-black">
                 <div className="text-center font-bold border-b-2 border-black py-1">勤怠</div>
                 <div className="p-2 space-y-2 h-[260px]">
-                   <div className="flex justify-between text-xs"><span>出勤日数</span><span>{stmt.details.metrics?.worked_days || 0} 日</span></div>
+                   <div className="flex justify-between text-xs"><span>出勤日数</span><span>{workedDays} 日</span></div>
                    <div className="flex justify-between text-xs"><span>欠勤日数</span><span>0 日</span></div>
-                   <div className="flex justify-between text-xs"><span>公休日数</span><span>0 日</span></div>
-                   <div className="flex justify-between text-xs"><span>有給使用回数</span><span>0 日</span></div>
+                   <div className="flex justify-between text-xs"><span>公休日数</span><span>{publicHolidays} 日</span></div>
+                   <div className="flex justify-between text-xs"><span>有給使用回数</span><span>{paidLeaves} 日</span></div>
                    <div className="flex justify-between text-xs mt-4"><span>労働時間</span><span>{stmt.details.metrics?.worked_hours || 0} 時間</span></div>
                    <div className="flex justify-between text-xs mt-4"><span>扶養人数</span><span>0 人</span></div>
                 </div>

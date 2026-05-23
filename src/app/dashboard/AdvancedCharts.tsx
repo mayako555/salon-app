@@ -43,6 +43,19 @@ export default function AdvancedCharts() {
     load();
   }, []);
 
+  // Scroll to the rightmost (most recent) data by default
+  useEffect(() => {
+    if (!loading && data.length > 0) {
+      // Use a small timeout to ensure DOM is fully rendered before scrolling
+      setTimeout(() => {
+        const scrollContainers = document.querySelectorAll('.custom-scrollbar');
+        scrollContainers.forEach(container => {
+          container.scrollLeft = container.scrollWidth;
+        });
+      }, 100);
+    }
+  }, [loading, data]);
+
   const chartData = data.map(d => {
     const stores: any = {};
     Object.entries(d.stores).forEach(([name, vals]: [string, any]) => {
@@ -62,7 +75,7 @@ export default function AdvancedCharts() {
         count: vals.count || 0
       };
     });
-    return { ...d, stores };
+    return { ...d, stores, regularSales: (d.total || 0) - (d.minimo || 0) };
   });
 
   if (loading) {
@@ -80,12 +93,13 @@ export default function AdvancedCharts() {
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <TrendingUp size={20} className="text-emerald-500" />
-            売上推移 (過去6ヶ月)
+            売上推移 (過去3年間)
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px] w-full mt-4">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full mt-4 overflow-x-auto pb-4 custom-scrollbar">
+            <div className="h-[300px]" style={{ minWidth: `${Math.max(chartData.length * 60, 600)}px` }}>
+              <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis 
@@ -116,7 +130,7 @@ export default function AdvancedCharts() {
                   }}
                 />
                 <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '20px' }} />
-                <Bar name="通常売上" dataKey="total" stackId="total" fill="#10b981" radius={[0, 0, 0, 0]} />
+                <Bar name="通常売上" dataKey="regularSales" stackId="total" fill="#10b981" radius={[0, 0, 0, 0]} />
                 <Bar name="ミニモ売上" dataKey="minimo" stackId="total" fill="#6366f1" radius={[4, 4, 0, 0]}>
                   <LabelList 
                     dataKey="total" 
@@ -128,6 +142,7 @@ export default function AdvancedCharts() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -154,8 +169,9 @@ export default function AdvancedCharts() {
             {["六甲", "元町", "神戸"].map((store) => (
               <div key={store} className="space-y-4">
                 <h4 className="text-sm font-black text-slate-600 text-center bg-slate-50 py-2 rounded-xl border border-slate-100">{store}店</h4>
-                <div className="h-[250px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="w-full overflow-x-auto pb-4 custom-scrollbar">
+                  <div className="h-[250px]" style={{ minWidth: `${Math.max(chartData.length * 50, 400)}px` }}>
+                    <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                       <XAxis 
@@ -179,25 +195,39 @@ export default function AdvancedCharts() {
                             return (
                               <div className="bg-white p-3 rounded-2xl shadow-lg border border-slate-100 text-xs font-bold space-y-1.5 text-slate-700">
                                 <p className="text-slate-400 font-extrabold text-[10px] uppercase border-b border-slate-50 pb-1 mb-1">{item.month}</p>
-                                <div className="flex items-center justify-between gap-4">
-                                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-[#10b981] rounded-full" /> 通常:</span>
-                                  <span className="text-slate-800">{storeData.regularVisits || 0}人</span>
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center justify-between gap-4">
+                                    <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-[#10b981] rounded-full" /> 通常:</span>
+                                    <span className="text-slate-800">{storeData.regularVisits || 0}人</span>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-4 pl-4">
+                                    <span className="flex items-center gap-1.5 text-[10px] text-slate-500 font-medium">↳ うち新規:</span>
+                                    <span className="text-slate-600 text-[10px]">{storeData.regularNewVisits || 0}人</span>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-4 pl-4">
+                                    <span className="flex items-center gap-1.5 text-[10px] text-slate-500 font-medium">↳ うちリピ:</span>
+                                    <span className="text-slate-600 text-[10px]">{(storeData.regularVisits || 0) - (storeData.regularNewVisits || 0)}人</span>
+                                  </div>
                                 </div>
-                                <div className="flex items-center justify-between gap-4">
-                                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-[#fbbf24] rounded-full" /> 次回予約:</span>
-                                  <span className="text-slate-800">{storeData.nextBookingVisits || 0}人</span>
+                                <div className="flex flex-col gap-1 pt-1 mt-1 border-t border-slate-50">
+                                  <div className="flex items-center justify-between gap-4">
+                                    <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-[#6366f1] rounded-full" /> ミニモ:</span>
+                                    <span className="text-slate-800">{storeData.minimoVisits || 0}人</span>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-4 pl-4">
+                                    <span className="flex items-center gap-1.5 text-[10px] text-slate-500 font-medium">↳ うち新規:</span>
+                                    <span className="text-slate-600 text-[10px]">{storeData.minimoNewVisits || 0}人</span>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-4 pl-4">
+                                    <span className="flex items-center gap-1.5 text-[10px] text-slate-500 font-medium">↳ うちリピ:</span>
+                                    <span className="text-slate-600 text-[10px]">{(storeData.minimoVisits || 0) - (storeData.minimoNewVisits || 0)}人</span>
+                                  </div>
                                 </div>
-                                <div className="flex items-center justify-between gap-4">
-                                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-[#6366f1] rounded-full" /> ミニモ:</span>
-                                  <span className="text-slate-800">{storeData.minimoVisits || 0}人</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-4 pt-1 mt-1 border-t border-slate-100 font-black text-sky-600 bg-sky-50/50 px-1.5 py-0.5 rounded-md">
-                                  <span className="flex items-center gap-1.5">👥 通常新規:</span>
-                                  <span>{storeData.regularNewVisits || 0}人</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-4 font-black text-purple-600 bg-purple-50/50 px-1.5 py-0.5 rounded-md">
-                                  <span className="flex items-center gap-1.5">👥 ミニモ新規:</span>
-                                  <span>{storeData.minimoNewVisits || 0}人</span>
+                                <div className="flex flex-col gap-1 pt-1 mt-1 border-t border-slate-50">
+                                  <div className="flex items-center justify-between gap-4">
+                                    <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-[#fbbf24] rounded-full" /> 次回予約:</span>
+                                    <span className="text-slate-800">{storeData.nextBookingVisits || 0}人</span>
+                                  </div>
                                 </div>
                               </div>
                             );
@@ -217,6 +247,7 @@ export default function AdvancedCharts() {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
+                  </div>
                 </div>
                 {/* Store Specific Unit Price & New Customer Info */}
                 <div className="grid grid-cols-2 gap-2">
@@ -264,12 +295,13 @@ export default function AdvancedCharts() {
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <Sparkles size={20} className="text-amber-500" />
-            次回予約分析（予約数 vs 来店数）
+            次回予約分析（過去3年間）
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px] w-full mt-4">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full mt-4 overflow-x-auto pb-4 custom-scrollbar">
+            <div className="h-[300px]" style={{ minWidth: `${Math.max(chartData.length * 60, 600)}px` }}>
+              <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis 
@@ -323,6 +355,7 @@ export default function AdvancedCharts() {
                 />
               </ComposedChart>
             </ResponsiveContainer>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -332,12 +365,13 @@ export default function AdvancedCharts() {
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <Activity size={20} className="text-rose-500" />
-            店舗稼働率（空き具合）
+            店舗稼働率（過去3年間）
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px] w-full mt-4">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full mt-4 overflow-x-auto pb-4 custom-scrollbar">
+            <div className="h-[300px]" style={{ minWidth: `${Math.max(chartData.length * 60, 600)}px` }}>
+              <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis 
@@ -369,6 +403,7 @@ export default function AdvancedCharts() {
                 />
               </ComposedChart>
             </ResponsiveContainer>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -378,12 +413,13 @@ export default function AdvancedCharts() {
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <PieChart size={20} className="text-blue-500" />
-            店舗別 売上推移（ミニモ比率）
+            店舗別 売上推移（過去3年間）
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px] w-full mt-4">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full mt-4 overflow-x-auto pb-4 custom-scrollbar">
+            <div className="h-[300px]" style={{ minWidth: `${Math.max(chartData.length * 60, 600)}px` }}>
+              <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis 
@@ -414,6 +450,7 @@ export default function AdvancedCharts() {
                 <Bar name="神戸:ミニモ" dataKey="stores.神戸.minimo" stackId="kobe" fill="#e11d48" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -21,7 +21,16 @@ export async function getStaffPerformanceStats(year: number, month: number) {
 
     const stats = staffList.map(staff => {
       // 1. Current Sales (Include HPB points in revenue, match by ID or Name for CSV compatibility)
-      const staffSales = sales.filter(s => s.staff_id === staff.id || (s.staff_id === "unknown" && s.staff_name === staff.name));
+      const staffSales = sales.filter(s => {
+        if (s.staff_id === staff.id) return true;
+        if (s.staff_id === "unknown") {
+          const sName = (s.staff_name || "").replace(/\s+/g, "").replace(/[凛凜]/g, "凛");
+          const fName = (staff.name || "").replace(/\s+/g, "").replace(/[凛凜]/g, "凛");
+          const lName = (staff.last_name || "").replace(/\s+/g, "").replace(/[凛凜]/g, "凛");
+          return sName === fName || (sName && (fName.includes(sName) || (lName && sName === lName)));
+        }
+        return false;
+      });
       const currentTotal = staffSales.reduce((acc, s) => acc + (s.tech_sales || 0) + (s.product_sales || 0) + (s.hpb_points || 0) - (s.discount || 0), 0);
       
       // 2. Target (Priority: Monthly Target > Fixed Staff Target)
