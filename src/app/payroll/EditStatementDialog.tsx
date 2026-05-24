@@ -90,18 +90,8 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
     }
   }, [isOpen, stmt.staff_id]);
 
-  // Dynamic client-side tax auto-calculation
-  useEffect(() => {
-    if (stmt.type !== "salary") {
-      // Clear deductions for outsourcing/reward types
-      setHealth("0");
-      setPension("0");
-      setEmployment("0");
-      setIncomeTax("0");
-      setChildcare("0");
-      return;
-    }
-
+  // Manual tax calculation trigger
+  const handleRecalculateTaxes = () => {
     const baseVal = Number(baseAmount) || 0;
     const transportVal = Number(transportAllowance) || 0;
     const otherAllowances = (Number(nominationAllowance) || 0) + 
@@ -123,7 +113,8 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
     setEmployment(taxes.employmentInsurance.toString());
     setIncomeTax(taxes.incomeTax.toString());
     setChildcare(taxes.childcareSupport ? taxes.childcareSupport.toString() : "0");
-  }, [baseAmount, transportAllowance, nominationAllowance, reviewAllowance, blogAllowance, executiveAllowance, stmt.type]);
+    toast.success("税金・保険料を再計算しました");
+  };
 
   // Calculations
   const numBase = Number(baseAmount) || 0;
@@ -415,9 +406,21 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
           {/* Social Insurance Deductions (Salary only) */}
           {stmt.type === "salary" && (
             <div className="space-y-3 animate-in slide-in-from-top-3 duration-200">
-              <h3 className="text-xs font-bold text-slate-700 border-b pb-1.5 flex items-center gap-1">
-                <span className="w-1.5 h-3.5 bg-blue-500 rounded-sm"></span> 社会保険・法定控除の入力 (円)
-              </h3>
+              <div className="flex items-center justify-between border-b pb-1.5">
+                <h3 className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                  <span className="w-1.5 h-3.5 bg-blue-500 rounded-sm"></span> 社会保険・法定控除の入力 (円)
+                </h3>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleRecalculateTaxes}
+                  className="h-7 text-[10px] text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 px-2"
+                >
+                  <Calculator className="w-3 h-3 mr-1" />
+                  自動再計算
+                </Button>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 block">健康保険料</label>

@@ -221,11 +221,24 @@ export async function editStaff(id: string, formData: FormData) {
     }
 
     // Sync passcode to Firebase Auth password under the hood using admin SDK
-    if (currentUid && passcode) {
-      try {
-        await adminAuth.updateUser(currentUid, { password: passcode + "_salon" });
-      } catch (authError) {
-        console.warn("Failed to sync passcode to Firebase Auth password:", authError);
+    if (passcode) {
+      if (currentUid) {
+        try {
+          await adminAuth.updateUser(currentUid, { password: passcode + "_salon" });
+        } catch (authError) {
+          console.warn("Failed to sync passcode to Firebase Auth password:", authError);
+        }
+      } else {
+        try {
+          const userRecord = await adminAuth.createUser({
+            email,
+            password: passcode + "_salon",
+            displayName: name,
+          });
+          currentUid = userRecord.uid;
+        } catch (createError) {
+          console.warn("Failed to create Firebase Auth user during edit:", createError);
+        }
       }
     }
 
