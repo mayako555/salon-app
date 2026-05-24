@@ -11,7 +11,9 @@ import {
   updateDoc, 
   doc, 
   deleteDoc,
-  serverTimestamp 
+  serverTimestamp,
+  getDoc,
+  setDoc
 } from "firebase/firestore";
 import { revalidatePath } from "next/cache";
 import { getAdvancedAnalytics } from "@/app/dashboard/actions";
@@ -26,6 +28,7 @@ export type ExpenseRecord = {
   description: string;
   staff_name: string;
   staff_id: string;
+  is_imported?: boolean;
   created_at?: string;
 };
 
@@ -125,6 +128,7 @@ export async function addExpensesBatch(expenses: Omit<ExpenseRecord, 'id' | 'cre
     await Promise.all(newExpenses.map(async (data) => {
       await addDoc(colRef, {
         ...data,
+        is_imported: true, // Flag as imported via CSV
         created_at: serverTimestamp()
       });
     }));
@@ -832,3 +836,43 @@ export async function parseYayoiTextAction(textContent: string) {
     return { success: false, error: error.message };
   }
 }
+
+const PETTY_CASH_COLLECTION = "petty_cash_balances";
+
+export async function getPettyCashBalance(year: number, month: number, storeName: string): Promise<number> {
+  try {
+    const targetPrefix = `${year}-${String(month).padStart(2, '0')}`;
+    const docId = `${storeName}_${targetPrefix}`;
+    const docRef = doc(db, PETTY_CASH_COLLECTION, docId);
+    const snapshot = await getDoc(docRef);
+    if (snapshot.exists()) {
+      return snapshot.data().balance || 0;
+    }
+    return 0; // Default to 0 if not set
+  } catch (error) {
+    console.error("Error getting petty cash balance:", error);
+    return 0;
+  }
+}
+
+export async function updatePettyCashBalance(year: number, month: number, storeName: string, balance: number) {
+  try {
+    const targetPrefix = `${year}-${String(month).padStart(2, '0')}`;
+    const docId = `${storeName}_${targetPrefix}`;
+    const docRef = doc(db, PETTY_CASH_COLLECTION, docId);
+    
+    await setDoc(docRef, {
+      store_name: storeName,
+      target_month: targetPrefix,
+      balance: balance,
+      updated_at: serverTimestamp()
+    });
+    
+    revalidatePath("/staff-portal/expenses");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating petty cash balance:", error);
+    return { success: false, error: error.message };
+  }
+}
+

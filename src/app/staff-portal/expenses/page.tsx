@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { getExpenses, addExpense, deleteExpense, ExpenseRecord } from "@/app/admin/expenses/actions";
+import { getExpenses, addExpense, deleteExpense, ExpenseRecord, getPettyCashBalance, updatePettyCashBalance } from "@/app/admin/expenses/actions";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,12 @@ export default function StaffExpensesPage() {
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [history, setHistory] = useState<ExpenseRecord[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  
+  // Petty cash balance
+  const [pettyCash, setPettyCash] = useState<number>(0);
+  const [isEditingPettyCash, setIsEditingPettyCash] = useState(false);
+  const [pettyCashInput, setPettyCashInput] = useState("");
+  const [isUpdatingPettyCash, setIsUpdatingPettyCash] = useState(false);
 
   const STORES = ["六甲", "元町", "神戸"];
   const CATEGORIES = ["消耗品費", "旅費交通費", "通信費", "水道光熱費", "広告宣伝費", "雑費", "その他"];
@@ -60,8 +66,23 @@ export default function StaffExpensesPage() {
     try {
       const now = new Date();
       const list = await getExpenses(now.getFullYear(), now.getMonth() + 1);
-      const myItems = list.filter(item => item.staff_id === profile.id);
-      setHistory(myItems);
+      
+      // Filter logic:
+      // 1. Must match the currently selected store (or default selected store if not specified)
+      // 2. Exclude mass-imported expenses
+      const matchedStore = STORES.find(s => (selectedStore || "六甲").includes(s)) || "六甲";
+      
+      const filteredItems = list.filter(item => 
+        item.store_name === matchedStore && 
+        !item.is_imported
+      );
+      
+      setHistory(filteredItems);
+
+      // Fetch petty cash starting balance
+      const balance = await getPettyCashBalance(now.getFullYear(), now.getMonth() + 1, matchedStore);
+      setPettyCash(balance);
+      setPettyCashInput(balance.toString());
     } catch (err) {
       console.error("Error loading expenses history:", err);
     } finally {
@@ -143,6 +164,78 @@ export default function StaffExpensesPage() {
           <p className="text-slate-500">
             店舗の現金で購入した消耗品や交通費等の経費を入力してください。入力されたデータは毎月の収支計算および弥生会計連携に使用されます。
           </p>
+        </div>
+
+        {/* Petty Cash Header Card */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="bg-white border-none shadow-md overflow-hidden rounded-2xl md:col-span-3 lg:col-span-1">
+            <CardHeader className="bg-emerald-500 p-4 border-b-0 pb-6 relative overflow-hidden">
+              <div className="absolute right-0 top-0 opacity-10 transform translate-x-4 -translate-y-4">
+                <Wallet size={120} />
+              </div>
+              <CardTitle className="text-white text-sm font-bold flex items-center gap-2 relative z-10">
+                今月の現金残高（{storeName}店）
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-5 pt-0 -mt-3 relative z-20">
+              <div className="bg-white rounded-xl shadow-sm border border-emerald-100 p-4">
+                {isEditingPettyCash ? (
+                  <div className="space-y-3">
+                    <label className="text-xs text-slate-500 font-bold block">月初めのレジ補充金額 (円)</label>
+                    <div className="flex gap-2">
+                      <Input 
+                        type="number"
+                        value={pettyCashInput}
+                        onChange={(e) => setPettyCashInput(e.target.value)}
+                        className="h-9 text-sm font-bold"
+                        placeholder="例: 30000"
+                      />
+                      <Button 
+                        size="sm" 
+                        onClick={async () => {
+                          setIsUpdatingPettyCash(true);
+                          const now = new Date();
+                          const val = Number(pettyCashInput) || 0;
+                          await updatePettyCashBalance(now.getFullYear(), now.getMonth() + 1, storeName, val);
+                          setPettyCash(val);
+                          setIsEditingPettyCash(false);
+                          setIsUpdatingPettyCash(false);
+                          toast.success("小口現金の開始残高を更新しました");
+                        }}
+                        disabled={isUpdatingPettyCash}
+                        className="h-9 bg-emerald-600 hover:bg-emerald-700 whitespace-nowrap"
+                      >
+                        {isUpdatingPettyCash ? <Loader2 className="w-4 h-4 animate-spin" /> : "保存"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-end mb-1">
+                      <span className="text-xs font-bold text-slate-500">現在のレジ残高</span>
+                      <button onClick={() => setIsEditingPettyCash(true)} className="text-[10px] text-blue-500 hover:underline">
+                        補充金額を設定
+                      </button>
+                    </div>
+                    <div className="text-3xl font-black text-slate-800 tracking-tight">
+                      ¥{(pettyCash - history.reduce((sum, item) => sum + item.amount, 0)).toLocaleString()}
+                    </div>
+                    
+                    <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between text-xs">
+                      <span className="text-slate-500">開始残高 (補充額)</span>
+                      <span className="font-bold text-slate-700">¥{pettyCash.toLocaleString()}</span>
+                    </div>
+                    <div className="mt-1 flex justify-between text-xs">
+                      <span className="text-slate-500">使用済みの経費合計</span>
+                      <span className="font-bold text-rose-500">
+                        - ¥{history.reduce((sum, item) => sum + item.amount, 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
