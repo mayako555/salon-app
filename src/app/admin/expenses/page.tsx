@@ -319,7 +319,7 @@ export default function AdminExpensesDashboard() {
         category: tx.category,
         amount: tx.amount,
         description: tx.description,
-        staff_name: profile?.displayName || "管理者",
+        staff_name: profile?.name || "管理者",
         staff_id: profile?.id || "admin"
       }));
 
@@ -553,7 +553,7 @@ export default function AdminExpensesDashboard() {
                         tickLine={false} 
                       />
                       <Tooltip 
-                        formatter={(value: number) => `¥${value.toLocaleString()}`}
+                        formatter={(value: any) => `¥${Number(value).toLocaleString()}`}
                         labelFormatter={(label) => `${label}月`}
                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                       />

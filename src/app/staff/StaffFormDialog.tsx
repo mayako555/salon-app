@@ -165,6 +165,12 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1 font-bold text-amber-600">有給残日数（日）</label>
+            <input required type="number" name="paid_leave_balance" defaultValue={staff?.paid_leave_balance ?? 0} min="0" className="w-full h-10 px-3 border-2 border-amber-100 rounded-md shadow-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none font-bold" />
+            <p className="text-[10px] text-slate-400 mt-1">※ スタッフの現在の有給残日数。付与・調整時に手動で変更してください。</p>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-slate-700 mb-1 font-bold text-blue-700">暗証番号（打刻・ポータル用）</label>
             <input required type="text" name="passcode" defaultValue={staff?.passcode || "1234"} placeholder="例: 1234" className="w-full h-10 px-3 border-2 border-blue-100 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none font-bold" />
             <p className="text-[10px] text-slate-400 mt-1">※ タイムカード打刻時およびポータルログイン時に入力する暗証番号（4桁以上推奨）</p>

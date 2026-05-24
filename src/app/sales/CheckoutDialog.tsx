@@ -262,10 +262,10 @@ export default function CheckoutDialog({
         
       if (res.success) {
         // Send LINE if preview was confirmed
-        if (showLinePreview && sendLine && selectedCustomer?.line_user_id && res.id) {
+        if (showLinePreview && sendLine && selectedCustomer?.line_user_id && (res as any).id) {
            await sendAndLogLineMessage({
              customerId: selectedCustomer.id,
-             accountingId: res.id,
+             accountingId: (res as any).id,
              lineUserId: selectedCustomer.line_user_id,
              messageType: "next_reservation_confirm",
              messageBody: previewLineText

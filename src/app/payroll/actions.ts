@@ -18,6 +18,7 @@ import { getContractsList } from "@/app/contracts/actions";
 import { getMonthlySales } from "@/app/sales/actions";
 import { getMonthlyAllowances } from "@/app/allowances/actions";
 import { getMonthlyAttendance, AttendanceRecord } from "@/app/attendance/actions";
+import { getMonthlyShifts, ShiftRecord } from "@/app/shifts/actions";
 import { addAuditLog } from "@/app/audit/actions";
 import { calculatePayrollTaxes } from "@/lib/tax-calculator";
 
@@ -184,6 +185,7 @@ export async function generateStatements(year: number, month: number) {
   const sales = await getMonthlySales(year, month);
   const allowances = await getMonthlyAllowances(year, month);
   const attendances = await getMonthlyAttendance(year, month);
+  const shifts = await getMonthlyShifts(year, month);
 
   await addAuditLog({
      table_name: "monthly_statements",
@@ -199,6 +201,7 @@ export async function generateStatements(year: number, month: number) {
     const staffSales = sales.filter((s: any) => s.staff_name === contract.staff_name);
     const staffAllowances = allowances.filter((a: any) => a.staff_name === contract.staff_name);
     const staffAttendances = attendances.filter((a: AttendanceRecord) => a.staff_name === contract.staff_name);
+    const staffPaidLeaves = shifts.filter((s: ShiftRecord) => s.staff_id === contract.staff_id && s.type === "paid_leave").length;
 
     const storesWorkedSet = new Set<string>();
     staffAttendances.forEach((att: any) => {
@@ -317,7 +320,8 @@ export async function generateStatements(year: number, month: number) {
             nomination_count: 0,
             cashless_sales_total: 0,
             worked_days: finalWorkedDays,
-            worked_hours: finalWorkedHours
+            worked_hours: finalWorkedHours,
+            paid_leaves: staffPaidLeaves
           }
         },
         created_at: serverTimestamp()
@@ -424,7 +428,8 @@ export async function generateStatements(year: number, month: number) {
             nomination_count: nominationCount,
             cashless_sales_total: effectiveCashlessTech + effectiveCashlessRetail,
             worked_days: finalWorkedDays,
-            worked_hours: finalWorkedHours
+            worked_hours: finalWorkedHours,
+            paid_leaves: staffPaidLeaves
           }
         },
         created_at: serverTimestamp()
@@ -481,7 +486,8 @@ export async function generateStatements(year: number, month: number) {
             nomination_count: nominationCount,
             cashless_sales_total: effectiveCashlessTech + effectiveCashlessRetail,
             worked_days: finalWorkedDays,
-            worked_hours: finalWorkedHours
+            worked_hours: finalWorkedHours,
+            paid_leaves: staffPaidLeaves
           }
         },
         created_at: serverTimestamp()
@@ -546,7 +552,8 @@ export async function generateStatements(year: number, month: number) {
           total_tech_sales: totalTechSales,
           total_product_sales: totalProductSales,
           nomination_count: nominationCount,
-          cashless_sales_total: effectiveCashlessTech + effectiveCashlessRetail
+          cashless_sales_total: effectiveCashlessTech + effectiveCashlessRetail,
+          paid_leaves: staffPaidLeaves
         }
       },
       created_at: serverTimestamp()

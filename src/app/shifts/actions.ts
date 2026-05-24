@@ -383,6 +383,19 @@ export async function updateHolidayRequestStatus(id: string, status: "approved" 
           type: newType,
           updated_at: serverTimestamp()
         });
+
+        // 3. Deduct paid_leave_balance if it's a paid leave
+        if (newType === "paid_leave") {
+          const staffSnap = await getDocs(query(collection(db, "staff_profiles"), where("__name__", "==", holidayData.staff_id)));
+          if (!staffSnap.empty) {
+            const staffDoc = staffSnap.docs[0];
+            const currentBalance = staffDoc.data().paid_leave_balance || 0;
+            batch.update(doc(db, "staff_profiles", staffDoc.id), {
+              paid_leave_balance: Math.max(0, currentBalance - 1),
+              updated_at: serverTimestamp()
+            });
+          }
+        }
       } else {
         // If rejected, remove the shift record entirely
         batch.delete(shiftDocRef);

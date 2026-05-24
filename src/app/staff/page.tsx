@@ -122,6 +122,11 @@ function SortableStaffItem({
             <p className="text-lg font-black text-slate-900 tracking-tight">{staff.max_holiday_requests ?? 3}日</p>
           </div>
 
+          <div className="hidden md:flex flex-col items-end gap-1 px-4 border-l border-slate-50 min-w-[70px]">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">有給残</p>
+            <p className="text-lg font-black text-amber-600 tracking-tight">{staff.paid_leave_balance ?? 0}日</p>
+          </div>
+
           <div className="flex items-center gap-2">
             <Link 
               href={`/contracts?staffId=${staff.id}`}

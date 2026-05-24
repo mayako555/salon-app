@@ -38,6 +38,7 @@ export type StaffProfile = {
   monthly_sales_target?: number;
   nomination_fee?: number; // 指名手当単価
   hourly_wage?: number; // 時給
+  paid_leave_balance?: number; // 有給残日数
   sns_accounts?: string[];
   sort_order?: number;
   passcode?: string; // Kiosk & Portal Passcode
@@ -109,6 +110,7 @@ export async function addStaff(formData: FormData) {
     const monthly_sales_target = parseInt(formData.get("monthly_sales_target") as string || "0", 10);
     const nomination_fee = parseInt(formData.get("nomination_fee") as string || "300", 10);
     const hourly_wage = parseInt(formData.get("hourly_wage") as string || "0", 10);
+    const paid_leave_balance = parseInt(formData.get("paid_leave_balance") as string || "0", 10);
     const passcode = (formData.get("passcode") as string) || "1234";
 
     if (!name || !email) {
@@ -152,6 +154,7 @@ export async function addStaff(formData: FormData) {
       monthly_sales_target,
       nomination_fee,
       hourly_wage,
+      paid_leave_balance,
       passcode,
       sns_accounts: formData.getAll("sns_accounts") as string[],
       created_at: serverTimestamp()
@@ -201,6 +204,7 @@ export async function editStaff(id: string, formData: FormData) {
     const monthly_sales_target = parseInt(formData.get("monthly_sales_target") as string || "0", 10);
     const nomination_fee = parseInt(formData.get("nomination_fee") as string || "300", 10);
     const hourly_wage = parseInt(formData.get("hourly_wage") as string || "0", 10);
+    const paid_leave_balance = parseInt(formData.get("paid_leave_balance") as string || "0", 10);
     const passcode = formData.get("passcode") as string;
 
     const is_trainee = formData.get("is_trainee") === "true";
@@ -242,6 +246,7 @@ export async function editStaff(id: string, formData: FormData) {
       monthly_sales_target,
       nomination_fee,
       hourly_wage,
+      paid_leave_balance,
       ...(passcode !== null && passcode !== undefined ? { passcode } : {}),
       sns_accounts: formData.getAll("sns_accounts") as string[],
       updated_at: serverTimestamp()

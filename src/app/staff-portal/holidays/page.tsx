@@ -48,6 +48,11 @@ export default function StaffPortalHolidaysPage() {
          if (prev.includes(dateStr)) {
            return prev.filter(d => d !== dateStr);
          } else {
+           const balance = profile?.paid_leave_balance ?? 0;
+           if (prev.length >= balance) {
+             alert(`有給残日数（${balance}日）を超えて申請することはできません。`);
+             return prev;
+           }
            return [...prev, dateStr];
          }
        });
@@ -111,7 +116,10 @@ export default function StaffPortalHolidaysPage() {
               </p>
             </div>
             <p className="ml-5 leading-relaxed font-bold">
-              ※ 希望休は {maxRequests} 日まで可能です。有給申請は無制限ですが店長の承認が必要です。
+              ※ 希望休は {maxRequests} 日まで可能です。
+            </p>
+            <p className="ml-5 leading-relaxed font-bold text-amber-600">
+              ※ 現在の有給残日数: {profile?.paid_leave_balance ?? 0} 日
             </p>
           </div>
           

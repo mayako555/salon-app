@@ -112,7 +112,7 @@ ${storeName}店
  * 次回予約確定メッセージを送信する（レガシー互換用・ログ保存なし）
  */
 export async function sendBookingConfirmation(customerName: string, lineUserId: string, date: string, time: string) {
-  const message = generateBookingConfirmationText(date, time, "六甲道"); // デフォルト
+  const message = await generateBookingConfirmationText(date, time, "六甲道"); // デフォルト
   return await sendLineMessage(lineUserId, message);
 }
 
