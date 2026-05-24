@@ -43,12 +43,14 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const [health, setHealth] = useState(stmt.details.social_insurance?.health.toString() || "0");
   const [pension, setPension] = useState(stmt.details.social_insurance?.pension.toString() || "0");
   const [employment, setEmployment] = useState(stmt.details.social_insurance?.employment.toString() || "0");
-  const [incomeTax, setIncomeTax] = useState(stmt.details.social_insurance?.income_tax.toString() || "0");
-  const [residentTax, setResidentTax] = useState(stmt.details.social_insurance?.resident_tax.toString() || "0");
-  const [childcare, setChildcare] = useState(stmt.details.social_insurance?.childcare?.toString() || "0");
+  const [incomeTax, setIncomeTax] = useState(stmt.details.social_insurance?.income_tax?.toString() || "");
+  const [residentTax, setResidentTax] = useState(stmt.details.social_insurance?.resident_tax?.toString() || "");
+  const [childcare, setChildcare] = useState(stmt.details.social_insurance?.childcare?.toString() || "");
+
+  const [alreadyPaidAmount, setAlreadyPaidAmount] = useState(stmt.adjustments?.already_paid_amount_override?.toString() || "");
 
   // Metrics State
-  const [workedDays, setWorkedDays] = useState(stmt.details.metrics?.worked_days?.toString() || "0");
+  const [workedDays, setWorkedDays] = useState(stmt.details.metrics?.worked_days?.toString() || "");
   const [workedHours, setWorkedHours] = useState(stmt.details.metrics?.worked_hours?.toString() || "0");
   const [hourlyWage, setHourlyWage] = useState(stmt.details.hourly_wage?.toString() || "0");
   const [workLocation, setWorkLocation] = useState(stmt.work_location || "");
@@ -133,9 +135,12 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const numIncomeTax = stmt.type === "salary" ? (Number(incomeTax) || 0) : 0;
   const numResidentTax = stmt.type === "salary" ? (Number(residentTax) || 0) : 0;
   const numChildcare = stmt.type === "salary" ? (Number(childcare) || 0) : 0;
+  
+  const numAlreadyPaid = Number(alreadyPaidAmount) || 0;
 
   const totalDeductions = numHealth + numPension + numEmployment + numIncomeTax + numResidentTax + numChildcare;
   const finalPaidAmount = numBase + numAllowance + numTaxAdd - totalDeductions;
+  const transferAmount = finalPaidAmount - numAlreadyPaid;
 
   const handleHourlyWageChange = (val: string) => {
     setHourlyWage(val);
@@ -182,6 +187,18 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
             resident_tax: numResidentTax,
             childcare: numChildcare
           } : undefined,
+          adjustments: {
+            ...stmt.adjustments,
+            transport_fee_override: numTransport,
+            health_insurance_override: numHealth,
+            pension_override: numPension,
+            employment_insurance_override: numEmployment,
+            income_tax_override: numIncomeTax,
+            resident_tax_override: numResidentTax,
+            childcare_support_override: numChildcare,
+            already_paid_amount_override: numAlreadyPaid,
+          },
+          updated_at: serverTimestamp(),
           metrics: {
             ...stmt.details.metrics,
             worked_days: Number(workedDays) || undefined,
@@ -482,6 +499,25 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
             </div>
           )}
 
+          {/* Other Adjustments */}
+          <div className="space-y-3 animate-in slide-in-from-top-3 duration-200">
+            <h3 className="text-xs font-bold text-slate-700 flex items-center gap-1 border-b pb-1.5">
+              <span className="w-1.5 h-3.5 bg-emerald-500 rounded-sm"></span> その他の調整 (円)
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 block" title="6ヶ月一括払いの定期代等、すでに前払い済みの金額を最終振込額から引く場合に入力します。">支払済振込額 (先払い分)</label>
+                <Input 
+                  type="number" 
+                  value={alreadyPaidAmount} 
+                  onChange={(e) => setAlreadyPaidAmount(e.target.value)}
+                  className="h-10 text-xs rounded-lg font-bold border-slate-200"
+                  placeholder="例: 15000"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Real-time Calculation Summary */}
           <div className="bg-slate-900 text-white p-5 rounded-2xl space-y-3 shadow-lg">
             <h4 className="text-xs font-bold tracking-wider text-slate-400 border-b border-slate-800 pb-2">計算結果のプレビュー</h4>
@@ -499,10 +535,24 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
             )}
             <div className="flex justify-between items-center pt-2 border-t border-slate-800">
               <span className="text-sm font-bold text-slate-300">
-                差し引き支給額 (差引支給額/振込総額):
+                差し引き支給額:
+              </span>
+              <span className="text-xl font-black text-slate-300">
+                ¥{finalPaidAmount.toLocaleString()}
+              </span>
+            </div>
+            {numAlreadyPaid > 0 && (
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">支払済振込額 (控除):</span>
+                <span className="font-bold text-rose-400">-¥{numAlreadyPaid.toLocaleString()}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center pt-2 border-t border-slate-800">
+              <span className="text-sm font-bold text-slate-300">
+                最終振込支給額:
               </span>
               <span className="text-2xl font-black text-emerald-400">
-                ¥{finalPaidAmount.toLocaleString()}
+                ¥{transferAmount.toLocaleString()}
               </span>
             </div>
           </div>

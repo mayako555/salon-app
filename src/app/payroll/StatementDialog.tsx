@@ -340,8 +340,8 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
                 </div>
 
                 <div className="p-2 space-y-2">
-                   <div className="flex justify-between text-xs"><span>振込支給額</span><span className="font-bold">{stmt.final_paid_amount.toLocaleString()}</span></div>
-                   <div className="flex justify-between text-xs"><span>支払済振込額</span><span>0</span></div>
+                   <div className="flex justify-between text-xs"><span>振込支給額</span><span className="font-bold">{(stmt.final_paid_amount - (stmt.adjustments?.already_paid_amount_override || 0)).toLocaleString()}</span></div>
+                   <div className="flex justify-between text-xs"><span>支払済振込額</span><span>{(stmt.adjustments?.already_paid_amount_override || 0).toLocaleString()}</span></div>
                 </div>
               </div>
             </div>
