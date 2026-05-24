@@ -166,6 +166,17 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
         final_paid_amount: finalPaidAmount,
         work_location: workLocation,
         status: status,
+        adjustments: {
+          ...stmt.adjustments,
+          transport_fee_override: numTransport,
+          health_insurance_override: numHealth,
+          pension_override: numPension,
+          employment_insurance_override: numEmployment,
+          income_tax_override: numIncomeTax,
+          resident_tax_override: numResidentTax,
+          childcare_support_override: numChildcare,
+          already_paid_amount_override: numAlreadyPaid,
+        },
         details: {
           ...stmt.details,
           base_tech_salary: stmt.type === "reward" ? numBase : 0,
@@ -187,18 +198,6 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
             resident_tax: numResidentTax,
             childcare: numChildcare
           } : undefined,
-          adjustments: {
-            ...stmt.adjustments,
-            transport_fee_override: numTransport,
-            health_insurance_override: numHealth,
-            pension_override: numPension,
-            employment_insurance_override: numEmployment,
-            income_tax_override: numIncomeTax,
-            resident_tax_override: numResidentTax,
-            childcare_support_override: numChildcare,
-            already_paid_amount_override: numAlreadyPaid,
-          },
-          updated_at: serverTimestamp(),
           metrics: {
             ...stmt.details.metrics,
             worked_days: Number(workedDays) || undefined,

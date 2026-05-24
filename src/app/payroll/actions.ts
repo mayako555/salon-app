@@ -995,6 +995,7 @@ export async function updateManualStatement(id: string, data: {
   final_paid_amount: number;
   work_location?: string;
   status?: "draft" | "closed";
+  adjustments?: MonthlyStatement["adjustments"];
   details: MonthlyStatement["details"];
 }) {
   try {
@@ -1016,6 +1017,10 @@ export async function updateManualStatement(id: string, data: {
       details: data.details,
       updated_at: serverTimestamp()
     };
+
+    if (data.adjustments !== undefined) {
+      updatePayload.adjustments = data.adjustments;
+    }
 
     if (data.status) {
       updatePayload.status = data.status;
