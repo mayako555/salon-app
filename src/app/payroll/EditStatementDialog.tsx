@@ -28,7 +28,8 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // States prefilled with the stmt values
-  const [baseAmount, setBaseAmount] = useState(stmt.base_amount.toString());
+  const [techSalary, setTechSalary] = useState((stmt.details.base_tech_salary || 0).toString());
+  const [productSalary, setProductSalary] = useState((stmt.details.base_product_salary || 0).toString());
   const [transportAllowance, setTransportAllowance] = useState((stmt.details.transport_fee || 0).toString());
   const [nominationAllowance, setNominationAllowance] = useState((stmt.details.nomination_reward || 0).toString());
   // @ts-ignore
@@ -73,7 +74,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
               // Also update the base basic pay if workedHours is already set
               const hours = Number(workedHours) || 0;
               if (hours > 0) {
-                setBaseAmount(Math.floor(data.hourly_wage * hours).toString());
+                setTechSalary(Math.floor(data.hourly_wage * hours).toString());
               }
             }
           }
@@ -94,7 +95,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
 
   // Manual tax calculation trigger
   const handleRecalculateTaxes = () => {
-    const baseVal = Number(baseAmount) || 0;
+    const baseVal = (Number(techSalary) || 0) + (Number(productSalary) || 0);
     const transportVal = Number(transportAllowance) || 0;
     const otherAllowances = (Number(nominationAllowance) || 0) + 
                             (Number(reviewAllowance) || 0) + 
@@ -119,7 +120,9 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   };
 
   // Calculations
-  const numBase = Number(baseAmount) || 0;
+  const numTech = Number(techSalary) || 0;
+  const numProduct = Number(productSalary) || 0;
+  const numBase = numTech + numProduct;
   const numTransport = Number(transportAllowance) || 0;
   const numNomination = Number(nominationAllowance) || 0;
   const numReview = Number(reviewAllowance) || 0;
@@ -146,14 +149,14 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
     setHourlyWage(val);
     const wage = Number(val) || 0;
     const hours = Number(workedHours) || 0;
-    setBaseAmount(Math.floor(wage * hours).toString());
+    setTechSalary(Math.floor(wage * hours).toString());
   };
 
   const handleWorkedHoursChange = (val: string) => {
     setWorkedHours(val);
     const wage = Number(hourlyWage) || 0;
     const hours = Number(val) || 0;
-    setBaseAmount(Math.floor(wage * hours).toString());
+    setTechSalary(Math.floor(wage * hours).toString());
   };
 
   const handleSave = async (status: "draft" | "closed") => {
@@ -179,7 +182,8 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
         },
         details: {
           ...stmt.details,
-          base_tech_salary: stmt.type === "reward" ? numBase : 0,
+          base_tech_salary: numTech,
+          base_product_salary: numProduct,
           nomination_reward: numNomination,
           transport_fee: numTransport,
           // @ts-ignore
@@ -259,7 +263,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
             </div>
           </div>
 
-          {/* 時給計算アシスタント */}
+          {/* 時給計算アシスタント - 技術歩合のみ自動計算 */}
           {stmt.type === "salary" && contractType !== "monthly" && contractType !== "tier_monthly" && (
             <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 shadow-sm space-y-3">
               <div className="flex items-center justify-between border-b border-blue-100/60 pb-2">
@@ -314,19 +318,27 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
               </div>
               <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-black border border-blue-100 flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
                 <span>総支給額 (基本給 + 手当):</span>
-                <span className="text-sm font-black text-blue-800">¥{((Number(baseAmount) || 0) + (Number(transportAllowance) || 0) + (Number(nominationAllowance) || 0) + (Number(reviewAllowance) || 0) + (Number(blogAllowance) || 0) + (Number(executiveAllowance) || 0)).toLocaleString()}</span>
+                <span className="text-sm font-black text-blue-800">¥{(numBase + numAllowance).toLocaleString()}</span>
               </div>
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 block">基本給 / 歩合報酬ベース (円)</label>
+                <label className="text-[10px] font-bold text-slate-500 block">技術歩合 / 基本給ベース (円)</label>
                 <Input 
                   type="number" 
-                  value={baseAmount} 
-                  onChange={(e) => setBaseAmount(e.target.value)}
+                  value={techSalary} 
+                  onChange={(e) => setTechSalary(e.target.value)}
                   className="h-10 text-xs rounded-lg font-bold border-slate-200 focus:ring-blue-500"
-                  required
                 />
+                <label className="text-[10px] font-bold text-slate-500 block mt-2">店販歩合 (円)</label>
+                <Input 
+                  type="number" 
+                  value={productSalary} 
+                  onChange={(e) => setProductSalary(e.target.value)}
+                  className="h-10 text-xs rounded-lg font-bold border-slate-200 focus:ring-blue-500"
+                  placeholder="0"
+                />
+                <div className="text-[9px] text-slate-400 font-bold mt-1">基本給合計: ¥{numBase.toLocaleString()}</div>
               </div>
 
               <div className="space-y-1">
