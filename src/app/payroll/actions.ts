@@ -141,6 +141,46 @@ export async function getAllStatements(): Promise<MonthlyStatement[]> {
   }
 }
 
+function calculateProductCommission(sales: any[], contract: any, cashlessRetail: number) {
+  let customBaseSum = 0;
+  let customOriginalSum = 0;
+
+  for (const sale of sales) {
+    if (sale.product_sales > 0 && sale.menu_course) {
+      const menus = sale.menu_course.split(/ \+ |\, /);
+      for (const m of menus) {
+        if (m.includes("コーティング")) {
+          customBaseSum += 1500;
+          customOriginalSum += 1760;
+        } else if (m.includes("リルジュ")) {
+          customBaseSum += 4300;
+          customOriginalSum += 4840;
+        }
+      }
+    }
+  }
+
+  const totalProductSales = sales.reduce((acc, s) => acc + s.product_sales, 0);
+  const standardProductSales = Math.max(0, totalProductSales - customOriginalSum);
+  
+  let standardCommissionable = 0;
+  if (contract.contract_type === "outsourcing" || contract.contract_type === "tier_monthly") {
+    const taxDeduction = Math.floor(standardProductSales * 0.1);
+    const standardCashlessFee = contract.deduction_cashless_ratio > 0 
+      ? Math.floor(Math.max(0, cashlessRetail - customOriginalSum) * (contract.deduction_cashless_ratio / 100)) 
+      : 0;
+    standardCommissionable = Math.max(0, standardProductSales - taxDeduction - standardCashlessFee);
+  } else {
+    // monthly
+    standardCommissionable = Math.floor(standardProductSales / 1.1);
+  }
+
+  const customCommission = Math.floor(customBaseSum * (contract.product_sales_ratio / 100));
+  const standardCommission = Math.floor(standardCommissionable * (contract.product_sales_ratio / 100));
+
+  return customCommission + standardCommission;
+}
+
 export async function generateStatements(year: number, month: number) {
   const targetMonth = `${year}-${String(month).padStart(2, '0')}`;
   
@@ -369,7 +409,7 @@ export async function generateStatements(year: number, month: number) {
          techCommission = Math.floor((techSalesTaxFree - quota) * (contract.tech_sales_ratio / 100));
       }
       
-      const productCommission = Math.floor(productSalesTaxFree * (contract.product_sales_ratio / 100));
+      const productCommission = calculateProductCommission(staffSales, contract, effectiveCashlessRetail);
       const nominationReward = nominationCount * contract.nomination_fee;
       
       const baseMonthlySalary = contract.monthly_base_salary || 0;
@@ -505,12 +545,9 @@ export async function generateStatements(year: number, month: number) {
     
     const commissionableTechSales = Math.max(0, totalTechSales - techTaxDeduction - techCashlessFee - totalPortalFees);
     const baseTechSalary = Math.floor(commissionableTechSales * (contract.tech_sales_ratio / 100));
-    
-    const productTaxDeduction = Math.floor(totalProductSales * 0.1);
     const productCashlessFee = contract.deduction_cashless_ratio > 0 ? Math.floor(effectiveCashlessRetail * (contract.deduction_cashless_ratio / 100)) : 0;
     
-    const commissionableProductSales = Math.max(0, totalProductSales - productTaxDeduction - productCashlessFee);
-    const baseProductSalary = Math.floor(commissionableProductSales * (contract.product_sales_ratio / 100));
+    const baseProductSalary = calculateProductCommission(staffSales, contract, effectiveCashlessRetail);
     
     const nominationReward = nominationCount * contract.nomination_fee;
     let baseAmount = baseTechSalary + baseProductSalary + nominationReward;
@@ -836,7 +873,7 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
          techCommission = Math.floor((techSalesTaxFree - quota) * (contract.tech_sales_ratio / 100));
       }
       
-      const productCommission = Math.floor(productSalesTaxFree * (contract.product_sales_ratio / 100));
+      const productCommission = calculateProductCommission(staffSales, contract, 0);
       
       base_amount = (contract.monthly_base_salary || 0) + techCommission + productCommission;
       transportAllowance = 17950; // Standard transport fee for monthly contracts
@@ -913,10 +950,9 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
       const commissionableTechSales = Math.max(0, totalTechSales - techTaxDeduction - techCashlessFee - totalPortalFees);
       const baseTechSalary = Math.floor(commissionableTechSales * (contract.tech_sales_ratio / 100));
 
-      const productTaxDeduction = Math.floor(totalProductSales * 0.1);
-      const productCashlessFee = contract.deduction_cashless_ratio > 0 ? Math.floor(cashlessProductSales * (contract.deduction_cashless_ratio / 100)) : 0;
-      const commissionableProductSales = Math.max(0, totalProductSales - productTaxDeduction - productCashlessFee);
-      const baseProductSalary = Math.floor(commissionableProductSales * (contract.product_sales_ratio / 100));
+      const cashlessProductSalesTmp = staffSales.filter(s => s.payment_method !== "現金" && s.payment_method !== "不明").reduce((sum, s) => sum + s.product_sales, 0);
+      const effectiveCashlessRetailTmp = cashlessProductSalesTmp;
+      const baseProductSalary = calculateProductCommission(staffSales, contract, effectiveCashlessRetailTmp);
       
       base_amount = baseTechSalary + baseProductSalary;
 

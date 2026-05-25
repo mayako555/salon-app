@@ -14,9 +14,11 @@ import {
   ShieldCheck, 
   Wallet,
   Calculator,
-  User
+  User,
+  MessageSquare
 } from "lucide-react";
 import { MonthlyStatement, updateManualStatement } from "./actions";
+import { getMonthlySales, SalesRecord } from "../sales/actions";
 import { toast } from "sonner";
 import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -57,6 +59,9 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const [workLocation, setWorkLocation] = useState(stmt.work_location || "");
   const [contractType, setContractType] = useState<string>("");
 
+  const [productSalesRecords, setProductSalesRecords] = useState<SalesRecord[]>([]);
+  const [showProductSales, setShowProductSales] = useState(false);
+
   // Prefill hourly wage from staff profile and fetch contract type on open
   useEffect(() => {
     if (isOpen && stmt.staff_id) {
@@ -90,8 +95,18 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
         }
       };
       fetchStaffWageAndContract();
+
+      const [year, month] = stmt.target_month.split('-');
+      if (year && month) {
+        getMonthlySales(Number(year), Number(month)).then(sales => {
+          const filtered = sales.filter(s => 
+            (s.staff_id === stmt.staff_id || s.staff_name === stmt.staff_name) && s.product_sales > 0
+          );
+          setProductSalesRecords(filtered);
+        });
+      }
     }
-  }, [isOpen, stmt.staff_id]);
+  }, [isOpen, stmt.staff_id, stmt.staff_name, stmt.target_month]);
 
   // Manual tax calculation trigger
   const handleRecalculateTaxes = () => {
@@ -338,7 +353,24 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                   className="h-10 text-xs rounded-lg font-bold border-slate-200 focus:ring-blue-500"
                   placeholder="0"
                 />
-                <div className="text-[9px] text-slate-400 font-bold mt-1">基本給合計: ¥{numBase.toLocaleString()}</div>
+                <div className="text-[9px] text-slate-400 font-bold mt-1 flex items-center justify-between">
+                  <span>基本給合計: ¥{numBase.toLocaleString()}</span>
+                  {productSalesRecords.length > 0 && (
+                    <button type="button" onClick={() => setShowProductSales(!showProductSales)} className="text-blue-500 hover:text-blue-700 underline">
+                      該当の会計({productSalesRecords.length}件)を確認
+                    </button>
+                  )}
+                </div>
+                {showProductSales && productSalesRecords.length > 0 && (
+                   <div className="mt-2 bg-white border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-2">
+                     {productSalesRecords.map(s => (
+                       <div key={s.id} className="text-[10px] border-b border-slate-100 pb-1 last:border-0 last:pb-0">
+                         <div className="font-bold text-slate-700">{s.date} {s.time} - {s.customer_name}</div>
+                         <div className="text-slate-500">{s.menu_course} <span className="font-bold text-blue-600">(店販: ¥{s.product_sales.toLocaleString()})</span></div>
+                       </div>
+                     ))}
+                   </div>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -365,7 +397,25 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                     />
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[9px] text-slate-400 font-bold block">口コミ手当</span>
+                    <span className="text-[9px] text-slate-400 font-bold flex flex-col gap-1">
+                      <span className="flex items-center justify-between">
+                        口コミ手当
+                        <div className="flex gap-2">
+                          <a href="https://beauty.hotpepper.jp/kr/slnH000391382/review/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 flex items-center gap-0.5">
+                            <MessageSquare size={10} />
+                            六甲
+                          </a>
+                          <a href="https://beauty.hotpepper.jp/kr/slnH000650559/review/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 flex items-center gap-0.5">
+                            <MessageSquare size={10} />
+                            神戸
+                          </a>
+                          <a href="https://beauty.hotpepper.jp/kr/slnH000799074/review/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 flex items-center gap-0.5">
+                            <MessageSquare size={10} />
+                            元町
+                          </a>
+                        </div>
+                      </span>
+                    </span>
                     <Input 
                       type="number" 
                       placeholder="口コミ手当"
@@ -375,7 +425,25 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                     />
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[9px] text-slate-400 font-bold block">ブログ手当</span>
+                    <span className="text-[9px] text-slate-400 font-bold flex flex-col gap-1">
+                      <span className="flex items-center justify-between">
+                        ブログ手当
+                        <div className="flex gap-2">
+                          <a href="https://beauty.hotpepper.jp/kr/slnH000391382/blog/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 flex items-center gap-0.5">
+                            <MessageSquare size={10} />
+                            六甲
+                          </a>
+                          <a href="https://beauty.hotpepper.jp/kr/slnH000650559/blog/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 flex items-center gap-0.5">
+                            <MessageSquare size={10} />
+                            神戸
+                          </a>
+                          <a href="https://beauty.hotpepper.jp/kr/slnH000799074/blog/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 flex items-center gap-0.5">
+                            <MessageSquare size={10} />
+                            元町
+                          </a>
+                        </div>
+                      </span>
+                    </span>
                     <Input 
                       type="number" 
                       placeholder="ブログ手当"

@@ -22,7 +22,8 @@ import {
   Library,
   Package,
   Award,
-  Wallet
+  Wallet,
+  Sparkles
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -42,6 +43,7 @@ const managementNav = [
   { name: "シフト管理", href: "/shifts", icon: CalendarDays, role: "manager" },
   { name: "スタッフ管理", href: "/staff", icon: Users, role: "admin" },
   { name: "スタッフ評価", href: "/evaluations", icon: Award, role: "manager" },
+  { name: "高度分析", href: "/analytics", icon: Sparkles, role: "manager" },
   { name: "給与・報酬計算", href: "/payroll", icon: Calculator, role: "admin" },
   { name: "経費・収支管理", href: "/admin/expenses", icon: Wallet, role: "manager" },
   { name: "雇用・業務委託契約", href: "/contracts", icon: FileText, role: "admin" },

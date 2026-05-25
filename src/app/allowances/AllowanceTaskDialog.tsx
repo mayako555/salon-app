@@ -226,11 +226,26 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
                   <tr className="bg-white border-b border-slate-200">
                     <th className="px-4 py-3 font-bold text-slate-500 w-[90px]">対象店舗</th>
                     <th className="px-4 py-3 font-bold text-slate-500">
-                      <div className="flex items-center gap-1.5">
-                        <MessageSquare size={14} className="text-pink-500" />
-                        <span>口コミ手当 (★5数)</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <MessageSquare size={14} className="text-pink-500" />
+                          <span>口コミ手当 (★5数)</span>
+                        </div>
                       </div>
-                      <span className="text-[10px] text-slate-400 font-normal mt-0.5 block">1件 500円</span>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className="text-[10px] text-slate-400 font-normal block">1件 500円</span>
+                        <div className="flex gap-2">
+                          <a href="https://beauty.hotpepper.jp/kr/slnH000391382/review/" target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-700 underline flex items-center gap-0.5">
+                            六甲
+                          </a>
+                          <a href="https://beauty.hotpepper.jp/kr/slnH000650559/review/" target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-700 underline flex items-center gap-0.5">
+                            神戸
+                          </a>
+                          <a href="https://beauty.hotpepper.jp/kr/slnH000799074/review/" target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-700 underline flex items-center gap-0.5">
+                            元町
+                          </a>
+                        </div>
+                      </div>
                     </th>
                     <th className="px-4 py-3 font-bold text-slate-500">
                       <div className="flex items-center gap-1.5">
@@ -319,9 +334,16 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
               {/* Blog */}
               <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-lg p-3">
                 <div className="flex-1">
-                  <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                    <Edit3 size={16} className="text-blue-500" />
-                    ブログ手当
+                  <label className="flex flex-col gap-1 text-sm font-bold text-slate-700">
+                    <div className="flex items-center gap-2">
+                      <Edit3 size={16} className="text-blue-500" />
+                      ブログ手当
+                    </div>
+                    <div className="flex gap-2 pl-6">
+                      <a href="https://beauty.hotpepper.jp/kr/slnH000391382/blog/" target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-700 underline">六甲</a>
+                      <a href="https://beauty.hotpepper.jp/kr/slnH000650559/blog/" target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-700 underline">神戸</a>
+                      <a href="https://beauty.hotpepper.jp/kr/slnH000799074/blog/" target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-700 underline">元町</a>
+                    </div>
                   </label>
                   <p className="text-xs text-slate-500 mt-0.5">5本以上で 3,000円支給</p>
                 </div>
