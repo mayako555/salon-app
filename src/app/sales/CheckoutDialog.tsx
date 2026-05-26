@@ -29,7 +29,8 @@ export default function CheckoutDialog({
   trigger,
   isOpenControlled,
   onOpenChangeControlled,
-  initialTime = ""
+  initialTime = "",
+  onSuccess
 }: { 
   defaultStaffName?: string, 
   defaultStoreName?: string,
