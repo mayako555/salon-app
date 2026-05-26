@@ -47,6 +47,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
 
   const navItems = [
     { name: "ホーム", href: "/staff-portal", icon: LayoutDashboard },
+    { name: "予約カレンダー", href: "/staff-portal/reservations", icon: Calendar },
     { name: "顧客管理", href: "/staff-portal/customers", icon: Users },
     { name: "会計入力", href: "/staff-portal/sales", icon: Receipt },
     { name: "売上管理・レジ締め", href: "/sales", icon: Lock },

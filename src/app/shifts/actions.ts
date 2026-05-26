@@ -178,7 +178,6 @@ export async function bulkSaveShifts(params: {
     const { staffIds, dateRange, type, segments, activeDaysOfWeek } = params;
     const start = new Date(dateRange.start);
     const end = new Date(dateRange.end);
-    const batch = writeBatch(db);
     const colRef = collection(db, SHIFTS_COLLECTION);
     const staffList = await getStaffList();
 
@@ -193,28 +192,62 @@ export async function bulkSaveShifts(params: {
     }
 
     const recordsCount = staffIds.length * dates.length;
-    if (recordsCount > 500) {
-      return { success: false, error: "一度に登録できる件数は500件までです。" };
+
+    // 既存の同日シフトを取得して削除対象にする
+    const qExisting = query(
+      colRef,
+      where("date", ">=", dateRange.start),
+      where("date", "<=", dateRange.end)
+    );
+    const existingSnap = await getDocs(qExisting);
+    const existingDocsToDelete = existingSnap.docs.filter(d => {
+       const data = d.data();
+       return staffIds.includes(data.staff_id) && dates.includes(data.date);
+    });
+
+    let currentBatch = writeBatch(db);
+    let operationCount = 0;
+    
+    const commitBatchIfNeeded = async () => {
+      if (operationCount >= 450) {
+        await currentBatch.commit();
+        currentBatch = writeBatch(db);
+        operationCount = 0;
+      }
+    };
+
+    // 既存シフトを削除
+    for (const d of existingDocsToDelete) {
+      currentBatch.delete(d.ref);
+      operationCount++;
+      await commitBatchIfNeeded();
     }
 
+    // 新規シフトを追加
     for (const staffId of staffIds) {
       const staff = staffList.find(s => s.id === staffId);
       const staffName = staff?.name || "不明";
 
       for (const date of dates) {
         const newDocRef = doc(colRef);
-        batch.set(newDocRef, {
+        currentBatch.set(newDocRef, {
           staff_id: staffId,
           staff_name: staffName,
           date,
           type,
           segments: type === "work" ? segments : [],
-          created_at: serverTimestamp()
+          created_at: serverTimestamp(),
+          updated_at: serverTimestamp()
         });
+        operationCount++;
+        await commitBatchIfNeeded();
       }
     }
 
-    await batch.commit();
+    // 残りのバッチをコミット
+    if (operationCount > 0) {
+      await currentBatch.commit();
+    }
 
     await addAuditLog({
       table_name: SHIFTS_COLLECTION,
@@ -222,7 +255,7 @@ export async function bulkSaveShifts(params: {
       action: "INSERT",
       old_data: null,
       new_data: { 
-        message: `Bulk added ${recordsCount} shifts`,
+        message: `Bulk updated ${recordsCount} shifts`,
         staff_count: staffIds.length,
         days_count: dates.length,
         type

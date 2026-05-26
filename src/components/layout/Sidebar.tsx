@@ -36,6 +36,7 @@ import { useAuth } from "@/lib/auth-context";
 
 const managementNav = [
   { name: "ダッシュボード", href: "/dashboard", icon: LayoutDashboard, role: "staff" },
+  { name: "予約スケジュール管理", href: "/reservations", icon: CalendarDays, role: "staff" },
   { name: "売上管理・レジ締め", href: "/sales", icon: Coins, role: "staff" },
   { name: "在庫管理", href: "/inventory", icon: Package, role: "staff" },
   { name: "マスタ管理", href: "/staff-portal/sales/master", icon: Database, role: "admin" },

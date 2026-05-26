@@ -772,3 +772,140 @@ export async function performSarimaxForecast(params: SarimaxParams) {
     return { success: false, error: err.message };
   }
 }
+
+export type RepeatAnalysisParams = {
+  store: string;
+  months: number;
+};
+
+export async function getRepeatAnalysis(params: RepeatAnalysisParams) {
+  try {
+    const { store, months } = params;
+    const now = new Date();
+    const startDate = subMonths(now, months);
+    const startStr = format(startDate, "yyyy-MM-dd");
+    const endStr = format(now, "yyyy-MM-dd");
+
+    const salesCol = collection(db, "sales");
+    let qSales = query(salesCol, where("date", ">=", startStr), where("date", "<=", endStr));
+    const salesSnap = await getDocs(qSales);
+
+    // 顧客ごとの来店履歴を整理
+    type Visit = { date: string; staff_name: string; menu_name: string; customer_type: string; is_minimo: boolean };
+    const customerVisits: Record<string, Visit[]> = {};
+
+    salesSnap.forEach(doc => {
+      const data = doc.data();
+      if (store !== "全店舗" && data.store_name !== store.replace("店", "")) return;
+      
+      const customerId = data.customer_id || data.customer_name;
+      if (!customerId) return;
+
+      if (!customerVisits[customerId]) {
+        customerVisits[customerId] = [];
+      }
+      customerVisits[customerId].push({
+        date: data.date,
+        staff_name: data.staff_name || "不明",
+        menu_name: data.menu_name || "不明",
+        customer_type: data.customer_type || "リピ",
+        is_minimo: data.is_minimo || (data.reservation_route || "").includes("ミニモ") || (data.menu_name || "").includes("ミニモ")
+      });
+    });
+
+    // スタッフ別・メニュー別の集計用オブジェクト
+    type Stats = { 
+      normalNewTotal: number; normalNewReturned: number; 
+      normalRepeatTotal: number; normalRepeatReturned: number;
+      minimoNewTotal: number; minimoNewReturned: number;
+      minimoRepeatTotal: number; minimoRepeatReturned: number;
+    };
+    const staffStats: Record<string, Stats> = {};
+    const menuStats: Record<string, Stats> = {};
+
+    const initStats = () => ({ 
+      normalNewTotal: 0, normalNewReturned: 0, 
+      normalRepeatTotal: 0, normalRepeatReturned: 0,
+      minimoNewTotal: 0, minimoNewReturned: 0,
+      minimoRepeatTotal: 0, minimoRepeatReturned: 0
+    });
+
+    Object.values(customerVisits).forEach(visits => {
+      // 日付順にソート
+      visits.sort((a, b) => a.date.localeCompare(b.date));
+
+      for (let i = 0; i < visits.length; i++) {
+        const v = visits[i];
+        const staff = v.staff_name;
+        const menu = v.menu_name;
+        const isMinimo = v.is_minimo;
+
+        if (!staffStats[staff]) staffStats[staff] = initStats();
+        if (!menuStats[menu]) menuStats[menu] = initStats();
+
+        const returned = (i < visits.length - 1); // 次の来店があるか
+
+        if (v.customer_type === "新規") {
+          if (isMinimo) {
+            staffStats[staff].minimoNewTotal++; menuStats[menu].minimoNewTotal++;
+            if (returned) { staffStats[staff].minimoNewReturned++; menuStats[menu].minimoNewReturned++; }
+          } else {
+            staffStats[staff].normalNewTotal++; menuStats[menu].normalNewTotal++;
+            if (returned) { staffStats[staff].normalNewReturned++; menuStats[menu].normalNewReturned++; }
+          }
+        } else {
+          if (isMinimo) {
+            staffStats[staff].minimoRepeatTotal++; menuStats[menu].minimoRepeatTotal++;
+            if (returned) { staffStats[staff].minimoRepeatReturned++; menuStats[menu].minimoRepeatReturned++; }
+          } else {
+            staffStats[staff].normalRepeatTotal++; menuStats[menu].normalRepeatTotal++;
+            if (returned) { staffStats[staff].normalRepeatReturned++; menuStats[menu].normalRepeatReturned++; }
+          }
+        }
+      }
+    });
+
+    // 配列化して率を計算
+    const formatStats = (record: Record<string, Stats>, keyName: string) => {
+      return Object.entries(record).map(([name, s]) => {
+        return {
+          [keyName]: name,
+          normalNewTotal: s.normalNewTotal,
+          normalNewRate: s.normalNewTotal > 0 ? (s.normalNewReturned / s.normalNewTotal) * 100 : 0,
+          normalRepeatTotal: s.normalRepeatTotal,
+          normalRepeatRate: s.normalRepeatTotal > 0 ? (s.normalRepeatReturned / s.normalRepeatTotal) * 100 : 0,
+          minimoNewTotal: s.minimoNewTotal,
+          minimoNewRate: s.minimoNewTotal > 0 ? (s.minimoNewReturned / s.minimoNewTotal) * 100 : 0,
+          minimoRepeatTotal: s.minimoRepeatTotal,
+          minimoRepeatRate: s.minimoRepeatTotal > 0 ? (s.minimoRepeatReturned / s.minimoRepeatTotal) * 100 : 0,
+          totalVisits: s.normalNewTotal + s.normalRepeatTotal + s.minimoNewTotal + s.minimoRepeatTotal
+        };
+      }).filter(s => s.totalVisits > 0);
+    };
+
+    const staffRanking = formatStats(staffStats, "staff_name").sort((a, b) => b.normalNewRate - a.normalNewRate);
+    const menuRanking = formatStats(menuStats, "menu_name").sort((a, b) => b.normalNewRate - a.normalNewRate);
+
+    // デバッグ情報
+    const debugInfo = {
+      salesCount: salesSnap.size,
+      startDate: startStr,
+      endDate: endStr,
+      storeFilter: store,
+      customerIdsFound: Object.keys(customerVisits).length,
+      sampleSales: salesSnap.docs.slice(0, 2).map(d => d.data())
+    };
+
+    return {
+      success: true,
+      data: {
+        staffRanking,
+        menuRanking,
+        debugInfo
+      }
+    };
+  } catch (err: any) {
+    console.error("Repeat Analysis Error:", err);
+    return { success: false, error: err.message };
+  }
+}

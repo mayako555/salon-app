@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getMonthlySales, SalesRecord } from "@/app/sales/actions";
+import { getReservationById, Reservation, updateReservationStatus } from "@/app/reservations/actions";
 import CheckoutDialog from "@/app/sales/CheckoutDialog";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -14,6 +15,7 @@ export default function StaffPortalSalesPage() {
   const { profile } = useAuth();
   const [sales, setSales] = useState<SalesRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [autoCheckoutRes, setAutoCheckoutRes] = useState<Reservation | null>(null);
 
   const year = new Date().getFullYear();
   const month = new Date().getMonth() + 1;
@@ -24,9 +26,47 @@ export default function StaffPortalSalesPage() {
       const data = await getMonthlySales(year, month);
       setSales(data);
       setLoading(false);
+
+      // Check URL for res_id
+      const params = new URLSearchParams(window.location.search);
+      const resId = params.get("res_id");
+      if (resId) {
+        const res = await getReservationById(resId);
+        if (res && res.status !== "completed") {
+          setAutoCheckoutRes(res);
+        }
+      }
     }
     load();
   }, [year, month]);
+
+  // Convert reservation to partial SalesRecord
+  const mapReservationToSalesRecord = (res: Reservation): SalesRecord => {
+    return {
+      id: "new",
+      staff_id: res.staff_id,
+      staff_name: res.staff_name,
+      store_name: res.store_name,
+      date: res.date,
+      time: res.start_time,
+      customer_name: res.customer_name,
+      customer_type: "不明",
+      menu_course: res.menu_name,
+      tech_sales: res.expected_price || 0,
+      product_sales: 0,
+      is_nominated: false,
+      nomination_fee: 0,
+      discount: 0,
+      discount_reason: "",
+      portal_fee: 0,
+      reservation_route: res.portal === "HPB" ? "HOT PEPPER Beauty" : res.portal,
+      status: "open",
+      payment_method: "cash",
+      hpb_points: 0,
+      created_at: null,
+      updated_at: null
+    };
+  };
 
   const allTodaysSales = sales
     .filter(s => s.date === todayStr)
@@ -66,6 +106,29 @@ export default function StaffPortalSalesPage() {
         </div>
         <p className="opacity-90 text-sm">お客様の会計完了後、速やかにこちらから登録してください。</p>
       </div>
+
+      {autoCheckoutRes && (
+        <CheckoutDialog 
+          defaultStaffName={profile?.name || ""} 
+          defaultStoreName="六甲" 
+          staffList={staffNames}
+          initialData={mapReservationToSalesRecord(autoCheckoutRes)}
+          isOpenControlled={true}
+          onSuccess={async () => {
+             // Mark reservation as completed
+             await updateReservationStatus(autoCheckoutRes.id, "completed");
+             setAutoCheckoutRes(null);
+             window.location.replace('/staff-portal/reservations'); // or back to calendar
+          }}
+          onOpenChangeControlled={(open) => {
+            if (!open) {
+              setAutoCheckoutRes(null);
+              // Remove query param from URL without reload
+              window.history.replaceState({}, '', window.location.pathname);
+            }
+          }}
+        />
+      )}
 
       <div className="-mt-6 px-4 space-y-6">
         <div className="bg-white rounded-xl shadow-md border border-slate-100 p-6 flex flex-col items-center justify-center">

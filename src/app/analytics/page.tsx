@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AdvancedCharts from "../dashboard/AdvancedCharts";
 import RegressionAnalysis from "./RegressionAnalysis";
 import SarimaxForecast from "./SarimaxForecast";
+import RepeatAnalysis from "./RepeatAnalysis";
 
 export default function AnalyticsPage() {
   const { profile } = useAuth();
@@ -24,7 +25,7 @@ export default function AnalyticsPage() {
 
         <Tabs defaultValue="overview" className="w-full">
           <div className="w-full overflow-x-auto pb-2 -mb-2 no-scrollbar">
-            <TabsList className="inline-flex w-max min-w-full md:grid md:w-full md:grid-cols-3 max-w-2xl h-auto md:h-12 bg-slate-100 p-1 rounded-xl">
+            <TabsList className="inline-flex w-max min-w-full md:grid md:w-full md:grid-cols-4 max-w-4xl h-auto md:h-12 bg-slate-100 p-1 rounded-xl">
               <TabsTrigger 
                 value="overview" 
                 className="rounded-lg font-bold px-4 py-2.5 md:py-1.5 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all"
@@ -46,6 +47,13 @@ export default function AnalyticsPage() {
                 <span className="md:hidden">将来予測</span>
                 <span className="hidden md:inline">将来予測 (SARIMAX)</span>
               </TabsTrigger>
+              <TabsTrigger 
+                value="repeat"
+                className="rounded-lg font-bold px-4 py-2.5 md:py-1.5 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all"
+              >
+                <span className="md:hidden">リピート</span>
+                <span className="hidden md:inline">リピート分析</span>
+              </TabsTrigger>
             </TabsList>
           </div>
           
@@ -60,6 +68,10 @@ export default function AnalyticsPage() {
 
           <TabsContent value="forecast" className="mt-6">
             <SarimaxForecast />
+          </TabsContent>
+
+          <TabsContent value="repeat" className="mt-6">
+            <RepeatAnalysis />
           </TabsContent>
         </Tabs>
       </div>

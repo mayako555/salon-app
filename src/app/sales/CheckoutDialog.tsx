@@ -38,7 +38,8 @@ export default function CheckoutDialog({
   trigger?: React.ReactNode,
   isOpenControlled?: boolean,
   onOpenChangeControlled?: (open: boolean) => void,
-  initialTime?: string
+  initialTime?: string,
+  onSuccess?: () => void
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isOpen = isOpenControlled !== undefined ? isOpenControlled : internalOpen;
@@ -79,6 +80,7 @@ export default function CheckoutDialog({
   const [menuCourse, setMenuCourse] = useState(initialData?.menu_course || "");
   const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
   const [noNextBooking, setNoNextBooking] = useState(!initialData?.next_booking_date);
+  const [customerType, setCustomerType] = useState<string>(initialData?.customer_type || "新規");
   
   // LINE and Reminder States
   const [remind2Days, setRemind2Days] = useState(initialData?.next_booking_line_reminder ?? true);
@@ -89,6 +91,7 @@ export default function CheckoutDialog({
 
   useEffect(() => {
     if (isOpen) {
+      setCustomerType(initialData?.customer_type || "新規");
       getStoreMasterData(selectedStore).then(setStoreMasterData);
       getStaffList().then(list => {
         setDbStaffList(list);
@@ -226,6 +229,12 @@ export default function CheckoutDialog({
     setFirstNameKana(customer.first_name_kana || customer.name_kana?.split(" ")[1] || "");
     setShowCustomerResults(false);
     
+    // 自動判定: 初来店日がない、または今日と同じ場合は「新規」、それ以外は「リピート」
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const checkoutDate = initialData?.date || todayStr;
+    const isNew = !customer.first_visit_date || customer.first_visit_date === checkoutDate;
+    setCustomerType(isNew ? "新規" : "リピ");
+    
     if (customer.is_minimo) {
       setRoute("ミニモ");
       handleFeeCalculation("ミニモ", techSales + productSales);
@@ -272,7 +281,7 @@ export default function CheckoutDialog({
            });
         }
         setIsOpen(false);
-        window.location.reload();
+        if(onSuccess) onSuccess(); else window.location.reload();
       } else {
         alert(res.error);
       }
@@ -433,14 +442,8 @@ export default function CheckoutDialog({
                     )}
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">新規/リピート</label>
-                  <select name="customer_type" defaultValue={selectedCustomer ? "リピ" : "新規"} className="w-full h-9 px-3 border border-slate-300 rounded-md text-sm bg-white">
-                    <option value="リピ">リピート</option>
-                    <option value="新規">新規</option>
-                    <option value="不明">不明</option>
-                  </select>
-                </div>
+                {/* 自動判定された値を裏側で送信 */}
+                <input type="hidden" name="customer_type" value={customerType} />
               </div>
 
               <div className="border-t border-slate-100 pt-4">
