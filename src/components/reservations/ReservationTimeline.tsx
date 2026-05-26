@@ -32,7 +32,14 @@ export default function ReservationTimeline({ reservations, staffList, date, sto
   // Group reservations by staff
   const grouped = useMemo(() => {
     const map: Record<string, Reservation[]> = {};
-    staffList.forEach(s => map[s.name] = []);
+    
+    // Only show staff who are NOT retired, OR who have reservations on the current timeline
+    const staffWithRes = new Set(reservations.map(r => r.staff_name));
+    const visibleStaff = staffList.filter(s => 
+      s.employment_status !== "retired" || staffWithRes.has(s.name)
+    );
+
+    visibleStaff.forEach(s => map[s.name] = []);
     reservations.forEach(r => {
       if (map[r.staff_name]) {
         map[r.staff_name].push(r);

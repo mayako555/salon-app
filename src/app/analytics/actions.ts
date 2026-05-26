@@ -1,6 +1,8 @@
 "use server";
 
 import { db } from "@/lib/firebase";
+import { isNationalHoliday, isSalonEvent } from "@/lib/seasonal-events";
+import { fetchHistoricalWeather } from "@/lib/weather";
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { format, subMonths, eachDayOfInterval, isWeekend, getDate, getDay, isAfter, isBefore, addDays, subDays, endOfMonth } from "date-fns";
 
@@ -105,39 +107,31 @@ function pseudoRandom(dateStr: string, salt: string) {
   return val;
 }
 
-const JAPANESE_HOLIDAYS_MOCK: Record<string, boolean> = {
-  // Mock partial list for demo purposes
-  "01-01": true, "01-02": true, "01-03": true, "02-11": true, 
-  "03-20": true, "04-29": true, "05-03": true, "05-04": true, 
-  "05-05": true, "07-15": true, "08-11": true, "09-16": true,
-  "09-23": true, "10-14": true, "11-03": true, "11-23": true,
-};
+// Removed JAPANESE_HOLIDAYS_MOCK
 
-function getSyntheticDayFactors(date: Date) {
+function getDailyAdSpend(store: string, date: Date) {
+  const daysInMonth = getDate(endOfMonth(date));
+  let monthlyCost = 88000 + 55000 + 55000; // 全店舗
+  if (store.includes("六甲")) monthlyCost = 88000;
+  if (store.includes("神戸")) monthlyCost = 55000;
+  if (store.includes("元町")) monthlyCost = 55000;
+  return Math.round(monthlyCost / daysInMonth);
+}
+
+function getDayFactors(date: Date, store: string = "全店舗", weatherData: any = {}) {
   const dateStr = format(date, "yyyy-MM-dd");
-  const monthDay = format(date, "MM-dd");
-  const isHoliday = JAPANESE_HOLIDAYS_MOCK[monthDay] || false;
+  const isHoliday = isNationalHoliday(date);
   
-  // Weather synthesis
-  const rWeather = pseudoRandom(dateStr, "weather");
-  let weather = "晴れ";
-  if (rWeather > 0.8) weather = "雨";
-  else if (rWeather > 0.6) weather = "曇り";
-  
-  const tempBase = 15 + Math.sin(date.getMonth() * Math.PI / 6 - Math.PI/2) * 12; 
-  const temp = Math.round(tempBase + (pseudoRandom(dateStr, "temp") * 6 - 3));
-  
-  const precip = weather === "雨" ? Math.round(pseudoRandom(dateStr, "precip") * 20) : 0;
+  const w = weatherData[dateStr] || { weatherText: "晴れ", tempMean: 15, precipSum: 0 };
   
   const day = getDate(date);
   const start_of_month = day <= 5;
   const end_of_month = day >= 25;
   const mid_month = !start_of_month && !end_of_month;
   
-  const isEvent = pseudoRandom(dateStr, "event") > 0.95; // 5% chance of local event
+  const isEvent = isSalonEvent(date);
 
-  const rAd = pseudoRandom(dateStr, "ad");
-  const adSpend = Math.round((2000 + rAd * 3000) / 100) * 100; // 2k~5k JPY
+  const adSpend = getDailyAdSpend(store, date);
 
   const dayOfWeek = getDay(date);
   const isWeekendDay = dayOfWeek === 0 || dayOfWeek === 6;
@@ -150,9 +144,9 @@ function getSyntheticDayFactors(date: Date) {
   return {
     dayOfWeek, // 0(Sun) - 6(Sat)
     isHoliday,
-    weather,
-    temp,
-    precip,
+    weather: w.weatherText,
+    temp: w.tempMean,
+    precip: w.precipSum,
     start_of_month,
     mid_month,
     end_of_month,
@@ -190,6 +184,9 @@ export async function performRegressionAnalysis(params: RegressionParams) {
     const startStr = format(startDate, "yyyy-MM-dd");
     const endStr = format(now, "yyyy-MM-dd");
 
+    // Fetch Weather Data
+    const weatherData = await fetchHistoricalWeather(startStr, endStr);
+
     // Fetch Sales
     const salesCol = collection(db, "sales");
     const qSales = query(
@@ -213,7 +210,7 @@ export async function performRegressionAnalysis(params: RegressionParams) {
     
     dateRange.forEach(d => {
       const dStr = format(d, "yyyy-MM-dd");
-      const factors = getSyntheticDayFactors(d);
+      const factors = getDayFactors(d, store, weatherData);
       dailyData[dStr] = {
         date: dStr,
         ...factors,
@@ -433,6 +430,53 @@ export async function performRegressionAnalysis(params: RegressionParams) {
 
     const rSquared = sst === 0 ? 0 : 1 - (sse / sst);
 
+    // --- Time Series Cross Validation (Forward Chaining) ---
+    const nSplits = 3;
+    let cvSse = 0;
+    let cvSst = 0;
+    let validFolds = 0;
+
+    // Minimum training size should be greater than the number of features
+    const minTrainSize = X[0].length + 5; 
+    const stepSize = Math.floor((X.length - minTrainSize) / nSplits);
+
+    if (stepSize > 0) {
+      for (let k = 0; k < nSplits; k++) {
+        const trainEnd = minTrainSize + k * stepSize;
+        const testEnd = (k === nSplits - 1) ? X.length : trainEnd + stepSize;
+        
+        const XTrain = X.slice(0, trainEnd);
+        const YTrain = Y.slice(0, trainEnd);
+        const XTest = X.slice(trainEnd, testEnd);
+        const YTest = Y.slice(trainEnd, testEnd);
+
+        // Train model on XTrain, YTrain
+        const XTrainT = transpose(XTrain);
+        const XTrainTXTrain = multiplyMatrix(XTrainT, XTrain);
+        for (let i = 0; i < XTrainTXTrain.length; i++) XTrainTXTrain[i][i] += lambda;
+        try {
+          const invXTrainTXTrain = invertMatrix(XTrainTXTrain);
+          const BetaTrain = multiplyMatrix(invXTrainTXTrain, multiplyMatrix(XTrainT, YTrain));
+          
+          // Test on XTest, YTest
+          const yTestMean = YTest.reduce((s, y) => s + y[0], 0) / YTest.length;
+          
+          for (let i = 0; i < XTest.length; i++) {
+            let predicted = BetaTrain[0][0];
+            for (let j = 1; j < BetaTrain.length; j++) predicted += BetaTrain[j][0] * XTest[i][j];
+            predicted = Math.max(0, predicted);
+            
+            cvSse += Math.pow(YTest[i][0] - predicted, 2);
+            cvSst += Math.pow(YTest[i][0] - yTestMean, 2);
+          }
+          validFolds++;
+        } catch(e) {
+          // Skip if singular matrix in fold
+        }
+      }
+    }
+    const cvRSquared = (validFolds > 0 && cvSst > 0) ? Math.max(0, 1 - (cvSse / cvSst)) : 0;
+
     // AI comments generation
     coefficients.sort((a, b) => Math.abs(b.value) - Math.abs(a.value)); // sort by absolute impact
     const topPositive = [...coefficients].sort((a, b) => b.value - a.value).slice(0, 3).filter(c => c.value > 0);
@@ -446,7 +490,8 @@ export async function performRegressionAnalysis(params: RegressionParams) {
     };
 
     const aiComments = [
-      `現在の分析モデルの当てはまり度（R²）は ${(rSquared * 100).toFixed(1)}% です。`,
+      `全データでのモデル当てはまり度（R²）は ${(rSquared * 100).toFixed(1)}% です。`,
+      validFolds > 0 ? `交差検証による未知データへの予測精度（CV R²）は ${(cvRSquared * 100).toFixed(1)}% です。${rSquared - cvRSquared > 0.3 ? '（※変数が多すぎて過学習を起こしている可能性があります）' : ''}` : '',
       topPositive.length > 0 
         ? `${topPositive[0].name} が最もプラスの影響を与えており、この要因がある/1単位増えると平均して ${formatVal(topPositive[0].value)} 上がる傾向があります。` 
         : "",
@@ -473,6 +518,7 @@ export async function performRegressionAnalysis(params: RegressionParams) {
       success: true,
       data: {
         rSquared,
+        cvRSquared,
         coefficients,
         chartData,
         aiComments,
@@ -513,7 +559,7 @@ export async function performSarimaxForecast(params: SarimaxParams) {
     const dailyData: Record<string, any> = {};
     dateRange.forEach(d => {
       const dStr = format(d, "yyyy-MM-dd");
-      const factors = getSyntheticDayFactors(d);
+      const factors = getDayFactors(d);
       dailyData[dStr] = {
         date: dStr,
         ...factors,
@@ -686,7 +732,7 @@ export async function performSarimaxForecast(params: SarimaxParams) {
     
     futureRange.forEach((d, i) => {
       const dStr = format(d, "yyyy-MM-dd");
-      const factors = getSyntheticDayFactors(d); // 将来の天気や祝日などを取得
+      const factors = getDayFactors(d); // 将来の天気や祝日などを取得
       
       const lag1 = historyY[historyY.length - 1];
       const lag7 = historyY[historyY.length - 7];

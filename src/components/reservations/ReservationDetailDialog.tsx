@@ -27,10 +27,12 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose }
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                 reservation.status === 'completed' ? 'bg-slate-800 text-white' : 
                 reservation.status === 'arrived' ? 'bg-emerald-100 text-emerald-800' :
+                reservation.status === 'cancelled' ? 'bg-rose-100 text-rose-800' :
                 'bg-blue-100 text-blue-800'
               }`}>
                 {reservation.status === 'completed' ? '会計済' : 
-                 reservation.status === 'arrived' ? '来店中' : '予約中'}
+                 reservation.status === 'arrived' ? '来店中' : 
+                 reservation.status === 'cancelled' ? 'キャンセル済' : '予約中'}
               </span>
             </div>
             <DialogTitle className="text-xl font-black text-slate-800 flex items-center gap-2">
@@ -91,10 +93,26 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose }
         </div>
 
         <div className="p-4 bg-white border-t border-slate-200 flex gap-2">
+          {reservation.status !== 'cancelled' && reservation.status !== 'completed' && (
+            <Button 
+              variant="destructive" 
+              className="flex-1"
+              onClick={async () => {
+                if (confirm('この予約をキャンセルしますか？')) {
+                  const { updateReservationStatus } = await import('@/app/reservations/actions');
+                  await updateReservationStatus(reservation.id, 'cancelled');
+                  onClose();
+                  window.location.reload();
+                }
+              }}
+            >
+              キャンセル
+            </Button>
+          )}
           <Button variant="outline" className="flex-1" onClick={onClose}>閉じる</Button>
           
-          {reservation.status !== 'completed' && (
-            <Link href={`/staff-portal/sales?res_id=${reservation.id}`} className="flex-1">
+          {reservation.status !== 'completed' && reservation.status !== 'cancelled' && (
+            <Link href={`/staff-portal/sales?res_id=${reservation.id}`} className="flex-[2]">
               <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-2">
                 <CreditCard className="w-4 h-4" /> お会計へ進む
               </Button>

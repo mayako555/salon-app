@@ -69,7 +69,8 @@ function SortableStaffItem({
     <div ref={setNodeRef} style={style}>
       <Card className={cn(
         "group border-none shadow-sm hover:shadow-xl transition-all rounded-2xl overflow-hidden bg-white mb-3",
-        isDragging && "shadow-2xl ring-2 ring-blue-500 ring-offset-2 scale-[1.01] z-50"
+        isDragging && "shadow-2xl ring-2 ring-blue-500 ring-offset-2 scale-[1.01] z-50",
+        staff.employment_status === "retired" && "opacity-60 bg-slate-100 grayscale-[0.5]"
       )}>
         <CardContent className="p-4 flex items-center gap-4">
           {/* Drag Handle */}
@@ -94,6 +95,12 @@ function SortableStaffItem({
                 </span>
                 {staff.is_invoice_registered && (
                   <Badge variant="outline" className="text-[9px] font-bold border-emerald-200 text-emerald-600 h-5">インボイス登録</Badge>
+                )}
+                {staff.employment_status === "leave" && (
+                  <Badge variant="outline" className="text-[9px] font-bold border-amber-200 bg-amber-50 text-amber-700 h-5">休職中</Badge>
+                )}
+                {staff.employment_status === "retired" && (
+                  <Badge variant="outline" className="text-[9px] font-bold border-slate-300 bg-slate-200 text-slate-600 h-5">退職済</Badge>
                 )}
               </div>
               {staff.name_kana && (

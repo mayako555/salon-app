@@ -88,18 +88,32 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">雇用形態</label>
-            <select 
-              name="employment_type" 
-              value={employmentType}
-              onChange={(e) => setEmploymentType(e.target.value as any)}
-              className="w-full h-10 px-3 border border-slate-300 rounded-md shadow-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none bg-white"
-            >
-              <option value="outsourcing">業務委託</option>
-              <option value="employee">正社員</option>
-              <option value="part_time">パート</option>
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">雇用形態</label>
+              <select 
+                name="employment_type" 
+                value={employmentType}
+                onChange={(e) => setEmploymentType(e.target.value as any)}
+                className="w-full h-10 px-3 border border-slate-300 rounded-md shadow-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none bg-white"
+              >
+                <option value="outsourcing">業務委託</option>
+                <option value="employee">正社員</option>
+                <option value="part_time">パート</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">在籍状況</label>
+              <select 
+                name="employment_status" 
+                defaultValue={staff?.employment_status || "active"}
+                className="w-full h-10 px-3 border border-slate-300 rounded-md shadow-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none bg-white font-bold"
+              >
+                <option value="active" className="text-emerald-700">🟢 在籍中</option>
+                <option value="leave" className="text-amber-600">🟡 休職中</option>
+                <option value="retired" className="text-slate-500">⚫ 退職済</option>
+              </select>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

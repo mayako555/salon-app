@@ -20,6 +20,7 @@ function pixelsToTime(px: number): string {
 }
 
 function getColorClasses(res: Reservation) {
+  if (res.status === 'cancelled') return "bg-slate-100 border-slate-200 text-slate-400 opacity-50 line-through";
   if (res.status === 'completed') return "bg-slate-200 border-slate-300 text-slate-500 opacity-60";
   
   if (res.is_caution) return "bg-rose-100 border-rose-300 text-rose-800";

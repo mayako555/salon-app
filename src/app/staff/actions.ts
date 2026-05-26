@@ -31,6 +31,7 @@ export type StaffProfile = {
   email?: string;
   role: StaffRole;
   employment_type: "employee" | "outsourcing" | "part_time";
+  employment_status?: "active" | "leave" | "retired";
   max_holiday_requests: number;
   is_invoice_registered?: boolean;
   is_trainee: boolean;
@@ -78,6 +79,12 @@ export async function getStaffList(): Promise<StaffProfile[]> {
 
     // Sort in-memory instead
     return staff.sort((a, b) => {
+      const aIsRetired = a.employment_status === "retired";
+      const bIsRetired = b.employment_status === "retired";
+      
+      if (aIsRetired && !bIsRetired) return 1;
+      if (!aIsRetired && bIsRetired) return -1;
+      
       const orderA = a.sort_order ?? 999;
       const orderB = b.sort_order ?? 999;
       if (orderA !== orderB) return orderA - orderB;
@@ -112,6 +119,7 @@ export async function addStaff(formData: FormData) {
     const hourly_wage = parseInt(formData.get("hourly_wage") as string || "0", 10);
     const paid_leave_balance = parseInt(formData.get("paid_leave_balance") as string || "0", 10);
     const passcode = (formData.get("passcode") as string) || "1234";
+    const employment_status = (formData.get("employment_status") as "active" | "leave" | "retired") || "active";
 
     if (!name || !email) {
       return { success: false, error: "名前、メールアドレスは必須です" };
@@ -147,6 +155,7 @@ export async function addStaff(formData: FormData) {
       email,
       role,
       employment_type,
+      employment_status,
       is_invoice_registered,
       is_trainee,
       max_holiday_requests,
@@ -206,6 +215,7 @@ export async function editStaff(id: string, formData: FormData) {
     const hourly_wage = parseInt(formData.get("hourly_wage") as string || "0", 10);
     const paid_leave_balance = parseInt(formData.get("paid_leave_balance") as string || "0", 10);
     const passcode = formData.get("passcode") as string;
+    const employment_status = (formData.get("employment_status") as "active" | "leave" | "retired") || "active";
 
     const is_trainee = formData.get("is_trainee") === "true";
 
@@ -220,25 +230,30 @@ export async function editStaff(id: string, formData: FormData) {
       currentUid = snap.docs[0].data().uid;
     }
 
-    // Sync passcode to Firebase Auth password under the hood using admin SDK
-    if (passcode) {
-      if (currentUid) {
-        try {
-          await adminAuth.updateUser(currentUid, { password: passcode + "_salon" });
-        } catch (authError) {
-          console.warn("Failed to sync passcode to Firebase Auth password:", authError);
+    // Sync passcode and status to Firebase Auth using admin SDK
+    if (currentUid) {
+      try {
+        const updateData: any = {
+          disabled: employment_status === "retired"
+        };
+        if (passcode) {
+          updateData.password = passcode + "_salon";
         }
-      } else {
-        try {
-          const userRecord = await adminAuth.createUser({
-            email,
-            password: passcode + "_salon",
-            displayName: name,
-          });
-          currentUid = userRecord.uid;
-        } catch (createError) {
-          console.warn("Failed to create Firebase Auth user during edit:", createError);
-        }
+        await adminAuth.updateUser(currentUid, updateData);
+      } catch (authError) {
+        console.warn("Failed to sync Firebase Auth user:", authError);
+      }
+    } else if (passcode) {
+      try {
+        const userRecord = await adminAuth.createUser({
+          email,
+          password: passcode + "_salon",
+          displayName: name,
+          disabled: employment_status === "retired"
+        });
+        currentUid = userRecord.uid;
+      } catch (createError) {
+        console.warn("Failed to create Firebase Auth user during edit:", createError);
       }
     }
 
@@ -253,6 +268,7 @@ export async function editStaff(id: string, formData: FormData) {
       email,
       role,
       employment_type,
+      employment_status,
       is_invoice_registered,
       is_trainee,
       max_holiday_requests,

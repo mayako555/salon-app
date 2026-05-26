@@ -239,7 +239,12 @@ export default function RegressionAnalysis() {
                   モデル適合度 (実績 vs AI予測)
                 </CardTitle>
                 <CardDescription className="text-[10px]">
-                  このモデルで実際の {targetY} の動きをどれくらい説明できているかを示します（R² = {(result.rSquared * 100).toFixed(1)}%）
+                  このモデルで実際の {targetY} の動きをどれくらい説明できているかを示します
+                  <br />
+                  <span className="font-bold text-slate-500">
+                    全データ学習 R²: {(result.rSquared * 100).toFixed(1)}%
+                    {result.cvRSquared !== undefined && ` / 交差検証 R²: ${(result.cvRSquared * 100).toFixed(1)}%`}
+                  </span>
                 </CardDescription>
               </CardHeader>
               <CardContent>
