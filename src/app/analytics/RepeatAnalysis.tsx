@@ -18,7 +18,7 @@ export default function RepeatAnalysis() {
   const handleAnalyze = async () => {
     setLoading(true);
     const res = await getRepeatAnalysis({ store, months });
-    if (res.success) {
+    if (res.success && res.data) {
       setResult(res.data);
       console.log("Repeat Analysis Debug Info:", res.data.debugInfo);
       toast.success("分析が完了しました");
