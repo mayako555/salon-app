@@ -22,8 +22,18 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push("/dashboard"); // Redirect to home/dashboard after login
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        router.push("/dashboard");
+      } catch (firstErr: any) {
+        if (firstErr.code === "auth/invalid-credential" || firstErr.code === "auth/wrong-password" || firstErr.code === "auth/user-not-found") {
+          // If the exact password fails, try appending _salon for staff PIN codes
+          await signInWithEmailAndPassword(auth, email, password + "_salon");
+          router.push("/dashboard");
+        } else {
+          throw firstErr;
+        }
+      }
     } catch (err: any) {
       console.error(err);
       if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {

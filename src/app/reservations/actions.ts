@@ -25,6 +25,7 @@ export type Reservation = {
   customer_type?: "新規" | "再来" | "モデル" | "不明";
   is_next_booking?: boolean;
   is_caution?: boolean;
+  bed_number?: string;
   memo?: string;
   expected_price?: number;
   created_at: any;

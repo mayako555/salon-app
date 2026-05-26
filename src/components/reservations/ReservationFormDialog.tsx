@@ -47,6 +47,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
       portal: formData.get("portal") as any,
       status: "booked" as any,
       memo: formData.get("memo") as string,
+      bed_number: formData.get("bed_number") as string,
       expected_price: Number(formData.get("expected_price")) || 0,
       is_caution: formData.get("is_caution") === "on",
     };
@@ -70,8 +71,8 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col max-h-[80vh]">
-          <div className="overflow-y-auto p-5 space-y-5 text-xs font-bold text-slate-700">
+        <form onSubmit={handleSubmit} className="flex flex-col max-h-[85vh]">
+          <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs font-bold text-slate-700">
             
             {/* 顧客情報ブロック */}
             <div className="bg-white p-4 border border-slate-200 rounded-lg shadow-sm">

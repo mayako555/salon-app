@@ -136,21 +136,32 @@ export default function ReservationsPage() {
       </div>
 
       {/* Sticky Notification Footer */}
-      <div className="bg-slate-800 text-white px-4 h-8 flex items-center justify-between shrink-0 text-[10px] font-bold z-30">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 text-emerald-400">
+      <div className="bg-slate-800 text-white px-4 h-10 flex items-center justify-between shrink-0 text-[10px] font-bold z-30">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5 text-emerald-400 border-r border-slate-600 pr-4">
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            システムは正常に稼働しています
+            正常稼働
           </div>
-          <div className="h-3 w-px bg-slate-600" />
+          
           <div className="flex items-center gap-4 text-slate-300">
-            <span className="flex items-center gap-1 hover:text-white cursor-pointer"><Bell className="w-3 h-3 text-rose-400" /> 本日空き枠: 3枠</span>
-            <span className="flex items-center gap-1 hover:text-white cursor-pointer"><Star className="w-3 h-3 text-amber-400" /> 未返信口コミ: 2件</span>
-            <span className="flex items-center gap-1 hover:text-white cursor-pointer"><MessageCircle className="w-3 h-3 text-emerald-400" /> LINE未送信: 5件</span>
+            <span className="flex items-center gap-1 hover:text-white cursor-pointer"><Bell className="w-3.5 h-3.5 text-blue-400" /> 空き枠: 3枠</span>
+            <span className="flex items-center gap-1 hover:text-white cursor-pointer"><MessageCircle className="w-3.5 h-3.5 text-emerald-400" /> LINE未送信: 5件</span>
+            <span className="flex items-center gap-1 hover:text-white cursor-pointer"><Star className="w-3.5 h-3.5 text-amber-400" /> 口コミ未返信: 2件</span>
+            <span className="flex items-center gap-1 hover:text-white cursor-pointer text-purple-300"><CalendarIcon className="w-3.5 h-3.5" /> 次回未設定: 4件</span>
+            <span className="flex items-center gap-1 hover:text-white cursor-pointer text-rose-300">会計未完了: 1件</span>
+            <span className="flex items-center gap-1 hover:text-white cursor-pointer text-red-400">要注意: 1件</span>
           </div>
         </div>
-        <div className="text-slate-400">
-          SALON MANAGEMENT SYSTEM v2.0
+        
+        {/* Quick Links */}
+        <div className="flex items-center gap-4 text-slate-400">
+           <span className="hover:text-white cursor-pointer transition-colors">予約</span>
+           <span className="hover:text-white cursor-pointer transition-colors">顧客</span>
+           <span className="hover:text-white cursor-pointer transition-colors">売上</span>
+           <span className="hover:text-white cursor-pointer transition-colors">シフト</span>
+           <span className="hover:text-white cursor-pointer transition-colors">KPI</span>
+           <span className="hover:text-white cursor-pointer transition-colors">教育</span>
+           <span className="hover:text-white cursor-pointer transition-colors">給与</span>
         </div>
       </div>
     </div>
