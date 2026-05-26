@@ -10,8 +10,6 @@ import DraggableReservation from "./DraggableReservation";
 type Props = {
   reservations: Reservation[];
   staffList: StaffProfile[];
-  reservations: Reservation[];
-  staffList: StaffProfile[];
   date: string; // YYYY-MM-DD
   storeName?: string; // Add store name prop for new reservations
   onRefresh?: () => void; // Add refresh callback

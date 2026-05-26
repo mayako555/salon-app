@@ -60,11 +60,14 @@ export default function StaffPortalSalesPage() {
       discount_reason: "",
       portal_fee: 0,
       reservation_route: res.portal === "HPB" ? "HOT PEPPER Beauty" : res.portal,
-      status: "open",
+      status: "draft",
       payment_method: "cash",
       hpb_points: 0,
-      created_at: null,
-      updated_at: null
+      source: "checkout",
+      hair_material: "",
+      options: "",
+      cancel_fee: 0,
+      created_at: null
     };
   };
 
