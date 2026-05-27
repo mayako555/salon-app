@@ -25,6 +25,9 @@ const PERIODS = [
   { label: "直近3ヶ月", value: "last_3m" },
   { label: "直近6ヶ月", value: "last_6m" },
   { label: "直近1年", value: "last_1y" },
+  { label: "直近3年", value: "last_3y" },
+  { label: "直近5年", value: "last_5y" },
+  { label: "全期間 (約9年)", value: "all_time" },
 ];
 
 export default function RegressionAnalysis() {

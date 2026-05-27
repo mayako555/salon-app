@@ -15,12 +15,21 @@ const FORECAST_DAYS = [
   { label: "向こう14日間 (2週間)", value: 14 },
   { label: "向こう30日間 (1ヶ月)", value: 30 },
 ];
+const PERIODS = [
+  { label: "直近3ヶ月", value: "last_3m" },
+  { label: "直近6ヶ月", value: "last_6m" },
+  { label: "直近1年", value: "last_1y" },
+  { label: "直近3年", value: "last_3y" },
+  { label: "直近5年", value: "last_5y" },
+  { label: "全期間 (約9年)", value: "all_time" },
+];
 const EXOGENOUS_FEATURES = ["曜日", "天気", "祝日", "イベント日", "デビュー済稼働人数", "研修中稼働人数"];
 
 export default function SarimaxForecast() {
   const [store, setStore] = useState("全店舗");
   const [targetY, setTargetY] = useState("売上");
   const [forecastDays, setForecastDays] = useState(7);
+  const [period, setPeriod] = useState("last_6m");
   const [featuresX, setFeaturesX] = useState<string[]>(["曜日", "天気", "祝日"]);
   
   const [loading, setLoading] = useState(false);
@@ -38,7 +47,7 @@ export default function SarimaxForecast() {
     setError(null);
     setResult(null);
 
-    const res = await performSarimaxForecast({ store, targetY, featuresX, forecastDays });
+    const res = await performSarimaxForecast({ store, targetY, featuresX, forecastDays, period });
     
     if (res.success) {
       setResult(res.data);
@@ -69,7 +78,7 @@ export default function SarimaxForecast() {
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 mb-6">
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase">対象店舗</label>
               <Select value={store} onValueChange={setStore}>
@@ -89,6 +98,16 @@ export default function SarimaxForecast() {
                 <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {TARGET_VARIABLES.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500 uppercase">学習データ期間</label>
+              <Select value={period} onValueChange={setPeriod}>
+                <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PERIODS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

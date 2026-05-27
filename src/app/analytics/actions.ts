@@ -175,6 +175,9 @@ export async function performRegressionAnalysis(params: RegressionParams) {
     else if (period === "last_3m") startDate = subMonths(now, 3);
     else if (period === "last_6m") startDate = subMonths(now, 6);
     else if (period === "last_1y") startDate = subMonths(now, 12);
+    else if (period === "last_3y") startDate = subMonths(now, 36);
+    else if (period === "last_5y") startDate = subMonths(now, 60);
+    else if (period === "all_time") startDate = new Date("2015-01-01"); // 約9年前
 
     const dateRange = eachDayOfInterval({ start: startDate, end: now });
     if (dateRange.length < 30) {
@@ -537,14 +540,23 @@ export type SarimaxParams = {
   targetY: string; // "売上", "来店人数"
   featuresX: string[]; // 外生変数の選択
   forecastDays: number; // 7, 14, 30
+  period?: string; // "last_3m", "last_6m", "last_1y", "last_3y", "last_5y", "all_time"
 };
 
 export async function performSarimaxForecast(params: SarimaxParams) {
   try {
-    const { store, targetY, featuresX, forecastDays } = params;
+    const { store, targetY, featuresX, forecastDays, period = "last_3m" } = params;
     const now = new Date();
-    // 過去90日間のデータを使ってモデルを学習する
-    const startDate = subDays(now, 90);
+    
+    let startDate = subDays(now, 90);
+    if (period === "this_month") startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    else if (period === "last_3m") startDate = subMonths(now, 3);
+    else if (period === "last_6m") startDate = subMonths(now, 6);
+    else if (period === "last_1y") startDate = subMonths(now, 12);
+    else if (period === "last_3y") startDate = subMonths(now, 36);
+    else if (period === "last_5y") startDate = subMonths(now, 60);
+    else if (period === "all_time") startDate = new Date("2015-01-01"); // 約9年前
+
     const dateRange = eachDayOfInterval({ start: startDate, end: now });
     
     const startStr = format(startDate, "yyyy-MM-dd");
@@ -555,11 +567,14 @@ export async function performSarimaxForecast(params: SarimaxParams) {
     const qSales = query(salesCol, where("date", ">=", startStr), where("date", "<=", endStr));
     const salesSnap = await getDocs(qSales);
     
+    // Fetch Weather Data
+    const weatherData = await fetchHistoricalWeather(startStr, endStr);
+    
     // Aggregate daily data
     const dailyData: Record<string, any> = {};
     dateRange.forEach(d => {
       const dStr = format(d, "yyyy-MM-dd");
-      const factors = getDayFactors(d);
+      const factors = getDayFactors(d, store, weatherData);
       dailyData[dStr] = {
         date: dStr,
         ...factors,
@@ -732,7 +747,8 @@ export async function performSarimaxForecast(params: SarimaxParams) {
     
     futureRange.forEach((d, i) => {
       const dStr = format(d, "yyyy-MM-dd");
-      const factors = getDayFactors(d); // 将来の天気や祝日などを取得
+      // 将来の天気は簡易予測またはデフォルトの「晴れ」になるため、weatherDataは渡さないか将来用のAPIを別途コールする
+      const factors = getDayFactors(d, store); 
       
       const lag1 = historyY[historyY.length - 1];
       const lag7 = historyY[historyY.length - 7];
