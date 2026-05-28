@@ -426,6 +426,7 @@ export default function AdminExpensesDashboard() {
   
   const totalEstimatedTaxes = estimatedIncomeTax + estimatedConsumptionTax + estimatedSocialInsurance;
   const pureProfit = netProfit - totalEstimatedTaxes;
+  const finalCashFlow = pureProfit - financialOutflows;
 
   // Filtered Expenses for Display List
   const filteredExpenses = expenses.filter(exp => {
@@ -591,13 +592,13 @@ export default function AdminExpensesDashboard() {
 
               <Card className="bg-white border border-emerald-200 shadow-sm rounded-2xl bg-emerald-50">
                 <CardContent className="p-4 flex flex-col gap-1">
-                  <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">手元に残る現金</span>
+                  <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">手元に残る現金 (税引後)</span>
                   {isLoading ? (
                     <Loader2 className="animate-spin text-emerald-300 w-5 h-5 mt-1" />
                   ) : (
-                    <span className={`text-lg font-black flex items-center gap-1 ${(netProfit - financialOutflows) >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                      {(netProfit - financialOutflows) >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                      ¥{(netProfit - financialOutflows).toLocaleString()}
+                    <span className={`text-lg font-black flex items-center gap-1 ${finalCashFlow >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                      {finalCashFlow >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+                      ¥{finalCashFlow.toLocaleString()}
                     </span>
                   )}
                 </CardContent>
