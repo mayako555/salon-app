@@ -82,9 +82,9 @@ export default function DashboardPage() {
   const handleGenerateReply = async (task: TaskRecord) => {
     // For demo: pretend we picked these slots
     const slots = ["5月10日 10:00〜", "5月10日 14:00〜", "5月12日 11:30〜"];
-    const res = await generateBookingReply(task.customer_name, slots);
+    const res = await generateBookingReply(task.customer_name, slots, task.content);
     if (res.success) {
-      setGeneratedReply(res.reply);
+      setGeneratedReply(res.reply || "");
       setSelectedTask(task);
     }
   };

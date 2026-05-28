@@ -15,6 +15,9 @@ import {
 import { revalidatePath } from "next/cache";
 import { sendLineMessage } from "@/lib/line";
 import { getCustomerById } from "@/lib/customers";
+import { GoogleGenAI } from "@google/genai";
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 export type TaskType = "booking_change_request" | "general_inquiry" | "staff_evaluation";
 
@@ -119,16 +122,34 @@ export async function sendReplyAndCompleteTask(taskId: string, customerId: strin
   }
 }
 
-export async function generateBookingReply(customerName: string, selectedSlots: string[]) {
-  // Use the exact style from the provided screenshots
-  const slotsText = selectedSlots.join("\n");
-  
-  const reply = `お問い合わせありがとうございます。
-かしこまりました。
+export async function generateBookingReply(customerName: string, selectedSlots: string[], taskContent?: string) {
+  try {
+    const slotsText = selectedSlots.join("、");
+    const prompt = `あなたは美容サロンのスタッフです。
+お客様（${customerName}様）からのLINEの問い合わせに対して、返信文を作成してください。
 
-${slotsText}
+以下の情報を自然な日本語に組み込んで、温かみのある丁寧な接客トーンで返信を作成してください。
+- 提案する予約可能な日時: ${slotsText}
+${taskContent ? `- お客様の元の問い合わせ内容: ${taskContent}` : ''}
 
-こちらに空きがございますが、ご都合いいかがでしょうか？`;
+注意点:
+- 挨拶から始めてください。
+- 予約枠の提案が含まれている場合は、「以下の日時でご案内可能ですが、ご都合はいかがでしょうか？」などの自然な提案にしてください。
+- 最後に「ご返信お待ちしております。」などの締めの言葉を入れてください。
+- 長すぎず、スマホのLINEで読みやすい長さにしてください。
+- 「※」「【】」などの過剰な記号は使わず、絵文字も控えめ（1〜2個程度）にしてください。`;
 
-  return { success: true, reply };
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
+
+    return { success: true, reply: response.text };
+  } catch (error: any) {
+    console.error("AI Generation Error:", error);
+    // Fallback to simple template if AI fails
+    const slotsText = selectedSlots.join("\n");
+    const reply = `お問い合わせありがとうございます。\nかしこまりました。\n\n${slotsText}\n\nこちらに空きがございますが、ご都合いいかがでしょうか？`;
+    return { success: true, reply }; // Return fallback even on error so user can proceed
+  }
 }

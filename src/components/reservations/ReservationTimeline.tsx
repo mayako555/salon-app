@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { Reservation } from "@/app/reservations/actions";
 import { StaffProfile } from "@/app/staff/actions";
+import { ShiftRecord } from "@/app/shifts/actions";
+import { ReservationSettings } from "@/app/admin/settings/actions";
 import ReservationDetailDialog from "./ReservationDetailDialog";
 import ReservationFormDialog from "./ReservationFormDialog";
 import DraggableReservation from "./DraggableReservation";
@@ -10,62 +12,92 @@ import DraggableReservation from "./DraggableReservation";
 type Props = {
   reservations: Reservation[];
   staffList: StaffProfile[];
+  shifts?: ShiftRecord[];
   date: string; // YYYY-MM-DD
   storeName?: string; // Add store name prop for new reservations
+  settings?: ReservationSettings;
   onRefresh?: () => void; // Add refresh callback
 };
 
-export const START_HOUR = 8;
-export const END_HOUR = 22;
-export const TOTAL_HOURS = END_HOUR - START_HOUR;
 export const HOUR_WIDTH = 120; // 120px per hour
 export const ROW_HEIGHT = 48; // h-12 = 48px
-export const TOTAL_WIDTH = TOTAL_HOURS * HOUR_WIDTH;
 
-// 削除: function timeToPixels() & getPortalColor() (DraggableReservation内に移動したため)
-
-export default function ReservationTimeline({ reservations, staffList, date, storeName = "六甲", onRefresh }: Props) {
+export default function ReservationTimeline({ reservations, staffList, shifts = [], date, storeName = "六甲", settings, onRefresh }: Props) {
   const [selectedRes, setSelectedRes] = useState<Reservation | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [clickData, setClickData] = useState({ staff: "", time: "" });
   
-  // Group reservations by staff
-  const grouped = useMemo(() => {
-    const map: Record<string, Reservation[]> = {};
-    
-    // Only show staff who are NOT retired, OR who have reservations on the current timeline
-    const staffWithRes = new Set(reservations.map(r => r.staff_name));
-    const visibleStaff = staffList.filter(s => 
-      s.employment_status !== "retired" || staffWithRes.has(s.name)
-    );
+  const storeSettings = settings?.stores[storeName] || settings?.stores["共通"] || { startHour: 8, endHour: 22, slotDuration: 30 };
+  const START_HOUR = storeSettings.startHour;
+  const END_HOUR = storeSettings.endHour;
+  const TOTAL_HOURS = END_HOUR - START_HOUR;
+  const TOTAL_WIDTH = TOTAL_HOURS * HOUR_WIDTH;
+  const slotDuration = storeSettings.slotDuration;
+  const numSlotsPerHour = 60 / slotDuration;
+  const slotWidth = HOUR_WIDTH / numSlotsPerHour;
 
-    visibleStaff.forEach(s => map[s.name] = []);
+  // Group reservations by staff
+  const { grouped, sortedStaff } = useMemo(() => {
+    const map: Record<string, Reservation[]> = {};
+    const staffWithRes = new Set(reservations.map(r => r.staff_name));
+    
+    // Calculate display status for all staff
+    const displayStaff = staffList.map(s => {
+      // 1. 退職者は、予約がある場合のみ
+      if (s.employment_status === "retired" && !staffWithRes.has(s.name)) return null;
+      
+      const shift = shifts?.find(sh => sh.staff_id === s.id);
+      
+      // 2. 「全店舗」なら全員がWorkingHere扱い
+      const isWorkingHere = storeName === "全店舗" || 
+        (shift?.type === "work" && shift.segments?.some(seg => seg.store === storeName));
+      const hasReservation = staffWithRes.has(s.name);
+      
+      const isOffOrOtherStore = !isWorkingHere && !hasReservation;
+      
+      return {
+        ...s,
+        isOffOrOtherStore,
+        shift
+      };
+    }).filter(Boolean) as (StaffProfile & { isOffOrOtherStore: boolean; shift?: ShiftRecord })[];
+
+    // Sort: Working here / Has Reservation First, then others
+    displayStaff.sort((a, b) => {
+      if (a.isOffOrOtherStore === b.isOffOrOtherStore) {
+        return (a.sort_order ?? 999) - (b.sort_order ?? 999);
+      }
+      return a.isOffOrOtherStore ? 1 : -1;
+    });
+
+    displayStaff.forEach(s => map[s.name] = []);
     reservations.forEach(r => {
       if (map[r.staff_name]) {
         map[r.staff_name].push(r);
       } else {
-        // Unassigned or unknown staff
         if (!map["不明"]) map["不明"] = [];
         map["不明"].push(r);
       }
     });
-    return map;
-  }, [reservations, staffList]);
 
-  const activeStaffList = Object.keys(grouped);
+    return { grouped: map, sortedStaff: displayStaff };
+  }, [reservations, staffList, shifts, storeName]);
+
+  const activeStaffNames = [
+    ...sortedStaff.map(s => s.name),
+    ...(grouped["不明"] ? ["不明"] : [])
+  ];
 
   const handleRowClick = (e: React.MouseEvent, staff: string) => {
-    // If they clicked on a button (reservation block), ignore
     if ((e.target as HTMLElement).closest('button')) return;
 
-    // Calculate clicked time
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const hourFraction = x / HOUR_WIDTH;
     const hour = START_HOUR + Math.floor(hourFraction);
     const minute = Math.floor((hourFraction % 1) * 60);
-    // Round to nearest 15 mins for cleaner default
-    const roundedMin = Math.round(minute / 15) * 15;
+    
+    const roundedMin = Math.round(minute / slotDuration) * slotDuration;
     const finalMin = roundedMin === 60 ? 0 : roundedMin;
     const finalHour = roundedMin === 60 ? hour + 1 : hour;
     
@@ -77,33 +109,63 @@ export default function ReservationTimeline({ reservations, staffList, date, sto
   };
 
   return (
-    <div className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden flex">
+    <div className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden flex h-full">
       <div className="w-36 flex-shrink-0 border-r border-slate-300 bg-white z-10 sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
         <div className="h-8 border-b border-slate-300 flex items-center justify-center bg-slate-100 text-[10px] font-bold text-slate-500 sticky top-0 z-20">
           スタッフ / ベッド
         </div>
-        {activeStaffList.map((staff, i) => (
-          <div key={staff} className="h-12 border-b border-slate-200 flex flex-col justify-center px-2 bg-white relative">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-800 truncate">{staff}</span>
-              <div className="flex gap-1">
-                <span className="w-4 h-4 bg-emerald-100 text-emerald-700 flex items-center justify-center rounded text-[8px] font-black" title="指名可">指</span>
-                <span className="w-4 h-4 bg-slate-100 text-slate-500 flex items-center justify-center rounded text-[9px] font-black border border-slate-200" title="ベッド番号">{i + 1}</span>
+        {activeStaffNames.map((staffName, i) => {
+          const staffObj = sortedStaff.find(s => s.name === staffName);
+          const shift = staffObj?.shift;
+          const isOffOrOther = staffObj?.isOffOrOtherStore;
+          
+          let shiftDisplay = "未設定";
+          let shiftColor = "text-slate-400";
+          let dotColor = "bg-slate-300";
+          
+          if (shift) {
+            if (shift.type === "work") {
+              const seg = shift.segments?.find(s => s.store === storeName) || shift.segments?.[0];
+              if (seg) {
+                shiftDisplay = `${seg.store !== storeName ? seg.store + ' ' : ''}出勤 (${seg.start_time}-${seg.end_time})`;
+                shiftColor = isOffOrOther ? "text-slate-400" : "text-slate-600";
+                dotColor = isOffOrOther ? "bg-slate-300" : "bg-emerald-500";
+              }
+            } else if (shift.type === "holiday" || shift.type === "requested_holiday") {
+              shiftDisplay = "公休";
+              shiftColor = isOffOrOther ? "text-rose-300" : "text-rose-500 font-bold";
+              dotColor = isOffOrOther ? "bg-rose-300" : "bg-rose-500";
+            } else if (shift.type === "paid_leave" || shift.type === "requested_paid_leave") {
+              shiftDisplay = "有休";
+              shiftColor = isOffOrOther ? "text-amber-300" : "text-amber-500 font-bold";
+              dotColor = isOffOrOther ? "bg-amber-300" : "bg-amber-500";
+            }
+          } else if (staffName === "不明") {
+            shiftDisplay = "-";
+            dotColor = "bg-transparent";
+          }
+
+          return (
+            <div key={staffName} className={`h-12 border-b border-slate-200 flex flex-col justify-center px-2 bg-white relative transition-opacity ${isOffOrOther ? 'opacity-50 grayscale' : ''}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-800 truncate">{staffName}</span>
+                <div className="flex gap-1">
+                  <span className="w-4 h-4 bg-emerald-100 text-emerald-700 flex items-center justify-center rounded text-[8px] font-black" title="指名可">指</span>
+                  <span className="w-4 h-4 bg-slate-100 text-slate-500 flex items-center justify-center rounded text-[9px] font-black border border-slate-200" title="ベッド番号">{i + 1}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 mt-0.5">
+                 <div className={`w-1.5 h-1.5 rounded-full ${dotColor}`}></div>
+                 <span className={`text-[9px] ${shiftColor} truncate`}>{shiftDisplay}</span>
               </div>
             </div>
-            <div className="flex items-center gap-1 mt-0.5">
-               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-               <span className="text-[9px] text-slate-400">出勤 (10:00-19:00)</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Right Column (Timeline) */}
       <div className="flex-1 overflow-auto relative no-scrollbar bg-slate-50">
         <div style={{ width: TOTAL_WIDTH }} className="relative min-h-full">
           
-          {/* Header (Time axis) */}
           <div className="h-8 border-b border-slate-300 flex bg-slate-100 sticky top-0 z-10">
             {Array.from({ length: TOTAL_HOURS }).map((_, i) => (
               <div 
@@ -116,37 +178,65 @@ export default function ReservationTimeline({ reservations, staffList, date, sto
             ))}
           </div>
 
-          {/* Grid Lines */}
           <div className="absolute top-8 bottom-0 left-0 right-0 pointer-events-none flex">
-            {Array.from({ length: TOTAL_HOURS * 2 }).map((_, i) => (
+            {Array.from({ length: TOTAL_HOURS * numSlotsPerHour }).map((_, i) => (
               <div 
                 key={i} 
-                style={{ width: HOUR_WIDTH / 2 }} 
-                className={`flex-shrink-0 h-full border-r ${i % 2 === 0 ? 'border-slate-200 border-dashed' : 'border-slate-300'}`}
+                style={{ width: slotWidth }} 
+                className={`flex-shrink-0 h-full border-r ${i % numSlotsPerHour === (numSlotsPerHour - 1) ? 'border-slate-300' : 'border-slate-200 border-dashed'}`}
               />
             ))}
           </div>
 
-          {/* Staff Rows & Reservations */}
-          <div className="relative pt-[32px] z-0">
-            {activeStaffList.map((staff, rowIndex) => (
-              <div 
-                key={staff} 
-                className="h-12 border-b border-slate-200 relative group hover:bg-slate-100/50 transition-colors cursor-pointer"
-                onClick={(e) => handleRowClick(e, staff)}
-              >
-                {grouped[staff].map(res => (
-                  <DraggableReservation
-                    key={res.id}
-                    res={res}
-                    staffList={activeStaffList}
-                    currentStaffIndex={rowIndex}
-                    onClick={() => setSelectedRes(res)}
-                    onUpdateComplete={() => { if(onRefresh) onRefresh(); }}
-                  />
-                ))}
-              </div>
-            ))}
+          <div className="relative z-0">
+            {activeStaffNames.map((staffName, rowIndex) => {
+              const staffObj = sortedStaff.find(s => s.name === staffName);
+              const isOffOrOther = staffObj?.isOffOrOtherStore;
+
+              return (
+                <div 
+                  key={staffName} 
+                  className={`h-12 border-b border-slate-200 relative group cursor-pointer ${
+                    isOffOrOther ? 'bg-slate-200/30' : ''
+                  }`}
+                  onClick={(e) => handleRowClick(e, staffName)}
+                >
+                  {/* Hover effect cells */}
+                  <div className="absolute inset-0 flex pointer-events-none">
+                     {Array.from({ length: TOTAL_HOURS * numSlotsPerHour }).map((_, i) => (
+                      <div 
+                        key={i} 
+                        style={{ width: slotWidth }} 
+                        className="h-full pointer-events-auto hover:bg-blue-100/50 transition-colors"
+                      />
+                    ))}
+                  </div>
+
+                  {isOffOrOther && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 overflow-hidden">
+                      {Array.from({ length: 15 }).map((_, i) => (
+                        <div key={i} className="text-xl font-black text-slate-500 rotate-[-15deg] whitespace-nowrap mx-8 select-none">
+                          {staffObj?.shift?.type?.includes('holiday') || staffObj?.shift?.type?.includes('leave') ? 'OFF' : 'OTHER STORE'}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {grouped[staffName].map(res => (
+                    <DraggableReservation
+                      key={res.id}
+                      res={res}
+                      staffList={activeStaffNames}
+                      currentStaffIndex={rowIndex}
+                      onClick={() => setSelectedRes(res)}
+                      onUpdateComplete={() => { if(onRefresh) onRefresh(); }}
+                      startHour={START_HOUR}
+                      totalHours={TOTAL_HOURS}
+                    />
+                  ))}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

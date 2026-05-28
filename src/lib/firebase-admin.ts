@@ -4,7 +4,6 @@
 // Build phase detection
 const isBuild = process.env.npm_lifecycle_event === "build" || 
                 process.env.NEXT_PHASE === "phase-production-build" ||
-                process.env.VERCEL_ENV === "preview" || // sometimes preview builds fail too
                 !process.env.FIREBASE_PRIVATE_KEY;
 
 // Create dummy proxies for build time to completely avoid importing or running firebase-admin

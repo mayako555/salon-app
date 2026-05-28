@@ -169,6 +169,7 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
       let total = 0;
       let minimo = 0;
       let treatmentCount = 0;
+      let totalTreatmentMinutes = 0;
       let totalNextBookings = 0;
       let totalNextBookingVisits = 0;
       const storeSales: Record<string, { total: number, minimo: number, nextBookings: number, nextBookingVisits: number, count: number, minimoVisits: number, regularVisits: number, regularNewVisits: number, minimoNewVisits: number }> = { 
@@ -213,7 +214,10 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
           totalNextBookingVisits++;
         }
 
-        if (data.tech_sales > 0) treatmentCount++;
+        if (data.tech_sales > 0) {
+          treatmentCount++;
+          totalTreatmentMinutes += data.treatment_minutes || 60; // 実際の施術時間がない場合は後方互換で60分とする
+        }
         
         const rawStore = data.store_name || "不明";
         const storeKey = rawStore.includes("六甲") ? "六甲" : rawStore.includes("元町") ? "元町" : rawStore.includes("神戸") ? "神戸" : "不明";
@@ -278,8 +282,8 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
         }
       });
 
-      // Occupancy calc: Treatment count * 60 mins / total work minutes
-      const estimatedTreatmentMinutes = treatmentCount * 60;
+      // Occupancy calc: Actual treatment minutes / total work minutes
+      const estimatedTreatmentMinutes = totalTreatmentMinutes;
       const occupancy = totalWorkMinutes > 0 ? Math.min(100, (estimatedTreatmentMinutes / totalWorkMinutes) * 100) : 0;
 
       const totalCount = Object.values(storeSales).reduce((acc, s) => acc + s.count, 0);

@@ -22,12 +22,16 @@ export default function StaffLoginPage() {
     setLoading(true);
     try {
       let userCredential;
-      // 1. Try with passcode suffix first
       try {
+        // スタッフ用にまず `_salon` 付きでログインを試す
         userCredential = await signInWithEmailAndPassword(auth, email, password + "_salon");
-      } catch (suffixErr) {
-        // 2. Fallback to raw password (for standard password logins)
-        userCredential = await signInWithEmailAndPassword(auth, email, password);
+      } catch (firstErr: any) {
+        if (firstErr.code === "auth/invalid-credential" || firstErr.code === "auth/wrong-password" || firstErr.code === "auth/user-not-found") {
+          // Firebase Console等で作成されたシステム管理者の場合は `_salon` なしで試す
+          userCredential = await signInWithEmailAndPassword(auth, email, password);
+        } else {
+          throw firstErr;
+        }
       }
       
       // Get ID token and set session cookie
@@ -46,7 +50,11 @@ export default function StaffLoginPage() {
       router.push("/staff-portal");
     } catch (error: any) {
       console.error(error);
-      toast.error("ログインに失敗しました。メールアドレスまたは暗証番号を確認してください。");
+      if (error.code === "auth/too-many-requests") {
+        toast.error("ログインの失敗が続いたため、一時的にロックされています。しばらく時間をおいてから再度お試しください。");
+      } else {
+        toast.error("ログインに失敗しました。メールアドレスまたは暗証番号を確認してください。");
+      }
     } finally {
       setLoading(false);
     }

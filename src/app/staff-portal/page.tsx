@@ -34,7 +34,6 @@ import { getMonthlyShifts } from "@/app/shifts/actions";
 import { getContractsList } from "@/app/contracts/actions";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { QRCodeSVG } from "qrcode.react";
 import SNSTaskSection from "@/app/tasks/SNSTaskSection";
 
 export default function StaffDashboardPage() {
@@ -47,7 +46,6 @@ export default function StaffDashboardPage() {
   const [attendance, setAttendance] = useState<any>(null);
   const [staffListData, setStaffListData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showMyQr, setShowMyQr] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskRecord | null>(null);
   const [generatedReply, setGeneratedReply] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -130,9 +128,9 @@ export default function StaffDashboardPage() {
   const handleGenerateReply = async (task: TaskRecord) => {
     // For demo: pretend we picked these slots
     const slots = ["5月10日 10:00〜", "5月10日 14:00〜", "5月12日 11:30〜"];
-    const res = await generateBookingReply(task.customer_name, slots);
+    const res = await generateBookingReply(task.customer_name, slots, task.content);
     if (res.success) {
-      setGeneratedReply(res.reply);
+      setGeneratedReply(res.reply || "");
       setSelectedTask(task);
     }
   };
@@ -229,22 +227,11 @@ export default function StaffDashboardPage() {
             <div className="font-bold text-sm">顧客管理</div>
             <div className="text-[10px] opacity-80">名簿・カルテ</div>
           </Link>
-          <Link href="/staff-portal/qr" className="bg-blue-500 hover:bg-blue-600 p-4 rounded-2xl shadow-lg shadow-blue-900/20 transition-all active:scale-95 text-left">
+          <Link href="/staff-portal/qr" className="bg-blue-500 hover:bg-blue-600 p-4 rounded-2xl shadow-lg shadow-blue-900/20 transition-all active:scale-95 text-left col-span-2">
             <QrCode className="mb-2" size={20} />
             <div className="font-bold text-sm">QR表示</div>
             <div className="text-[10px] opacity-80">お客様入力用</div>
           </Link>
-          
-          <Button 
-            onClick={() => setShowMyQr(true)}
-            className="col-span-2 bg-white text-slate-900 p-4 rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 h-auto"
-          >
-            <QrCode size={24} className="text-blue-500" />
-            <div className="text-left">
-              <div className="font-black text-sm">マイ出勤QRコード</div>
-              <div className="text-[10px] font-bold text-slate-400">お店の端末でスキャン</div>
-            </div>
-          </Button>
         </div>
       </div>
 
@@ -638,44 +625,6 @@ export default function StaffDashboardPage() {
           </div>
         </div>
       </div>
-
-      {/* My Attendance QR Modal */}
-      {showMyQr && profile && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setShowMyQr(false)}>
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-[3rem] p-10 flex flex-col items-center gap-8 w-full max-w-sm shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="text-center">
-              <h3 className="text-2xl font-black text-slate-900 mb-1">My ID Code</h3>
-              <p className="text-sm font-bold text-slate-400">お店の端末にかざしてください</p>
-            </div>
-
-            <div className="bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100">
-              <QRCodeSVG 
-                value={`salon-auth:${profile.id}`} 
-                size={220}
-                level="H"
-                includeMargin={true}
-              />
-            </div>
-
-            <div className="text-center">
-              <p className="text-xl font-black text-slate-800">{profile.name}</p>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{profile.role || "Staff"}</p>
-            </div>
-
-            <Button 
-              onClick={() => setShowMyQr(false)}
-              className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black"
-            >
-              閉じる
-            </Button>
-          </motion.div>
-        </div>
-      )}
 
       {/* Reply Generator Modal */}
       {selectedTask && (

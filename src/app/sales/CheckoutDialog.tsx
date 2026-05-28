@@ -557,6 +557,7 @@ export default function CheckoutDialog({
 
               <input type="hidden" name="menu_course" value={menuCourse} />
               <input type="hidden" name="hair_material" value="" />
+              <input type="hidden" name="treatment_minutes" value={initialData?.treatment_minutes || 60} />
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-slate-100 pt-4">
                 <div className="col-span-2">

@@ -12,15 +12,16 @@ export type Reservation = {
   store_name: string;
   staff_id: string;
   staff_name: string;
+  type?: "reservation" | "schedule"; // Added for schedules
   customer_id?: string;
-  customer_name: string;
+  customer_name?: string; // Optional for schedules
   customer_kana?: string;
   customer_phone?: string;
   date: string; // YYYY-MM-DD
   start_time: string; // HH:MM
   end_time: string; // HH:MM
-  menu_name: string;
-  portal: ReservationPortal;
+  menu_name?: string; // Can be title for schedule
+  portal?: ReservationPortal;
   status: ReservationStatus;
   customer_type?: "新規" | "再来" | "モデル" | "不明";
   is_next_booking?: boolean;

@@ -34,47 +34,83 @@ function cn(...inputs: ClassValue[]) {
 
 import { useAuth } from "@/lib/auth-context";
 
-const managementNav = [
-  { name: "ダッシュボード", href: "/dashboard", icon: LayoutDashboard, role: "staff" },
-  { name: "予約スケジュール管理", href: "/reservations", icon: CalendarDays, role: "staff" },
-  { name: "売上管理・レジ締め", href: "/sales", icon: Coins, role: "staff" },
-  { name: "在庫管理", href: "/inventory", icon: Package, role: "staff" },
-  { name: "マスタ管理", href: "/staff-portal/sales/master", icon: Database, role: "admin" },
-  { name: "勤怠管理", href: "/attendance", icon: Clock, role: "staff" },
-  { name: "シフト管理", href: "/shifts", icon: CalendarDays, role: "manager" },
-  { name: "スタッフ管理", href: "/staff", icon: Users, role: "admin" },
-  { name: "スタッフ評価", href: "/evaluations", icon: Award, role: "manager" },
-  { name: "高度分析", href: "/analytics", icon: Sparkles, role: "manager" },
-  { name: "給与・報酬計算", href: "/payroll", icon: Calculator, role: "admin" },
-  { name: "経費・収支管理", href: "/admin/expenses", icon: Wallet, role: "manager" },
-  { name: "雇用・業務委託契約", href: "/contracts", icon: FileText, role: "admin" },
-  { name: "手当管理", href: "/allowances", icon: Gift, role: "admin" },
-  { name: "監査ログ", href: "/audit", icon: Settings, role: "admin" },
-  { name: "店舗用タイムカード", href: "/attendance/setup", icon: Clock, role: "admin" },
-  { name: "新人教育", href: "/training", icon: GraduationCap, role: "staff" },
-  { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste, role: "manager" },
-  { name: "口コミ一括取込", href: "/admin/reviews/import", icon: ClipboardPaste, role: "manager" },
+const managementCategories = [
+  {
+    title: "日常業務",
+    items: [
+      { name: "ダッシュボード", href: "/dashboard", icon: LayoutDashboard, role: "staff" },
+      { name: "予約スケジュール管理", href: "/reservations", icon: CalendarDays, role: "staff" },
+      { name: "売上管理・レジ締め", href: "/sales", icon: Coins, role: "staff" },
+    ]
+  },
+  {
+    title: "分析・経理",
+    items: [
+      { name: "高度分析", href: "/analytics", icon: Sparkles, role: "admin" },
+      { name: "経費・収支管理", href: "/admin/expenses", icon: Wallet, role: "admin" },
+      { name: "給与・報酬計算", href: "/payroll", icon: Calculator, role: "admin" },
+    ]
+  },
+  {
+    title: "勤怠・シフト",
+    items: [
+      { name: "シフト管理", href: "/shifts", icon: CalendarDays, role: "manager" },
+      { name: "勤怠管理", href: "/attendance", icon: Clock, role: "admin" },
+      { name: "店舗用タイムカード", href: "/attendance/setup", icon: Clock, role: "admin" },
+    ]
+  },
+  {
+    title: "スタッフ・教育",
+    items: [
+      { name: "スタッフ管理", href: "/staff", icon: Users, role: "admin" },
+      { name: "スタッフ評価", href: "/evaluations", icon: Award, role: "manager" },
+      { name: "新人教育", href: "/training", icon: GraduationCap, role: "manager" },
+    ]
+  },
+  {
+    title: "マスタ・データ管理",
+    items: [
+      { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste, role: "admin" },
+      { name: "口コミ一括取込", href: "/admin/reviews/import", icon: ClipboardPaste, role: "admin" },
+      { name: "マスタ管理", href: "/staff-portal/sales/master", icon: Database, role: "admin" },
+      { name: "在庫管理", href: "/inventory", icon: Package, role: "admin" },
+      { name: "雇用・業務委託契約", href: "/contracts", icon: FileText, role: "admin" },
+      { name: "手当管理", href: "/allowances", icon: Gift, role: "admin" },
+      { name: "システム設定", href: "/admin/settings", icon: Settings, role: "admin" },
+      { name: "監査ログ", href: "/audit", icon: Settings, role: "admin" },
+    ]
+  }
 ];
 
-const staffNav = [
-  { name: "自分の明細を確認", href: "/staff-portal/payroll", icon: Calculator },
-  { name: "希望休の提出", href: "/staff-portal/holidays", icon: CalendarDays },
-  { name: "交通費の申請", href: "/staff-portal/transport", icon: Train },
-  { name: "経費の申請", href: "/staff-portal/expenses", icon: Wallet },
-  { name: "就業規則", href: "/staff-portal/rules", icon: BookOpen },
-  { name: "マニュアル", href: "/manuals", icon: Library },
+const staffCategories = [
+  {
+    title: "各種申請・確認",
+    items: [
+      { name: "自分の明細を確認", href: "/staff-portal/payroll", icon: Calculator },
+      { name: "交通費の申請", href: "/staff-portal/transport", icon: Train },
+      { name: "経費の申請", href: "/staff-portal/expenses", icon: Wallet },
+      { name: "希望休の提出", href: "/staff-portal/holidays", icon: CalendarDays },
+    ]
+  },
+  {
+    title: "マニュアル・規程",
+    items: [
+      { name: "就業規則", href: "/staff-portal/rules", icon: BookOpen },
+      { name: "マニュアル", href: "/manuals", icon: Library },
+    ]
+  }
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const { profile, isAdmin, isManager, isStaff } = useAuth();
 
-  const filteredManagementNav = managementNav.filter(item => {
-    if (item.role === "admin") return isAdmin;
-    if (item.role === "manager") return isManager;
-    if (item.role === "staff") return isStaff;
+  const hasAccess = (role: string) => {
+    if (role === "admin") return isAdmin;
+    if (role === "manager") return isManager || isAdmin;
+    if (role === "staff") return isStaff || isManager || isAdmin;
     return true;
-  });
+  };
 
   const NavItem = ({ item, colorClass = "text-rose-600", bgClass = "bg-rose-50", iconColor = "text-rose-500" }: { item: any, colorClass?: string, bgClass?: string, iconColor?: string }) => {
     const isActive = pathname.startsWith(item.href);
@@ -113,37 +149,50 @@ export function Sidebar() {
       </div>
       
       <div className="flex flex-1 flex-col overflow-y-auto py-4">
-        <nav className="flex-1 space-y-8 px-3">
+        <nav className="flex-1 space-y-6 px-3 pb-8">
           {/* Management Section */}
           {(isAdmin || isManager) && (
-            <div className="space-y-1">
-              <h3 className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                Salon Management
-              </h3>
-              <div className="space-y-1">
-                {filteredManagementNav.map((item) => (
-                  <NavItem key={item.name} item={item} />
-                ))}
-              </div>
+            <div className="space-y-6">
+              {managementCategories.map((category) => {
+                const visibleItems = category.items.filter(item => hasAccess(item.role));
+                if (visibleItems.length === 0) return null;
+                
+                return (
+                  <div key={category.title} className="space-y-1">
+                    <h3 className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                      {category.title}
+                    </h3>
+                    <div className="space-y-1">
+                      {visibleItems.map((item) => (
+                        <NavItem key={item.name} item={item} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 
           {/* Staff Portal Section */}
-          <div className="space-y-1">
-            <h3 className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-              Staff Portal
-            </h3>
-            <div className="space-y-1">
-              {staffNav.map((item) => (
-                <NavItem 
-                  key={item.name} 
-                  item={item} 
-                  colorClass="text-blue-600" 
-                  bgClass="bg-blue-50" 
-                  iconColor="text-blue-500" 
-                />
-              ))}
-            </div>
+          <div className="space-y-6 pt-4 border-t border-slate-100">
+            {staffCategories.map((category) => (
+              <div key={category.title} className="space-y-1">
+                <h3 className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                  {category.title}
+                </h3>
+                <div className="space-y-1">
+                  {category.items.map((item) => (
+                    <NavItem 
+                      key={item.name} 
+                      item={item} 
+                      colorClass="text-blue-600" 
+                      bgClass="bg-blue-50" 
+                      iconColor="text-blue-500" 
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </nav>
       </div>

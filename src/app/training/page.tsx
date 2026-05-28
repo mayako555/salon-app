@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getCurriculum, getStaffProgress, CurriculumItem, StaffTrainingProgress, TrainingStatus } from "./training-actions";
 import { getStaffList, StaffProfile } from "../staff/actions";
+import { useAuth } from "@/lib/auth-context";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -23,6 +24,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 
 export default function TrainingDashboard() {
+  const { profile } = useAuth();
   const [staff, setStaff] = useState<StaffProfile[]>([]);
   const [curriculum, setCurriculum] = useState<CurriculumItem[]>([]);
   const [progressMap, setProgressMap] = useState<Record<string, StaffTrainingProgress[]>>({});
@@ -200,14 +202,16 @@ export default function TrainingDashboard() {
                       </Button>
                     </Link>
                   </div>
-                  <div className="pt-3">
-                    <Link href={`/training/staff/${s.id}/ojt/new`}>
-                      <Button variant="ghost" className="w-full h-10 rounded-xl bg-blue-50/50 text-blue-700 font-bold hover:bg-blue-100 text-[11px] gap-2">
-                        <FileSpreadsheet size={14} />
-                        助成金用 OJT訓練日誌を作成
-                      </Button>
-                    </Link>
-                  </div>
+                  {profile?.role === "admin" && (
+                    <div className="pt-3">
+                      <Link href={`/training/staff/${s.id}/ojt/new`}>
+                        <Button variant="ghost" className="w-full h-10 rounded-xl bg-blue-50/50 text-blue-700 font-bold hover:bg-blue-100 text-[11px] gap-2">
+                          <FileSpreadsheet size={14} />
+                          助成金用 OJT訓練日誌を作成
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </Card>
             </motion.div>

@@ -1,207 +1,140 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getReservationSettings, saveReservationSettings, ReservationSettings } from "./actions";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Save, ArrowLeft, Loader2 } from "lucide-react";
-import Link from "next/link";
-import { getMasterData, updateMasterData, MasterData, MasterItem } from "./actions";
+import { toast } from "sonner";
+import { Save, Settings } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
-export default function AdminSettingsPage() {
-  const [data, setData] = useState<MasterData | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+export default function SystemSettingsPage() {
+  const { profile } = useAuth();
+  const [settings, setSettings] = useState<ReservationSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    getMasterData().then(setData);
+    async function load() {
+      const data = await getReservationSettings();
+      setSettings(data);
+      setLoading(false);
+    }
+    load();
   }, []);
 
-  const addItem = (type: keyof MasterData) => {
-    if (!data) return;
-    const newItem: MasterItem = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: "",
-      price: 0
-    };
-    setData({ ...data, [type]: [...data[type], newItem] });
-  };
+  if (profile?.role !== "admin") {
+    return <div className="p-12 text-center text-slate-400 font-bold">アクセス権限がありません</div>;
+  }
 
-  const removeItem = (type: keyof MasterData, id: string) => {
-    if (!data) return;
-    setData({ ...data, [type]: data[type].filter(i => i.id !== id) });
-  };
+  if (loading || !settings) {
+    return <div className="p-12 text-center text-slate-400 font-bold animate-pulse">Loading Settings...</div>;
+  }
 
-  const updateItem = (type: keyof MasterData, id: string, field: keyof MasterItem, value: string | number) => {
-    if (!data) return;
-    setData({
-      ...data,
-      [type]: data[type].map(i => i.id === id ? { ...i, [field]: value } : i)
+  const handleStoreChange = (store: string, field: "startHour" | "endHour" | "slotDuration", value: number) => {
+    setSettings(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        stores: {
+          ...prev.stores,
+          [store]: {
+            ...prev.stores[store],
+            [field]: value
+          }
+        }
+      };
     });
   };
 
   const handleSave = async () => {
-    if (!data) return;
-    setIsSaving(true);
-    await updateMasterData(data);
-    setIsSaving(false);
-    alert("設定を保存しました。");
+    setSaving(true);
+    const res = await saveReservationSettings(settings);
+    if (res.success) {
+      toast.success("設定を保存しました");
+    } else {
+      toast.error(res.error || "保存に失敗しました");
+    }
+    setSaving(false);
   };
 
-  if (!data) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="animate-spin text-slate-400" /></div>;
-
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/sales" className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
-              <ArrowLeft size={20} />
-            </Link>
-            <h1 className="text-xl font-bold text-slate-800">マスタデータ設定</h1>
-          </div>
-          <Button onClick={handleSave} disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
-            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            保存する
-          </Button>
+    <div className="p-6 max-w-4xl mx-auto space-y-8 pb-24">
+      <div className="flex justify-between items-center border-b border-slate-200 pb-6">
+        <div>
+          <h1 className="text-3xl font-black tracking-tight text-slate-900 flex items-center gap-2">
+            <Settings className="text-blue-600" /> システム設定
+          </h1>
+          <p className="text-slate-500 font-medium">予約台帳の営業時間・刻み幅などの設定</p>
         </div>
-      </header>
+        <Button 
+          onClick={handleSave} 
+          disabled={saving}
+          className="rounded-2xl bg-blue-600 hover:bg-blue-700 font-black text-white h-12 px-8 shadow-xl shadow-blue-200"
+        >
+          <Save size={18} className="mr-2" /> 
+          {saving ? "保存中..." : "保存する"}
+        </Button>
+      </div>
 
-      <main className="max-w-5xl mx-auto px-4 py-8 space-y-8">
-        
-        {/* Menus Section */}
-        <Card className="border-slate-200 shadow-sm overflow-hidden">
-          <CardHeader className="bg-slate-50 border-b border-slate-200 flex flex-row items-center justify-between py-4">
-            <div>
-              <CardTitle className="text-slate-800 text-lg">施術メニュー・本数</CardTitle>
-              <p className="text-xs text-slate-500 font-normal mt-0.5">会計時に選択・自動入力されるメニュー名と基本価格</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => addItem("menus")} className="bg-white border-slate-300 text-slate-600 font-medium">
-              <Plus size={14} className="mr-1" /> 追加
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50/50 text-slate-500 border-b border-slate-100">
-                <tr>
-                  <th className="font-medium px-6 py-3 text-left">メニュー名・本数</th>
-                  <th className="font-medium px-6 py-3 text-left w-40">基本価格 (円)</th>
-                  <th className="w-16"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {data.menus.map(item => (
-                  <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-3">
-                      <Input 
-                        value={item.name} 
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItem("menus", item.id, "name", e.target.value)}
-                        placeholder="例: 上まつげ120本"
-                        className="h-9 border-transparent group-hover:border-slate-200 focus:border-emerald-500 bg-transparent focus:bg-white transition-all"
-                      />
-                    </td>
-                    <td className="px-6 py-3">
-                      <Input 
-                        type="number"
-                        value={item.price} 
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItem("menus", item.id, "price", parseInt(e.target.value) || 0)}
-                        className="h-9 border-transparent group-hover:border-slate-200 focus:border-emerald-500 bg-transparent focus:bg-white transition-all font-mono"
-                      />
-                    </td>
-                    <td className="px-6 py-3 text-right">
-                      <button onClick={() => removeItem("menus", item.id)} className="text-slate-300 hover:text-rose-500 transition-colors">
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Hair Materials Section */}
-          <Card className="border-slate-200 shadow-sm overflow-hidden">
-            <CardHeader className="bg-slate-50 border-b border-slate-200 flex flex-row items-center justify-between py-4">
-              <CardTitle className="text-slate-800 text-lg">毛質グレード</CardTitle>
-              <Button variant="outline" size="sm" onClick={() => addItem("materials")} className="bg-white border-slate-300">
-                <Plus size={14} />
-              </Button>
+      <div className="space-y-6">
+        {Object.entries(settings.stores).filter(([store]) => store !== "共通").map(([store, storeSettings]) => (
+          <Card key={store} className="border-none shadow-lg shadow-slate-200/50 rounded-3xl overflow-hidden bg-white">
+            <CardHeader className="bg-slate-50 border-b border-slate-100">
+              <CardTitle className="text-lg font-black text-slate-800">{store}店の予約台帳設定</CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
-              <table className="w-full text-sm">
-                <tbody className="divide-y divide-slate-100">
-                  {data.materials.map(item => (
-                    <tr key={item.id} className="hover:bg-slate-50/50 group">
-                      <td className="px-4 py-2">
-                        <Input 
-                          value={item.name} 
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItem("materials", item.id, "name", e.target.value)}
-                          className="h-8 border-transparent group-hover:border-slate-200 focus:border-emerald-500 bg-transparent focus:bg-white text-xs"
-                        />
-                      </td>
-                      <td className="px-4 py-2 w-28 text-right">
-                        <Input 
-                          type="number"
-                          value={item.price} 
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItem("materials", item.id, "price", parseInt(e.target.value) || 0)}
-                          className="h-8 border-transparent group-hover:border-slate-200 focus:border-emerald-500 bg-transparent focus:bg-white text-xs text-right font-mono"
-                        />
-                      </td>
-                      <td className="pr-4 text-right">
-                        <button onClick={() => removeItem("materials", item.id)} className="text-slate-300 hover:text-rose-500">
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">営業開始（何時から表示するか）</label>
+                  <div className="relative">
+                    <Input 
+                      type="number"
+                      min={0}
+                      max={23}
+                      value={storeSettings.startHour} 
+                      onChange={(e) => handleStoreChange(store, "startHour", parseInt(e.target.value) || 0)}
+                      className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
+                    />
+                    <span className="absolute right-4 top-3 text-slate-400 font-bold">時</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">営業終了（何時まで表示するか）</label>
+                  <div className="relative">
+                    <Input 
+                      type="number"
+                      min={1}
+                      max={24}
+                      value={storeSettings.endHour} 
+                      onChange={(e) => handleStoreChange(store, "endHour", parseInt(e.target.value) || 0)}
+                      className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
+                    />
+                    <span className="absolute right-4 top-3 text-slate-400 font-bold">時</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">時間の刻み幅（マス目の単位）</label>
+                  <div className="relative">
+                    <select
+                      value={storeSettings.slotDuration}
+                      onChange={(e) => handleStoreChange(store, "slotDuration", parseInt(e.target.value) || 30)}
+                      className="w-full h-12 bg-slate-50 border-none rounded-2xl px-4 font-bold text-sm appearance-none"
+                    >
+                      <option value={60}>60分ごと</option>
+                      <option value={30}>30分ごと</option>
+                      <option value={15}>15分ごと</option>
+                      <option value={10}>10分ごと</option>
+                      <option value={5}>5分ごと</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
-
-          {/* Options Section */}
-          <Card className="border-slate-200 shadow-sm overflow-hidden">
-            <CardHeader className="bg-slate-50 border-b border-slate-200 flex flex-row items-center justify-between py-4">
-              <CardTitle className="text-slate-800 text-lg">その他オプション</CardTitle>
-              <Button variant="outline" size="sm" onClick={() => addItem("options")} className="bg-white border-slate-300">
-                <Plus size={14} />
-              </Button>
-            </CardHeader>
-            <CardContent className="p-0">
-              <table className="w-full text-sm">
-                <tbody className="divide-y divide-slate-100">
-                  {data.options.map(item => (
-                    <tr key={item.id} className="hover:bg-slate-50/50 group">
-                      <td className="px-4 py-2">
-                        <Input 
-                          value={item.name} 
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItem("options", item.id, "name", e.target.value)}
-                          className="h-8 border-transparent group-hover:border-slate-200 focus:border-emerald-500 bg-transparent focus:bg-white text-xs"
-                        />
-                      </td>
-                      <td className="px-4 py-2 w-28 text-right">
-                        <Input 
-                          type="number"
-                          value={item.price} 
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItem("options", item.id, "price", parseInt(e.target.value) || 0)}
-                          className="h-8 border-transparent group-hover:border-slate-200 focus:border-emerald-500 bg-transparent focus:bg-white text-xs text-right font-mono"
-                        />
-                      </td>
-                      <td className="pr-4 text-right">
-                        <button onClick={() => removeItem("options", item.id)} className="text-slate-300 hover:text-rose-500">
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
-        </div>
-
-      </main>
+        ))}
+      </div>
     </div>
   );
 }

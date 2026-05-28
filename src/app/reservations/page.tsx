@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { getReservations, Reservation } from "./actions";
 import { getStaffList, StaffProfile } from "@/app/staff/actions";
+import { getMonthlyShifts, ShiftRecord } from "@/app/shifts/actions";
+import { getReservationSettings, ReservationSettings } from "@/app/admin/settings/actions";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, RefreshCw, Search, Plus, Bell, MessageCircle, Star } from "lucide-react";
@@ -15,6 +17,8 @@ export default function ReservationsPage() {
   const [store, setStore] = useState("六甲");
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [staffList, setStaffList] = useState<StaffProfile[]>([]);
+  const [shifts, setShifts] = useState<ShiftRecord[]>([]);
+  const [settings, setSettings] = useState<ReservationSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
   const dateStr = format(date, "yyyy-MM-dd");
@@ -22,12 +26,19 @@ export default function ReservationsPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [resData, staffData] = await Promise.all([
+      const [resData, staffData, shiftsData, settingsData] = await Promise.all([
         getReservations(store, dateStr),
-        getStaffList()
+        getStaffList(),
+        getMonthlyShifts(date.getFullYear(), date.getMonth() + 1),
+        getReservationSettings()
       ]);
       setReservations(resData);
       setStaffList(staffData);
+      setSettings(settingsData);
+      
+      // Filter shifts for the selected date
+      const dailyShifts = shiftsData.filter(s => s.date === dateStr);
+      setShifts(dailyShifts);
     } catch (e) {
       console.error(e);
     }
@@ -104,7 +115,35 @@ export default function ReservationsPage() {
             </div>
             <div className="px-3 py-1.5 flex flex-col items-center">
               <span className="text-slate-500 mb-0.5">稼働率</span>
-              <span className="text-emerald-600 text-sm">78<span className="text-[10px] ml-0.5">%</span></span>
+              <span className="text-emerald-600 text-sm">
+                {(() => {
+                  // 動的な稼働率計算
+                  let totalWorkMinutes = 0;
+                  shifts.forEach(shift => {
+                    if (shift.type === "work") {
+                      (shift.segments || []).forEach(seg => {
+                        if (store === "全店舗" || seg.store === store) {
+                          const [h1, m1] = seg.start_time.split(":").map(Number);
+                          const [h2, m2] = seg.end_time.split(":").map(Number);
+                          totalWorkMinutes += (h2 * 60 + m2) - (h1 * 60 + m1);
+                        }
+                      });
+                    }
+                  });
+
+                  let totalReservedMinutes = 0;
+                  reservations.forEach(res => {
+                    if (!res.start_time || !res.end_time || res.type !== 'reservation') return;
+                    const [h1, m1] = res.start_time.split(":").map(Number);
+                    const [h2, m2] = res.end_time.split(":").map(Number);
+                    totalReservedMinutes += (h2 * 60 + m2) - (h1 * 60 + m1);
+                  });
+
+                  const occupancy = totalWorkMinutes > 0 ? Math.round((totalReservedMinutes / totalWorkMinutes) * 100) : 0;
+                  return Math.min(100, occupancy);
+                })()}
+                <span className="text-[10px] ml-0.5">%</span>
+              </span>
             </div>
           </div>
 
@@ -120,19 +159,19 @@ export default function ReservationsPage() {
 
       {/* Timeline Area (Takes remaining height) */}
       <div className="flex-1 overflow-hidden p-2 relative">
-        {loading ? (
-          <div className="absolute inset-0 bg-white/50 z-50 flex flex-col items-center justify-center">
-            <RefreshCw className="w-8 h-8 animate-spin text-blue-500 mb-4" />
-            <p className="font-bold text-slate-500 text-sm">読み込み中...</p>
-          </div>
-        ) : null}
-        <ReservationTimeline 
-          reservations={reservations} 
-          staffList={staffList} 
-          date={dateStr} 
-          storeName={store}
-          onRefresh={loadData}
-        />
+        {loading || !settings ? (
+          <div className="p-20 text-center text-slate-400 font-bold animate-pulse">Loading Timeline...</div>
+        ) : (
+          <ReservationTimeline 
+            reservations={reservations} 
+            staffList={staffList} 
+            shifts={shifts}
+            date={dateStr}
+            storeName={store}
+            settings={settings}
+            onRefresh={loadData}
+          />
+        )}
       </div>
 
       {/* Sticky Notification Footer */}

@@ -23,12 +23,13 @@ export default function LoginPage() {
 
     try {
       try {
-        await signInWithEmailAndPassword(auth, email, password);
+        // スタッフがマネージャー権限で入る場合は _salon が付与されている可能性が高いので先に試す
+        await signInWithEmailAndPassword(auth, email, password + "_salon");
         router.push("/dashboard");
       } catch (firstErr: any) {
         if (firstErr.code === "auth/invalid-credential" || firstErr.code === "auth/wrong-password" || firstErr.code === "auth/user-not-found") {
-          // If the exact password fails, try appending _salon for staff PIN codes
-          await signInWithEmailAndPassword(auth, email, password + "_salon");
+          // Firebase Console等で手動作成されたシステム管理者の場合は _salon なしで試す
+          await signInWithEmailAndPassword(auth, email, password);
           router.push("/dashboard");
         } else {
           throw firstErr;
@@ -38,6 +39,8 @@ export default function LoginPage() {
       console.error(err);
       if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
         setError("メールアドレスまたはパスワードが正しくありません。");
+      } else if (err.code === "auth/too-many-requests") {
+        setError("ログインの失敗が続いたため、一時的にロックされています。しばらく時間をおいてから再度お試しください。");
       } else {
         setError("ログイン中にエラーが発生しました。");
       }

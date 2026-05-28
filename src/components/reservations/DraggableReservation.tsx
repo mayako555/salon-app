@@ -1,25 +1,27 @@
 import { useState, useRef, useEffect } from "react";
 import { Reservation, updateReservationTime } from "@/app/reservations/actions";
-import { START_HOUR, TOTAL_HOURS, HOUR_WIDTH, ROW_HEIGHT } from "./ReservationTimeline";
+import { HOUR_WIDTH, ROW_HEIGHT } from "./ReservationTimeline";
 import { User, Scissors, Star, Tag, MessageSquare, Phone, MapPin, Eye, AlertCircle } from "lucide-react";
 
-function timeToPixels(timeStr: string): number {
+function timeToPixels(timeStr: string, startHour: number, totalHours: number): number {
   const [h, m] = timeStr.split(":").map(Number);
-  const hourOffset = h - START_HOUR;
-  if (hourOffset < 0 || hourOffset > TOTAL_HOURS) return -1;
+  const hourOffset = h - startHour;
+  if (hourOffset < 0 || hourOffset > totalHours) return -1;
   return (hourOffset * HOUR_WIDTH) + ((m / 60) * HOUR_WIDTH);
 }
 
-function pixelsToTime(px: number): string {
-  const clampedPx = Math.max(0, Math.min(px, TOTAL_HOURS * HOUR_WIDTH));
+function pixelsToTime(px: number, startHour: number, totalHours: number): string {
+  const clampedPx = Math.max(0, Math.min(px, totalHours * HOUR_WIDTH));
   const totalMinutes = (clampedPx / HOUR_WIDTH) * 60;
   const snappedMinutes = Math.round(totalMinutes / 15) * 15;
-  const h = START_HOUR + Math.floor(snappedMinutes / 60);
+  const h = startHour + Math.floor(snappedMinutes / 60);
   const m = snappedMinutes % 60;
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 }
 
 function getColorClasses(res: Reservation) {
+  if (res.type === "schedule") return "bg-slate-200/80 border-slate-300 text-slate-700 shadow-none";
+
   if (res.status === 'cancelled') return "bg-slate-100 border-slate-200 text-slate-400 opacity-50 line-through";
   if (res.status === 'completed') return "bg-slate-200 border-slate-300 text-slate-500 opacity-60";
   
@@ -34,7 +36,9 @@ function getColorClasses(res: Reservation) {
   }
 }
 
-function getMenuIcon(menuName: string) {
+function getMenuIcon(menuName: string, isSchedule = false) {
+  if (isSchedule) return <AlertCircle className="w-2.5 h-2.5" />;
+  if (!menuName) return <Tag className="w-2.5 h-2.5" />;
   if (menuName.includes('アイブロウ') || menuName.includes('眉')) return <Eye className="w-2.5 h-2.5" />;
   if (menuName.includes('パーマ') || menuName.includes('カール')) return <Scissors className="w-2.5 h-2.5" />;
   if (menuName.includes('エクステ') || menuName.includes('ボリューム')) return <Star className="w-2.5 h-2.5" />;
@@ -47,25 +51,29 @@ type Props = {
   currentStaffIndex: number;
   onClick: (res: Reservation) => void;
   onUpdateComplete: () => void;
+  startHour: number;
+  totalHours: number;
 };
 
-export default function DraggableReservation({ res, staffList, currentStaffIndex, onClick, onUpdateComplete }: Props) {
+export default function DraggableReservation({ res, staffList, currentStaffIndex, onClick, onUpdateComplete, startHour, totalHours }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [showHover, setShowHover] = useState(false);
   const [contextMenu, setContextMenu] = useState<{x: number, y: number} | null>(null);
   
-  const [currentLeft, setCurrentLeft] = useState(timeToPixels(res.start_time));
-  const [currentWidth, setCurrentWidth] = useState(timeToPixels(res.end_time) - timeToPixels(res.start_time));
+  const [currentLeft, setCurrentLeft] = useState(timeToPixels(res.start_time, startHour, totalHours));
+  const [currentWidth, setCurrentWidth] = useState(timeToPixels(res.end_time, startHour, totalHours) - timeToPixels(res.start_time, startHour, totalHours));
   const [currentTop, setCurrentTop] = useState(0); 
   
   useEffect(() => {
     if (!isDragging && !isResizing) {
-      setCurrentLeft(timeToPixels(res.start_time));
-      setCurrentWidth(timeToPixels(res.end_time) - timeToPixels(res.start_time));
+      const initialLeft = timeToPixels(res.start_time, startHour, totalHours);
+      const initialWidth = timeToPixels(res.end_time, startHour, totalHours) - initialLeft;
+      setCurrentLeft(initialLeft);
+      setCurrentWidth(initialWidth);
       setCurrentTop(0);
     }
-  }, [res.start_time, res.end_time, isDragging, isResizing]);
+  }, [res.start_time, res.end_time, isDragging, isResizing, startHour, totalHours]);
 
   const handlePointerDown = (e: React.PointerEvent, type: 'move' | 'resize') => {
     if (e.button === 2) return; // Ignore right click
@@ -111,8 +119,6 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
         const dy = upEvent.clientY - startY;
 
         if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
-          // It's a click. Wait for double click logic? We can just use standard onClick for now,
-          // or we can implement real double click. Let's just trigger onClick.
           onClick(res);
           return;
         }
@@ -121,9 +127,9 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
         const newStaffIndex = Math.max(0, Math.min(staffList.length - 1, currentStaffIndex + rowOffset));
         const newStaff = staffList[newStaffIndex];
 
-        const newStart = pixelsToTime(currentLeft + dx);
-        const newStartPx = timeToPixels(newStart);
-        const newEnd = pixelsToTime(newStartPx + initialWidth);
+        const newStart = pixelsToTime(currentLeft + dx, startHour, totalHours);
+        const newStartPx = timeToPixels(newStart, startHour, totalHours);
+        const newEnd = pixelsToTime(newStartPx + initialWidth, startHour, totalHours);
 
         await updateReservationTime(res.id, newStaff, newStart, newEnd);
         onUpdateComplete();
@@ -131,7 +137,7 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
         const dx = upEvent.clientX - startX;
         if (Math.abs(dx) < 3) return; 
 
-        const newEnd = pixelsToTime(initialLeft + initialWidth + dx);
+        const newEnd = pixelsToTime(initialLeft + initialWidth + dx, startHour, totalHours);
         await updateReservationTime(res.id, res.staff_name, res.start_time, newEnd);
         onUpdateComplete();
       }
@@ -172,20 +178,24 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
         `}
       >
         <div className="flex items-center gap-1 text-[8px] font-bold opacity-90 leading-none pointer-events-none mb-0.5">
-          <span className="bg-white/60 px-0.5 rounded flex items-center gap-0.5 border border-black/5">
-            {getMenuIcon(res.menu_name)} {res.portal}
+          <span className={`px-0.5 rounded flex items-center gap-0.5 border border-black/5 ${res.type === 'schedule' ? 'bg-slate-300/50' : 'bg-white/60'}`}>
+            {getMenuIcon(res.menu_name || "", res.type === 'schedule')} {res.type !== 'schedule' ? res.portal : ""}
           </span>
-          {res.customer_type && (
+          {res.type !== 'schedule' && res.customer_type && (
             <span className={`px-0.5 rounded text-white ${res.customer_type === '新規' ? 'bg-blue-500' : res.customer_type === '再来' ? 'bg-green-500' : 'bg-slate-500'}`}>
               {res.customer_type.charAt(0)}
             </span>
           )}
-          {res.is_caution && <AlertCircle className="w-2.5 h-2.5 text-red-500 fill-white" />}
-          {res.status === 'arrived' && <span className="bg-emerald-500 text-white px-0.5 rounded">来</span>}
-          {res.status === 'completed' && <span className="bg-slate-800 text-white px-0.5 rounded">済</span>}
+          {res.type !== 'schedule' && res.is_caution && <AlertCircle className="w-2.5 h-2.5 text-red-500 fill-white" />}
+          {res.type !== 'schedule' && res.status === 'arrived' && <span className="bg-emerald-500 text-white px-0.5 rounded">来</span>}
+          {res.type !== 'schedule' && res.status === 'completed' && <span className="bg-slate-800 text-white px-0.5 rounded">済</span>}
         </div>
-        <span className="text-[10px] font-black truncate leading-tight pointer-events-none tracking-tight">{res.customer_name}</span>
-        <span className="text-[8px] truncate opacity-80 leading-tight mt-px pointer-events-none">{res.menu_name}</span>
+        <span className="text-[10px] font-black truncate leading-tight pointer-events-none tracking-tight">
+          {res.type === 'schedule' ? res.menu_name : res.customer_name}
+        </span>
+        {res.type !== 'schedule' && (
+          <span className="text-[8px] truncate opacity-80 leading-tight mt-px pointer-events-none">{res.menu_name}</span>
+        )}
         
         {!isCompleted && (
           <div 

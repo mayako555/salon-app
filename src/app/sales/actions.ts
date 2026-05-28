@@ -58,6 +58,7 @@ export type SalesRecord = {
   next_booking_line_reminder?: boolean; // 2日前のリマインダー送付
   customer_id?: string;
   is_minimo?: boolean;
+  treatment_minutes?: number; // 稼働率計算用
   created_at: any; // Firestore Timestamp
 };
 
@@ -248,6 +249,7 @@ export async function addCheckout(formData: FormData) {
     const nextBookingTime = formData.get("next_booking_time") as string || "";
     const nextBookingLineReminder = formData.get("next_booking_line_reminder") === "true";
     const isMinimo = formData.get("is_minimo") === "true" || reservationRoute.includes("ミニモ");
+    const treatmentMinutes = parseInt(formData.get("treatment_minutes") as string || "60", 10);
 
     if (!staffName || !date) {
       return { success: false, error: "必須項目が入力されていません。" };
@@ -284,6 +286,7 @@ export async function addCheckout(formData: FormData) {
       next_booking_time: nextBookingTime,
       next_booking_line_reminder: nextBookingLineReminder,
       is_minimo: isMinimo,
+      treatment_minutes: treatmentMinutes,
       status: "draft",
       source: "checkout" as SalesSource,
       created_at: serverTimestamp()
@@ -377,6 +380,7 @@ export async function updateCheckout(id: string, formData: FormData) {
     const nextBookingTime = formData.get("next_booking_time") as string || "";
     const nextBookingLineReminder = formData.get("next_booking_line_reminder") === "true";
     const isMinimo = formData.get("is_minimo") === "true" || reservationRoute.includes("ミニモ");
+    const treatmentMinutes = parseInt(formData.get("treatment_minutes") as string || "60", 10);
 
     if (!staffName || !date) {
       return { success: false, error: "必須項目が入力されていません。" };
@@ -413,6 +417,7 @@ export async function updateCheckout(id: string, formData: FormData) {
       next_booking_time: nextBookingTime,
       next_booking_line_reminder: nextBookingLineReminder,
       is_minimo: isMinimo,
+      treatment_minutes: treatmentMinutes,
       updated_at: serverTimestamp()
     };
 

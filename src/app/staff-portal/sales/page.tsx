@@ -42,6 +42,13 @@ export default function StaffPortalSalesPage() {
 
   // Convert reservation to partial SalesRecord
   const mapReservationToSalesRecord = (res: Reservation): SalesRecord => {
+    let treatmentMinutes = 60;
+    if (res.start_time && res.end_time) {
+      const [h1, m1] = res.start_time.split(":").map(Number);
+      const [h2, m2] = res.end_time.split(":").map(Number);
+      treatmentMinutes = (h2 * 60 + m2) - (h1 * 60 + m1);
+    }
+
     return {
       id: "new",
       staff_id: res.staff_id,
@@ -49,9 +56,9 @@ export default function StaffPortalSalesPage() {
       store_name: res.store_name,
       date: res.date,
       time: res.start_time,
-      customer_name: res.customer_name,
+      customer_name: res.customer_name || "予定",
       customer_type: "不明",
-      menu_course: res.menu_name,
+      menu_course: res.menu_name || "",
       tech_sales: res.expected_price || 0,
       product_sales: 0,
       is_nominated: false,
@@ -59,7 +66,7 @@ export default function StaffPortalSalesPage() {
       discount: 0,
       discount_reason: "",
       portal_fee: 0,
-      reservation_route: res.portal === "HPB" ? "HOT PEPPER Beauty" : res.portal,
+      reservation_route: res.portal === "HPB" ? "HOT PEPPER Beauty" : (res.portal || "Direct"),
       status: "draft",
       payment_method: "cash",
       hpb_points: 0,
@@ -67,6 +74,7 @@ export default function StaffPortalSalesPage() {
       hair_material: "",
       options: "",
       cancel_fee: 0,
+      treatment_minutes: treatmentMinutes,
       created_at: null
     };
   };
