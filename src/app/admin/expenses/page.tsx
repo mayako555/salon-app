@@ -33,7 +33,8 @@ import {
   Calendar,
   Layers,
   ArrowRightLeft,
-  X
+  X,
+  Lock
 } from "lucide-react";
 import { format } from "date-fns";
 import AuthGuard from "@/components/AuthGuard";
@@ -66,10 +67,10 @@ export default function AdminExpensesDashboard() {
   const [financialOutflows, setFinancialOutflows] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Custom Fixed Costs States
-  const [rent, setRent] = useState("150000");
-  const [salaries, setSalaries] = useState("450000");
-  const [marketing, setMarketing] = useState("100000");
+  // Auto-calculated Fixed Costs States
+  const [rent, setRent] = useState(0);
+  const [salaries, setSalaries] = useState(0);
+  const [marketing, setMarketing] = useState(0);
 
   // Search Filter
   const [search, setSearch] = useState("");
@@ -111,6 +112,9 @@ export default function AdminExpensesDashboard() {
         setSales(res.totalSales || 0);
         setCashExpenses(res.totalCashExpenses || 0);
         setFinancialOutflows(res.totalFinancialOutflows || 0);
+        setRent(res.autoRent || 0);
+        setMarketing(res.autoMarketing || 0);
+        setSalaries(res.autoSalaries || 0);
         setExpenses(res.expensesList || []);
       } else {
         toast.error("データの取得に失敗しました");
@@ -206,9 +210,9 @@ export default function AdminExpensesDashboard() {
     setAiReport(null);
     try {
       const costs = {
-        rent: parseInt(rent, 10) || 0,
-        salaries: parseInt(salaries, 10) || 0,
-        marketing: parseInt(marketing, 10) || 0
+        rent,
+        salaries,
+        marketing
       };
       
       const res = await generateAiManagementAdvice(year, month, costs);
@@ -341,11 +345,7 @@ export default function AdminExpensesDashboard() {
   };
 
   // Calculations
-  const customRent = parseInt(rent, 10) || 0;
-  const customSalaries = parseInt(salaries, 10) || 0;
-  const customMarketing = parseInt(marketing, 10) || 0;
-
-  const totalFixedExpenses = customRent + customSalaries + customMarketing;
+  const totalFixedExpenses = rent + salaries + marketing;
   const totalAllExpenses = cashExpenses + totalFixedExpenses;
   const netProfit = sales - totalAllExpenses;
 
@@ -673,12 +673,10 @@ export default function AdminExpensesDashboard() {
                     <label className="text-[10px] font-bold text-slate-500">地代家賃 (賃料)</label>
                     <div className="relative">
                       <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">¥</span>
-                      <Input 
-                        type="number"
-                        value={rent}
-                        onChange={e => setRent(e.target.value)}
-                        className="h-9 bg-slate-50 border-slate-200 pl-6 text-xs font-bold rounded-lg focus:ring-emerald-500 focus:bg-white transition-all outline-none"
-                      />
+                      <div className="h-9 bg-slate-50 border border-slate-200 pl-6 pr-8 text-xs font-bold rounded-lg flex items-center text-slate-700">
+                        {rent.toLocaleString()}
+                      </div>
+                      <Lock className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 w-3 h-3" />
                     </div>
                   </div>
 
@@ -686,12 +684,10 @@ export default function AdminExpensesDashboard() {
                     <label className="text-[10px] font-bold text-slate-500">人件費 (給与含む)</label>
                     <div className="relative">
                       <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">¥</span>
-                      <Input 
-                        type="number"
-                        value={salaries}
-                        onChange={e => setSalaries(e.target.value)}
-                        className="h-9 bg-slate-50 border-slate-200 pl-6 text-xs font-bold rounded-lg focus:ring-emerald-500 focus:bg-white transition-all outline-none"
-                      />
+                      <div className="h-9 bg-slate-50 border border-slate-200 pl-6 pr-8 text-xs font-bold rounded-lg flex items-center text-slate-700">
+                        {salaries.toLocaleString()}
+                      </div>
+                      <Lock className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 w-3 h-3" />
                     </div>
                   </div>
 
@@ -699,12 +695,10 @@ export default function AdminExpensesDashboard() {
                     <label className="text-[10px] font-bold text-slate-500">広告宣伝費 (HPB等)</label>
                     <div className="relative">
                       <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">¥</span>
-                      <Input 
-                        type="number"
-                        value={marketing}
-                        onChange={e => setMarketing(e.target.value)}
-                        className="h-9 bg-slate-50 border-slate-200 pl-6 text-xs font-bold rounded-lg focus:ring-emerald-500 focus:bg-white transition-all outline-none"
-                      />
+                      <div className="h-9 bg-slate-50 border border-slate-200 pl-6 pr-8 text-xs font-bold rounded-lg flex items-center text-slate-700">
+                        {marketing.toLocaleString()}
+                      </div>
+                      <Lock className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 w-3 h-3" />
                     </div>
                   </div>
                 </div>

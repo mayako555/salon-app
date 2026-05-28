@@ -419,14 +419,30 @@ export async function getExpensesDashboardData(year: number, month: number) {
     // Separate normal cash expenses and financial/tax outflows
     let totalCashExpenses = 0;
     let totalFinancialOutflows = 0;
+    let autoRent = 0;
+    let autoMarketing = 0;
 
     expensesList.forEach(e => {
       const isTaxOrDebt = ["借入金", "長期借入金", "短期借入金", "法人税等", "法人税", "所得税", "住民税", "消費税"].some(keyword => e.category.includes(keyword) || (e.description && e.description.includes(keyword)));
       if (isTaxOrDebt) {
         totalFinancialOutflows += e.amount;
+      } else if (e.category === "地代家賃") {
+        autoRent += e.amount;
+      } else if (e.category === "広告宣伝費") {
+        autoMarketing += e.amount;
+      } else if (e.category === "給料手当" || e.category === "役員報酬" || e.category === "給料賃金" || e.category === "法定福利費") {
+        // Skip salaries from cash expenses to avoid double-counting, as we will use the payroll system
       } else {
         totalCashExpenses += e.amount;
       }
+    });
+
+    // Automatically calculate payroll salaries
+    const { getMonthlyStatements } = await import("@/app/payroll/actions");
+    const statements = await getMonthlyStatements(year, month);
+    let autoSalaries = 0;
+    statements.forEach(s => {
+      autoSalaries += s.final_paid_amount;
     });
     
     return {
@@ -434,6 +450,9 @@ export async function getExpensesDashboardData(year: number, month: number) {
       totalSales,
       totalCashExpenses,
       totalFinancialOutflows,
+      autoRent,
+      autoMarketing,
+      autoSalaries,
       expensesList
     };
   } catch (error: any) {
@@ -475,23 +494,56 @@ export async function getAnnualPnLData() {
       }
     });
 
+    const { getMonthlyStatements } = await import("@/app/payroll/actions");
+
     // Merge sales and expenses for the last 12 months
     const now = new Date();
     const result = [];
     
     for (let i = 11; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const targetYear = d.getFullYear();
+      const targetMonth = d.getMonth() + 1;
+      const monthStr = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
+      
       const sales = salesData[monthStr] || 0;
-      const expenses = expensesByMonth[monthStr] || 0;
+      let rawExpenses = expensesByMonth[monthStr] || 0;
       const financialOutflow = financialByMonth[monthStr] || 0;
-      const profit = sales - expenses;
+
+      // Extract specific fixed costs for this month from the DB
+      const monthlyExpList = await getExpenses(targetYear, targetMonth);
+      let autoRent = 0;
+      let autoMarketing = 0;
+      let variableExpenses = 0;
+
+      monthlyExpList.forEach(e => {
+        const isTaxOrDebt = ["借入金", "長期借入金", "短期借入金", "法人税等", "法人税", "所得税", "住民税", "消費税"].some(keyword => e.category.includes(keyword) || (e.description && e.description.includes(keyword)));
+        if (!isTaxOrDebt) {
+          if (e.category === "地代家賃") autoRent += e.amount;
+          else if (e.category === "広告宣伝費") autoMarketing += e.amount;
+          else if (e.category === "給料手当" || e.category === "役員報酬" || e.category === "給料賃金" || e.category === "法定福利費") {
+            // Ignore Yayoi salaries
+          } else {
+            variableExpenses += e.amount;
+          }
+        }
+      });
+
+      // Get payroll salaries
+      const statements = await getMonthlyStatements(targetYear, targetMonth);
+      let autoSalaries = 0;
+      statements.forEach(s => {
+        autoSalaries += s.final_paid_amount;
+      });
+
+      const totalExpenses = variableExpenses + autoRent + autoMarketing + autoSalaries;
+      const profit = sales - totalExpenses;
       const cashFlow = profit - financialOutflow;
       
       result.push({
         month: monthStr,
         sales,
-        expenses,
+        expenses: totalExpenses,
         profit,
         financialOutflow,
         cashFlow
