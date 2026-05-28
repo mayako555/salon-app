@@ -1,0 +1,43 @@
+Retrieving project…
+Deploying mayakos-projects-ee58882d/salon-app
+Uploading [--------------------] (0.0B/68B)
+Uploading [====================] (68.0B/68B)
+  Inspect     https://vercel.com/mayakos-projects-ee58882d/salon-app/3WGQq9JMXToQUrxDet41MNvsWMnX
+▲ Production  https://salon-96ge8c6zn-mayakos-projects-ee58882d.vercel.app
+https://salon-96ge8c6zn-mayakos-projects-ee58882d.vercel.appBuilding…
+Building…
+Running build in Washington, D.C., USA (East) – iad1
+Build machine configuration: 2 cores, 8 GB
+Retrieving list of deployment files...
+Downloading 246 deployment files...
+Restored build cache from previous deployment (AXexrCSdvBfreLsiSiTkF8UqLB84)
+Running "vercel build"
+Vercel CLI 54.4.1
+Installing dependencies...
+up to date in 2s
+251 packages are looking for funding
+run `npm fund` for details
+Detected Next.js version: 16.2.4
+Running "npm run build"
+> salon-app@0.1.0 build
+> next build
+Applying modifyConfig from Vercel
+▲ Next.js 16.2.4 (Turbopack)
+- Experiments (use with caution):
+· serverActions
+Creating an optimized production build ...
+✓ Compiled successfully in 45s
+Running TypeScript ...
+Failed to type check.
+./src/components/reservations/ReservationFormDialog.tsx:262:35
+Type error: Property 'type' does not exist on type 'Customer'.
+260 |                           </div>
+261 |                           <div className="font-mono">{c.phone || "-"}</div>
+> 262 |                           <div>{c.type || "-"}</div>
+|                                   ^
+263 |                           <div>{c.last_visit ? c.last_visit.substring(0, 10) : "なし"}</div>
+264 |                         </div>
+265 |                       ))}
+Next.js build worker exited with code: 1 and signal: null
+Error: Command "npm run build" exited with 1
+Error: Command "npm run build" exited with 1

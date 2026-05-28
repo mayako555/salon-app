@@ -27,7 +27,7 @@ export default function ReservationsPage() {
     setLoading(true);
     try {
       const [resData, staffData, shiftsData, settingsData] = await Promise.all([
-        getReservations(store, dateStr),
+        getReservations("全店舗", dateStr), // タイムラインには他店舗の予約も出すために一旦全店舗分取得
         getStaffList(),
         getMonthlyShifts(date.getFullYear(), date.getMonth() + 1),
         getReservationSettings()
@@ -59,6 +59,8 @@ export default function ReservationsPage() {
   const setToday = () => {
     setDate(new Date());
   };
+
+  const currentStoreReservations = reservations.filter(r => store === "全店舗" || r.store_name === store);
 
   return (
     <div className="flex flex-col h-screen bg-slate-100 overflow-hidden text-xs">
@@ -107,11 +109,11 @@ export default function ReservationsPage() {
           <div className="flex bg-slate-50 border border-slate-200 rounded-md overflow-hidden text-[10px] font-bold">
             <div className="px-3 py-1.5 border-r border-slate-200 flex flex-col items-center">
               <span className="text-slate-500 mb-0.5">来店予定</span>
-              <span className="text-slate-800 text-sm">{reservations.length}<span className="text-[10px] ml-0.5">名</span></span>
+              <span className="text-slate-800 text-sm">{currentStoreReservations.length}<span className="text-[10px] ml-0.5">名</span></span>
             </div>
             <div className="px-3 py-1.5 border-r border-slate-200 flex flex-col items-center">
               <span className="text-slate-500 mb-0.5">売上見込</span>
-              <span className="text-slate-800 text-sm">¥{(reservations.reduce((acc, r) => acc + (r.expected_price || 0), 0)).toLocaleString()}</span>
+              <span className="text-slate-800 text-sm">¥{(currentStoreReservations.reduce((acc, r) => acc + (r.expected_price || 0), 0)).toLocaleString()}</span>
             </div>
             <div className="px-3 py-1.5 flex flex-col items-center">
               <span className="text-slate-500 mb-0.5">稼働率</span>
@@ -132,7 +134,7 @@ export default function ReservationsPage() {
                   });
 
                   let totalReservedMinutes = 0;
-                  reservations.forEach(res => {
+                  currentStoreReservations.forEach(res => {
                     if (!res.start_time || !res.end_time || res.type !== 'reservation') return;
                     const [h1, m1] = res.start_time.split(":").map(Number);
                     const [h2, m2] = res.end_time.split(":").map(Number);

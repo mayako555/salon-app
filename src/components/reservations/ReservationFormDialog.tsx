@@ -259,8 +259,8 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                             <span className="text-[9px] text-slate-500">{(c as any).kana || `${(c as any).last_name_kana || ''} ${(c as any).first_name_kana || ''}`.trim()}</span>
                           </div>
                           <div className="font-mono">{c.phone || "-"}</div>
-                          <div>{c.type || "-"}</div>
-                          <div>{c.last_visit ? c.last_visit.substring(0, 10) : "なし"}</div>
+                          <div>{(c as any).customer_type || "-"}</div>
+                          <div>{(c as any).last_visit ? (c as any).last_visit.substring(0, 10) : "なし"}</div>
                         </div>
                       ))}
                     </div>
