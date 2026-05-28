@@ -438,12 +438,33 @@ export async function getExpensesDashboardData(year: number, month: number) {
       }
     });
 
-    // Automatically calculate payroll salaries
+    // Automatically calculate payroll salaries and actual insurance deductions
     const { getMonthlyStatements } = await import("@/app/payroll/actions");
     const statements = await getMonthlyStatements(year, month);
     let autoSalaries = 0;
+    let actualSocialInsurance = 0;
+    let actualLaborInsurance = 0;
+    
     statements.forEach(s => {
       autoSalaries += s.final_paid_amount;
+      
+      if (s.details.social_insurance) {
+        // Employer pays 50% matching for health and pension, plus childcare
+        const health = s.details.social_insurance.health || 0;
+        const pension = s.details.social_insurance.pension || 0;
+        const childcare = s.details.social_insurance.childcare || 0;
+        actualSocialInsurance += (health + pension + childcare);
+        
+        // Employer pays 0.95% out of 1.55% total for employment insurance (employee pays 0.6%)
+        const employment = s.details.social_insurance.employment || 0;
+        const employerEmployment = Math.round((employment / 0.6) * 0.95) || 0;
+        
+        // Worker's comp (労災) is 100% employer paid (0.3% of gross salary)
+        const gross = s.base_amount + s.total_allowances;
+        const workersComp = Math.round(gross * 0.003) || 0;
+        
+        actualLaborInsurance += (employerEmployment + workersComp);
+      }
     });
     
     // Fallback to Yayoi salaries if no payroll records exist for this month
@@ -459,6 +480,8 @@ export async function getExpensesDashboardData(year: number, month: number) {
       autoRent,
       autoMarketing,
       autoSalaries,
+      actualSocialInsurance,
+      actualLaborInsurance,
       expensesList
     };
   } catch (error: any) {
@@ -611,7 +634,7 @@ export async function parseYayoiPdfAction(base64File: string, mimeType: string) 
 
     console.log(`[Yayoi Parser] Sending file to Gemini (MIME: ${mimeType})...`);
     
-    const modelIds = ["gemini-2.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-flash-latest"];
+    const modelIds = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-flash-latest"];
     let lastError = null;
     let jsonResultText = null;
 
@@ -829,7 +852,7 @@ export async function parseYayoiTextAction(textContent: string) {
 
     console.log(`[Yayoi Parser] Sending text data to Gemini...`);
     
-    const modelIds = ["gemini-2.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-flash-latest"];
+    const modelIds = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-flash-latest"];
     let lastError = null;
     let jsonResultText = null;
 

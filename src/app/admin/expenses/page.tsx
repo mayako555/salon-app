@@ -52,7 +52,14 @@ import {
   Line
 } from "recharts";
 
-function calculateAccurateTaxes(monthlyNetProfit: number, monthlySales: number, salaries: number, businessType: "corporation" | "sole") {
+function calculateAccurateTaxes(
+  monthlyNetProfit: number, 
+  monthlySales: number, 
+  salaries: number, 
+  businessType: "corporation" | "sole",
+  actualSocialInsurance: number,
+  actualLaborInsurance: number
+) {
   if (monthlyNetProfit <= 0) {
     return { incomeTax: 0, consumptionTax: 0, socialInsurance: 0, laborInsurance: 0 };
   }
@@ -106,12 +113,15 @@ function calculateAccurateTaxes(monthlyNetProfit: number, monthlySales: number, 
     annualIncomeTax = incomeTax + residentTax + enterpriseTax;
   }
 
-  // 3. 社会保険料 (会社負担分/事業主負担分目安 約15%)
-  const annualSocialInsurance = (salaries * 12) * 0.15;
+  // 3. 社会保険料 (実績があれば実績から年換算、なければ給与目安15%)
+  const annualSocialInsurance = actualSocialInsurance > 0 
+    ? actualSocialInsurance * 12 
+    : (salaries * 12) * 0.15;
 
-  // 4. 労働保険料 (雇用・労災: 会社負担分目安 約1.25%)
-  // 美容業の目安: 労災 0.3% + 雇用 0.95% = 1.25%
-  const annualLaborInsurance = (salaries * 12) * 0.0125;
+  // 4. 労働保険料 (実績があれば実績から年換算、なければ給与目安1.25%)
+  const annualLaborInsurance = actualLaborInsurance > 0
+    ? actualLaborInsurance * 12
+    : (salaries * 12) * 0.0125;
 
   // 月割りに戻す
   return {
@@ -142,6 +152,8 @@ export default function AdminExpensesDashboard() {
   const [rent, setRent] = useState(0);
   const [salaries, setSalaries] = useState(0);
   const [marketing, setMarketing] = useState(0);
+  const [actualSocialInsurance, setActualSocialInsurance] = useState(0);
+  const [actualLaborInsurance, setActualLaborInsurance] = useState(0);
 
   // Search Filter
   const [search, setSearch] = useState("");
@@ -186,6 +198,8 @@ export default function AdminExpensesDashboard() {
         setRent(res.autoRent || 0);
         setMarketing(res.autoMarketing || 0);
         setSalaries(res.autoSalaries || 0);
+        setActualSocialInsurance(res.actualSocialInsurance || 0);
+        setActualLaborInsurance(res.actualLaborInsurance || 0);
         setExpenses(res.expensesList || []);
       } else {
         toast.error("データの取得に失敗しました");
@@ -428,7 +442,7 @@ export default function AdminExpensesDashboard() {
     consumptionTax: estimatedConsumptionTax, 
     socialInsurance: estimatedSocialInsurance,
     laborInsurance: estimatedLaborInsurance
-  } = calculateAccurateTaxes(netProfit, sales, salaries, businessType);
+  } = calculateAccurateTaxes(netProfit, sales, salaries, businessType, actualSocialInsurance, actualLaborInsurance);
   
   const totalEstimatedTaxes = estimatedIncomeTax + estimatedConsumptionTax + estimatedSocialInsurance + estimatedLaborInsurance;
   const pureProfit = netProfit - totalEstimatedTaxes;
@@ -841,11 +855,11 @@ export default function AdminExpensesDashboard() {
                       <span>¥{estimatedConsumptionTax.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-[10px] text-slate-500">
-                      <span>社会保険料 (会社負担分目安):</span>
+                      <span>社会保険料 ({actualSocialInsurance > 0 ? "給与明細から実績反映" : "会社負担分目安"}):</span>
                       <span>¥{estimatedSocialInsurance.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-[10px] text-slate-500">
-                      <span>労働保険 (雇用・労災: 会社負担分目安):</span>
+                      <span>労働保険 ({actualLaborInsurance > 0 ? "給与明細から実績反映" : "雇用・労災 会社負担目安"}):</span>
                       <span>¥{estimatedLaborInsurance.toLocaleString()}</span>
                     </div>
                     <div className="border-t border-amber-200/50 my-1"></div>
