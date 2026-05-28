@@ -349,6 +349,13 @@ export default function AdminExpensesDashboard() {
   const totalAllExpenses = cashExpenses + totalFixedExpenses;
   const netProfit = sales - totalAllExpenses;
 
+  // Tax and Insurance Estimates
+  const estimatedCorporateTax = netProfit > 0 ? Math.floor(netProfit * 0.3) : 0;
+  const valueAdded = sales - (totalAllExpenses - salaries);
+  const estimatedConsumptionTax = valueAdded > 0 ? Math.floor(valueAdded * 0.1) : 0;
+  const estimatedSocialInsurance = Math.floor(salaries * 0.15);
+  const totalEstimatedTaxes = estimatedCorporateTax + estimatedConsumptionTax + estimatedSocialInsurance;
+
   // Filtered Expenses for Display List
   const filteredExpenses = expenses.filter(exp => {
     const matchesStore = store === "すべて" || exp.store_name === store;
@@ -719,6 +726,31 @@ export default function AdminExpensesDashboard() {
                     <span className={netProfit >= 0 ? "text-emerald-600 font-black" : "text-rose-600 font-black"}>
                       ¥{netProfit.toLocaleString()}
                     </span>
+                  </div>
+
+                  {/* Tax & Insurance Estimates */}
+                  <div className="mt-2 bg-amber-50/50 border border-amber-100 rounded-lg p-2.5 space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-800 mb-1">
+                      <Wallet size={12} />
+                      <span>翌月以降の納税・支払準備金 (目安)</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-slate-500">
+                      <span>法人税等 (約30%):</span>
+                      <span>¥{estimatedCorporateTax.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-slate-500">
+                      <span>消費税 (概算10%):</span>
+                      <span>¥{estimatedConsumptionTax.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-slate-500">
+                      <span>社会保険料 (会社負担分):</span>
+                      <span>¥{estimatedSocialInsurance.toLocaleString()}</span>
+                    </div>
+                    <div className="h-px bg-amber-200/50 my-1" />
+                    <div className="flex justify-between text-xs text-amber-900 font-bold">
+                      <span>準備金 合計目安:</span>
+                      <span>¥{totalEstimatedTaxes.toLocaleString()}</span>
+                    </div>
                   </div>
                 </div>
               </CardContent>
