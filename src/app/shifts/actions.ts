@@ -67,6 +67,27 @@ export async function getMonthlyShifts(year: number, month: number): Promise<Shi
   }
 }
 
+export async function getShiftsForDate(dateStr: string): Promise<ShiftRecord[]> {
+  try {
+    const colRef = collection(db, SHIFTS_COLLECTION);
+    const q = query(colRef, where("date", "==", dateStr));
+    const snapshot = await getDocs(q);
+    
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null),
+        updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : (data.updated_at || null)
+      };
+    }) as ShiftRecord[];
+  } catch (error) {
+    console.error("Error fetching shifts for date:", error);
+    return [];
+  }
+}
+
 export async function saveShift(data: Omit<ShiftRecord, "id"> & { id?: string }) {
   try {
     const colRef = collection(db, SHIFTS_COLLECTION);

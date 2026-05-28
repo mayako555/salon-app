@@ -1,0 +1,33 @@
+Retrieving project…
+Deploying mayakos-projects-ee58882d/salon-app
+Uploading [--------------------] (0.0B/40.7KB)
+Uploading [========------------] (17.2KB/40.7KB)
+Uploading [================----] (33.2KB/40.7KB)
+Uploading [====================] (40.7KB/40.7KB)
+  Inspect     https://vercel.com/mayakos-projects-ee58882d/salon-app/5BA29oFjwQZ2epWhLcgQhqaqfJ5D
+▲ Production  https://salon-gpqu4yvq4-mayakos-projects-ee58882d.vercel.app
+https://salon-gpqu4yvq4-mayakos-projects-ee58882d.vercel.appBuilding…
+Running build in Washington, D.C., USA (East) – iad1
+Build machine configuration: 2 cores, 8 GB
+Retrieving list of deployment files...
+Downloading 253 deployment files...
+Downloading 253 deployment files...
+Restored build cache from previous deployment (FGqahjAB9YzSH5ApCeMzYavMHfKx)
+Running "vercel build"
+Vercel CLI 54.4.1
+Installing dependencies...
+up to date in 2s
+251 packages are looking for funding
+run `npm fund` for details
+Detected Next.js version: 16.2.4
+Running "npm run build"
+> salon-app@0.1.0 build
+> next build
+Applying modifyConfig from Vercel
+▲ Next.js 16.2.4 (Turbopack)
+- Experiments (use with caution):
+· serverActions
+Creating an optimized production build ...
+✓ Compiled successfully in 35.7s
+Running TypeScript ...
+Error: Command "npm run build" exited with 1

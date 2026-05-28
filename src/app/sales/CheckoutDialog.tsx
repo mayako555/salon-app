@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, X, Search, Sparkles, Tag, MessageSquare, Calendar, Scissors, Gift } from "lucide-react";
+import { Plus, X, Search, Sparkles, Tag, MessageSquare, Calendar, Scissors, Gift, Lock } from "lucide-react";
 import { addCheckout, updateCheckout, getStoreMasterData, SalesRecord } from "./actions";
 import { format } from "date-fns";
 import { SalesMasterItem } from "./seeds";
@@ -146,6 +146,57 @@ export default function CheckoutDialog({
     handleFeeCalculation(route, newTechPrice + newProductPrice - newDiscount);
   };
 
+  // Next booking states
+  const [nextBookingDate, setNextBookingDate] = useState(initialData?.next_booking_date || "");
+  const [nextBookingStaffName, setNextBookingStaffName] = useState<string>("");
+  const [autoSuggestedStaff, setAutoSuggestedStaff] = useState(false);
+
+  useEffect(() => {
+    if (!nextBookingStaffName && selectedStaff) {
+      setNextBookingStaffName(initialData?.next_booking_staff_name || selectedStaff.name);
+    }
+  }, [selectedStaff, nextBookingStaffName, initialData]);
+
+  useEffect(() => {
+    if (isOpen && nextBookingDate && dbStaffList.length > 0 && selectedStaff) {
+      import("@/app/shifts/actions").then(({ getShiftsForDate }) => {
+        getShiftsForDate(nextBookingDate).then(shifts => {
+          const currentStaffShift = shifts.find(s => s.staff_name === selectedStaff.name);
+          const isOff = currentStaffShift && (currentStaffShift.type === "holiday" || currentStaffShift.type === "paid_leave" || currentStaffShift.type === "requested_holiday" || currentStaffShift.type === "requested_paid_leave");
+          
+          if (isOff) {
+             const workingShifts = shifts.filter(s => s.type === "work");
+             const workingStaffNames = workingShifts.map(s => s.staff_name);
+             const workingStaffProfiles = dbStaffList.filter(s => workingStaffNames.includes(s.name));
+             
+             if (workingStaffProfiles.length > 0) {
+               let closestStaff = workingStaffProfiles[0];
+               let minDiff = Infinity;
+               workingStaffProfiles.forEach(ws => {
+                 const diff = Math.abs((ws.nomination_fee || 0) - (selectedStaff.nomination_fee || 0));
+                 if (diff < minDiff) {
+                   minDiff = diff;
+                   closestStaff = ws;
+                 }
+               });
+               
+               if (nextBookingStaffName !== closestStaff.name) {
+                 setNextBookingStaffName(closestStaff.name);
+                 setAutoSuggestedStaff(true);
+               }
+             }
+          } else {
+            // If they are working or no shift defined, default to them if we had auto-suggested someone else previously
+            if (autoSuggestedStaff) {
+              setNextBookingStaffName(selectedStaff.name);
+              setAutoSuggestedStaff(false);
+            }
+          }
+        });
+      });
+    }
+  }, [nextBookingDate, selectedStaff, dbStaffList, isOpen]);
+
   const handleRemoveItem = (index: number) => {
     const currentMenus = menuCourse ? menuCourse.split(' + ') : [];
     const removedName = currentMenus[index];
@@ -249,10 +300,14 @@ export default function CheckoutDialog({
     const formData = new FormData(e.currentTarget);
     formData.append("next_booking_line_reminder", remind2Days ? "true" : "false");
 
+    const nextDate = formData.get("next_booking_date") as string;
+    const nextTime = formData.get("next_booking_time") as string;
+
+    const isNewCheckout = !initialData?.id || initialData.id === "new";
+    const isBookingChanged = isNewCheckout || nextDate !== (initialData?.next_booking_date || "") || nextTime !== (initialData?.next_booking_time || "");
+
     // Intercept for LINE Preview if conditions are met
-    if ((!initialData?.id || initialData.id === "new") && sendLine && selectedCustomer?.line_user_id && !noNextBooking) {
-      const nextDate = formData.get("next_booking_date") as string;
-      const nextTime = formData.get("next_booking_time") as string;
+    if (isBookingChanged && sendLine && selectedCustomer?.line_user_id && !noNextBooking) {
       if (nextDate && nextTime) {
         const text = await generateBookingConfirmationText(nextDate, nextTime, selectedStore);
         setPreviewLineText(text);
@@ -273,11 +328,12 @@ export default function CheckoutDialog({
         : await addCheckout(formData);
         
       if (res.success) {
+        const accountingId = (res as any).id || initialData?.id;
         // Send LINE if preview was confirmed
-        if (showLinePreview && sendLine && selectedCustomer?.line_user_id && (res as any).id) {
+        if (showLinePreview && sendLine && selectedCustomer?.line_user_id && accountingId) {
            await sendAndLogLineMessage({
              customerId: selectedCustomer.id,
-             accountingId: (res as any).id,
+             accountingId: accountingId,
              lineUserId: selectedCustomer.line_user_id,
              messageType: "next_reservation_confirm",
              messageBody: previewLineText
@@ -624,8 +680,25 @@ export default function CheckoutDialog({
                 </div>
                 {!noNextBooking && (
                   <>
-                    <input type="date" name="next_booking_date" defaultValue={initialData?.next_booking_date || ""} className="w-full h-9 px-3 border border-blue-200 rounded-md text-sm font-bold text-blue-800" />
+                    <input type="date" name="next_booking_date" value={nextBookingDate} onChange={(e) => setNextBookingDate(e.target.value)} className="w-full h-9 px-3 border border-blue-200 rounded-md text-sm font-bold text-blue-800" />
                     <input type="time" name="next_booking_time" defaultValue={initialData?.next_booking_time || "10:00"} className="w-full h-9 px-3 border border-blue-200 rounded-md text-sm font-bold text-blue-800" />
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-blue-900 mb-1">次回担当者</label>
+                      <select
+                        name="next_booking_staff_name"
+                        value={nextBookingStaffName}
+                        onChange={(e) => {
+                          setNextBookingStaffName(e.target.value);
+                          setAutoSuggestedStaff(false);
+                        }}
+                        className="w-full h-9 px-3 border border-blue-200 rounded-md text-sm font-bold text-blue-800 bg-white"
+                      >
+                        {staffList.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      {autoSuggestedStaff && (
+                        <p className="text-[10px] text-emerald-600 font-bold mt-1">※担当休日のため、近い等級のスタッフを自動選択しました</p>
+                      )}
+                    </div>
                     <div className="col-span-2 space-y-2 mt-2">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" checked={remind2Days} onChange={(e) => setRemind2Days(e.target.checked)} className="w-4 h-4 rounded text-emerald-600" />

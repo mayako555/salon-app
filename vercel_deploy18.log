@@ -1,0 +1,46 @@
+Retrieving project…
+Deploying mayakos-projects-ee58882d/salon-app
+Uploading [--------------------] (0.0B/60.2KB)
+Uploading [=====---------------] (17.3KB/60.2KB)
+Uploading [===========---------] (33.3KB/60.2KB)
+Uploading [================----] (49.3KB/60.2KB)
+Uploading [====================] (60.2KB/60.2KB)
+  Inspect     https://vercel.com/mayakos-projects-ee58882d/salon-app/BfP1CLYLe2Vu7oS8ne8YYH4HUaCK
+▲ Production  https://salon-d5c5fxeji-mayakos-projects-ee58882d.vercel.app
+https://salon-d5c5fxeji-mayakos-projects-ee58882d.vercel.appBuilding…
+Building…
+Running build in Washington, D.C., USA (East) – iad1
+Build machine configuration: 2 cores, 8 GB
+Retrieving list of deployment files...
+Downloading 263 deployment files...
+Restored build cache from previous deployment (FGqahjAB9YzSH5ApCeMzYavMHfKx)
+Running "vercel build"
+Vercel CLI 54.4.1
+Installing dependencies...
+up to date in 2s
+251 packages are looking for funding
+run `npm fund` for details
+Detected Next.js version: 16.2.4
+Running "npm run build"
+> salon-app@0.1.0 build
+> next build
+Applying modifyConfig from Vercel
+▲ Next.js 16.2.4 (Turbopack)
+- Experiments (use with caution):
+· serverActions
+Creating an optimized production build ...
+✓ Compiled successfully in 36.6s
+Running TypeScript ...
+Failed to type check.
+./src/app/staff-portal/sales/page.tsx:200:58
+Type error: Cannot find name 'Search'.
+198 | ...          trigger={
+199 | ...            <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:...
+> 200 | ...              {sale.status === 'closed' ? <Search size={16} /> : <Database size={16} />}
+|                                               ^
+201 | ...            </button>
+202 | ...          }
+203 | ...        />
+Next.js build worker exited with code: 1 and signal: null
+Error: Command "npm run build" exited with 1
+Error: Command "npm run build" exited with 1

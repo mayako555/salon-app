@@ -338,9 +338,15 @@ export default function AdminExpensesDashboard() {
           if (!mime && file.name.endsWith(".rtf")) mime = "text/rtf";
           if (mime === "application/rtf") mime = "text/rtf";
           const res = await parseYayoiPdfAction(base64Data, mime || "application/pdf");
-          if (res.success && res.data) {
-            setParsedTransactions(res.data);
-            toast.success("取引履歴をAIで解析しました！");
+          if (res.success && res.dataStr) {
+            const parsedArray = JSON.parse(res.dataStr);
+            if (parsedArray.length === 0) {
+              setImportError("取引データが見つかりませんでした。金額や摘要が含まれているか確認してください。");
+              toast.error("データが0件です");
+            } else {
+              setParsedTransactions(parsedArray);
+              toast.success("取引履歴をAIで解析しました！");
+            }
           } else {
             setImportError(res.error || "取引履歴の解析に失敗しました");
             toast.error("解析エラーが発生しました");
@@ -375,9 +381,15 @@ export default function AdminExpensesDashboard() {
 
     try {
       const res = await parseYayoiTextAction(pasteText);
-      if (res.success && res.data) {
-        setParsedTransactions(res.data);
-        toast.success("テキストから取引履歴をAIで解析しました！");
+      if (res.success && res.dataStr) {
+        const parsedArray = JSON.parse(res.dataStr);
+        if (parsedArray.length === 0) {
+          setImportError("取引データが見つかりませんでした。金額や摘要が含まれているか確認してください。");
+          toast.error("データが0件です");
+        } else {
+          setParsedTransactions(parsedArray);
+          toast.success("テキストから取引履歴をAIで解析しました！");
+        }
       } else {
         setImportError(res.error || "取引履歴の解析に失敗しました");
         toast.error("解析エラーが発生しました");

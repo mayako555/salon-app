@@ -248,6 +248,7 @@ export async function addCheckout(formData: FormData) {
     const nextBookingDate = formData.get("next_booking_date") as string || "";
     const nextBookingTime = formData.get("next_booking_time") as string || "";
     const nextBookingLineReminder = formData.get("next_booking_line_reminder") === "true";
+    const nextBookingStaffName = formData.get("next_booking_staff_name") as string || staffName;
     const isMinimo = formData.get("is_minimo") === "true" || reservationRoute.includes("ミニモ");
     const treatmentMinutes = parseInt(formData.get("treatment_minutes") as string || "60", 10);
 
@@ -284,6 +285,7 @@ export async function addCheckout(formData: FormData) {
       cancel_fee: cancelFee,
       next_booking_date: nextBookingDate,
       next_booking_time: nextBookingTime,
+      next_booking_staff_name: nextBookingStaffName,
       next_booking_line_reminder: nextBookingLineReminder,
       is_minimo: isMinimo,
       treatment_minutes: treatmentMinutes,
@@ -295,8 +297,41 @@ export async function addCheckout(formData: FormData) {
     const colRef = collection(db, SALES_COLLECTION);
     const docRef = await addDoc(colRef, payload);
 
-    // --- LINE Automation Trigger ---
-    // Moved to manual preview flow on the client side using sendAndLogLineMessage
+    // --- Create Auto Reservation for Next Booking ---
+    if (nextBookingDate && nextBookingTime) {
+      try {
+        const h = parseInt(nextBookingTime.split(":")[0] || "0", 10);
+        const m = parseInt(nextBookingTime.split(":")[1] || "0", 10);
+        const endTotalMins = h * 60 + m + treatmentMinutes;
+        const endHour = Math.floor(endTotalMins / 60);
+        const endMin = endTotalMins % 60;
+        const endTime = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
+
+        const { addReservation } = await import("@/app/reservations/actions");
+        const resData = await addReservation({
+          store_name: storeName,
+          staff_id: "staff-" + nextBookingStaffName,
+          staff_name: nextBookingStaffName,
+          type: "reservation",
+          customer_id: customerId || undefined,
+          customer_name: customerName || undefined,
+          customer_kana: lastNameKana ? `${lastNameKana} ${firstNameKana}`.trim() : undefined,
+          date: nextBookingDate,
+          start_time: nextBookingTime,
+          end_time: endTime,
+          menu_name: menuCourse || "次回予約",
+          status: "booked",
+          is_next_booking: true,
+          expected_price: techSales + prodSales - discount,
+        });
+        
+        if (resData.success && resData.id) {
+          await updateDoc(docRef, { next_reservation_id: resData.id });
+        }
+      } catch (e) {
+        console.error("Failed to auto-create next reservation:", e);
+      }
+    }
 
     // --- Inventory Sync ---
     await syncInventoryFromSale({ id: docRef.id, ...payload }, "deduct");
@@ -379,6 +414,7 @@ export async function updateCheckout(id: string, formData: FormData) {
     const nextBookingDate = formData.get("next_booking_date") as string || "";
     const nextBookingTime = formData.get("next_booking_time") as string || "";
     const nextBookingLineReminder = formData.get("next_booking_line_reminder") === "true";
+    const nextBookingStaffName = formData.get("next_booking_staff_name") as string || staffName;
     const isMinimo = formData.get("is_minimo") === "true" || reservationRoute.includes("ミニモ");
     const treatmentMinutes = parseInt(formData.get("treatment_minutes") as string || "60", 10);
 
@@ -386,43 +422,113 @@ export async function updateCheckout(id: string, formData: FormData) {
       return { success: false, error: "必須項目が入力されていません。" };
     }
 
-    const payload = {
-      staff_id: staffId,
-      staff_name: staffName,
-      store_name: storeName,
-      date,
-      time,
-      customer_name: customerName,
-      last_name: lastName,
-      first_name: firstName,
-      last_name_kana: lastNameKana,
-      first_name_kana: firstNameKana,
-      customer_id: customerId,
-      customer_type: customerType,
-      menu_course: menuCourse,
-      tech_sales: techSales,
-      product_sales: prodSales,
-      is_nominated: isNominated,
-      nomination_fee: nominationFee,
-      discount: discount,
-      discount_reason: discountReason,
-      portal_fee: portalFee,
-      hpb_points: hpbPoints,
-      reservation_route: reservationRoute,
-      payment_method: paymentMethod,
-      hair_material: hairMaterial,
-      options: options,
-      cancel_fee: cancelFee,
-      next_booking_date: nextBookingDate,
-      next_booking_time: nextBookingTime,
-      next_booking_line_reminder: nextBookingLineReminder,
-      is_minimo: isMinimo,
-      treatment_minutes: treatmentMinutes,
-      updated_at: serverTimestamp()
-    };
+    const payload = Object.fromEntries(
+      Object.entries({
+        staff_id: staffId || "staff-" + staffName,
+        staff_name: staffName,
+        store_name: storeName,
+        date,
+        time,
+        customer_name: customerName,
+        last_name: lastName,
+        first_name: firstName,
+        last_name_kana: lastNameKana,
+        first_name_kana: firstNameKana,
+        customer_id: customerId || null,
+        customer_type: customerType,
+        menu_course: menuCourse,
+        tech_sales: techSales,
+        product_sales: prodSales,
+        is_nominated: isNominated,
+        nomination_fee: nominationFee,
+        discount: discount,
+        discount_reason: discountReason,
+        portal_fee: portalFee,
+        hpb_points: hpbPoints,
+        reservation_route: reservationRoute,
+        payment_method: paymentMethod,
+        hair_material: hairMaterial,
+        options: options,
+        cancel_fee: cancelFee,
+        next_booking_date: nextBookingDate,
+        next_booking_time: nextBookingTime,
+        next_booking_staff_name: nextBookingStaffName,
+        next_booking_line_reminder: nextBookingLineReminder,
+        is_minimo: isMinimo,
+        treatment_minutes: treatmentMinutes,
+        updated_at: serverTimestamp()
+      }).filter(([_, v]) => v !== undefined)
+    );
 
     const docRef = doc(db, SALES_COLLECTION, id);
+    const oldDoc = await getDoc(docRef);
+    const oldData = oldDoc.exists() ? oldDoc.data() : null;
+    
     await updateDoc(docRef, payload);
+
+    // --- Auto Create/Update Reservation for Next Booking ---
+    if (nextBookingDate && nextBookingTime) {
+      try {
+        const h = parseInt(nextBookingTime.split(":")[0] || "0", 10);
+        const m = parseInt(nextBookingTime.split(":")[1] || "0", 10);
+        const endTotalMins = h * 60 + m + treatmentMinutes;
+        const endHour = Math.floor(endTotalMins / 60);
+        const endMin = endTotalMins % 60;
+        const endTime = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
+
+        const { addReservation, updateReservationTime, getReservationById } = await import("@/app/reservations/actions");
+        
+        let existingResId = oldData?.next_reservation_id;
+        let shouldCreate = !existingResId;
+
+        if (existingResId) {
+          // Verify it still exists
+          const existingRes = await getReservationById(existingResId);
+          if (existingRes) {
+            // Update time and date
+            const resRef = doc(db, "reservations", existingResId);
+            await updateDoc(resRef, {
+              date: nextBookingDate,
+              start_time: nextBookingTime,
+              end_time: endTime,
+              staff_name: nextBookingStaffName,
+              staff_id: "staff-" + nextBookingStaffName,
+              menu_name: menuCourse || "次回予約",
+              expected_price: techSales + prodSales - discount,
+              updated_at: serverTimestamp()
+            });
+            shouldCreate = false;
+          } else {
+            shouldCreate = true;
+          }
+        }
+
+        if (shouldCreate) {
+          const resData = await addReservation({
+            store_name: storeName,
+            staff_id: "staff-" + nextBookingStaffName,
+            staff_name: nextBookingStaffName,
+            type: "reservation",
+            customer_id: customerId || undefined,
+            customer_name: customerName || undefined,
+            customer_kana: lastNameKana ? `${lastNameKana} ${firstNameKana}`.trim() : undefined,
+            date: nextBookingDate,
+            start_time: nextBookingTime,
+            end_time: endTime,
+            menu_name: menuCourse || "次回予約",
+            status: "booked",
+            is_next_booking: true,
+            expected_price: techSales + prodSales - discount,
+          });
+          
+          if (resData.success && resData.id) {
+            await updateDoc(docRef, { next_reservation_id: resData.id });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to auto-update next reservation:", e);
+      }
+    }
 
     revalidatePath("/staff-portal/sales");
     return { success: true };

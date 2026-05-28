@@ -614,6 +614,7 @@ export async function parseYayoiPdfAction(base64File: string, mimeType: string) 
 4. 口座間振替・資金移動（経費ではない取引）のチェック:
    - 上記の「財務・税務」以外で、借方と貸方の両方が資産口座（例：「普通預金」⇔「普通預金」、「普通預金」⇔「現金」、「クレジットカード」の返済）となっている取引、または摘要に「パソコン振替」「セブンATM出金」「カード (302)」「通帳 (709)」などの資金移動を示す文言がある場合は、経費ではなく資金の移動に過ぎないため、 is_transfer を true にしてください。それ以外（消耗品費、水道光熱費、通信費、広告宣伝費、地代家賃、税理士報酬、給料賃金、支払手数料など）は is_transfer を false にし、 classification を "経費" にしてください。
 5. 金額はカンマを除いた数値型（number）で出力してください。
+6. 取引データが存在しない場合は、必ず空のJSON配列 \`[]\` だけを出力してください。挨拶や説明などの文章は一切不要です。
 
 【期待するJSON構造】
 [
@@ -699,13 +700,24 @@ export async function parseYayoiPdfAction(base64File: string, mimeType: string) 
     try {
       const jsonMatch = jsonResultText.match(/\[[\s\S]*\]/);
       const jsonStr = jsonMatch ? jsonMatch[0] : jsonResultText;
-      const parsedData = JSON.parse(jsonStr);
-      return { success: true, data: parsedData };
+      let parsedData = JSON.parse(jsonStr);
+      
+      if (!Array.isArray(parsedData)) {
+        parsedData = [parsedData];
+      }
+      
+      // Keep only flat objects to prevent Next.js rendering issues with weird nested structures
+      const validTransactions = parsedData.flat(5).filter((item: any) => 
+        item && typeof item === 'object' && !Array.isArray(item)
+      );
+      
+      // Return as a JSON string to bypass Next.js Server Action "Maximum array nesting exceeded" limits
+      return { success: true, dataStr: JSON.stringify(validTransactions) };
     } catch (parseErr: any) {
       console.error("JSON parse error on Gemini output:", parseErr, jsonResultText);
       return {
         success: false,
-        error: `AIの出力解析に失敗しました。ファイルの内容が適切にJSONとして読み取れませんでした。もう一度お試しいただくか、別のファイルをアップロードしてください。`
+        error: `AIの出力解析に失敗しました。データが多すぎるため途中で処理が途切れた可能性があります。数ヶ月ごとに分割してアップロードするか、弥生会計から「CSV形式」でエクスポートして貼り付けると確実に読み込めます。`
       };
     }
   } catch (error: any) {
@@ -808,11 +820,10 @@ export async function parseYayoiTextAction(textContent: string) {
       }
 
       if (parsedData.length > 0) {
-        return { success: true, data: parsedData };
+        return { success: true, dataStr: JSON.stringify(parsedData) };
       }
     }
 
-    // 2. Fallback to Gemini API if it's not CSV or parsing failed
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY is not configured in environment variables.");
@@ -832,6 +843,7 @@ export async function parseYayoiTextAction(textContent: string) {
 4. 口座間振替・資金移動（経費ではない取引）のチェック:
    - 上記の「財務・税務」以外で、借方と貸方の両方が資産口座（例：「普通預金」⇔「普通預金」、「普通預金」⇔「現金」、「クレジットカード」の返済）となっている取引、または摘要に「パソコン振替」「セブンATM出金」「カード (302)」「通帳 (709)」などの資金移動を示す文言がある場合は、経費ではなく資金の移動に過ぎないため、 is_transfer を true にしてください。それ以外（消耗品費、水道光熱費、通信費、広告宣伝費、地代家賃、税理士報酬、給料賃金、支払手数料など）は is_transfer を false にし、 classification を "経費" にしてください。
 5. 金額はカンマを除いた数値型（number）で出力してください。
+6. 取引データが存在しない場合は、必ず空のJSON配列 \`[]\` だけを出力してください。挨拶や説明などの文章は一切不要です。
 
 【期待するJSON構造】
 [
@@ -909,12 +921,23 @@ export async function parseYayoiTextAction(textContent: string) {
     try {
       const jsonMatch = jsonResultText.match(/\[[\s\S]*\]/);
       const jsonStr = jsonMatch ? jsonMatch[0] : jsonResultText;
-      const parsedData = JSON.parse(jsonStr);
-      return { success: true, data: parsedData };
+      let parsedData = JSON.parse(jsonStr);
+      
+      if (!Array.isArray(parsedData)) {
+        parsedData = [parsedData];
+      }
+      
+      // Keep only flat objects to prevent Next.js rendering issues
+      const validTransactions = parsedData.flat(5).filter((item: any) => 
+        item && typeof item === 'object' && !Array.isArray(item)
+      );
+
+      // Return as string to avoid Next.js Server Action array depth limits
+      return { success: true, dataStr: JSON.stringify(validTransactions) };
     } catch (parseErr: any) {
       return {
         success: false,
-        error: `AIの出力解析に失敗しました。`
+        error: `AIの出力解析に失敗しました。データが多すぎるため途中で処理が途切れた可能性があります（長文テキストや元帳まるごと等の場合）。数ヶ月ごとに分割して貼り付けるか、弥生会計から「CSV形式」でエクスポートしたテキストを貼り付けると確実に一瞬で読み込めます。`
       };
     }
   } catch (error: any) {
