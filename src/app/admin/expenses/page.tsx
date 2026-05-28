@@ -590,7 +590,7 @@ export default function AdminExpensesDashboard() {
 
               <Card className="bg-white border border-slate-200 shadow-sm rounded-2xl">
                 <CardContent className="p-4 flex flex-col gap-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">一般経費 (固定費等除く)</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">変動費 (固定費等除く)</span>
                   {isLoading ? (
                     <Loader2 className="animate-spin text-slate-300 w-5 h-5 mt-1" />
                   ) : (
