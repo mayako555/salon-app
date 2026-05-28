@@ -216,7 +216,7 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 overflow-hidden">
                       {Array.from({ length: 15 }).map((_, i) => (
                         <div key={i} className="text-xl font-black text-slate-500 rotate-[-15deg] whitespace-nowrap mx-8 select-none">
-                          {staffObj?.shift?.type?.includes('holiday') || staffObj?.shift?.type?.includes('leave') ? 'OFF' : 'OTHER STORE'}
+                          {staffObj?.shift?.type?.includes('holiday') || staffObj?.shift?.type?.includes('leave') ? 'OFF' : `${staffObj?.shift?.segments?.[0]?.store || '他'}店勤務`}
                         </div>
                       ))}
                     </div>

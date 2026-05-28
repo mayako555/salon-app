@@ -32,8 +32,10 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
 
   // Form state for autofill
   const [formDataState, setFormDataState] = useState({
-    name: "",
-    kana: "",
+    last_name: "",
+    first_name: "",
+    last_name_kana: "",
+    first_name_kana: "",
     phone: "",
     type: "新規"
   });
@@ -41,6 +43,15 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
   const handleSearchMode = async () => {
     setIsNewCustomer(false);
     setIsSearching(true);
+    
+    const kanjiName = `${formDataState.last_name} ${formDataState.first_name}`.trim();
+    const kanaName = `${formDataState.last_name_kana} ${formDataState.first_name_kana}`.trim();
+    const searchTarget = kanjiName || kanaName || formDataState.phone;
+    
+    if (searchTarget) {
+      setSearchQuery(searchTarget);
+    }
+
     if (!hasLoadedCustomers) {
       const data = await getAllCustomers();
       setCustomers(data);
@@ -50,8 +61,10 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
 
   const handleSelectCustomer = (c: Customer) => {
     setFormDataState({
-      name: c.name || "",
-      kana: (c as any).kana || (c as any).last_name_kana ? `${(c as any).last_name_kana || ''} ${(c as any).first_name_kana || ''}`.trim() : "",
+      last_name: c.last_name || c.name?.split(" ")[0] || "",
+      first_name: c.first_name || c.name?.split(" ")[1] || "",
+      last_name_kana: (c as any).last_name_kana || "",
+      first_name_kana: (c as any).first_name_kana || "",
       phone: c.phone || "",
       type: "再来" // 既存顧客を選択したので自動で「再来」にする
     });
@@ -81,12 +94,16 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
     const endMin = endTotalMins % 60;
     const end_time = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
 
+    const lastName = formData.get("last_name") as string || "";
+    const firstName = formData.get("first_name") as string || "";
+    const customerName = `${lastName} ${firstName}`.trim();
+
     const data = {
       store_name: storeName,
       staff_id: "manual", 
       staff_name: formData.get("staff_name") as string,
       type: recordType,
-      customer_name: recordType === "reservation" ? (formData.get("customer_name") as string) : "",
+      customer_name: recordType === "reservation" ? customerName : "",
       customer_type: recordType === "reservation" ? (formData.get("customer_type") as any) : undefined,
       date: defaultDate,
       start_time: start_time,
@@ -140,27 +157,83 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
             
             {/* 顧客情報ブロック (予約時のみ) */}
             {recordType === "reservation" && (
-            <div className="bg-white p-4 border border-slate-200 rounded-lg shadow-sm">
-              <h3 className="text-sm font-black text-slate-800 mb-3 border-b border-slate-100 pb-2 flex items-center justify-between">
-                <span>顧客情報</span>
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" className={`h-6 text-[10px] ${!isNewCustomer ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-50'}`} onClick={handleSearchMode}>
-                    <Search className="w-3 h-3 mr-1" /> 顧客検索
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" className={`h-6 text-[10px] ${isNewCustomer ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50'}`} onClick={() => { setIsNewCustomer(true); setIsSearching(false); }}>
-                    <UserPlus className="w-3 h-3 mr-1" /> 手動入力
+            <div className="bg-white border border-slate-300 shadow-sm mb-5">
+              <div className="bg-slate-400 text-white text-xs font-bold px-3 py-1.5">
+                お客様情報
+              </div>
+              <div className="flex flex-col sm:flex-row">
+                {/* Left side: Form Fields */}
+                <div className="flex-1 p-2 grid gap-2 text-xs">
+                  {/* Kana */}
+                  <div className="flex items-center bg-orange-50/50 p-1 border-b border-slate-100 pb-2">
+                    <div className="w-28 font-bold text-slate-700 flex items-center justify-between pr-2">
+                      氏名（カナ） <span className="w-2 h-2 rounded-full bg-rose-500 block"></span>
+                    </div>
+                    <div className="flex-1 flex gap-2">
+                      <input required type="text" name="last_name_kana" placeholder="セイ" className="w-full h-7 px-2 border border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" value={formDataState.last_name_kana} onChange={e => {
+                        const val = e.target.value.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
+                        setFormDataState({...formDataState, last_name_kana: val});
+                      }} />
+                      <input required type="text" name="first_name_kana" placeholder="メイ" className="w-full h-7 px-2 border border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" value={formDataState.first_name_kana} onChange={e => {
+                        const val = e.target.value.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
+                        setFormDataState({...formDataState, first_name_kana: val});
+                      }} />
+                    </div>
+                  </div>
+                  {/* Kanji */}
+                  <div className="flex items-center p-1 border-b border-slate-100 pb-2">
+                    <div className="w-28 font-bold text-slate-700 pr-2">
+                      氏名（漢字）
+                    </div>
+                    <div className="flex-1 flex gap-2">
+                      <input type="text" name="last_name" placeholder="氏" className="w-full h-7 px-2 border border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" value={formDataState.last_name} onChange={e => setFormDataState({...formDataState, last_name: e.target.value})} />
+                      <input type="text" name="first_name" placeholder="名" className="w-full h-7 px-2 border border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" value={formDataState.first_name} onChange={e => setFormDataState({...formDataState, first_name: e.target.value})} />
+                    </div>
+                  </div>
+                  {/* Phone */}
+                  <div className="flex items-center bg-orange-50/50 p-1 border-b border-slate-100 pb-2">
+                    <div className="w-28 font-bold text-slate-700 pr-2">
+                      電話番号
+                    </div>
+                    <div className="flex-1">
+                      <input type="tel" name="customer_phone" placeholder="ハイフンなしで入力してください" className="w-full h-7 px-2 border border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none max-w-[200px]" value={formDataState.phone} onChange={e => setFormDataState({...formDataState, phone: e.target.value})} />
+                    </div>
+                  </div>
+                  {/* Customer Type */}
+                  <div className="flex items-center p-1">
+                    <div className="w-28 font-bold text-slate-700 pr-2">
+                      顧客区分
+                    </div>
+                    <div className="flex-1">
+                      <select name="customer_type" className="h-7 px-2 border border-slate-300 bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none min-w-[150px]" value={formDataState.type} onChange={e => setFormDataState({...formDataState, type: e.target.value})}>
+                        <option value="新規">新規</option>
+                        <option value="再来">再来</option>
+                        <option value="モデル">モデル</option>
+                        <option value="不明">不明</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right side: Search Button */}
+                <div className="w-full sm:w-48 border-t sm:border-t-0 sm:border-l border-slate-200 bg-white flex flex-col items-center justify-center p-4 relative">
+                  <div className="hidden sm:block absolute left-[-16px] top-1/2 -translate-y-1/2 w-0 h-0 border-y-[20px] border-y-transparent border-l-[16px] border-l-slate-200 opacity-20"></div>
+                  <Button type="button" onClick={handleSearchMode} className="w-full bg-gradient-to-b from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white shadow font-bold tracking-wider h-12 text-sm border border-blue-700/50">
+                    <Search className="w-4 h-4 mr-2" />
+                    検索する
                   </Button>
                 </div>
-              </h3>
-              
-              {isSearching ? (
-                <div className="mb-4">
-                  <div className="relative mb-3">
+              </div>
+
+              {/* Search Results */}
+              {isSearching && (
+                <div className="border-t border-slate-300 bg-slate-50 p-3">
+                  <div className="relative mb-3 max-w-md mx-auto">
                     <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                     <input 
                       type="text" 
                       placeholder="名前（漢字・カナ）または電話番号で検索..." 
-                      className="w-full h-9 pl-9 pr-3 border border-blue-300 rounded-lg bg-blue-50/50 focus:bg-white focus:ring-2 focus:ring-blue-200 outline-none text-sm"
+                      className="w-full h-9 pl-9 pr-3 border border-blue-300 rounded bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm shadow-inner"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       autoFocus
@@ -168,59 +241,47 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                   </div>
                   
                   {searchQuery && filteredCustomers.length > 0 && (
-                    <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                    <div className="border border-slate-300 bg-white shadow-sm max-w-2xl mx-auto text-xs">
+                      <div className="grid grid-cols-4 bg-slate-100 font-bold text-slate-600 p-2 border-b border-slate-300 text-center">
+                        <div>お名前</div>
+                        <div>電話番号</div>
+                        <div>顧客区分</div>
+                        <div>前回来店日</div>
+                      </div>
                       {filteredCustomers.map(c => (
                         <div 
                           key={c.id} 
-                          className="px-4 py-3 border-b border-slate-100 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors flex justify-between items-center"
+                          className="grid grid-cols-4 p-2 border-b border-slate-200 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors items-center text-center text-slate-700"
                           onClick={() => handleSelectCustomer(c)}
                         >
-                          <div>
-                            <div className="font-black text-slate-800">{c.name}</div>
-                            <div className="text-[10px] text-slate-400">{(c as any).kana || `${(c as any).last_name_kana || ''} ${(c as any).first_name_kana || ''}`.trim()}</div>
+                          <div className="flex flex-col text-left pl-2">
+                            <span className="font-bold text-blue-700">{c.name}</span>
+                            <span className="text-[9px] text-slate-500">{(c as any).kana || `${(c as any).last_name_kana || ''} ${(c as any).first_name_kana || ''}`.trim()}</span>
                           </div>
-                          <div className="text-xs text-slate-500 font-mono">{c.phone || "電話番号なし"}</div>
+                          <div className="font-mono">{c.phone || "-"}</div>
+                          <div>{c.type || "-"}</div>
+                          <div>{c.last_visit ? c.last_visit.substring(0, 10) : "なし"}</div>
                         </div>
                       ))}
                     </div>
                   )}
                   {searchQuery && filteredCustomers.length === 0 && (
-                    <div className="text-center py-6 text-slate-400 flex flex-col items-center">
-                      <SearchX className="w-6 h-6 mb-2 opacity-50" />
-                      <p>見つかりませんでした</p>
+                    <div className="text-center py-4 text-slate-500">
+                      見つかりませんでした
                     </div>
                   )}
                   {!searchQuery && (
-                    <div className="text-center py-4 text-slate-400 text-xs">
+                    <div className="text-center py-3 text-slate-400 text-xs">
                       検索キーワードを入力してください
                     </div>
                   )}
+                  <div className="text-center mt-3">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setIsSearching(false)} className="text-xs h-7">
+                      閉じる
+                    </Button>
+                  </div>
                 </div>
-              ) : null}
-
-              <div className={`grid grid-cols-2 gap-4 ${isSearching ? 'opacity-50 pointer-events-none' : ''}`}>
-                <div>
-                  <label className="block mb-1">お名前 <span className="text-rose-500">*</span></label>
-                  <input required type="text" name="customer_name" placeholder="山田 花子" className="w-full h-8 px-2 border border-slate-300 rounded focus:bg-blue-50" value={formDataState.name} onChange={e => setFormDataState({...formDataState, name: e.target.value})} />
-                </div>
-                <div>
-                  <label className="block mb-1">フリガナ</label>
-                  <input type="text" name="customer_kana" placeholder="ヤマダ ハナコ" className="w-full h-8 px-2 border border-slate-300 rounded focus:bg-blue-50" value={formDataState.kana} onChange={e => setFormDataState({...formDataState, kana: e.target.value})} />
-                </div>
-                <div>
-                  <label className="block mb-1">電話番号</label>
-                  <input type="tel" name="customer_phone" placeholder="090-0000-0000" className="w-full h-8 px-2 border border-slate-300 rounded focus:bg-blue-50" value={formDataState.phone} onChange={e => setFormDataState({...formDataState, phone: e.target.value})} />
-                </div>
-                <div>
-                  <label className="block mb-1">顧客区分</label>
-                  <select name="customer_type" className="w-full h-8 px-2 border border-slate-300 rounded bg-white" value={formDataState.type} onChange={e => setFormDataState({...formDataState, type: e.target.value})}>
-                    <option value="新規">新規</option>
-                    <option value="再来">再来</option>
-                    <option value="モデル">モデル</option>
-                    <option value="不明">不明</option>
-                  </select>
-                </div>
-              </div>
+              )}
             </div>
             )}
 
@@ -240,10 +301,12 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block">所要時間（分）</label>
+                    {recordType === "schedule" && (
                     <label className="flex items-center gap-1 cursor-pointer text-blue-600 hover:text-blue-700">
                       <input type="checkbox" checked={isAllDay} onChange={e => setIsAllDay(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500" />
                       <span>終日</span>
                     </label>
+                    )}
                   </div>
                   <input required={!isAllDay} type="number" step="5" value={isAllDay ? 660 : duration} onChange={e => setDuration(Number(e.target.value))} disabled={isAllDay} className="w-full h-8 px-2 border border-slate-300 rounded bg-white disabled:bg-slate-100 disabled:text-slate-400" />
                 </div>

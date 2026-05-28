@@ -24,7 +24,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     pathname.startsWith("/customers/intake") || 
     pathname.startsWith("/entry") || 
     pathname.startsWith("/attendance/kiosk") ||
-    pathname.startsWith("/staff/login")
+    pathname.startsWith("/staff/login") ||
+    pathname.startsWith("/link-line")
   ) {
     return <div className="min-h-screen bg-slate-50">{children}</div>;
   }
