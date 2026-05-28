@@ -358,6 +358,7 @@ export default function AdminExpensesDashboard() {
   const estimatedConsumptionTax = valueAdded > 0 ? Math.floor(valueAdded * 0.1) : 0;
   const estimatedSocialInsurance = Math.floor(salaries * 0.15);
   const totalEstimatedTaxes = estimatedIncomeTax + estimatedConsumptionTax + estimatedSocialInsurance;
+  const pureProfit = netProfit - totalEstimatedTaxes;
 
   // Filtered Expenses for Display List
   const filteredExpenses = expenses.filter(exp => {
@@ -771,6 +772,12 @@ export default function AdminExpensesDashboard() {
                       <span>準備金 合計目安:</span>
                       <span>¥{totalEstimatedTaxes.toLocaleString()}</span>
                     </div>
+                  </div>
+
+                  {/* Pure Profit */}
+                  <div className="mt-1 flex justify-between items-center text-sm font-black p-2 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    <span className="flex items-center gap-1.5"><Wallet size={16} /> 最終的に手元に残るお金:</span>
+                    <span>¥{pureProfit.toLocaleString()}</span>
                   </div>
                 </div>
               </CardContent>
