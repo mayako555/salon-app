@@ -266,7 +266,7 @@ export default function CheckoutDialog({
   const executeSubmit = async (formData: FormData) => {
     setIsSubmitting(true);
     try {
-      const res = initialData?.id 
+      const res = initialData?.id && initialData.id !== "new"
         ? await updateCheckout(initialData.id, formData)
         : await addCheckout(formData);
         
