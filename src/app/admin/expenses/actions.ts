@@ -421,6 +421,7 @@ export async function getExpensesDashboardData(year: number, month: number) {
     let totalFinancialOutflows = 0;
     let autoRent = 0;
     let autoMarketing = 0;
+    let yayoiSalaries = 0;
 
     expensesList.forEach(e => {
       const isTaxOrDebt = ["借入金", "長期借入金", "短期借入金", "法人税等", "法人税", "所得税", "住民税", "消費税"].some(keyword => e.category.includes(keyword) || (e.description && e.description.includes(keyword)));
@@ -431,7 +432,7 @@ export async function getExpensesDashboardData(year: number, month: number) {
       } else if (e.category === "広告宣伝費") {
         autoMarketing += e.amount;
       } else if (e.category === "給料手当" || e.category === "役員報酬" || e.category === "給料賃金" || e.category === "法定福利費") {
-        // Skip salaries from cash expenses to avoid double-counting, as we will use the payroll system
+        yayoiSalaries += e.amount;
       } else {
         totalCashExpenses += e.amount;
       }
@@ -444,6 +445,11 @@ export async function getExpensesDashboardData(year: number, month: number) {
     statements.forEach(s => {
       autoSalaries += s.final_paid_amount;
     });
+    
+    // Fallback to Yayoi salaries if no payroll records exist for this month
+    if (autoSalaries === 0 && yayoiSalaries > 0) {
+      autoSalaries = yayoiSalaries;
+    }
     
     return {
       success: true,
@@ -515,6 +521,7 @@ export async function getAnnualPnLData() {
       let autoRent = 0;
       let autoMarketing = 0;
       let variableExpenses = 0;
+      let yayoiSalaries = 0;
 
       monthlyExpList.forEach(e => {
         const isTaxOrDebt = ["借入金", "長期借入金", "短期借入金", "法人税等", "法人税", "所得税", "住民税", "消費税"].some(keyword => e.category.includes(keyword) || (e.description && e.description.includes(keyword)));
@@ -522,7 +529,7 @@ export async function getAnnualPnLData() {
           if (e.category === "地代家賃") autoRent += e.amount;
           else if (e.category === "広告宣伝費") autoMarketing += e.amount;
           else if (e.category === "給料手当" || e.category === "役員報酬" || e.category === "給料賃金" || e.category === "法定福利費") {
-            // Ignore Yayoi salaries
+            yayoiSalaries += e.amount;
           } else {
             variableExpenses += e.amount;
           }
@@ -535,6 +542,10 @@ export async function getAnnualPnLData() {
       statements.forEach(s => {
         autoSalaries += s.final_paid_amount;
       });
+
+      if (autoSalaries === 0 && yayoiSalaries > 0) {
+        autoSalaries = yayoiSalaries;
+      }
 
       const totalExpenses = variableExpenses + autoRent + autoMarketing + autoSalaries;
       const profit = sales - totalExpenses;
