@@ -30,7 +30,8 @@ export default function CheckoutDialog({
   isOpenControlled,
   onOpenChangeControlled,
   initialTime = "",
-  onSuccess
+  onSuccess,
+  readOnly = false
 }: { 
   defaultStaffName?: string, 
   defaultStoreName?: string,
@@ -40,7 +41,8 @@ export default function CheckoutDialog({
   isOpenControlled?: boolean,
   onOpenChangeControlled?: (open: boolean) => void,
   initialTime?: string,
-  onSuccess?: () => void
+  onSuccess?: () => void,
+  readOnly?: boolean
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isOpen = isOpenControlled !== undefined ? isOpenControlled : internalOpen;
@@ -248,7 +250,7 @@ export default function CheckoutDialog({
     formData.append("next_booking_line_reminder", remind2Days ? "true" : "false");
 
     // Intercept for LINE Preview if conditions are met
-    if (!initialData?.id && sendLine && selectedCustomer?.line_user_id && !noNextBooking) {
+    if ((!initialData?.id || initialData.id === "new") && sendLine && selectedCustomer?.line_user_id && !noNextBooking) {
       const nextDate = formData.get("next_booking_date") as string;
       const nextTime = formData.get("next_booking_time") as string;
       if (nextDate && nextTime) {
@@ -370,7 +372,16 @@ export default function CheckoutDialog({
                </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="px-6 py-4 space-y-5">
+            <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[85vh] space-y-6">
+              
+              {readOnly && (
+                <div className="bg-amber-50 text-amber-800 p-3 rounded-lg text-xs font-bold flex items-center gap-2 border border-amber-200 mb-4">
+                  <Lock size={14} />
+                  <span>この会計データは確定済みのため、内容の閲覧のみ可能です。</span>
+                </div>
+              )}
+              
+              <div className={readOnly ? "pointer-events-none opacity-90" : ""}>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">対象日</label>
@@ -631,12 +642,17 @@ export default function CheckoutDialog({
                   </>
                 )}
               </div>
+              </div>
 
               <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
-                <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={isSubmitting}>キャンセル</Button>
-                <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[120px]">
-                  {isSubmitting ? "処理中..." : "保存する"}
+                <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={isSubmitting}>
+                  {readOnly ? "閉じる" : "キャンセル"}
                 </Button>
+                {!readOnly && (
+                  <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[120px]">
+                    {isSubmitting ? "処理中..." : "保存する"}
+                  </Button>
+                )}
               </div>
             </form>
           </div>
