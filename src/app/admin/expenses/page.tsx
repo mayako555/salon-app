@@ -54,7 +54,7 @@ import {
 
 function calculateAccurateTaxes(monthlyNetProfit: number, monthlySales: number, salaries: number, businessType: "corporation" | "sole") {
   if (monthlyNetProfit <= 0) {
-    return { incomeTax: 0, consumptionTax: 0, socialInsurance: 0 };
+    return { incomeTax: 0, consumptionTax: 0, socialInsurance: 0, laborInsurance: 0 };
   }
 
   // 1. 年換算 (Annualize values)
@@ -109,11 +109,16 @@ function calculateAccurateTaxes(monthlyNetProfit: number, monthlySales: number, 
   // 3. 社会保険料 (会社負担分/事業主負担分目安 約15%)
   const annualSocialInsurance = (salaries * 12) * 0.15;
 
+  // 4. 労働保険料 (雇用・労災: 会社負担分目安 約1.25%)
+  // 美容業の目安: 労災 0.3% + 雇用 0.95% = 1.25%
+  const annualLaborInsurance = (salaries * 12) * 0.0125;
+
   // 月割りに戻す
   return {
     incomeTax: Math.floor(annualIncomeTax / 12),
     consumptionTax: Math.floor(annualConsumptionTax / 12),
-    socialInsurance: Math.floor(annualSocialInsurance / 12)
+    socialInsurance: Math.floor(annualSocialInsurance / 12),
+    laborInsurance: Math.floor(annualLaborInsurance / 12)
   };
 }
 
@@ -421,10 +426,11 @@ export default function AdminExpensesDashboard() {
   const { 
     incomeTax: estimatedIncomeTax, 
     consumptionTax: estimatedConsumptionTax, 
-    socialInsurance: estimatedSocialInsurance 
+    socialInsurance: estimatedSocialInsurance,
+    laborInsurance: estimatedLaborInsurance
   } = calculateAccurateTaxes(netProfit, sales, salaries, businessType);
   
-  const totalEstimatedTaxes = estimatedIncomeTax + estimatedConsumptionTax + estimatedSocialInsurance;
+  const totalEstimatedTaxes = estimatedIncomeTax + estimatedConsumptionTax + estimatedSocialInsurance + estimatedLaborInsurance;
   const pureProfit = netProfit - totalEstimatedTaxes;
   const finalCashFlow = pureProfit - financialOutflows;
 
@@ -835,10 +841,14 @@ export default function AdminExpensesDashboard() {
                       <span>¥{estimatedConsumptionTax.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-[10px] text-slate-500">
-                      <span>社会保険料 (会社負担分):</span>
+                      <span>社会保険料 (会社負担分目安):</span>
                       <span>¥{estimatedSocialInsurance.toLocaleString()}</span>
                     </div>
-                    <div className="h-px bg-amber-200/50 my-1" />
+                    <div className="flex justify-between text-[10px] text-slate-500">
+                      <span>労働保険 (雇用・労災: 会社負担分目安):</span>
+                      <span>¥{estimatedLaborInsurance.toLocaleString()}</span>
+                    </div>
+                    <div className="border-t border-amber-200/50 my-1"></div>
                     <div className="flex justify-between text-xs text-amber-900 font-bold">
                       <span>準備金 合計目安:</span>
                       <span>¥{totalEstimatedTaxes.toLocaleString()}</span>
