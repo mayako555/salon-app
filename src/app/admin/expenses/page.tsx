@@ -52,6 +52,71 @@ import {
   Line
 } from "recharts";
 
+function calculateAccurateTaxes(monthlyNetProfit: number, monthlySales: number, salaries: number, businessType: "corporation" | "sole") {
+  if (monthlyNetProfit <= 0) {
+    return { incomeTax: 0, consumptionTax: 0, socialInsurance: 0 };
+  }
+
+  // 1. 年換算 (Annualize values)
+  const annualProfit = monthlyNetProfit * 12;
+  const annualSales = monthlySales * 12;
+
+  // 2. 消費税 (簡易課税・第5種サービス業：みなし仕入率50%)
+  const annualConsumptionTax = Math.max(0, annualSales * 0.1 * 0.5);
+
+  let annualIncomeTax = 0;
+  
+  if (businessType === "corporation") {
+    // 法人税 (15% up to 8M, 23.2% above 8M)
+    const portionUnder8M = Math.min(annualProfit, 8000000);
+    const portionOver8M = Math.max(0, annualProfit - 8000000);
+    const corporateTax = (portionUnder8M * 0.15) + (portionOver8M * 0.232);
+    
+    // 法人住民税 (法人税割 約7% + 均等割 約70,000円)
+    const residentTax = (corporateTax * 0.07) + 70000;
+    
+    // 法人事業税 (3.5% up to 4M, 5.3% up to 8M, 7% over 8M)
+    const enterpriseUnder4M = Math.min(annualProfit, 4000000);
+    const enterpriseUnder8M = Math.min(Math.max(0, annualProfit - 4000000), 4000000);
+    const enterpriseOver8M = Math.max(0, annualProfit - 8000000);
+    const enterpriseTax = (enterpriseUnder4M * 0.035) + (enterpriseUnder8M * 0.053) + (enterpriseOver8M * 0.07);
+    
+    annualIncomeTax = corporateTax + residentTax + enterpriseTax;
+  } else {
+    // 個人事業主
+    // 控除: 基礎控除48万 + 青色申告特別控除65万
+    const taxableIncome = Math.max(0, annualProfit - 480000 - 650000);
+    
+    // 所得税 (累進課税テーブル)
+    let incomeTax = 0;
+    if (taxableIncome <= 1949000) incomeTax = taxableIncome * 0.05;
+    else if (taxableIncome <= 3299000) incomeTax = taxableIncome * 0.10 - 97500;
+    else if (taxableIncome <= 6949000) incomeTax = taxableIncome * 0.20 - 427500;
+    else if (taxableIncome <= 8999000) incomeTax = taxableIncome * 0.23 - 636000;
+    else if (taxableIncome <= 17999000) incomeTax = taxableIncome * 0.33 - 1536000;
+    else if (taxableIncome <= 39999000) incomeTax = taxableIncome * 0.40 - 2796000;
+    else incomeTax = taxableIncome * 0.45 - 4796000;
+
+    // 住民税 (一律10% + 均等割約5000円)
+    const residentTax = (taxableIncome * 0.10) + 5000;
+
+    // 個人事業税 (290万控除後 5%)
+    const enterpriseTax = Math.max(0, annualProfit - 2900000) * 0.05;
+
+    annualIncomeTax = incomeTax + residentTax + enterpriseTax;
+  }
+
+  // 3. 社会保険料 (会社負担分/事業主負担分目安 約15%)
+  const annualSocialInsurance = (salaries * 12) * 0.15;
+
+  // 月割りに戻す
+  return {
+    incomeTax: Math.floor(annualIncomeTax / 12),
+    consumptionTax: Math.floor(annualConsumptionTax / 12),
+    socialInsurance: Math.floor(annualSocialInsurance / 12)
+  };
+}
+
 export default function AdminExpensesDashboard() {
   const { profile } = useAuth();
   
@@ -351,12 +416,14 @@ export default function AdminExpensesDashboard() {
   const netProfit = sales - totalAllExpenses;
 
   // Tax and Insurance Estimates
-  const taxRate = businessType === "corporation" ? 0.3 : 0.25;
-  const taxLabel = businessType === "corporation" ? "法人税等 (約30%)" : "所得税・住民税 (概算25%)";
-  const estimatedIncomeTax = netProfit > 0 ? Math.floor(netProfit * taxRate) : 0;
-  const valueAdded = sales - (totalAllExpenses - salaries);
-  const estimatedConsumptionTax = valueAdded > 0 ? Math.floor(valueAdded * 0.1) : 0;
-  const estimatedSocialInsurance = Math.floor(salaries * 0.15);
+  const taxLabel = businessType === "corporation" ? "法人税・住民税・事業税等" : "所得税・住民税・事業税等";
+  
+  const { 
+    incomeTax: estimatedIncomeTax, 
+    consumptionTax: estimatedConsumptionTax, 
+    socialInsurance: estimatedSocialInsurance 
+  } = calculateAccurateTaxes(netProfit, sales, salaries, businessType);
+  
   const totalEstimatedTaxes = estimatedIncomeTax + estimatedConsumptionTax + estimatedSocialInsurance;
   const pureProfit = netProfit - totalEstimatedTaxes;
 
@@ -751,16 +818,19 @@ export default function AdminExpensesDashboard() {
 
                   {/* Tax & Insurance Estimates */}
                   <div className="mt-2 bg-amber-50/50 border border-amber-100 rounded-lg p-2.5 space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-800 mb-1">
-                      <Wallet size={12} />
-                      <span>翌月以降の納税・支払準備金 (目安)</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-800">
+                        <Wallet size={12} />
+                        <span>翌月以降の納税・支払準備金 (年換算・精密計算)</span>
+                      </div>
+                      {businessType === "sole" && <span className="text-[9px] text-amber-600 bg-amber-100 px-1 py-0.5 rounded">青色申告控除適用済</span>}
                     </div>
                     <div className="flex justify-between text-[10px] text-slate-500">
                       <span>{taxLabel}:</span>
                       <span>¥{estimatedIncomeTax.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-[10px] text-slate-500">
-                      <span>消費税 (概算10%):</span>
+                      <span>消費税 (簡易課税・みなし仕入率50%):</span>
                       <span>¥{estimatedConsumptionTax.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-[10px] text-slate-500">
