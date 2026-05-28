@@ -59,6 +59,7 @@ export default function AdminExpensesDashboard() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [store, setStore] = useState("すべて");
+  const [businessType, setBusinessType] = useState<"corporation" | "sole">("corporation");
   
   // Dashboard States
   const [sales, setSales] = useState(0);
@@ -350,11 +351,13 @@ export default function AdminExpensesDashboard() {
   const netProfit = sales - totalAllExpenses;
 
   // Tax and Insurance Estimates
-  const estimatedCorporateTax = netProfit > 0 ? Math.floor(netProfit * 0.3) : 0;
+  const taxRate = businessType === "corporation" ? 0.3 : 0.25;
+  const taxLabel = businessType === "corporation" ? "法人税等 (約30%)" : "所得税・住民税 (概算25%)";
+  const estimatedIncomeTax = netProfit > 0 ? Math.floor(netProfit * taxRate) : 0;
   const valueAdded = sales - (totalAllExpenses - salaries);
   const estimatedConsumptionTax = valueAdded > 0 ? Math.floor(valueAdded * 0.1) : 0;
   const estimatedSocialInsurance = Math.floor(salaries * 0.15);
-  const totalEstimatedTaxes = estimatedCorporateTax + estimatedConsumptionTax + estimatedSocialInsurance;
+  const totalEstimatedTaxes = estimatedIncomeTax + estimatedConsumptionTax + estimatedSocialInsurance;
 
   // Filtered Expenses for Display List
   const filteredExpenses = expenses.filter(exp => {
@@ -667,12 +670,29 @@ export default function AdminExpensesDashboard() {
             
             {/* Custom Fixed Costs Panel */}
             <Card className="bg-white border border-slate-200 shadow-sm rounded-2xl">
-              <CardHeader className="bg-slate-50/80 border-b border-slate-100 p-5">
-                <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                  <Layers className="text-slate-500 w-4.5 h-4.5" />
-                  今月のサロン固定経費の入力
-                </CardTitle>
-                <p className="text-[10px] text-slate-400 mt-0.5">人件費や地代家賃などの基本固定費を想定して収支差額を算出します。</p>
+              <CardHeader className="bg-slate-50/80 border-b border-slate-100 p-5 flex flex-row items-start justify-between">
+                <div>
+                  <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <Layers className="text-slate-500 w-4.5 h-4.5" />
+                    今月のサロン固定経費の入力
+                  </CardTitle>
+                  <p className="text-[10px] text-slate-400 mt-0.5">人件費や地代家賃などの基本固定費を想定して収支差額を算出します。</p>
+                </div>
+                
+                <div className="flex bg-white rounded-lg border border-slate-200 p-1">
+                  <button 
+                    onClick={() => setBusinessType("corporation")}
+                    className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${businessType === "corporation" ? "bg-slate-800 text-white shadow" : "text-slate-500 hover:bg-slate-100"}`}
+                  >
+                    法人
+                  </button>
+                  <button 
+                    onClick={() => setBusinessType("sole")}
+                    className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${businessType === "sole" ? "bg-slate-800 text-white shadow" : "text-slate-500 hover:bg-slate-100"}`}
+                  >
+                    個人事業主
+                  </button>
+                </div>
               </CardHeader>
               <CardContent className="p-5 space-y-4">
                 <div className="grid grid-cols-3 gap-3">
@@ -735,8 +755,8 @@ export default function AdminExpensesDashboard() {
                       <span>翌月以降の納税・支払準備金 (目安)</span>
                     </div>
                     <div className="flex justify-between text-[10px] text-slate-500">
-                      <span>法人税等 (約30%):</span>
-                      <span>¥{estimatedCorporateTax.toLocaleString()}</span>
+                      <span>{taxLabel}:</span>
+                      <span>¥{estimatedIncomeTax.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-[10px] text-slate-500">
                       <span>消費税 (概算10%):</span>
