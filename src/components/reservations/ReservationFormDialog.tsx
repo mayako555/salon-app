@@ -21,6 +21,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
   const [loading, setLoading] = useState(false);
   const [isNewCustomer, setIsNewCustomer] = useState(false);
   const [duration, setDuration] = useState(60);
+  const [isAllDay, setIsAllDay] = useState(false);
   const [recordType, setRecordType] = useState<"reservation" | "schedule">("reservation");
 
   // Search state
@@ -71,10 +72,11 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
     setLoading(true);
     
     const formData = new FormData(e.currentTarget);
-    const start_time = formData.get("start_time") as string;
+    const start_time = isAllDay ? "09:00" : (formData.get("start_time") as string || "09:00");
+    const finalDuration = isAllDay ? 660 : duration;
     
     const [h, m] = start_time.split(":").map(Number);
-    const endTotalMins = h * 60 + m + duration;
+    const endTotalMins = h * 60 + m + finalDuration;
     const endHour = Math.floor(endTotalMins / 60);
     const endMin = endTotalMins % 60;
     const end_time = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
@@ -233,11 +235,17 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                 </div>
                 <div>
                   <label className="block mb-1">開始時間</label>
-                  <input required type="time" name="start_time" defaultValue={defaultTime} className="w-full h-8 px-2 border border-slate-300 rounded bg-white" />
+                  <input required={!isAllDay} type="time" name="start_time" defaultValue={isAllDay ? "09:00" : defaultTime} disabled={isAllDay} className="w-full h-8 px-2 border border-slate-300 rounded bg-white disabled:bg-slate-100 disabled:text-slate-400" />
                 </div>
                 <div>
-                  <label className="block mb-1">所要時間（分）</label>
-                  <input required type="number" step="5" value={duration} onChange={e => setDuration(Number(e.target.value))} className="w-full h-8 px-2 border border-slate-300 rounded bg-white" />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block">所要時間（分）</label>
+                    <label className="flex items-center gap-1 cursor-pointer text-blue-600 hover:text-blue-700">
+                      <input type="checkbox" checked={isAllDay} onChange={e => setIsAllDay(e.target.checked)} className="rounded text-blue-600 focus:ring-blue-500" />
+                      <span>終日</span>
+                    </label>
+                  </div>
+                  <input required={!isAllDay} type="number" step="5" value={isAllDay ? 660 : duration} onChange={e => setDuration(Number(e.target.value))} disabled={isAllDay} className="w-full h-8 px-2 border border-slate-300 rounded bg-white disabled:bg-slate-100 disabled:text-slate-400" />
                 </div>
               </div>
 
