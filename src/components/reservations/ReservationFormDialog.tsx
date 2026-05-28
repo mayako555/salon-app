@@ -170,11 +170,11 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                       氏名（カナ） <span className="w-2 h-2 rounded-full bg-rose-500 block"></span>
                     </div>
                     <div className="flex-1 flex gap-2">
-                      <input required type="text" name="last_name_kana" placeholder="セイ" className="w-full h-7 px-2 border border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" value={formDataState.last_name_kana} onChange={e => {
+                      <input required={!formDataState.last_name} type="text" name="last_name_kana" placeholder="セイ" className="w-full h-7 px-2 border border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" value={formDataState.last_name_kana} onChange={e => {
                         const val = e.target.value.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
                         setFormDataState({...formDataState, last_name_kana: val});
                       }} />
-                      <input required type="text" name="first_name_kana" placeholder="メイ" className="w-full h-7 px-2 border border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" value={formDataState.first_name_kana} onChange={e => {
+                      <input required={!formDataState.first_name} type="text" name="first_name_kana" placeholder="メイ" className="w-full h-7 px-2 border border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" value={formDataState.first_name_kana} onChange={e => {
                         const val = e.target.value.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
                         setFormDataState({...formDataState, first_name_kana: val});
                       }} />
@@ -339,7 +339,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                 <div className="col-span-2">
                   <label className="block mb-1">メニュー・クーポン</label>
                   <div className="flex gap-2">
-                    <input required type="text" name="menu_name" placeholder="メニュー名を入力" className="flex-1 h-8 px-2 border border-slate-300 rounded focus:bg-blue-50" />
+                    <input type="text" name="menu_name" placeholder="メニュー名を入力" className="flex-1 h-8 px-2 border border-slate-300 rounded focus:bg-blue-50" />
                     <Button type="button" variant="outline" className="h-8">選択...</Button>
                   </div>
                 </div>

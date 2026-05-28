@@ -190,18 +190,17 @@ export default function StaffPortalSalesPage() {
                         <span className="font-bold text-slate-800 text-sm">¥{(sale.tech_sales + sale.product_sales + (sale.hpb_points || 0) - (sale.discount || 0)).toLocaleString()}</span>
                       </div>
                       
-                      {sale.status !== 'closed' && (
-                        <CheckoutDialog 
-                          initialData={sale}
-                          staffList={staffNames}
-                          defaultStoreName={sale.store_name}
-                          trigger={
-                            <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-emerald-600 transition-colors">
-                              <Database size={16} />
-                            </button>
-                          }
-                        />
-                      )}
+                      <CheckoutDialog 
+                        initialData={sale}
+                        staffList={staffNames}
+                        defaultStoreName={sale.store_name}
+                        readOnly={sale.status === 'closed'}
+                        trigger={
+                          <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-emerald-600 transition-colors">
+                            {sale.status === 'closed' ? <Search size={16} /> : <Database size={16} />}
+                          </button>
+                        }
+                      />
                     </div>
                   </div>
                   <div className="text-xs text-slate-500 flex flex-wrap gap-x-3 gap-y-1 mt-2">
