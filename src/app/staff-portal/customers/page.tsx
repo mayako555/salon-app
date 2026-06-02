@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import ScanPaperDialog from "./ScanPaperDialog";
 import AddCustomerDialog from "./AddCustomerDialog";
 import MergeCustomerDialog from "./MergeCustomerDialog";
+import { useAuth } from "@/lib/auth-context";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -20,6 +21,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function StaffCustomersPage() {
+  const { profile, availableStores } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -45,15 +47,25 @@ export default function StaffCustomersPage() {
     load();
   }, []);
 
+  const isInHouse = !profile?.companyId || profile?.companyId === "company_default" || profile?.role === "systemOwner";
+  const allowedStores = isInHouse ? availableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : availableStores);
+
   const filtered = customers
     .filter(c => {
+      // Security filter: only allow customers that belong to allowedStores
+      const store = c.store_name || (c as any).main_store;
+      
+      // If store is completely undefined and they are a franchise, they shouldn't see it
+      if (!isInHouse && (!store || !allowedStores.includes(store))) {
+        return false;
+      }
+
       const matchesSearch = (c.name || "").includes(search) || 
                            (c.name_kana || "").includes(search) || 
                            (c.phone || "").includes(search) ||
                            (c.customer_no || "").includes(search);
       
       if (selectedStore === "すべて") return matchesSearch;
-      const store = c.store_name || (c as any).main_store;
       return matchesSearch && store === selectedStore;
     })
     .sort((a, b) => {
@@ -86,7 +98,7 @@ export default function StaffCustomersPage() {
       return partsA.num - partsB.num;
     });
 
-  const stores = ["すべて", "神戸", "六甲", "元町"];
+  const stores = ["すべて", ...allowedStores];
 
   const toggleSelect = (id: string, e: React.MouseEvent) => {
     e.preventDefault();

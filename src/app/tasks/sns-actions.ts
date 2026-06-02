@@ -15,6 +15,8 @@ import {
 } from "firebase/firestore";
 import { generateSNSContent as generateAI } from "@/lib/gemini";
 import { revalidatePath } from "next/cache";
+import { getCurrentUserContext } from "@/lib/auth-server";
+import { getStaffList } from "@/app/staff/actions";
 
 export type SNSPostStatus = "uncreated" | "draft" | "posted";
 
@@ -36,10 +38,11 @@ const SNS_POSTS_COLLECTION = "sns_posts";
 
 export async function getDailySNSPosts(date: string): Promise<SNSPost[]> {
   try {
+    const ctx = await getCurrentUserContext();
     const colRef = collection(db, SNS_POSTS_COLLECTION);
     const q = query(colRef, where("target_date", "==", date));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => {
+    const posts = snapshot.docs.map(d => {
       const data = d.data();
       return {
         id: d.id,
@@ -48,6 +51,16 @@ export async function getDailySNSPosts(date: string): Promise<SNSPost[]> {
         updated_at: data.updated_at?.toMillis?.() || data.updated_at || null
       };
     }) as SNSPost[];
+
+    if (ctx.role !== "systemOwner") {
+      const staffList = await getStaffList(); // Filtered by companyId
+      const allowedAccounts = new Set(
+        staffList.flatMap(s => s.sns_accounts || [])
+      );
+      return posts.filter(p => allowedAccounts.has(p.account));
+    }
+
+    return posts;
   } catch (error) {
     console.error("Error fetching SNS posts:", error);
     return [];

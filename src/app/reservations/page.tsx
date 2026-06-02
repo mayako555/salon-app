@@ -170,7 +170,16 @@ export default function ReservationsPage() {
         ) : (
           <ReservationTimeline 
             reservations={reservations} 
-            staffList={staffList} 
+            staffList={staffList.filter(s => {
+              if (selectedStore === "全店舗") {
+                // Return staff if they belong to ANY of the allowed stores, or if they have no salonIds (legacy/admin)
+                if (!s.salonIds || s.salonIds.length === 0) return true;
+                return s.salonIds.some(st => allowedStores.includes(st));
+              }
+              // Return staff only if they belong to the specific selected store
+              if (!s.salonIds || s.salonIds.length === 0) return true;
+              return s.salonIds.includes(selectedStore);
+            })} 
             shifts={shifts}
             date={dateStr}
             storeName={selectedStore}

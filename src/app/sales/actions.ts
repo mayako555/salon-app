@@ -23,6 +23,7 @@ import { SalesMasterItem, seedSalesMasterData } from "./seeds";
 import { addAuditLog } from "../audit/actions";
 import { addCustomer } from "@/lib/customers";
 import { syncInventoryFromSale } from "../inventory/inventory-actions";
+import { getCurrentUserContext } from "@/lib/auth-server";
 
 export type SalesSource = "checkout" | "hotpepper" | "manual";
 
@@ -63,6 +64,7 @@ export type SalesRecord = {
   customer_id?: string;
   is_minimo?: boolean;
   treatment_minutes?: number; // 稼働率計算用
+  companyId?: string; // Tenant isolation
   created_at: any; // Firestore Timestamp
 };
 
@@ -153,6 +155,7 @@ export async function duplicateSalesMasterItem(id: string) {
 
 export async function getSaleByReservationId(resId: string): Promise<SalesRecord | null> {
   try {
+    const ctx = await getCurrentUserContext();
     const q = query(
       collection(db, SALES_COLLECTION),
       where("source_reservation_id", "==", resId),
@@ -161,7 +164,14 @@ export async function getSaleByReservationId(resId: string): Promise<SalesRecord
     const snap = await getDocs(q);
     if (snap.empty) return null;
     const doc = snap.docs[0];
-    return { id: doc.id, ...doc.data() } as SalesRecord;
+    const data = { id: doc.id, ...doc.data() } as SalesRecord;
+    
+    if (ctx.role !== "systemOwner") {
+      const sCompanyId = data.companyId || "company_default";
+      if (sCompanyId !== (ctx.companyId || "company_default")) return null;
+    }
+    
+    return data;
   } catch (error) {
     console.error("Error fetching sale by res id:", error);
     return null;
@@ -174,6 +184,7 @@ export async function executeSeed() {
 
 export async function getMonthlySales(year: number, month: number): Promise<SalesRecord[]> {
   try {
+    const ctx = await getCurrentUserContext();
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
     const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
 
@@ -201,6 +212,16 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
         created_at: data.created_at?.toMillis?.() || data.created_at || null
       };
     }) as SalesRecord[];
+
+    let filteredSales = sales;
+    if (ctx.role !== "systemOwner") {
+      filteredSales = sales.filter(s => {
+        // Fallback: If no companyId in record, assume it's company_default
+        const sCompanyId = s.companyId || "company_default";
+        return sCompanyId === (ctx.companyId || "company_default");
+      });
+    }
+    return filteredSales;
   } catch (error: any) {
     console.error("Error fetching sales from Firestore:", error);
     return [];

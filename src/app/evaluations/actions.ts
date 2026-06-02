@@ -21,11 +21,13 @@ import { getMonthlySales } from "@/app/sales/actions";
 import { getStaffList } from "@/app/staff/actions";
 import { getMonthlyReviews } from "@/app/admin/reviews/actions";
 import { getMonthlyStaffTargets } from "@/lib/staff_targets";
+import { getCurrentUserContext } from "@/lib/auth-server";
 
 const EVALUATIONS_COLLECTION = "staff_evaluations";
 
 export async function getStaffEvaluations(staffId?: string): Promise<StaffEvaluation[]> {
   try {
+    const ctx = await getCurrentUserContext();
     const colRef = collection(db, EVALUATIONS_COLLECTION);
     let q = query(colRef, orderBy("evaluation_date", "desc"));
     
@@ -34,7 +36,7 @@ export async function getStaffEvaluations(staffId?: string): Promise<StaffEvalua
     }
     
     const snapshot = await getDocs(q);
-    return snapshot.docs
+    const evaluations = snapshot.docs
       .map(doc => {
         const data = doc.data();
         return {
@@ -45,6 +47,14 @@ export async function getStaffEvaluations(staffId?: string): Promise<StaffEvalua
         } as StaffEvaluation;
       })
       .filter(e => (e as any).deleted !== true); // Filter in-memory to handle legacy records missing the field
+
+    if (ctx.role !== "systemOwner") {
+      const staffList = await getStaffList(); // already filtered by companyId
+      const allowedStaffIds = new Set(staffList.map(s => s.id));
+      return evaluations.filter(e => allowedStaffIds.has(e.staff_id));
+    }
+    
+    return evaluations;
   } catch (error) {
     console.error("Error fetching evaluations:", error);
     return [];

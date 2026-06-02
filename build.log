@@ -1,0 +1,1519 @@
+
+> salon-app@0.1.0 build
+> next build
+
+⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Users/mayako/package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * /Users/mayako/.gemini/antigravity/scratch/salon-app/package-lock.json
+
+▲ Next.js 16.2.4 (Turbopack)
+- Environments: .env.local
+- Experiments (use with caution):
+  · serverActions
+
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 42 errors:
+./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts:1:1
+You're importing a module that depends on "next/headers". This API is only available in Server Components in the App Router, but you are using it in the Pages Router.
+    Learn more: https://nextjs.org/docs/app/building-your-application/rendering/server-components
+[31m[1m>[0m [90m1 |[0m [36mimport[0m { cookies } [36mfrom[0m [32m"next/headers"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m2 |[0m [36mimport[0m { adminAuth, adminDb } [36mfrom[0m [32m"./firebase-admin"[0m;
+  [90m3 |[0m
+  [90m4 |[0m [36mexport[0m [36mtype[0m [33mUserRole[0m = [32m"systemOwner"[0m | [32m"companyOwner"[0m | [32m"manager"[0m | [32m"st...[0m
+
+Ecmascript file had an error
+
+Import traces:
+  #1 [Server Component]:
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts
+    ./.gemini/antigravity/scratch/salon-app/src/app/evaluations/actions.ts
+
+  #2 [App Route]:
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff/actions.ts
+    ./.gemini/antigravity/scratch/salon-app/src/app/api/webhooks/sync-reservations/route.ts
+
+  #3 [Server Component]:
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff/actions.ts
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/page.tsx
+
+  #4 [Client Component Browser]:
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+  #5 [Client Component SSR]:
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component SSR]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component SSR]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component SSR]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+
+./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts:17:10
+the name `addAuditLog` is defined multiple times
+  [90m15 |[0m } [36mfrom[0m [32m"firebase/firestore"[0m;
+  [90m16 |[0m [36mimport[0m { addAuditLog } [36mfrom[0m [32m"@/app/audit/actions"[0m;
+[31m[1m>[0m [90m17 |[0m [36mimport[0m { addAuditLog } [36mfrom[0m [32m"@/app/audit/actions"[0m;
+  [90m   |[0m          [31m[1m^^^^^^^^^^^[0m
+  [90m18 |[0m [36mimport[0m { getStaffList } [36mfrom[0m [32m"@/app/staff/actions"[0m;
+  [90m19 |[0m [36mimport[0m { getCurrentUserContext } [36mfrom[0m [32m"@/lib/auth-server"[0m;
+  [90m20 |[0m
+
+Ecmascript file had an error
+
+Import traces:
+  #1 [Server Component]:
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts
+    ./.gemini/antigravity/scratch/salon-app/src/app/dashboard/performance/actions.ts
+
+  #2 [Server Component]:
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/shifts/page.tsx
+
+  #3 [Client Component Browser]:
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+  #4 [Client Component SSR]:
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component SSR]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component SSR]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/auth/googleauth.js:29:25
+Module not found: Can't resolve 'child_process'
+  [90m27 |[0m ...[33mect[0m.defineProperty(exports, [32m"__esModule"[0m, { value: [36mtrue[0m });
+  [90m28 |[0m ...orts.[33mGoogleAuth[0m = exports.[33mGoogleAuthExceptionMessages[0m = exports.[33mCLO...[0m
+[31m[1m>[0m [90m29 |[0m ...[36mst[0m child_process_1 = require([32m"child_process"[0m);
+  [90m   |[0m                         [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m30 |[0m ...[36mst[0m fs = require([32m"fs"[0m);
+  [90m31 |[0m ...[36mst[0m gcpMetadata = require([32m"gcp-metadata"[0m);
+  [90m32 |[0m ...[36mst[0m os = require([32m"os"[0m);
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/storage/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js:19:22
+Module not found: Can't resolve 'child_process'
+  [90m17 |[0m [36mconst[0m pluggable_auth_client_1 = require([32m"./pluggable-auth-client"[0m);
+  [90m18 |[0m [36mconst[0m executable_response_1 = require([32m"./executable-response"[0m);
+[31m[1m>[0m [90m19 |[0m [36mconst[0m childProcess = require([32m"child_process"[0m);
+  [90m   |[0m                      [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m20 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m21 |[0m /**
+  [90m22 |[0m  * [33mA[0m handler used to retrieve [35m3[0mrd party token responses [36mfrom[0m user defined
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/storage/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/googleauth.js:17:25
+Module not found: Can't resolve 'child_process'
+  [90m15 |[0m [33mObject[0m.defineProperty(exports, [32m"__esModule"[0m, { value: [36mtrue[0m });
+  [90m16 |[0m exports.[33mGoogleAuth[0m = exports.[33mGoogleAuthExceptionMessages[0m = [36mvoid[0m [35m0[0m;
+[31m[1m>[0m [90m17 |[0m [36mconst[0m child_process_1 = require([32m"child_process"[0m);
+  [90m   |[0m                         [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m18 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m19 |[0m [36mconst[0m gaxios_1 = require([32m"gaxios"[0m);
+  [90m20 |[0m [36mconst[0m gcpMetadata = require([32m"gcp-metadata"[0m);
+
+
+
+Import traces:
+  Server Component:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/googleauth.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-internal.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-factory.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftEditDialog.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Server Component]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/shifts/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js:18:22
+Module not found: Can't resolve 'child_process'
+  [90m16 |[0m exports.[33mPluggableAuthHandler[0m = exports.[33mExecutableError[0m = [36mvoid[0m [35m0[0m;
+  [90m17 |[0m [36mconst[0m executable_response_1 = require([32m"./executable-response"[0m);
+[31m[1m>[0m [90m18 |[0m [36mconst[0m childProcess = require([32m"child_process"[0m);
+  [90m   |[0m                      [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m19 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m20 |[0m /**
+  [90m21 |[0m  * [33mError[0m thrown [36mfrom[0m the executable run by [33mPluggableAuthClient[0m.
+
+
+
+Import traces:
+  #1 [Server Component]:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/googleauth.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  #2 [Server Component]:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  #3 [Client Component Browser]:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-internal.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-factory.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftEditDialog.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Server Component]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/shifts/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/googleauth.js:29:25
+Module not found: Can't resolve 'child_process'
+  [90m27 |[0m ...[33mect[0m.defineProperty(exports, [32m"__esModule"[0m, { value: [36mtrue[0m });
+  [90m28 |[0m ...orts.[33mGoogleAuth[0m = exports.[33mGoogleAuthExceptionMessages[0m = exports.[33mCLO...[0m
+[31m[1m>[0m [90m29 |[0m ...[36mst[0m child_process_1 = require([32m"child_process"[0m);
+  [90m   |[0m                         [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m30 |[0m ...[36mst[0m fs = require([32m"fs"[0m);
+  [90m31 |[0m ...[36mst[0m gcpMetadata = require([32m"gcp-metadata"[0m);
+  [90m32 |[0m ...[36mst[0m os = require([32m"os"[0m);
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/build/src/fallback.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/firestore/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/attendance/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/attendance/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js:19:22
+Module not found: Can't resolve 'child_process'
+  [90m17 |[0m [36mconst[0m pluggable_auth_client_1 = require([32m"./pluggable-auth-client"[0m);
+  [90m18 |[0m [36mconst[0m executable_response_1 = require([32m"./executable-response"[0m);
+[31m[1m>[0m [90m19 |[0m [36mconst[0m childProcess = require([32m"child_process"[0m);
+  [90m   |[0m                      [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m20 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m21 |[0m /**
+  [90m22 |[0m  * [33mA[0m handler used to retrieve [35m3[0mrd party token responses [36mfrom[0m user defined
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/build/src/fallback.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/firestore/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/attendance/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/attendance/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/bucket.js:56:25
+Module not found: Can't resolve 'fs'
+  [90m54 |[0m [36mconst[0m paginator_1 = require([32m"@google-cloud/paginator"[0m);
+  [90m55 |[0m [36mconst[0m promisify_1 = require([32m"@google-cloud/promisify"[0m);
+[31m[1m>[0m [90m56 |[0m [36mconst[0m fs = __importStar(require([32m"fs"[0m));
+  [90m   |[0m                         [31m[1m^^^^^^^^^^^^^[0m
+  [90m57 |[0m [36mconst[0m mime_1 = __importDefault(require([32m"mime"[0m));
+  [90m58 |[0m [36mconst[0m path = __importStar(require([32m"path"[0m));
+  [90m59 |[0m [36mconst[0m p_limit_1 = __importDefault(require([32m"p-limit"[0m));
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/bucket.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/storage/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/crc32c.js:29:14
+Module not found: Can't resolve 'fs'
+  [90m27 |[0m [33mObject[0m.defineProperty(exports, [32m"__esModule"[0m, { value: [36mtrue[0m });
+  [90m28 |[0m exports.[33mCRC32C_EXTENSION_TABLE[0m = exports.[33mCRC32C_EXTENSIONS[0m = exports.[33mC...[0m
+[31m[1m>[0m [90m29 |[0m [36mconst[0m fs_1 = require([32m"fs"[0m);
+  [90m   |[0m              [31m[1m^^^^^^^^^^^^^[0m
+  [90m30 |[0m [90m/**[0m
+  [90m31 |[0m [90m * Ported from {@link https://github.com/google/crc32c/blob/21fc8ef304...[0m
+  [90m32 |[0m [90m */[0m
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/crc32c.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/storage/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/file.js:62:25
+Module not found: Can't resolve 'fs'
+  [90m60 |[0m [36mconst[0m promisify_1 = require([32m"@google-cloud/promisify"[0m);
+  [90m61 |[0m [36mconst[0m crypto = __importStar(require([32m"crypto"[0m));
+[31m[1m>[0m [90m62 |[0m [36mconst[0m fs = __importStar(require([32m"fs"[0m));
+  [90m   |[0m                         [31m[1m^^^^^^^^^^^^^[0m
+  [90m63 |[0m [36mconst[0m mime_1 = __importDefault(require([32m"mime"[0m));
+  [90m64 |[0m [36mconst[0m resumableUpload = __importStar(require([32m"./resumable-upload.js"[0m));
+  [90m65 |[0m [36mconst[0m stream_1 = require([32m"stream"[0m);
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/file.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/storage/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/transfer-manager.js:64:14
+Module not found: Can't resolve 'fs'
+  [90m62 |[0m [36mconst[0m p_limit_1 = __importDefault(require([32m"p-limit"[0m));
+  [90m63 |[0m [36mconst[0m path = __importStar(require([32m"path"[0m));
+[31m[1m>[0m [90m64 |[0m [36mconst[0m fs_1 = require([32m"fs"[0m);
+  [90m   |[0m              [31m[1m^^^^^^^^^^^^^[0m
+  [90m65 |[0m [36mconst[0m crc32c_js_1 = require([32m"./crc32c.js"[0m);
+  [90m66 |[0m [36mconst[0m google_auth_library_1 = require([32m"google-auth-library"[0m);
+  [90m67 |[0m [36mconst[0m fast_xml_parser_1 = require([32m"fast-xml-parser"[0m);
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/transfer-manager.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/storage/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/gcp-metadata/build/src/gcp-residency.js:24:14
+Module not found: Can't resolve 'fs'
+  [90m22 |[0m exports.isGoogleComputeEngine = isGoogleComputeEngine;
+  [90m23 |[0m exports.detectGCPResidency = detectGCPResidency;
+[31m[1m>[0m [90m24 |[0m [36mconst[0m fs_1 = require([32m"fs"[0m);
+  [90m   |[0m              [31m[1m^^^^^^^^^^^^^[0m
+  [90m25 |[0m [36mconst[0m os_1 = require([32m"os"[0m);
+  [90m26 |[0m /**
+  [90m27 |[0m  * [33mKnown[0m paths unique to [33mGoogle[0m [33mCompute[0m [33mEngine[0m [33mLinux[0m instances
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/gcp-metadata/build/src/gcp-residency.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/gcp-metadata/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/storage/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js:19:12
+Module not found: Can't resolve 'fs'
+  [90m17 |[0m exports.[33mFileSubjectTokenSupplier[0m = [36mvoid[0m [35m0[0m;
+  [90m18 |[0m [36mconst[0m util_1 = require([32m"util"[0m);
+[31m[1m>[0m [90m19 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m   |[0m            [31m[1m^^^^^^^^^^^^^[0m
+  [90m20 |[0m [90m// fs.readfile is undefined in browser karma tests causing[0m
+  [90m21 |[0m [90m// `npm run browser-test` to fail as test.oauth2.ts imports this file via[0m
+  [90m22 |[0m [90m// src/index.ts.[0m
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/auth/identitypoolclient.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/storage/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/auth/googleauth.js:30:12
+Module not found: Can't resolve 'fs'
+  [90m28 |[0m exports.[33mGoogleAuth[0m = exports.[33mGoogleAuthExceptionMessages[0m = exports.[33mCLO...[0m
+  [90m29 |[0m [36mconst[0m child_process_1 = require([32m"child_process"[0m);
+[31m[1m>[0m [90m30 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m   |[0m            [31m[1m^^^^^^^^^^^^^[0m
+  [90m31 |[0m [36mconst[0m gcpMetadata = require([32m"gcp-metadata"[0m);
+  [90m32 |[0m [36mconst[0m os = require([32m"os"[0m);
+  [90m33 |[0m [36mconst[0m path = require([32m"path"[0m);
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/storage/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js:20:12
+Module not found: Can't resolve 'fs'
+  [90m18 |[0m [36mconst[0m executable_response_1 = require([32m"./executable-response"[0m);
+  [90m19 |[0m [36mconst[0m childProcess = require([32m"child_process"[0m);
+[31m[1m>[0m [90m20 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m   |[0m            [31m[1m^^^^^^^^^^^^^[0m
+  [90m21 |[0m /**
+  [90m22 |[0m  * [33mA[0m handler used to retrieve [35m3[0mrd party token responses [36mfrom[0m user defined
+  [90m23 |[0m  * executables and cached file output [36mfor[0m the [33mPluggableAuthClient[0m [36mclass[0m.
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/storage/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-internal.js:23:12
+Module not found: Can't resolve 'fs'
+  [90m21 |[0m exports.isApplicationDefault = isApplicationDefault;
+  [90m22 |[0m exports.getApplicationDefault = getApplicationDefault;
+[31m[1m>[0m [90m23 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m   |[0m            [31m[1m^^^^^^^^^^^^^[0m
+  [90m24 |[0m [36mconst[0m google_auth_library_1 = require([32m"google-auth-library"[0m);
+  [90m25 |[0m [36mconst[0m error_1 = require([32m"../utils/error"[0m);
+  [90m26 |[0m [36mconst[0m util = require([32m"../utils/validator"[0m);
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-internal.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-factory.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftEditDialog.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Server Component]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/shifts/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/lifecycle.js:25:12
+Module not found: Can't resolve 'fs'
+  [90m23 |[0m exports.getApps = getApps;
+  [90m24 |[0m exports.deleteApp = deleteApp;
+[31m[1m>[0m [90m25 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m   |[0m            [31m[1m^^^^^^^^^^^^^[0m
+  [90m26 |[0m [36mconst[0m validator = require([32m"../utils/validator"[0m);
+  [90m27 |[0m [36mconst[0m error_1 = require([32m"../utils/error"[0m);
+  [90m28 |[0m [36mconst[0m credential_internal_1 = require([32m"./credential-internal"[0m);
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/lifecycle.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/gcp-metadata/build/src/gcp-residency.js:24:14
+Module not found: Can't resolve 'fs'
+  [90m22 |[0m exports.isGoogleComputeEngine = isGoogleComputeEngine;
+  [90m23 |[0m exports.detectGCPResidency = detectGCPResidency;
+[31m[1m>[0m [90m24 |[0m [36mconst[0m fs_1 = require([32m"fs"[0m);
+  [90m   |[0m              [31m[1m^^^^^^^^^^^^^[0m
+  [90m25 |[0m [36mconst[0m os_1 = require([32m"os"[0m);
+  [90m26 |[0m /**
+  [90m27 |[0m  * [33mKnown[0m paths unique to [33mGoogle[0m [33mCompute[0m [33mEngine[0m [33mLinux[0m instances
+
+
+
+Import traces:
+  Server Component:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/gcp-metadata/build/src/gcp-residency.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/gcp-metadata/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/gcp-metadata/build/src/gcp-residency.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/gcp-metadata/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-internal.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-factory.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftEditDialog.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Server Component]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/shifts/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/certificatesubjecttokensupplier.js:18:12
+Module not found: Can't resolve 'fs'
+  [90m16 |[0m exports.[33mCertificateSubjectTokenSupplier[0m = exports.[33mInvalidConfiguration...[0m
+  [90m17 |[0m [36mconst[0m util_1 = require([32m"../util"[0m);
+[31m[1m>[0m [90m18 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m   |[0m            [31m[1m^^^^^^^^^^^^^[0m
+  [90m19 |[0m [36mconst[0m crypto_1 = require([32m"crypto"[0m);
+  [90m20 |[0m [36mconst[0m https = require([32m"https"[0m);
+  [90m21 |[0m exports.[33mCERTIFICATE_CONFIGURATION_ENV_VARIABLE[0m = [32m'GOOGLE_API_CERTIFICA...[0m
+
+
+
+Import traces:
+  #1 [Server Component]:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/certificatesubjecttokensupplier.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/googleauth.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  #2 [Server Component]:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/certificatesubjecttokensupplier.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/identitypoolclient.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  #3 [Client Component Browser]:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/certificatesubjecttokensupplier.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/identitypoolclient.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-internal.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-factory.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftEditDialog.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Server Component]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/shifts/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js:18:12
+Module not found: Can't resolve 'fs'
+  [90m16 |[0m exports.[33mFileSubjectTokenSupplier[0m = [36mvoid[0m [35m0[0m;
+  [90m17 |[0m [36mconst[0m util_1 = require([32m"util"[0m);
+[31m[1m>[0m [90m18 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m   |[0m            [31m[1m^^^^^^^^^^^^^[0m
+  [90m19 |[0m [90m// fs.readfile is undefined in browser karma tests causing[0m
+  [90m20 |[0m [90m// `npm run browser-test` to fail as test.oauth2.ts imports this file via[0m
+  [90m21 |[0m [90m// src/index.ts.[0m
+
+
+
+Import traces:
+  #1 [Server Component]:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/googleauth.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  #2 [Server Component]:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/identitypoolclient.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  #3 [Client Component Browser]:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/identitypoolclient.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-internal.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-factory.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftEditDialog.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Server Component]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/shifts/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/googleauth.js:18:12
+Module not found: Can't resolve 'fs'
+  [90m16 |[0m exports.[33mGoogleAuth[0m = exports.[33mGoogleAuthExceptionMessages[0m = [36mvoid[0m [35m0[0m;
+  [90m17 |[0m [36mconst[0m child_process_1 = require([32m"child_process"[0m);
+[31m[1m>[0m [90m18 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m   |[0m            [31m[1m^^^^^^^^^^^^^[0m
+  [90m19 |[0m [36mconst[0m gaxios_1 = require([32m"gaxios"[0m);
+  [90m20 |[0m [36mconst[0m gcpMetadata = require([32m"gcp-metadata"[0m);
+  [90m21 |[0m [36mconst[0m os = require([32m"os"[0m);
+
+
+
+Import traces:
+  Server Component:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/googleauth.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-internal.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-factory.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftEditDialog.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Server Component]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/shifts/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js:19:12
+Module not found: Can't resolve 'fs'
+  [90m17 |[0m [36mconst[0m executable_response_1 = require([32m"./executable-response"[0m);
+  [90m18 |[0m [36mconst[0m childProcess = require([32m"child_process"[0m);
+[31m[1m>[0m [90m19 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m   |[0m            [31m[1m^^^^^^^^^^^^^[0m
+  [90m20 |[0m [90m/**[0m
+  [90m21 |[0m [90m * Error thrown from the executable run by PluggableAuthClient.[0m
+  [90m22 |[0m [90m */[0m
+
+
+
+Import traces:
+  #1 [Server Component]:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/googleauth.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  #2 [Server Component]:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  #3 [Client Component Browser]:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-internal.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-factory.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftEditDialog.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Server Component]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/shifts/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/gtoken/getCredentials.js:18:12
+Module not found: Can't resolve 'fs'
+  [90m16 |[0m exports.getCredentials = getCredentials;
+  [90m17 |[0m [36mconst[0m path = require([32m"path"[0m);
+[31m[1m>[0m [90m18 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m   |[0m            [31m[1m^^^^^^^^^^^^^[0m
+  [90m19 |[0m [36mconst[0m util_1 = require([32m"util"[0m);
+  [90m20 |[0m [36mconst[0m errorWithCode_1 = require([32m"./errorWithCode"[0m);
+  [90m21 |[0m [36mconst[0m readFile = fs.readFile
+
+
+
+Import traces:
+  Server Component:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/gtoken/getCredentials.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/jwtclient.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/gtoken/getCredentials.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/jwtclient.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-internal.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-factory.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftEditDialog.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/ShiftsView.tsx [Server Component]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/shifts/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/util.js:22:12
+Module not found: Can't resolve 'fs'
+  [90m20 |[0m exports.isValidFile = isValidFile;
+  [90m21 |[0m exports.getWellKnownCertificateConfigFileLocation = getWellKnownCertif...
+[31m[1m>[0m [90m22 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m   |[0m            [31m[1m^^^^^^^^^^^^^[0m
+  [90m23 |[0m [36mconst[0m os = require([32m"os"[0m);
+  [90m24 |[0m [36mconst[0m path = require([32m"path"[0m);
+  [90m25 |[0m [36mconst[0m [33mWELL_KNOWN_CERTIFICATE_CONFIG_FILE[0m = [32m'certificate_config.json'[0m;
+
+
+
+Import traces:
+  Server Component:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/util.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/baseexternalclient.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/util.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/auth/baseexternalclient.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-internal.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/lifecycle.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/reservations/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/reservations/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/gcp-metadata/build/src/gcp-residency.js:24:14
+Module not found: Can't resolve 'fs'
+  [90m22 |[0m exports.isGoogleComputeEngine = isGoogleComputeEngine;
+  [90m23 |[0m exports.detectGCPResidency = detectGCPResidency;
+[31m[1m>[0m [90m24 |[0m [36mconst[0m fs_1 = require([32m"fs"[0m);
+  [90m   |[0m              [31m[1m^^^^^^^^^^^^^[0m
+  [90m25 |[0m [36mconst[0m os_1 = require([32m"os"[0m);
+  [90m26 |[0m /**
+  [90m27 |[0m  * [33mKnown[0m paths unique to [33mGoogle[0m [33mCompute[0m [33mEngine[0m [33mLinux[0m instances
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/gcp-metadata/build/src/gcp-residency.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/gcp-metadata/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/build/src/fallback.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/firestore/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/attendance/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/attendance/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js:19:12
+Module not found: Can't resolve 'fs'
+  [90m17 |[0m exports.[33mFileSubjectTokenSupplier[0m = [36mvoid[0m [35m0[0m;
+  [90m18 |[0m [36mconst[0m util_1 = require([32m"util"[0m);
+[31m[1m>[0m [90m19 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m   |[0m            [31m[1m^^^^^^^^^^^^^[0m
+  [90m20 |[0m [90m// fs.readfile is undefined in browser karma tests causing[0m
+  [90m21 |[0m [90m// `npm run browser-test` to fail as test.oauth2.ts imports this file via[0m
+  [90m22 |[0m [90m// src/index.ts.[0m
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/identitypoolclient.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/build/src/fallback.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/firestore/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/attendance/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/attendance/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/googleauth.js:30:12
+Module not found: Can't resolve 'fs'
+  [90m28 |[0m exports.[33mGoogleAuth[0m = exports.[33mGoogleAuthExceptionMessages[0m = exports.[33mCLO...[0m
+  [90m29 |[0m [36mconst[0m child_process_1 = require([32m"child_process"[0m);
+[31m[1m>[0m [90m30 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m   |[0m            [31m[1m^^^^^^^^^^^^^[0m
+  [90m31 |[0m [36mconst[0m gcpMetadata = require([32m"gcp-metadata"[0m);
+  [90m32 |[0m [36mconst[0m os = require([32m"os"[0m);
+  [90m33 |[0m [36mconst[0m path = require([32m"path"[0m);
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/build/src/fallback.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/firestore/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/attendance/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/attendance/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js:20:12
+Module not found: Can't resolve 'fs'
+  [90m18 |[0m [36mconst[0m executable_response_1 = require([32m"./executable-response"[0m);
+  [90m19 |[0m [36mconst[0m childProcess = require([32m"child_process"[0m);
+[31m[1m>[0m [90m20 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m   |[0m            [31m[1m^^^^^^^^^^^^^[0m
+  [90m21 |[0m /**
+  [90m22 |[0m  * [33mA[0m handler used to retrieve [35m3[0mrd party token responses [36mfrom[0m user defined
+  [90m23 |[0m  * executables and cached file output [36mfor[0m the [33mPluggableAuthClient[0m [36mclass[0m.
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/build/src/fallback.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/firestore/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/attendance/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/attendance/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/gtoken/build/src/index.js:22:12
+Module not found: Can't resolve 'fs'
+  [90m20 |[0m [33mObject[0m.defineProperty(exports, [32m"__esModule"[0m, { value: [36mtrue[0m });
+  [90m21 |[0m exports.[33mGoogleToken[0m = [36mvoid[0m [35m0[0m;
+[31m[1m>[0m [90m22 |[0m [36mconst[0m fs = require([32m"fs"[0m);
+  [90m   |[0m            [31m[1m^^^^^^^^^^^^^[0m
+  [90m23 |[0m [36mconst[0m gaxios_1 = require([32m"gaxios"[0m);
+  [90m24 |[0m [36mconst[0m jws = require([32m"jws"[0m);
+  [90m25 |[0m [36mconst[0m path = require([32m"path"[0m);
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/gtoken/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/jwtclient.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/build/src/fallback.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/firestore/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/holidays/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/holidays/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/utils/api-request.js:27:15
+Module not found: Can't resolve 'http2'
+  [90m25 |[0m [36mconst[0m http = require([32m"http"[0m);
+  [90m26 |[0m [36mconst[0m https = require([32m"https"[0m);
+[31m[1m>[0m [90m27 |[0m [36mconst[0m http2 = require([32m"http2"[0m);
+  [90m   |[0m               [31m[1m^^^^^^^^^^^^^^^^[0m
+  [90m28 |[0m [36mconst[0m url = require([32m"url"[0m);
+  [90m29 |[0m [36mconst[0m events_1 = require([32m"events"[0m);
+  [90m30 |[0m [36mconst[0m credential_internal_1 = require([32m"../app/credential-internal"[0m);
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/utils/api-request.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/messaging/messaging.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/attendance/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/attendance/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/@firebase/database-compat/dist/index.standalone.js:11:20
+Module not found: Can't resolve 'net'
+  [90m 9 |[0m [36mvar[0m require$$1$1 = require([32m'crypto'[0m);
+  [90m10 |[0m [36mvar[0m require$$2$1 = require([32m'url'[0m);
+[31m[1m>[0m [90m11 |[0m [36mvar[0m require$$1$2 = require([32m'net'[0m);
+  [90m   |[0m                    [31m[1m^^^^^^^^^^^^^^[0m
+  [90m12 |[0m [36mvar[0m require$$2$2 = require([32m'tls'[0m);
+  [90m13 |[0m [36mvar[0m require$$2$3 = require([32m'@firebase/util'[0m);
+  [90m14 |[0m [36mvar[0m require$$1$3 = require([32m'@firebase/logger'[0m);
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@firebase/database-compat/dist/index.standalone.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/agent-base/dist/index.js:30:26
+Module not found: Can't resolve 'net'
+  [90m28 |[0m [33mObject[0m.defineProperty(exports, [32m"__esModule"[0m, { value: [36mtrue[0m });
+  [90m29 |[0m exports.[33mAgent[0m = [36mvoid[0m [35m0[0m;
+[31m[1m>[0m [90m30 |[0m [36mconst[0m net = __importStar(require([32m"net"[0m));
+  [90m   |[0m                          [31m[1m^^^^^^^^^^^^^^[0m
+  [90m31 |[0m [36mconst[0m http = __importStar(require([32m"http"[0m));
+  [90m32 |[0m [36mconst[0m https_1 = require([32m"https"[0m);
+  [90m33 |[0m __exportStar(require([32m"./helpers"[0m), exports);
+
+
+
+Import traces:
+  Server Component:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/agent-base/dist/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/https-proxy-agent/dist/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/node_modules/gaxios/build/cjs/src/gaxios.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/node_modules/gaxios/build/cjs/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/agent-base/dist/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/https-proxy-agent/dist/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/gaxios/build/src/gaxios.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/gaxios/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/build/src/fallback.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/firestore/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/reservations/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/reservations/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/http-proxy-agent/dist/agent.js:15:31
+Module not found: Can't resolve 'net'
+  [90m13 |[0m };
+  [90m14 |[0m [33mObject[0m.defineProperty(exports, [32m"__esModule"[0m, { value: [36mtrue[0m });
+[31m[1m>[0m [90m15 |[0m [36mconst[0m net_1 = __importDefault(require([32m"net"[0m));
+  [90m   |[0m                               [31m[1m^^^^^^^^^^^^^^[0m
+  [90m16 |[0m [36mconst[0m tls_1 = __importDefault(require([32m"tls"[0m));
+  [90m17 |[0m [36mconst[0m url_1 = __importDefault(require([32m"url"[0m));
+  [90m18 |[0m [36mconst[0m debug_1 = __importDefault(require([32m"debug"[0m));
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/http-proxy-agent/dist/agent.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/http-proxy-agent/dist/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/teeny-request/build/src/agents.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/teeny-request/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/nodejs-common/util.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/nodejs-common/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/storage/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/https-proxy-agent/dist/index.js:30:26
+Module not found: Can't resolve 'net'
+  [90m28 |[0m [33mObject[0m.defineProperty(exports, [32m"__esModule"[0m, { value: [36mtrue[0m });
+  [90m29 |[0m exports.[33mHttpsProxyAgent[0m = [36mvoid[0m [35m0[0m;
+[31m[1m>[0m [90m30 |[0m [36mconst[0m net = __importStar(require([32m"net"[0m));
+  [90m   |[0m                          [31m[1m^^^^^^^^^^^^^^[0m
+  [90m31 |[0m [36mconst[0m tls = __importStar(require([32m"tls"[0m));
+  [90m32 |[0m [36mconst[0m assert_1 = __importDefault(require([32m"assert"[0m));
+  [90m33 |[0m [36mconst[0m debug_1 = __importDefault(require([32m"debug"[0m));
+
+
+
+Import traces:
+  Server Component:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/https-proxy-agent/dist/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/node_modules/gaxios/build/cjs/src/gaxios.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/node_modules/gaxios/build/cjs/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/https-proxy-agent/dist/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/gaxios/build/src/gaxios.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/gaxios/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/build/src/fallback.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/firestore/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/reservations/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/reservations/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/teeny-request/node_modules/https-proxy-agent/dist/agent.js:15:31
+Module not found: Can't resolve 'net'
+  [90m13 |[0m };
+  [90m14 |[0m [33mObject[0m.defineProperty(exports, [32m"__esModule"[0m, { value: [36mtrue[0m });
+[31m[1m>[0m [90m15 |[0m [36mconst[0m net_1 = __importDefault(require([32m"net"[0m));
+  [90m   |[0m                               [31m[1m^^^^^^^^^^^^^^[0m
+  [90m16 |[0m [36mconst[0m tls_1 = __importDefault(require([32m"tls"[0m));
+  [90m17 |[0m [36mconst[0m url_1 = __importDefault(require([32m"url"[0m));
+  [90m18 |[0m [36mconst[0m assert_1 = __importDefault(require([32m"assert"[0m));
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/teeny-request/node_modules/https-proxy-agent/dist/agent.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/teeny-request/node_modules/https-proxy-agent/dist/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/teeny-request/build/src/agents.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/teeny-request/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/nodejs-common/util.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/nodejs-common/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/storage/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/@firebase/database-compat/dist/index.standalone.js:12:20
+Module not found: Can't resolve 'tls'
+  [90m10 |[0m [36mvar[0m require$$2$1 = require([32m'url'[0m);
+  [90m11 |[0m [36mvar[0m require$$1$2 = require([32m'net'[0m);
+[31m[1m>[0m [90m12 |[0m [36mvar[0m require$$2$2 = require([32m'tls'[0m);
+  [90m   |[0m                    [31m[1m^^^^^^^^^^^^^^[0m
+  [90m13 |[0m [36mvar[0m require$$2$3 = require([32m'@firebase/util'[0m);
+  [90m14 |[0m [36mvar[0m require$$1$3 = require([32m'@firebase/logger'[0m);
+  [90m15 |[0m [36mvar[0m require$$0$2 = require([32m'@firebase/component'[0m);
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@firebase/database-compat/dist/index.standalone.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/http-proxy-agent/dist/agent.js:16:31
+Module not found: Can't resolve 'tls'
+  [90m14 |[0m [33mObject[0m.defineProperty(exports, [32m"__esModule"[0m, { value: [36mtrue[0m });
+  [90m15 |[0m [36mconst[0m net_1 = __importDefault(require([32m"net"[0m));
+[31m[1m>[0m [90m16 |[0m [36mconst[0m tls_1 = __importDefault(require([32m"tls"[0m));
+  [90m   |[0m                               [31m[1m^^^^^^^^^^^^^^[0m
+  [90m17 |[0m [36mconst[0m url_1 = __importDefault(require([32m"url"[0m));
+  [90m18 |[0m [36mconst[0m debug_1 = __importDefault(require([32m"debug"[0m));
+  [90m19 |[0m [36mconst[0m once_1 = __importDefault(require([32m"@tootallnate/once"[0m));
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/http-proxy-agent/dist/agent.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/http-proxy-agent/dist/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/teeny-request/build/src/agents.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/teeny-request/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/nodejs-common/util.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/nodejs-common/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/storage/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/https-proxy-agent/dist/index.js:31:26
+Module not found: Can't resolve 'tls'
+  [90m29 |[0m exports.[33mHttpsProxyAgent[0m = [36mvoid[0m [35m0[0m;
+  [90m30 |[0m [36mconst[0m net = __importStar(require([32m"net"[0m));
+[31m[1m>[0m [90m31 |[0m [36mconst[0m tls = __importStar(require([32m"tls"[0m));
+  [90m   |[0m                          [31m[1m^^^^^^^^^^^^^^[0m
+  [90m32 |[0m [36mconst[0m assert_1 = __importDefault(require([32m"assert"[0m));
+  [90m33 |[0m [36mconst[0m debug_1 = __importDefault(require([32m"debug"[0m));
+  [90m34 |[0m [36mconst[0m agent_base_1 = require([32m"agent-base"[0m);
+
+
+
+Import traces:
+  Server Component:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/https-proxy-agent/dist/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/node_modules/gaxios/build/cjs/src/gaxios.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/node_modules/gaxios/build/cjs/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/https-proxy-agent/dist/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/gaxios/build/src/gaxios.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/gaxios/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-gax/build/src/fallback.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/firestore/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/reservations/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/reservations/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/teeny-request/node_modules/https-proxy-agent/dist/agent.js:16:31
+Module not found: Can't resolve 'tls'
+  [90m14 |[0m [33mObject[0m.defineProperty(exports, [32m"__esModule"[0m, { value: [36mtrue[0m });
+  [90m15 |[0m [36mconst[0m net_1 = __importDefault(require([32m"net"[0m));
+[31m[1m>[0m [90m16 |[0m [36mconst[0m tls_1 = __importDefault(require([32m"tls"[0m));
+  [90m   |[0m                               [31m[1m^^^^^^^^^^^^^^[0m
+  [90m17 |[0m [36mconst[0m url_1 = __importDefault(require([32m"url"[0m));
+  [90m18 |[0m [36mconst[0m assert_1 = __importDefault(require([32m"assert"[0m));
+  [90m19 |[0m [36mconst[0m debug_1 = __importDefault(require([32m"debug"[0m));
+
+
+
+Import trace:
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/teeny-request/node_modules/https-proxy-agent/dist/agent.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/teeny-request/node_modules/https-proxy-agent/dist/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/teeny-request/build/src/agents.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/teeny-request/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/nodejs-common/util.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/nodejs-common/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google-cloud/storage/build/cjs/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/storage/storage.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/fetch-blob/from.js
+Code generation for chunk item errored
+An error occurred while generating the chunk item [project]/.gemini/antigravity/scratch/salon-app/node_modules/fetch-blob/from.js [app-client] (ecmascript) <locals>
+
+Caused by:
+- the chunking context (unknown) does not support external modules (request: node:fs)
+
+Debug info:
+- An error occurred while generating the chunk item [project]/.gemini/antigravity/scratch/salon-app/node_modules/fetch-blob/from.js [app-client] (ecmascript) <locals>
+- Execution of <MergedEcmascriptModule as EcmascriptChunkPlaceable>::chunk_item_content failed
+- Execution of *EcmascriptChunkItemContent::new failed
+- Execution of EcmascriptModuleContent::new_merged failed
+- the chunking context (unknown) does not support external modules (request: node:fs)
+
+Import traces:
+  Server Component:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/fetch-blob/from.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/node-fetch/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/node_modules/gaxios/build/cjs/src/gaxios.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/node_modules/gaxios/build/cjs/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/fetch-blob/from.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/node-fetch/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/node_modules/gaxios/build/cjs/src/gaxios.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/node_modules/gaxios/build/cjs/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-internal.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/lifecycle.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+
+./.gemini/antigravity/scratch/salon-app/node_modules/node-fetch/src/index.js
+Code generation for chunk item errored
+An error occurred while generating the chunk item [project]/.gemini/antigravity/scratch/salon-app/node_modules/node-fetch/src/index.js [app-client] (ecmascript)
+
+Caused by:
+- the chunking context (unknown) does not support external modules (request: node:net)
+
+Debug info:
+- An error occurred while generating the chunk item [project]/.gemini/antigravity/scratch/salon-app/node_modules/node-fetch/src/index.js [app-client] (ecmascript)
+- Execution of <MergedEcmascriptModule as EcmascriptChunkPlaceable>::chunk_item_content failed
+- Execution of *EcmascriptChunkItemContent::new failed
+- Execution of EcmascriptModuleContent::new_merged failed
+- the chunking context (unknown) does not support external modules (request: node:net)
+
+Import traces:
+  Server Component:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/node-fetch/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/node_modules/gaxios/build/cjs/src/gaxios.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/node_modules/gaxios/build/cjs/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js
+    ./.gemini/antigravity/scratch/salon-app/node_modules/@google/genai/dist/node/index.mjs
+    ./.gemini/antigravity/scratch/salon-app/src/app/tasks/actions.ts
+
+  Client Component Browser:
+    ./.gemini/antigravity/scratch/salon-app/node_modules/node-fetch/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/node_modules/gaxios/build/cjs/src/gaxios.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/node_modules/gaxios/build/cjs/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/credential-internal.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/lifecycle.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/app/firebase-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/default-namespace.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/node_modules/firebase-admin/lib/index.js [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/firebase-admin.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Client Component Browser]
+    ./.gemini/antigravity/scratch/salon-app/src/app/staff-portal/page.tsx [Server Component]
+
+
+    at <unknown> (./.gemini/antigravity/scratch/salon-app/src/lib/auth-server.ts:1:1)
+    at <unknown> (./.gemini/antigravity/scratch/salon-app/src/app/shifts/actions.ts:17:10)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at ./.gemini/antigravity/scratch/salon-app/node_modules/ (google-cloud/storage/build/cjs/src/bucket.js:56:25)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at ./.gemini/antigravity/scratch/salon-app/node_modules/ (google-cloud/storage/build/cjs/src/crc32c.js:29:14)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at ./.gemini/antigravity/scratch/salon-app/node_modules/ (google-cloud/storage/build/cjs/src/file.js:62:25)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at ./.gemini/antigravity/scratch/salon-app/node_modules/ (google-cloud/storage/build/cjs/src/transfer-manager.js:64:14)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at ./.gemini/antigravity/scratch/salon-app/node_modules/ (firebase/database-compat/dist/index.standalone.js:11:20)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at ./.gemini/antigravity/scratch/salon-app/node_modules/ (firebase/database-compat/dist/index.standalone.js:12:20)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)

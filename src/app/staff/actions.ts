@@ -82,8 +82,17 @@ export async function getStaffList(): Promise<StaffProfile[]> {
       };
     }) as StaffProfile[];
 
+    // Filter by companyId in memory to gracefully handle legacy records without companyId
+    let filteredStaff = staff;
+    if (ctx.role !== "systemOwner") {
+      filteredStaff = staff.filter(s => {
+        const sCompanyId = s.companyId || "company_default";
+        return sCompanyId === (ctx.companyId || "company_default");
+      });
+    }
+
     // Sort in-memory instead
-    return staff.sort((a, b) => {
+    return filteredStaff.sort((a, b) => {
       const aIsRetired = a.employment_status === "retired";
       const bIsRetired = b.employment_status === "retired";
       

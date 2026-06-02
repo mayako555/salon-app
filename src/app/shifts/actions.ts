@@ -1,3 +1,5 @@
+"use server";
+
 import { db } from "@/lib/firebase";
 import { 
   collection, 
@@ -15,6 +17,7 @@ import {
 } from "firebase/firestore";
 import { addAuditLog } from "@/app/audit/actions";
 import { getStaffList } from "@/app/staff/actions";
+import { getCurrentUserContext } from "@/lib/auth-server";
 
 export type StoreLocation = "六甲" | "元町" | "神戸";
 export type ShiftType = "work" | "holiday" | "paid_leave" | "requested_holiday" | "requested_paid_leave";
@@ -43,6 +46,7 @@ export async function getMonthlyShifts(year: number, month: number): Promise<Shi
   const targetPrefix = `${year}-${String(month).padStart(2, '0')}`;
   
   try {
+    const ctx = await getCurrentUserContext();
     const colRef = collection(db, SHIFTS_COLLECTION);
     const q = query(
       colRef, 
@@ -52,7 +56,7 @@ export async function getMonthlyShifts(year: number, month: number): Promise<Shi
     );
     const snapshot = await getDocs(q);
     
-    return snapshot.docs.map(doc => {
+    const shifts = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
         id: doc.id,
@@ -61,6 +65,17 @@ export async function getMonthlyShifts(year: number, month: number): Promise<Shi
         updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : (data.updated_at || null)
       };
     }) as ShiftRecord[];
+    
+    // In-memory filter by companyId
+    if (ctx.role !== "systemOwner") {
+      const allowedCompany = ctx.companyId || "company_default";
+      const staffList = await getStaffList(); // Already filtered by companyId
+      const allowedStaffIds = new Set(staffList.map(s => s.id));
+      
+      return shifts.filter(s => allowedStaffIds.has(s.staff_id));
+    }
+    
+    return shifts;
   } catch (error) {
     console.error("Error fetching monthly shifts:", error);
     return [];
@@ -69,11 +84,12 @@ export async function getMonthlyShifts(year: number, month: number): Promise<Shi
 
 export async function getShiftsForDate(dateStr: string): Promise<ShiftRecord[]> {
   try {
+    const ctx = await getCurrentUserContext();
     const colRef = collection(db, SHIFTS_COLLECTION);
     const q = query(colRef, where("date", "==", dateStr));
     const snapshot = await getDocs(q);
     
-    return snapshot.docs.map(doc => {
+    const shifts = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
         id: doc.id,
@@ -82,6 +98,14 @@ export async function getShiftsForDate(dateStr: string): Promise<ShiftRecord[]> 
         updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : (data.updated_at || null)
       };
     }) as ShiftRecord[];
+
+    if (ctx.role !== "systemOwner") {
+      const staffList = await getStaffList();
+      const allowedStaffIds = new Set(staffList.map(s => s.id));
+      return shifts.filter(s => allowedStaffIds.has(s.staff_id));
+    }
+
+    return shifts;
   } catch (error) {
     console.error("Error fetching shifts for date:", error);
     return [];
@@ -378,6 +402,7 @@ export async function getStaffHolidayRequests(staffId: string): Promise<HolidayR
 export async function getAllHolidayRequests(year: number, month: number): Promise<HolidayRequest[]> {
   const targetPrefix = `${year}-${String(month).padStart(2, '0')}`;
   try {
+    const ctx = await getCurrentUserContext();
     const colRef = collection(db, HOLIDAY_REQUESTS_COLLECTION);
     const q = query(
       colRef, 
@@ -386,14 +411,20 @@ export async function getAllHolidayRequests(year: number, month: number): Promis
       orderBy("date", "asc")
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => {
+    const requests = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
         id: doc.id,
         ...data,
         created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null)
       };
-    }) as HolidayRequest[];
+    }) as HolidayRequest[];    if (ctx.role !== "systemOwner") {
+      const staffList = await getStaffList();
+      const allowedStaffIds = new Set(staffList.map(s => s.id));
+      return requests.filter(r => allowedStaffIds.has(r.staff_id));
+    }
+
+    return requests;
   } catch (error) {
     console.error("Error fetching all holiday requests:", error);
     return [];

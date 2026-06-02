@@ -13,6 +13,7 @@ import {
   serverTimestamp,
   Timestamp 
 } from "firebase/firestore";
+import { getCurrentUserContext } from "./auth-server";
 
 export type Customer = {
   id: string;
@@ -71,10 +72,11 @@ const CUSTOMERS_COLLECTION = "customers";
 
 export async function getAllCustomers(): Promise<Customer[]> {
   try {
+    const ctx = await getCurrentUserContext();
     const colRef = collection(db, CUSTOMERS_COLLECTION);
     const q = query(colRef, orderBy("name_kana", "asc"));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => {
+    const customers = snapshot.docs.map(d => {
       const data = d.data();
       return { 
         id: d.id, 
@@ -83,6 +85,21 @@ export async function getAllCustomers(): Promise<Customer[]> {
         updated_at: data.updated_at?.toMillis?.() || data.updated_at || null
       };
     }) as Customer[];
+
+    if (ctx.role !== "systemOwner") {
+      const isInHouse = !ctx.companyId || ctx.companyId === "company_default";
+      const allowedStores = isInHouse ? [] : (ctx.salonIds || []);
+      
+      return customers.filter(c => {
+        const store = c.store_name || (c as any).main_store;
+        if (isInHouse) return true; // Give headquarters access to all legacy customers or we can restrict it.
+        // For franchise, they MUST only see customers linked to their stores
+        if (!store || !allowedStores.includes(store)) return false;
+        return true;
+      });
+    }
+
+    return customers;
   } catch (error) {
     console.error("Error fetching customers:", error);
     return [];
