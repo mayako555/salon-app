@@ -50,8 +50,11 @@ export type StaffProfile = {
 
 const STAFF_COLLECTION = "staff_profiles";
 
+import { getCurrentUserContext } from "@/lib/auth-server";
+
 export async function getStaffList(): Promise<StaffProfile[]> {
   try {
+    const ctx = await getCurrentUserContext();
     const colRef = collection(db, STAFF_COLLECTION);
     // Remove orderBy from the query itself to ensure records without sort_order are also fetched
     const q = query(colRef);
