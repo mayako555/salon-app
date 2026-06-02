@@ -264,7 +264,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                       顧客区分
                     </div>
                     <div className="flex-1">
-                      <select name="customer_type" className="h-7 px-2 border border-slate-300 bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none min-w-[150px]" value={formDataState.type} onChange={e => setFormDataState({...formDataState, type: e.target.value})}>
+                      <select name="customer_type" className="h-7 px-2 border border-slate-300 bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none min-w-[150px]" value={formDataState.type} onChange={e => setFormDataState({...formDataState, type: e.target.value as any})}>
                         <option value="新規">新規</option>
                         <option value="再来">再来</option>
                         <option value="モデル">モデル</option>

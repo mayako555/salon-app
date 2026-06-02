@@ -52,8 +52,8 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
     { name: "会計入力", href: "/staff-portal/sales", icon: Receipt },
     { name: "売上管理・レジ締め", href: "/sales", icon: Lock },
     { name: "シフト確認", href: "/staff-portal/shifts", icon: Calendar },
-    { name: "メニュー・商品設定", href: "/staff-portal/sales/master", icon: Database },
     ...(isAdminOrManager ? [
+      { name: "メニュー・商品設定", href: "/admin/master/operations", icon: Database },
       { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste },
     ] : []),
     { name: "タイムカード", href: "/attendance", icon: Clock },
