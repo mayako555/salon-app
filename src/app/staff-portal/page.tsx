@@ -37,7 +37,7 @@ import { toast } from "sonner";
 import SNSTaskSection from "@/app/tasks/SNSTaskSection";
 
 export default function StaffDashboardPage() {
-  const { profile } = useAuth();
+  const { profile, availableStores: contextAvailableStores } = useAuth();
   const [recentCustomers, setRecentCustomers] = useState<Customer[]>([]);
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [storeStats, setStoreStats] = useState<any[]>([]);
@@ -49,6 +49,10 @@ export default function StaffDashboardPage() {
   const [selectedTask, setSelectedTask] = useState<TaskRecord | null>(null);
   const [generatedReply, setGeneratedReply] = useState("");
   const [isSending, setIsSending] = useState(false);
+
+  // Derived auth state
+  const isInHouse = !profile?.companyId || profile?.companyId === "company_default" || profile?.role === "systemOwner";
+  const allowedStores = isInHouse ? contextAvailableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : contextAvailableStores);
 
   // My Dashboard State
   const [mySales, setMySales] = useState({ techSales: 0, productSales: 0, count: 0, cashlessSales: 0, nominations: 0 });
@@ -68,14 +72,25 @@ export default function StaffDashboardPage() {
         getContractsList()
       ]);
       
-      setTasks(tRecords);
       if (dashboardRes.success && dashboardRes.data) {
         setStoreStats(dashboardRes.data.storeStats);
       }
       
+      // Inside useEffect, we can use the same logic or just use the derived vars if they are stable.
+      // But since they depend on profile and contextAvailableStores which are deps of useEffect (indirectly or directly), it's safe.
+      const localIsInHouse = !profile?.companyId || profile?.companyId === "company_default" || profile?.role === "systemOwner";
+      const localAvailableStores = localIsInHouse ? contextAvailableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : contextAvailableStores);
+
+      const storeTasks = localIsInHouse ? tRecords : tRecords.filter(t => {
+        const staff = sList.find(s => s.id === t.staff_id);
+        if (!staff || !staff.salonIds) return true; // Show unassigned tasks to everyone just in case
+        return staff.salonIds.some((st: string) => localAvailableStores.includes(st));
+      });
+      setTasks(storeTasks);
+      
       // Filter today's shifts and sort by staff sort_order
       const tShifts = mShifts
-        .filter((s: any) => s.date === today && s.type === 'work')
+        .filter((s: any) => s.date === today && s.type === 'work' && (localIsInHouse || s.segments?.some((seg: any) => localAvailableStores.includes(seg.store))))
         .sort((a, b) => {
           const staffA = sList.find(s => s.id === a.staff_id);
           const staffB = sList.find(s => s.id === b.staff_id);
@@ -83,7 +98,10 @@ export default function StaffDashboardPage() {
         });
       setTodayShifts(tShifts);
       setStaffListData(sList);
-      const todaySalesData = sales.filter(s => s.date === today);
+      
+      // Filter sales by available stores
+      const storeSales = localIsInHouse ? sales : sales.filter(s => localAvailableStores.includes(s.store_name));
+      const todaySalesData = storeSales.filter(s => s.date === today);
       const total = todaySalesData.reduce((acc, s) => acc + (s.tech_sales || 0) + (s.product_sales || 0) - (s.discount || 0), 0);
       
       setStats({
@@ -114,7 +132,10 @@ export default function StaffDashboardPage() {
       }
 
       // Sort by created_at desc and take top 5
-      const sorted = [...customers].sort((a, b) => {
+      // If store_name is not available on customer, we might lose them if we strictly filter.
+      // Assuming store_name is set for new customers from now on. For existing, we can only do our best.
+      const storeCustomers = localIsInHouse ? customers : customers.filter(c => !c.store_name || localAvailableStores.includes(c.store_name));
+      const sorted = [...storeCustomers].sort((a, b) => {
         const dateA = a.created_at?.toDate?.() || new Date(0);
         const dateB = b.created_at?.toDate?.() || new Date(0);
         return dateB.getTime() - dateA.getTime();
@@ -487,7 +508,7 @@ export default function StaffDashboardPage() {
           </div>
           
           <div className="grid grid-cols-1 gap-3">
-            {["神戸", "元町", "六甲"].map(store => {
+            {contextAvailableStores.filter(store => isInHouse || allowedStores.includes(store)).map(store => {
               const staffAtStore = todayShifts.filter(s => 
                 s.segments?.some((seg: any) => seg.store === store)
               );

@@ -17,7 +17,7 @@ import {
 import { addAuditLog } from "../audit/actions";
 import { revalidatePath } from "next/cache";
 
-export type StaffRole = "systemOwner" | "admin" | "manager" | "staff";
+export type StaffRole = "systemOwner" | "companyOwner" | "manager" | "storeManager" | "staff" | "admin";
 
 export type StaffProfile = {
   id: string;
@@ -31,6 +31,7 @@ export type StaffProfile = {
   email?: string;
   role: StaffRole;
   companyId?: string;
+  salonIds?: string[];
   employment_type: "employee" | "outsourcing" | "part_time";
   employment_status?: "active" | "leave" | "retired";
   max_holiday_requests: number;

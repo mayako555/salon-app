@@ -7,14 +7,15 @@ import { getMonthlyShifts, ShiftRecord } from "@/app/shifts/actions";
 import { getReservationSettings, ReservationSettings } from "@/app/admin/settings/actions";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, RefreshCw, Search, Plus, Bell, MessageCircle, Star } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, RefreshCw, Search, Plus } from "lucide-react";
 import ReservationTimeline from "@/components/reservations/ReservationTimeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/lib/auth-context";
 
 export default function ReservationsPage() {
+  const { profile, selectedStore, setSelectedStore, availableStores } = useAuth();
   const [date, setDate] = useState(new Date());
-  const [store, setStore] = useState("六甲");
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [staffList, setStaffList] = useState<StaffProfile[]>([]);
   const [shifts, setShifts] = useState<ShiftRecord[]>([]);
@@ -48,7 +49,7 @@ export default function ReservationsPage() {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateStr, store]);
+  }, [dateStr, selectedStore]);
 
   const changeDate = (days: number) => {
     const newDate = new Date(date);
@@ -60,7 +61,10 @@ export default function ReservationsPage() {
     setDate(new Date());
   };
 
-  const currentStoreReservations = reservations.filter(r => store === "全店舗" || r.store_name === store);
+  const currentStoreReservations = reservations.filter(r => selectedStore === "全店舗" || r.store_name === selectedStore);
+
+  const isInHouse = !profile?.companyId || profile?.companyId === "company_default" || profile?.role === "systemOwner";
+  const allowedStores = isInHouse ? availableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : availableStores);
 
   return (
     <div className="flex flex-col h-screen bg-slate-100 overflow-hidden text-xs">
@@ -89,14 +93,14 @@ export default function ReservationsPage() {
           </div>
 
           <select 
-            value={store} 
-            onChange={e => setStore(e.target.value)}
+            value={selectedStore} 
+            onChange={e => setSelectedStore(e.target.value)}
             className="h-8 px-2 border border-slate-300 rounded text-xs font-bold bg-white min-w-[100px]"
           >
-            <option value="六甲">六甲店</option>
-            <option value="神戸">神戸店</option>
-            <option value="元町">元町店</option>
-            <option value="全店舗">全店舗</option>
+            {allowedStores.map(s => (
+              <option key={s} value={s}>{s}店</option>
+            ))}
+            {isInHouse && <option value="全店舗">全店舗</option>}
           </select>
         </div>
 
@@ -124,7 +128,7 @@ export default function ReservationsPage() {
                   shifts.forEach(shift => {
                     if (shift.type === "work") {
                       (shift.segments || []).forEach(seg => {
-                        if (store === "全店舗" || seg.store === store) {
+                        if (selectedStore === "全店舗" || seg.store === selectedStore) {
                           const [h1, m1] = seg.start_time.split(":").map(Number);
                           const [h2, m2] = seg.end_time.split(":").map(Number);
                           totalWorkMinutes += (h2 * 60 + m2) - (h1 * 60 + m1);
@@ -169,42 +173,13 @@ export default function ReservationsPage() {
             staffList={staffList} 
             shifts={shifts}
             date={dateStr}
-            storeName={store}
+            storeName={selectedStore}
             settings={settings}
             onRefresh={loadData}
           />
         )}
       </div>
 
-      {/* Sticky Notification Footer */}
-      <div className="bg-slate-800 text-white px-4 h-10 flex items-center justify-between shrink-0 text-[10px] font-bold z-30">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5 text-emerald-400 border-r border-slate-600 pr-4">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            正常稼働
-          </div>
-          
-          <div className="flex items-center gap-4 text-slate-300">
-            <span className="flex items-center gap-1 hover:text-white cursor-pointer"><Bell className="w-3.5 h-3.5 text-blue-400" /> 空き枠: 3枠</span>
-            <span className="flex items-center gap-1 hover:text-white cursor-pointer"><MessageCircle className="w-3.5 h-3.5 text-emerald-400" /> LINE未送信: 5件</span>
-            <span className="flex items-center gap-1 hover:text-white cursor-pointer"><Star className="w-3.5 h-3.5 text-amber-400" /> 口コミ未返信: 2件</span>
-            <span className="flex items-center gap-1 hover:text-white cursor-pointer text-purple-300"><CalendarIcon className="w-3.5 h-3.5" /> 次回未設定: 4件</span>
-            <span className="flex items-center gap-1 hover:text-white cursor-pointer text-rose-300">会計未完了: 1件</span>
-            <span className="flex items-center gap-1 hover:text-white cursor-pointer text-red-400">要注意: 1件</span>
-          </div>
-        </div>
-        
-        {/* Quick Links */}
-        <div className="flex items-center gap-4 text-slate-400">
-           <span className="hover:text-white cursor-pointer transition-colors">予約</span>
-           <span className="hover:text-white cursor-pointer transition-colors">顧客</span>
-           <span className="hover:text-white cursor-pointer transition-colors">売上</span>
-           <span className="hover:text-white cursor-pointer transition-colors">シフト</span>
-           <span className="hover:text-white cursor-pointer transition-colors">KPI</span>
-           <span className="hover:text-white cursor-pointer transition-colors">教育</span>
-           <span className="hover:text-white cursor-pointer transition-colors">給与</span>
-        </div>
-      </div>
     </div>
   );
 }

@@ -12,9 +12,11 @@ import { format } from "date-fns";
 import { getStoreTargets } from "../stores/actions";
 import { getMonthlyShifts } from "../shifts/actions";
 import { subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { getCurrentUserContext } from "@/lib/auth-server";
 
 export async function getDashboardStats() {
   try {
+    const ctx = await getCurrentUserContext();
     const now = new Date();
     const todayStr = format(now, "yyyy-MM-dd");
     const currentMonthPrefix = format(now, "yyyy-MM");
@@ -111,7 +113,15 @@ export async function getDashboardStats() {
       monthlyStoreSales[store] = (monthlyStoreSales[store] || 0) + amount;
     });
 
-    const storeStats = ["六甲", "神戸", "元町"].map(name => {
+    // Use user's salonIds if available, otherwise fallback to all targets
+    const isInHouse = !ctx.companyId || ctx.companyId === "company_default" || ctx.role === "systemOwner";
+    
+    // In-house can see all store targets. Franchise users see their salonIds (or all their company stores if salonIds is empty)
+    const availableStores = isInHouse ? storeTargets.map(t => t.store_name) : (ctx.salonIds && ctx.salonIds.length > 0 ? ctx.salonIds : storeTargets.map(t => t.store_name));
+    
+    const uniqueStores = Array.from(new Set(availableStores));
+
+    const storeStats = uniqueStores.map(name => {
       const target = storeTargets.find(t => t.store_name === name)?.target || 0;
       const current = monthlyStoreSales[name] || 0;
       return {

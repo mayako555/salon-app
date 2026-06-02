@@ -17,7 +17,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function StaffPortalLayout({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading, selectedStore, setSelectedStore } = useAuth();
+  const { user, profile, loading, selectedStore, setSelectedStore, availableStores } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -44,6 +44,8 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
   };
 
   const isAdminOrManager = profile?.role === "admin" || profile?.role === "manager";
+  const isInHouse = !profile?.companyId || profile?.companyId === "company_default" || profile?.role === "systemOwner";
+  const allowedStores = isInHouse ? availableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : availableStores);
 
   const navItems = [
     { name: "ホーム", href: "/staff-portal", icon: LayoutDashboard },
@@ -80,7 +82,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
           <div className="mb-4">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2 px-2">勤務店舗</label>
             <div className="grid grid-cols-1 gap-1">
-              {["六甲", "神戸", "元町"].map(store => (
+              {allowedStores.map(store => (
                 <button
                   key={store}
                   onClick={() => setSelectedStore(store)}

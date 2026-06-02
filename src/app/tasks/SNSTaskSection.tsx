@@ -33,9 +33,11 @@ export default function SNSTaskSection({ assignedAccounts }: { assignedAccounts?
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const targetDate = format(new Date(), "yyyy-MM-dd");
 
-  const filteredAccounts = assignedAccounts 
+  // Staff should only see SNS accounts explicitly assigned to them.
+  // If undefined or empty, show nothing instead of all accounts.
+  const filteredAccounts = (assignedAccounts && assignedAccounts.length > 0)
     ? ACCOUNTS.filter(a => assignedAccounts.includes(a.id))
-    : ACCOUNTS;
+    : [];
 
   useEffect(() => {
     async function load() {
