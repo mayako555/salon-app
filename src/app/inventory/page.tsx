@@ -26,11 +26,12 @@ import {
   Download
 } from "lucide-react";
 import { 
-  updateStock, 
   requestOrder,
   updateOrderStatus,
   resetAndSeedInventory,
-  updateInventoryItem
+  updateInventoryItem,
+  getAvailableStores,
+  updateStock
 } from "./inventory-actions";
 import { 
   InventoryItem, 
@@ -66,7 +67,8 @@ export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState<"stock" | "orders">("stock");
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStore, setSelectedStore] = useState("六甲");
+  const [selectedStore, setSelectedStore] = useState("");
+  const [availableStores, setAvailableStores] = useState<string[]>([]);
   const [isBulkOrderOpen, setIsBulkOrderOpen] = useState(false);
 
   // Selection for adjustment modal
@@ -81,17 +83,29 @@ export default function InventoryPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, "inventory"), where("storeName", "==", selectedStore));
+      const stores = await getAvailableStores();
+      setAvailableStores(stores);
+      const storeToLoad = selectedStore || stores[0];
+      if (!selectedStore && stores.length > 0) {
+        setSelectedStore(stores[0]);
+      }
+      
+      if (!storeToLoad) {
+        setLoading(false);
+        return;
+      }
+
+      const q = query(collection(db, "inventory"), where("storeName", "==", storeToLoad));
       const snapshot = await getDocs(q);
       setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as InventoryItem[]);
       
-      const qLog = query(collection(db, "inventory_logs"), where("storeName", "==", selectedStore), orderBy("date", "desc"), limit(20));
+      const qLog = query(collection(db, "inventory_logs"), where("storeName", "==", storeToLoad), orderBy("date", "desc"), limit(20));
       const snapLog = await getDocs(qLog);
       setLogs(snapLog.docs.map(doc => ({ 
         id: doc.id, ...doc.data(), date: doc.data().date?.toDate() || new Date() 
       })) as InventoryLog[]);
       
-      const qOrder = query(collection(db, "inventory_orders"), where("storeName", "==", selectedStore), orderBy("createdAt", "desc"));
+      const qOrder = query(collection(db, "inventory_orders"), where("storeName", "==", storeToLoad), orderBy("createdAt", "desc"));
       const snapOrder = await getDocs(qOrder);
       setOrders(snapOrder.docs.map(doc => ({ 
         id: doc.id, ...doc.data(), createdAt: doc.data().createdAt?.toDate() || new Date() 
@@ -239,7 +253,7 @@ export default function InventoryPage() {
         </div>
         
         <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
-          {["六甲", "神戸", "元町"].map(store => (
+          {availableStores.map(store => (
             <button
               key={store}
               onClick={() => setSelectedStore(store)}

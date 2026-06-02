@@ -14,6 +14,7 @@ import { Plus, Trash2, X } from "lucide-react";
 import { ShiftRecord, ShiftType, StoreLocation, ShiftSegment, saveShift, deleteShift, updateHolidayRequestStatus } from "./actions";
 import { StaffProfile } from "@/app/staff/actions";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 
 type ShiftEditDialogProps = {
   isOpen: boolean;
@@ -32,12 +33,15 @@ export default function ShiftEditDialog({
 }: ShiftEditDialogProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const { availableStores } = useAuth();
+  const defaultStore = availableStores.length > 0 ? availableStores[0] : "神戸";
+
   const [formData, setFormData] = useState<Omit<ShiftRecord, "id"> & { id?: string }>({
     staff_id: "",
     staff_name: "",
     date: initialDate || new Date().toISOString().split("T")[0],
     type: "work",
-    segments: [{ start_time: "10:00", end_time: "19:00", store: "神戸" }]
+    segments: [{ start_time: "10:00", end_time: "19:00", store: defaultStore as StoreLocation }]
   });
 
   useEffect(() => {
@@ -70,7 +74,7 @@ export default function ShiftEditDialog({
   const addSegment = () => {
     setFormData(prev => ({
       ...prev,
-      segments: [...(prev.segments || []), { start_time: "10:00", end_time: "19:00", store: "神戸" }]
+      segments: [...(prev.segments || []), { start_time: "10:00", end_time: "19:00", store: defaultStore as StoreLocation }]
     }));
   };
 
@@ -265,9 +269,9 @@ export default function ShiftEditDialog({
                         value={seg.store}
                         onChange={(e) => updateSegment(idx, "store", e.target.value as StoreLocation)}
                       >
-                        <option value="神戸">神戸</option>
-                        <option value="元町">元町</option>
-                        <option value="六甲">六甲</option>
+                        {availableStores.map(store => (
+                          <option key={store} value={store}>{store}</option>
+                        ))}
                       </select>
                     </div>
                   </div>

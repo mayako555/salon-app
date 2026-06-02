@@ -4,13 +4,15 @@ import { collection, writeBatch, doc, serverTimestamp } from "firebase/firestore
 export type SalesMasterItem = {
   id?: string;
   store: "六甲" | "神戸" | "元町" | "共通";
-  itemType: "menu" | "coupon" | "messageCoupon" | "option" | "discount" | "fee" | "karteTemplate" | "product" | "reservationRoute";
+  itemType: "menu" | "coupon" | "messageCoupon" | "option" | "discount" | "fee" | "karteTemplate" | "product" | "reservationRoute" | "store";
   category: string;
   name: string;
   internalName?: string;
   price: number;
   imageUrl?: string;
   duration?: string; // 所要時間
+  openTime?: string; // 営業時間(開始)
+  closeTime?: string; // 営業時間(終了)
   hpbName?: string;  // HPBクーポン名
   restrictions?: string; // 制約
   notes?: string; // その他
@@ -124,12 +126,16 @@ export async function seedSalesMasterData() {
   const colRef = collection(db, "sales_master");
 
   const allData = [
+    { itemType: "store", category: "店舗", name: "元町", price: 0, store: "共通", isActive: true, openTime: "10:00", closeTime: "19:00" },
+    { itemType: "store", category: "店舗", name: "神戸", price: 0, store: "共通", isActive: true, openTime: "10:00", closeTime: "19:00" },
+    { itemType: "store", category: "店舗", name: "六甲", price: 0, store: "共通", isActive: true, openTime: "10:00", closeTime: "19:00" },
     ...MOTOMACHI_DATA.map(d => ({ ...d, store: "元町", isActive: true })),
     ...KOBE_DATA.map(d => ({ ...d, store: "神戸", isActive: true })),
     ...ROKKO_DATA.map(d => ({ ...d, store: "六甲", isActive: true }))
   ];
 
-  allData.forEach((data) => {
+  allData.forEach((d) => {
+    const data = d as any;
     const newDocRef = doc(colRef);
     batch.set(newDocRef, {
       ...data,

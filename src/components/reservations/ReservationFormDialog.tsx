@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { addReservation } from "@/app/reservations/actions";
+import { addReservation, updateReservation, Reservation } from "@/app/reservations/actions";
 import { getAllCustomers, Customer } from "@/lib/customers";
 import { Button } from "@/components/ui/button";
 import { Search, UserPlus, FileText, CheckCircle, SearchX } from "lucide-react";
@@ -15,14 +15,26 @@ type Props = {
   defaultTime: string;
   defaultDate: string;
   storeName: string;
+  initialData?: Reservation;
 };
 
-export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defaultStaff, defaultTime, defaultDate, storeName }: Props) {
+export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defaultStaff, defaultTime, defaultDate, storeName, initialData }: Props) {
   const [loading, setLoading] = useState(false);
   const [isNewCustomer, setIsNewCustomer] = useState(false);
-  const [duration, setDuration] = useState(60);
-  const [isAllDay, setIsAllDay] = useState(false);
-  const [recordType, setRecordType] = useState<"reservation" | "schedule">("reservation");
+  
+  // Calculate initial duration
+  const initDuration = (() => {
+    if (initialData?.start_time && initialData?.end_time) {
+      const [sh, sm] = initialData.start_time.split(":").map(Number);
+      const [eh, em] = initialData.end_time.split(":").map(Number);
+      return (eh * 60 + em) - (sh * 60 + sm);
+    }
+    return 60;
+  })();
+
+  const [duration, setDuration] = useState(initDuration);
+  const [isAllDay, setIsAllDay] = useState(initialData?.start_time === "09:00" && initialData?.end_time === "20:00");
+  const [recordType, setRecordType] = useState<"reservation" | "schedule">(initialData?.type || "reservation");
 
   // Search state
   const [isSearching, setIsSearching] = useState(false);
@@ -36,9 +48,48 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
     first_name: "",
     last_name_kana: "",
     first_name_kana: "",
-    phone: "",
-    type: "新規"
+    phone: initialData?.customer_phone || "",
+    type: initialData?.customer_type || "新規"
   });
+
+  useEffect(() => {
+    if (isOpen) {
+      setRecordType(initialData?.type || "reservation");
+      if (initialData?.start_time && initialData?.end_time) {
+        const [sh, sm] = initialData.start_time.split(":").map(Number);
+        const [eh, em] = initialData.end_time.split(":").map(Number);
+        setDuration((eh * 60 + em) - (sh * 60 + sm));
+        setIsAllDay(initialData.start_time === "09:00" && initialData.end_time === "20:00");
+      } else {
+        setDuration(60);
+        setIsAllDay(false);
+      }
+
+      if (initialData?.customer_name || initialData?.customer_kana) {
+        const cName = initialData.customer_name || "";
+        const kName = initialData.customer_kana || "";
+        const nameParts = cName.split(/[\s　]+/);
+        const kanaParts = kName.split(/[\s　]+/);
+        setFormDataState({
+          last_name: nameParts[0] || "",
+          first_name: nameParts[1] || "",
+          last_name_kana: kanaParts[0] || "",
+          first_name_kana: kanaParts[1] || "",
+          phone: initialData.customer_phone || "",
+          type: initialData.customer_type || "新規"
+        });
+      } else {
+        setFormDataState({
+          last_name: "",
+          first_name: "",
+          last_name_kana: "",
+          first_name_kana: "",
+          phone: "",
+          type: "新規"
+        });
+      }
+    }
+  }, [isOpen, initialData]);
 
   const handleSearchMode = async () => {
     setIsNewCustomer(false);
@@ -97,27 +148,35 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
     const lastName = formData.get("last_name") as string || "";
     const firstName = formData.get("first_name") as string || "";
     const customerName = `${lastName} ${firstName}`.trim();
+    
+    const lastNameKana = formData.get("last_name_kana") as string || "";
+    const firstNameKana = formData.get("first_name_kana") as string || "";
+    const customerKana = `${lastNameKana} ${firstNameKana}`.trim();
 
     const data = {
       store_name: storeName,
-      staff_id: "manual", 
+      staff_id: initialData?.staff_id || "manual", 
       staff_name: formData.get("staff_name") as string,
       type: recordType,
       customer_name: recordType === "reservation" ? customerName : "",
+      customer_kana: recordType === "reservation" ? customerKana : "",
       customer_type: recordType === "reservation" ? (formData.get("customer_type") as any) : undefined,
-      date: defaultDate,
+      date: initialData?.date || defaultDate,
       start_time: start_time,
       end_time: end_time,
       menu_name: recordType === "reservation" ? (formData.get("menu_name") as string) : ((formData.get("schedule_title") as string)?.trim() || "予定あり"),
       portal: recordType === "reservation" ? (formData.get("portal") as any) : undefined,
-      status: "booked" as any,
+      status: (initialData?.status || "booked") as any,
       memo: formData.get("memo") as string,
       bed_number: recordType === "reservation" ? (formData.get("bed_number") as string) : undefined,
       expected_price: recordType === "reservation" ? Number(formData.get("expected_price")) || 0 : 0,
       is_caution: formData.get("is_caution") === "on",
     };
 
-    const res = await addReservation(data);
+    const res = initialData?.id 
+      ? await updateReservation(initialData.id, data)
+      : await addReservation(data);
+      
     setLoading(false);
     
     if (res.success) {
@@ -170,11 +229,11 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                       氏名（カナ） <span className="w-2 h-2 rounded-full bg-rose-500 block"></span>
                     </div>
                     <div className="flex-1 flex gap-2">
-                      <input required={!formDataState.last_name} type="text" name="last_name_kana" placeholder="セイ" className="w-full h-7 px-2 border border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" value={formDataState.last_name_kana} onChange={e => {
+                      <input required type="text" name="last_name_kana" placeholder="セイ" className="w-full h-7 px-2 border border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" value={formDataState.last_name_kana} onChange={e => {
                         const val = e.target.value.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
                         setFormDataState({...formDataState, last_name_kana: val});
                       }} />
-                      <input required={!formDataState.first_name} type="text" name="first_name_kana" placeholder="メイ" className="w-full h-7 px-2 border border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" value={formDataState.first_name_kana} onChange={e => {
+                      <input required type="text" name="first_name_kana" placeholder="メイ" className="w-full h-7 px-2 border border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" value={formDataState.first_name_kana} onChange={e => {
                         const val = e.target.value.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
                         setFormDataState({...formDataState, first_name_kana: val});
                       }} />
@@ -315,7 +374,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block mb-1">担当スタッフ</label>
-                  <select name="staff_name" defaultValue={defaultStaff} className="w-full h-8 px-2 border border-slate-300 rounded bg-white">
+                  <select name="staff_name" defaultValue={initialData?.staff_name || defaultStaff} className="w-full h-8 px-2 border border-slate-300 rounded bg-white">
                     <option value={defaultStaff}>{defaultStaff}</option>
                     <option value="大谷奈津子">大谷奈津子</option>
                     <option value="山田花子">山田花子</option>
@@ -324,7 +383,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                 {recordType === "reservation" && (
                 <div>
                   <label className="block mb-1">使用ベッド</label>
-                  <select name="bed_number" className="w-full h-8 px-2 border border-slate-300 rounded bg-white">
+                  <select name="bed_number" defaultValue={initialData?.bed_number || "auto"} className="w-full h-8 px-2 border border-slate-300 rounded bg-white">
                     <option value="auto">自動割り当て</option>
                     <option value="1">ベッド 1</option>
                     <option value="2">ベッド 2</option>
@@ -339,13 +398,13 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                 <div className="col-span-2">
                   <label className="block mb-1">メニュー・クーポン</label>
                   <div className="flex gap-2">
-                    <input type="text" name="menu_name" placeholder="メニュー名を入力" className="flex-1 h-8 px-2 border border-slate-300 rounded focus:bg-blue-50" />
+                    <input type="text" name="menu_name" defaultValue={initialData?.menu_name || ""} placeholder="メニュー名を入力" className="flex-1 h-8 px-2 border border-slate-300 rounded focus:bg-blue-50" />
                     <Button type="button" variant="outline" className="h-8">選択...</Button>
                   </div>
                 </div>
                 <div>
                   <label className="block mb-1">予約経路</label>
-                  <select name="portal" className="w-full h-8 px-2 border border-slate-300 rounded bg-white">
+                  <select name="portal" defaultValue={initialData?.portal || "Direct"} className="w-full h-8 px-2 border border-slate-300 rounded bg-white">
                     <option value="Direct">直接（電話/LINE/来店）</option>
                     <option value="HPB">HOT PEPPER Beauty</option>
                     <option value="Minimo">ミニモ</option>
@@ -354,19 +413,19 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                 </div>
                 <div>
                   <label className="block mb-1">売上見込金額（円）</label>
-                  <input type="number" name="expected_price" placeholder="5000" className="w-full h-8 px-2 border border-slate-300 rounded focus:bg-blue-50" />
+                  <input type="number" name="expected_price" defaultValue={initialData?.expected_price || ""} placeholder="5000" className="w-full h-8 px-2 border border-slate-300 rounded focus:bg-blue-50" />
                 </div>
               </div>
               ) : (
                 <div className="mb-4">
                   <label className="block mb-1">予定のタイトル</label>
-                  <input required type="text" name="schedule_title" placeholder="休憩、ミーティングなど" className="w-full h-8 px-2 border border-slate-300 rounded focus:bg-blue-50" />
+                  <input required type="text" name="schedule_title" defaultValue={initialData?.menu_name || ""} placeholder="休憩、ミーティングなど" className="w-full h-8 px-2 border border-slate-300 rounded focus:bg-blue-50" />
                 </div>
               )}
 
               <div>
                 <label className="block mb-1">予約メモ（スタッフ間共有）</label>
-                <textarea name="memo" rows={2} className="w-full p-2 border border-slate-300 rounded focus:bg-blue-50"></textarea>
+                <textarea name="memo" defaultValue={initialData?.memo || ""} rows={2} className="w-full p-2 border border-slate-300 rounded focus:bg-blue-50"></textarea>
               </div>
             </div>
 
@@ -378,7 +437,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                  指名予約
                </label>
                <label className="flex items-center gap-2 cursor-pointer text-rose-600">
-                 <input type="checkbox" name="is_caution" className="w-4 h-4 rounded border-slate-300" />
+                 <input type="checkbox" name="is_caution" defaultChecked={initialData?.is_caution || false} className="w-4 h-4 rounded border-slate-300" />
                  要注意フラグ（アレルギー・クレーム等）
                </label>
                <label className="flex items-center gap-2 cursor-pointer">
@@ -397,7 +456,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
           <div className="bg-white border-t border-slate-200 p-4 flex items-center justify-between shrink-0">
             <Button type="button" variant="outline" onClick={onClose} className="w-32 font-bold">キャンセル</Button>
             <Button type="submit" disabled={loading} className="w-48 bg-blue-600 hover:bg-blue-700 font-bold text-white">
-              {loading ? "登録中..." : "予約を確定する"}
+              {loading ? "保存中..." : (initialData?.id ? "更新する" : "予約を確定する")}
             </Button>
           </div>
         </form>

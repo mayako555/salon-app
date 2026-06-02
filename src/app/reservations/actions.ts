@@ -29,6 +29,7 @@ export type Reservation = {
   bed_number?: string;
   memo?: string;
   expected_price?: number;
+  same_day_cancel_count?: number; // Optional flag to show on calendar
   created_at: any;
   updated_at: any;
 };
@@ -45,7 +46,7 @@ export async function getReservations(store: string, dateStr: string): Promise<R
     // For simplicity, fetch by date, filter by store in memory to avoid needing composite indexes.
     const snapshot = await getDocs(q);
     
-    const results = snapshot.docs.map(d => {
+    let results = snapshot.docs.map(d => {
       const data = d.data();
       return {
         id: d.id,
@@ -54,6 +55,25 @@ export async function getReservations(store: string, dateStr: string): Promise<R
         updated_at: data.updated_at?.toMillis?.() || data.updated_at
       } as Reservation;
     });
+
+    // Populate same_day_cancel_count
+    const customerIds = Array.from(new Set(results.map(r => r.customer_id).filter(Boolean))) as string[];
+    if (customerIds.length > 0) {
+      // Split into chunks of 10 for 'in' queries
+      const { doc, getDoc } = await import('firebase/firestore');
+      const counts: Record<string, number> = {};
+      
+      // Better to fetch individually if few, or bulk fetch if many. Let's do simple getDoc for now since daily reservations aren't massive.
+      await Promise.all(customerIds.map(async id => {
+        const cRef = doc(db, 'customers', id);
+        const cSnap = await getDoc(cRef);
+        if (cSnap.exists()) {
+          counts[id] = cSnap.data().same_day_cancel_count || 0;
+        }
+      }));
+
+      results = results.map(r => r.customer_id && counts[r.customer_id] ? { ...r, same_day_cancel_count: counts[r.customer_id] } : r);
+    }
 
     if (store !== "全店舗") {
       return results.filter(r => r.store_name === store).sort((a, b) => a.start_time.localeCompare(b.start_time));
@@ -94,9 +114,54 @@ export async function addReservation(data: Omit<Reservation, "id" | "created_at"
   }
 }
 
-export async function updateReservationStatus(id: string, status: ReservationStatus) {
+export async function updateReservationStatus(id: string, status: ReservationStatus, isCustomerFault: boolean = true) {
   try {
     const docRef = doc(db, RESERVATIONS_COLLECTION, id);
+    
+    // Get the reservation first to check if it's a same-day cancellation
+    const snap = await getDoc(docRef);
+    if (snap.exists() && status === 'cancelled' && isCustomerFault) {
+      const resData = snap.data();
+      const todayJst = new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' });
+      const todayDateStr = new Date(todayJst).toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      if (resData.date === todayDateStr && resData.customer_id) {
+        // It's a same-day cancellation for a known customer
+        const { getCustomerById, updateCustomer } = await import('@/lib/customers');
+        const customer = await getCustomerById(resData.customer_id);
+        
+        if (customer) {
+          const currentCount = customer.same_day_cancel_count || 0;
+          const newCount = currentCount + 1;
+          
+          // Update customer count
+          await updateCustomer(customer.id, { same_day_cancel_count: newCount });
+          
+          // Determine fee
+          let fee = "無し";
+          if (newCount === 2) fee = "2000円";
+          else if (newCount === 3 || newCount === 4) fee = "50%";
+          else if (newCount >= 5) fee = "100%";
+          
+          // Create cancellation record
+          const { addSameDayCancellation } = await import('@/app/customers/cancellations');
+          await addSameDayCancellation({
+            customer_id: customer.id,
+            reservation_id: id,
+            cancel_date: todayDateStr,
+            cancel_count: newCount,
+            cancel_fee_type: fee,
+            is_karte_recorded: false,
+            is_line_sent: false,
+            is_salonboard_updated: false,
+            is_fee_notified: false,
+            is_fee_collected_at_visit: false,
+            memo: "",
+          });
+        }
+      }
+    }
+
     await updateDoc(docRef, { 
       status, 
       updated_at: serverTimestamp() 
@@ -135,6 +200,32 @@ export async function deleteReservation(id: string) {
     return { success: true };
   } catch (error: any) {
     console.error("Error deleting reservation:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateReservation(id: string, data: Partial<Omit<Reservation, "id" | "created_at" | "updated_at">>) {
+  try {
+    const docRef = doc(db, RESERVATIONS_COLLECTION, id);
+    const cleanData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined));
+    
+    await updateDoc(docRef, { 
+      ...cleanData,
+      updated_at: serverTimestamp() 
+    });
+
+    await addAuditLog({
+      table_name: RESERVATIONS_COLLECTION,
+      record_id: id,
+      action: "UPDATE",
+      old_data: null,
+      new_data: cleanData,
+      actor: "System"
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating reservation:", error);
     return { success: false, error: error.message };
   }
 }

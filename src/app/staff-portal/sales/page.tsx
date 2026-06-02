@@ -6,7 +6,7 @@ import { getReservationById, Reservation, updateReservationStatus } from "@/app/
 import CheckoutDialog from "@/app/sales/CheckoutDialog";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
-import { ReceiptText, CheckCircle2, UserCircle, Users, Lock, Database } from "lucide-react";
+import { ReceiptText, CheckCircle2, UserCircle, Users, Lock, Database, Search } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ export default function StaffPortalSalesPage() {
   const [sales, setSales] = useState<SalesRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [autoCheckoutRes, setAutoCheckoutRes] = useState<Reservation | null>(null);
+  const [autoEditSale, setAutoEditSale] = useState<SalesRecord | null>(null);
 
   const year = new Date().getFullYear();
   const month = new Date().getMonth() + 1;
@@ -34,13 +35,18 @@ export default function StaffPortalSalesPage() {
         const res = await getReservationById(resId);
         if (res && res.status !== "completed") {
           setAutoCheckoutRes(res);
+        } else if (res && res.status === "completed") {
+          const { getSaleByReservationId } = await import('@/app/sales/actions');
+          const sale = await getSaleByReservationId(resId);
+          if (sale) {
+            setAutoEditSale(sale);
+          }
         }
       }
     }
     load();
   }, [year, month]);
 
-  // Convert reservation to partial SalesRecord
   const mapReservationToSalesRecord = (res: Reservation): SalesRecord => {
     let treatmentMinutes = 60;
     if (res.start_time && res.end_time) {
@@ -49,6 +55,13 @@ export default function StaffPortalSalesPage() {
       treatmentMinutes = (h2 * 60 + m2) - (h1 * 60 + m1);
     }
 
+    const cName = (res.customer_name && res.customer_name !== "-") ? res.customer_name : (res.customer_kana && res.customer_kana !== "-" ? res.customer_kana : "予定");
+    const nameParts = cName !== "予定" ? cName.split(/[\s　]+/) : ["予定", ""];
+    
+    // もし customer_kana が無くても、cName があればそれをカナ枠にも入れる（カタカナしか入力されていないケースへの対応）
+    const kanaStr = res.customer_kana && res.customer_kana !== "-" ? res.customer_kana : (cName !== "予定" ? cName : "");
+    const kanaParts = kanaStr.split(/[\s　]+/);
+
     return {
       id: "new",
       staff_id: res.staff_id,
@@ -56,7 +69,11 @@ export default function StaffPortalSalesPage() {
       store_name: res.store_name,
       date: res.date,
       time: res.start_time,
-      customer_name: res.customer_name || "予定",
+      customer_name: cName,
+      last_name: nameParts[0] || "",
+      first_name: nameParts[1] || "",
+      last_name_kana: kanaParts[0] || "",
+      first_name_kana: kanaParts[1] || "",
       customer_type: "不明",
       menu_course: res.menu_name || "",
       tech_sales: res.expected_price || 0,
@@ -71,6 +88,7 @@ export default function StaffPortalSalesPage() {
       payment_method: "cash",
       hpb_points: 0,
       source: "checkout",
+      source_reservation_id: res.id,
       hair_material: "",
       options: "",
       cancel_fee: 0,
@@ -126,14 +144,45 @@ export default function StaffPortalSalesPage() {
           initialData={mapReservationToSalesRecord(autoCheckoutRes)}
           isOpenControlled={true}
           onSuccess={async () => {
-             // Mark reservation as completed
+             // Mark reservation as completed (handled by addCheckout as well)
              await updateReservationStatus(autoCheckoutRes.id, "completed");
              setAutoCheckoutRes(null);
-             window.location.replace('/staff-portal/reservations'); // or back to calendar
+             
+             // Try to go back to the previous page (e.g., /reservations or /staff-portal/reservations)
+             if (window.history.length > 2) {
+               window.history.back();
+             } else {
+               window.location.replace('/staff-portal/reservations');
+             }
           }}
           onOpenChangeControlled={(open) => {
             if (!open) {
               setAutoCheckoutRes(null);
+              // Remove query param from URL without reload
+              window.history.replaceState({}, '', window.location.pathname);
+            }
+          }}
+        />
+      )}
+
+      {autoEditSale && (
+        <CheckoutDialog 
+          staffList={staffNames}
+          defaultStoreName={autoEditSale.store_name}
+          initialData={autoEditSale}
+          isOpenControlled={true}
+          readOnly={autoEditSale.status === 'closed'}
+          onSuccess={async () => {
+             setAutoEditSale(null);
+             if (window.history.length > 2) {
+               window.history.back();
+             } else {
+               window.location.replace('/staff-portal/reservations');
+             }
+          }}
+          onOpenChangeControlled={(open) => {
+            if (!open) {
+              setAutoEditSale(null);
               // Remove query param from URL without reload
               window.history.replaceState({}, '', window.location.pathname);
             }

@@ -17,7 +17,7 @@ import {
 import { addAuditLog } from "../audit/actions";
 import { revalidatePath } from "next/cache";
 
-export type StaffRole = "admin" | "manager" | "staff";
+export type StaffRole = "systemOwner" | "admin" | "manager" | "staff";
 
 export type StaffProfile = {
   id: string;
@@ -30,6 +30,7 @@ export type StaffProfile = {
   name_kana?: string; // Combined kana
   email?: string;
   role: StaffRole;
+  companyId?: string;
   employment_type: "employee" | "outsourcing" | "part_time";
   employment_status?: "active" | "leave" | "retired";
   max_holiday_requests: number;

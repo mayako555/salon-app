@@ -14,6 +14,7 @@ import { Plus, X, Check, Users } from "lucide-react";
 import { ShiftType, StoreLocation, ShiftSegment, bulkSaveShifts } from "./actions";
 import { StaffProfile } from "@/app/staff/actions";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 
 type BulkShiftDialogProps = {
   isOpen: boolean;
@@ -30,8 +31,11 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList }: BulkShif
     end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
   });
   const [type, setType] = useState<ShiftType>("work");
+  const { availableStores } = useAuth();
+  const defaultStore = availableStores.length > 0 ? availableStores[0] : "神戸";
+
   const [segments, setSegments] = useState<ShiftSegment[]>([
-    { start_time: "10:00", end_time: "19:00", store: "神戸" }
+    { start_time: "10:00", end_time: "19:00", store: defaultStore as StoreLocation }
   ]);
   const [activeDaysOfWeek, setActiveDaysOfWeek] = useState<number[]>([1, 2, 3, 4, 5]); // Default Mon-Fri
 
@@ -56,7 +60,7 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList }: BulkShif
   };
 
   const addSegment = () => {
-    setSegments(prev => [...prev, { start_time: "10:00", end_time: "19:00", store: "神戸" }]);
+    setSegments(prev => [...prev, { start_time: "10:00", end_time: "19:00", store: defaultStore as StoreLocation }]);
   };
 
   const removeSegment = (index: number) => {
@@ -278,9 +282,9 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList }: BulkShif
                         value={seg.store}
                         onChange={(e) => updateSegment(idx, "store", e.target.value as StoreLocation)}
                       >
-                        <option value="神戸">神戸</option>
-                        <option value="元町">元町</option>
-                        <option value="六甲">六甲</option>
+                        {availableStores.map(store => (
+                          <option key={store} value={store}>{store}</option>
+                        ))}
                       </select>
                     </div>
                   </div>

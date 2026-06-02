@@ -61,6 +61,7 @@ export type Customer = {
   chart_image_urls?: string[]; // スキャンしたカルテ画像のURLリスト
   notes?: string; // 自由記述のメモ
   store_name?: string; // 所属店舗 (例: "神戸", "六甲")
+  same_day_cancel_count?: number; // 当日キャンセル回数
   
   created_at: any;
   updated_at: any;

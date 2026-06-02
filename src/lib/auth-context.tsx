@@ -11,10 +11,12 @@ interface AuthContextType {
   profile: StaffProfile | null;
   loading: boolean;
   isAdmin: boolean;
+  isSystemOwner: boolean;
   isManager: boolean;
   isStaff: boolean;
   selectedStore: string;
   setSelectedStore: (store: string) => void;
+  availableStores: string[];
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -22,10 +24,12 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   loading: true,
   isAdmin: false,
+  isSystemOwner: false,
   isManager: false,
   isStaff: false,
-  selectedStore: "六甲",
+  selectedStore: "",
   setSelectedStore: () => {},
+  availableStores: [],
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -33,7 +37,8 @@ export const useAuth = () => useContext(AuthContext);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<StaffProfile | null>(null);
-  const [selectedStore, setSelectedStoreState] = useState<string>("六甲");
+  const [selectedStore, setSelectedStoreState] = useState<string>("");
+  const [availableStores, setAvailableStores] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Persistence for selected store
@@ -69,12 +74,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const data = staffDoc.data();
             setProfile({ id: staffDoc.id, ...data } as StaffProfile);
             
-            // If no store selected yet, use the profile's store
-            if (!localStorage.getItem("selected_store") && data.store_name) {
-              setSelectedStore(data.store_name);
+            // Fetch available stores for this company
+            try {
+              const companyIdToUse = data.companyId || "company_default";
+              const masterRef = collection(db, "sales_master");
+              // Query all stores, filter by companyId in memory in case of missing compound index
+              const storeQ = query(masterRef, where("itemType", "==", "store"));
+              const storeSnap = await getDocs(storeQ);
+              const stores = storeSnap.docs
+                .map(d => d.data())
+                .filter(d => (d.companyId || "company_default") === companyIdToUse && d.isActive !== false)
+                .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                .map(d => d.name);
+                
+              const finalStores = stores.length > 0 ? stores : ["六甲", "神戸", "元町"]; // Fallback
+              setAvailableStores(finalStores);
+
+              const savedStore = localStorage.getItem("selected_store");
+              if (savedStore && finalStores.includes(savedStore)) {
+                setSelectedStoreState(savedStore);
+              } else if (data.store_name && finalStores.includes(data.store_name)) {
+                setSelectedStore(data.store_name);
+              } else if (finalStores.length > 0) {
+                setSelectedStore(finalStores[0]);
+              }
+            } catch (err) {
+              console.error("Error fetching stores:", err);
+              const defaultStores = ["六甲", "神戸", "元町"];
+              setAvailableStores(defaultStores);
+              setSelectedStore(defaultStores[0]);
             }
           } else {
             setProfile(null);
+            setAvailableStores([]);
           }
         } catch (error) {
           console.error("Error fetching staff profile:", error);
@@ -94,11 +126,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     profile,
     loading,
-    isAdmin: profile?.role === "admin",
-    isManager: profile?.role === "manager" || profile?.role === "admin",
-    isStaff: !!profile,
+    isAdmin: profile?.role === "admin" || profile?.role === "systemOwner",
+    isSystemOwner: profile?.role === "systemOwner" || (profile?.role === "admin" && (!profile?.companyId || profile?.companyId === "company_default")),
+    isManager: profile?.role === "manager" || profile?.role === "storeManager" || profile?.role === "admin" || profile?.role === "systemOwner",
+    isStaff: true,
     selectedStore,
     setSelectedStore,
+    availableStores
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

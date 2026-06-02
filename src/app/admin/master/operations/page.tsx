@@ -34,7 +34,8 @@ import {
   ChevronRight,
   Clock,
   Tag,
-  Copy
+  Copy,
+  Store
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -118,6 +119,7 @@ function SortableItem({
             item.itemType === 'coupon' ? 'bg-rose-400' :
             item.itemType === 'messageCoupon' ? 'bg-amber-400' :
             item.itemType === 'discount' ? 'bg-rose-500' :
+            item.itemType === 'store' ? 'bg-indigo-500' :
             'bg-slate-300'
           )} />
           
@@ -135,12 +137,21 @@ function SortableItem({
             {item.hpbName && <p className="text-[10px] text-slate-400 truncate mt-0.5">{item.hpbName}</p>}
           </div>
 
-          <div className="text-right flex flex-col items-end gap-1 px-4 border-l border-slate-50">
-            <p className="text-lg font-black text-slate-900 tracking-tight">
-              {item.itemType === 'discount' ? '-¥' : '¥'}{item.price.toLocaleString()}
-            </p>
-            {item.duration && <p className="text-[10px] font-black text-slate-400 flex items-center gap-1"><Clock size={10} /> {item.duration}</p>}
-          </div>
+            <div className="text-right flex flex-col items-end gap-1 px-4 border-l border-slate-50">
+              {item.itemType === 'store' ? (
+                <div className="flex flex-col items-end">
+                  <p className="text-xs font-black text-slate-700">営業時間</p>
+                  <p className="text-sm font-black text-slate-500">{item.openTime || "10:00"} - {item.closeTime || "19:00"}</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-lg font-black text-slate-900 tracking-tight">
+                    {item.itemType === 'discount' ? '-¥' : '¥'}{item.price.toLocaleString()}
+                  </p>
+                  {item.duration && <p className="text-[10px] font-black text-slate-400 flex items-center gap-1"><Clock size={10} /> {item.duration}</p>}
+                </>
+              )}
+            </div>
 
           <div className="flex items-center gap-1">
             <Button 
@@ -359,6 +370,8 @@ export default function MasterManagementPage() {
         if (item.itemType !== "reservationRoute") return false;
       } else if (typeFilter === "discount") {
         if (item.itemType !== "discount") return false;
+      } else if (typeFilter === "store") {
+        if (item.itemType !== "store") return false;
       }
     }
 
@@ -482,6 +495,13 @@ export default function MasterManagementPage() {
             }} className="rounded-xl bg-rose-500 hover:bg-rose-600 shadow-md font-black text-white px-4 h-11">
               <Tag size={16} className="mr-1" /> 割引追加
             </Button>
+            <Button onClick={() => {
+              setEditingItem({ store: "共通", itemType: "store", category: "店舗", price: 0, isActive: true });
+              setTypeFilter("store");
+              setIsDialogOpen(true);
+            }} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 shadow-md font-black text-white px-4 h-11">
+              <Store size={16} className="mr-1" /> 店舗追加
+            </Button>
           </div>
         </div>
       </div>
@@ -493,6 +513,7 @@ export default function MasterManagementPage() {
           { id: "product", label: "店販商品", icon: Zap },
           { id: "reservationRoute", label: "予約経路", icon: ArrowUpDown },
           { id: "discount", label: "割引", icon: Tag },
+          { id: "store", label: "店舗", icon: Store },
         ].map(tab => (
           <button
             key={tab.id}
@@ -617,6 +638,7 @@ export default function MasterManagementPage() {
               {editingItem?.id ? "アイテムを編集" : 
                editingItem?.itemType === 'product' ? "店販商品を新規作成" :
                editingItem?.itemType === 'reservationRoute' ? "予約経路を新規作成" :
+               editingItem?.itemType === 'store' ? "店舗を新規作成" :
                "メニューを新規作成"}
             </DialogTitle>
           </DialogHeader>
@@ -630,9 +652,19 @@ export default function MasterManagementPage() {
                   onChange={(e) => setEditingItem({ ...editingItem!, store: e.target.value as any })}
                 >
                   <option value="共通">共通</option>
-                  <option value="六甲">六甲</option>
-                  <option value="神戸">神戸</option>
-                  <option value="元町">元町</option>
+                  {/* Dynamic or static depending on context, but here they can still set which store it applies to. 
+                      Since they are adding stores, maybe we don't want to restrict this list. For now we use the unique stores from items */}
+                  {Array.from(new Set(items.filter(i => i.itemType === 'store').map(i => i.name))).map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                  {/* Fallbacks */}
+                  {!items.some(i => i.itemType === 'store') && (
+                    <>
+                      <option value="六甲">六甲</option>
+                      <option value="神戸">神戸</option>
+                      <option value="元町">元町</option>
+                    </>
+                  )}
                 </select>
               </div>
               {(editingItem?.itemType === 'menu' || editingItem?.itemType === 'coupon' || editingItem?.itemType === 'messageCoupon' || editingItem?.id) && (
@@ -651,22 +683,48 @@ export default function MasterManagementPage() {
                     <option value="discount">割引</option>
                     <option value="fee">キャンセル料</option>
                     <option value="reservationRoute">予約経路</option>
+                    <option value="store">店舗</option>
                   </select>
                 </div>
               )}
             </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Name</label>
-              <Input 
-                value={editingItem?.name || ""} 
-                onChange={(e) => setEditingItem({ ...editingItem!, name: e.target.value })}
-                className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
-                placeholder={editingItem?.itemType === 'reservationRoute' ? "例：ホットペッパー、インスタなど" : "名前を入力"}
-              />
-            </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Name</label>
+                <Input 
+                  value={editingItem?.name || ""} 
+                  onChange={(e) => setEditingItem({ ...editingItem!, name: e.target.value })}
+                  className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
+                  placeholder={
+                    editingItem?.itemType === 'reservationRoute' ? "例：ホットペッパー、インスタなど" : 
+                    editingItem?.itemType === 'store' ? "例：渋谷本店、横浜店など" : "名前を入力"
+                  }
+                />
+              </div>
+            {editingItem?.itemType === 'store' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Open Time (開店時間)</label>
+                  <Input 
+                    type="time"
+                    value={editingItem?.openTime || "10:00"} 
+                    onChange={(e) => setEditingItem({ ...editingItem!, openTime: e.target.value })}
+                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Close Time (閉店時間)</label>
+                  <Input 
+                    type="time"
+                    value={editingItem?.closeTime || "19:00"} 
+                    onChange={(e) => setEditingItem({ ...editingItem!, closeTime: e.target.value })}
+                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
+                  />
+                </div>
+              </div>
+            )}
 
-            {editingItem?.itemType !== 'reservationRoute' && (
+            {editingItem?.itemType !== 'reservationRoute' && editingItem?.itemType !== 'store' && (
               <div className="grid grid-cols-2 gap-4">
                 {editingItem?.itemType !== 'product' && (
                   <div className="space-y-2">
@@ -686,6 +744,7 @@ export default function MasterManagementPage() {
                       <option value="割引">割引</option>
                       <option value="店販">店販</option>
                       <option value="予約経路">予約経路</option>
+                      <option value="店舗">店舗</option>
                       <option value="その他">その他</option>
                     </select>
                   </div>

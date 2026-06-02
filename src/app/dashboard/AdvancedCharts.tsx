@@ -46,17 +46,21 @@ export default function AdvancedCharts() {
   // Scroll to the rightmost (most recent) data by default
   useEffect(() => {
     if (!loading && data.length > 0) {
-      // Use a small timeout to ensure DOM is fully rendered before scrolling
-      setTimeout(() => {
+      const scrollRight = () => {
         const scrollContainers = document.querySelectorAll('.custom-scrollbar');
         scrollContainers.forEach(container => {
           container.scrollLeft = container.scrollWidth;
         });
-      }, 100);
+      };
+      
+      // Use a timeout to ensure DOM is fully rendered before scrolling
+      setTimeout(scrollRight, 300);
+      // Backup timeout for slower re-renders of Recharts responsive container
+      setTimeout(scrollRight, 800);
     }
   }, [loading, data]);
 
-  const chartData = data.map(d => {
+  const processedData = data.map(d => {
     const stores: any = {};
     Object.entries(d.stores).forEach(([name, vals]: [string, any]) => {
       stores[name] = {
@@ -78,6 +82,20 @@ export default function AdvancedCharts() {
     return { ...d, stores, regularSales: (d.total || 0) - (d.minimo || 0) };
   });
 
+  // 最初のデータが存在する月を探し、それ以前の空データをカットする
+  const firstDataIndex = processedData.findIndex(d => d.total > 0 || d.minimo > 0 || Object.values(d.stores).some((s: any) => s.totalVisits > 0));
+  const chartData = firstDataIndex >= 0 ? processedData.slice(firstDataIndex) : processedData;
+  // Calculate global max visits to align Y-axis scales across all stores
+  const globalMaxVisits = chartData.reduce((max, d) => {
+    const storeMax = Math.max(
+      d.stores["六甲"]?.totalVisits || 0,
+      d.stores["神戸"]?.totalVisits || 0,
+      d.stores["元町"]?.totalVisits || 0
+    );
+    return Math.max(max, storeMax);
+  }, 0);
+  const maxVisitsAxis = Math.ceil(globalMaxVisits * 1.15 / 10) * 10; // add 15% buffer and round up to 10
+
   if (loading) {
     return (
       <div className="h-[400px] flex items-center justify-center bg-white rounded-2xl border border-slate-100">
@@ -89,7 +107,7 @@ export default function AdvancedCharts() {
   return (
     <div className="grid gap-6 md:grid-cols-2">
       {/* Sales Trend Chart */}
-      <Card className="bg-white border-none shadow-sm">
+      <Card className="bg-white border-none shadow-sm md:col-span-2">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <TrendingUp size={20} className="text-emerald-500" />
@@ -117,21 +135,84 @@ export default function AdvancedCharts() {
                 />
                 <Tooltip 
                   cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
-                  formatter={(value: any, name: any, props: any) => {
-                    const data = props.payload;
-                    if (name === "通常売上") {
-                      return [`¥${value.toLocaleString()} (単価: ¥${(data.avgRegular || 0).toLocaleString()})`, name];
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      const stores = ["六甲", "神戸", "元町"];
+                      const groupedData: Record<string, { regular: number, minimo: number, colors: { regular: string, minimo: string } }> = {};
+                      
+                      stores.forEach(store => {
+                        groupedData[store] = { regular: 0, minimo: 0, colors: { regular: "", minimo: "" } };
+                      });
+
+                      payload.forEach((entry: any) => {
+                        const [store, type] = entry.name.split(':');
+                        if (stores.includes(store)) {
+                          if (type === "通常") {
+                            groupedData[store].regular = entry.value;
+                            groupedData[store].colors.regular = entry.color;
+                          } else if (type === "ミニモ") {
+                            groupedData[store].minimo = entry.value;
+                            groupedData[store].colors.minimo = entry.color;
+                          }
+                        }
+                      });
+
+                      return (
+                        <div className="bg-white p-3 border border-slate-100 rounded-xl shadow-xl min-w-[160px]">
+                          <p className="font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2">{label}</p>
+                          <div className="space-y-3">
+                            {stores.map(store => {
+                              const data = groupedData[store];
+                              if (!data) return null;
+                              const total = data.regular + data.minimo;
+                              if (total === 0) return null; // skip if no data
+
+                              return (
+                                <div key={store} className="space-y-1">
+                                  <div className="flex items-center justify-between font-black text-slate-700 text-sm">
+                                    <span>{store}</span>
+                                    <span>¥{total.toLocaleString()}</span>
+                                  </div>
+                                  <div className="pl-2 space-y-0.5 border-l-2 border-slate-100 ml-1">
+                                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 gap-4">
+                                      <div className="flex items-center gap-1.5">
+                                        <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: data.colors.regular || '#ccc' }} />
+                                        <span>通常</span>
+                                      </div>
+                                      <span>¥{data.regular.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 gap-4">
+                                      <div className="flex items-center gap-1.5">
+                                        <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: data.colors.minimo || '#ccc' }} />
+                                        <span>ミニモ</span>
+                                      </div>
+                                      <span>¥{data.minimo.toLocaleString()}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
                     }
-                    if (name === "ミニモ売上") {
-                      return [`¥${value.toLocaleString()} (単価: ¥${(data.avgMinimo || 0).toLocaleString()})`, name];
-                    }
-                    return [`¥${value.toLocaleString()}`, name];
+                    return null;
                   }}
                 />
                 <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '20px' }} />
-                <Bar name="通常売上" dataKey="regularSales" stackId="total" fill="#10b981" radius={[0, 0, 0, 0]} />
-                <Bar name="ミニモ売上" dataKey="minimo" stackId="total" fill="#6366f1" radius={[4, 4, 0, 0]}>
+                
+                {/* グラフの積み上げ順序: 最初が下、最後が上 */}
+                {/* 上から六甲、神戸、元町にするには、一番下が元町、真ん中が神戸、一番上が六甲 */}
+                
+                {/* 通常売上 */}
+                <Bar name="元町:通常" dataKey="stores.元町.regular" stackId="total" fill="#059669" />
+                <Bar name="神戸:通常" dataKey="stores.神戸.regular" stackId="total" fill="#10b981" />
+                <Bar name="六甲:通常" dataKey="stores.六甲.regular" stackId="total" fill="#34d399" />
+                
+                {/* ミニモ売上 */}
+                <Bar name="元町:ミニモ" dataKey="stores.元町.minimo" stackId="total" fill="#4f46e5" />
+                <Bar name="神戸:ミニモ" dataKey="stores.神戸.minimo" stackId="total" fill="#6366f1" />
+                <Bar name="六甲:ミニモ" dataKey="stores.六甲.minimo" stackId="total" fill="#818cf8" radius={[4, 4, 0, 0]}>
                   <LabelList 
                     dataKey="total" 
                     position="top" 
@@ -146,8 +227,6 @@ export default function AdvancedCharts() {
           </div>
         </CardContent>
       </Card>
-
-      <div className="hidden md:block" />
 
       {/* Visit Breakdown Charts (Small Multiples) */}
       <Card className="bg-white border-none shadow-sm md:col-span-2">
@@ -166,7 +245,7 @@ export default function AdvancedCharts() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {["六甲", "元町", "神戸"].map((store) => (
+            {["六甲", "神戸", "元町"].map((store) => (
               <div key={store} className="space-y-4">
                 <h4 className="text-sm font-black text-slate-600 text-center bg-slate-50 py-2 rounded-xl border border-slate-100">{store}店</h4>
                 <div className="w-full overflow-x-auto pb-4 custom-scrollbar">
@@ -185,6 +264,7 @@ export default function AdvancedCharts() {
                         tickLine={false} 
                         tick={{ fontSize: 9, fill: '#94a3b8' }}
                         tickFormatter={(value) => `${value}人`}
+                        domain={[0, maxVisitsAxis]}
                       />
                       <Tooltip 
                         cursor={{ fill: '#f8fafc' }}
@@ -291,7 +371,7 @@ export default function AdvancedCharts() {
       </Card>
 
       {/* Next Booking Analytics Chart */}
-      <Card className="bg-white border-none shadow-sm">
+      <Card className="bg-white border-none shadow-sm md:col-span-2">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <Sparkles size={20} className="text-amber-500" />
@@ -328,24 +408,58 @@ export default function AdvancedCharts() {
                   domain={[0, 100]}
                 />
                 <Tooltip 
-                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
+                   cursor={{ fill: '#f8fafc' }}
+                   content={({ active, payload, label }) => {
+                     if (active && payload && payload.length) {
+                       // Find the line payload for the ratio
+                       const ratioPayload = payload.find(p => p.dataKey === 'nextBookingRatio');
+                       const ratio = ratioPayload ? ratioPayload.value : 0;
+                       
+                       // Group store data
+                       const stores = ["六甲", "神戸", "元町"];
+                       const storeData = payload.filter((p: any) => stores.some(s => p.name && typeof p.name === 'string' && p.name.includes(s)));
+
+                       return (
+                         <div className="bg-white p-3 border border-slate-100 rounded-xl shadow-xl min-w-[180px]">
+                           <p className="font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2">{label}</p>
+                           
+                           <div className="flex items-center justify-between font-black text-rose-600 mb-4 bg-rose-50 p-2 rounded-lg">
+                             <span>全体 次回予約率</span>
+                             <span className="text-lg">{ratio}%</span>
+                           </div>
+
+                           <div className="space-y-2">
+                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">店舗別 総来店数</p>
+                             {storeData.map((entry: any, index: number) => {
+                               const storeName = entry.name.split(':')[0];
+                               return (
+                                 <div key={index} className="flex items-center justify-between text-xs font-bold">
+                                   <div className="flex items-center gap-1.5">
+                                     <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: entry.color }} />
+                                     <span className="text-slate-600">{storeName}</span>
+                                   </div>
+                                   <span className="text-slate-800">{entry.value}人</span>
+                                 </div>
+                               );
+                             })}
+                           </div>
+                         </div>
+                       );
+                     }
+                     return null;
+                   }}
                 />
                 <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '20px' }} />
                 
-                <Bar yAxisId="left" name="六甲:来店数" dataKey="stores.六甲.nextBookingVisits" stackId="visit" fill="#10b981" />
-                <Bar yAxisId="left" name="元町:来店数" dataKey="stores.元町.nextBookingVisits" stackId="visit" fill="#6366f1" />
-                <Bar yAxisId="left" name="神戸:来店数" dataKey="stores.神戸.nextBookingVisits" stackId="visit" fill="#f43f5e" radius={[4, 4, 0, 0]}>
-                  <LabelList 
-                    dataKey="nextBookingVisits" 
-                    position="top" 
-                    formatter={(val: any) => `${val || 0}人`}
-                    style={{ fontSize: '10px', fontWeight: 'bold', fill: '#475569' }}
-                  />
-                </Bar>
+                {/* 積み上げ棒グラフ：総来店数（サロンのトラフィック） */}
+                <Bar yAxisId="left" name="元町:来店数" dataKey="stores.元町.totalVisits" stackId="visit" fill="#6366f1" />
+                <Bar yAxisId="left" name="神戸:来店数" dataKey="stores.神戸.totalVisits" stackId="visit" fill="#f43f5e" />
+                <Bar yAxisId="left" name="六甲:来店数" dataKey="stores.六甲.totalVisits" stackId="visit" fill="#10b981" radius={[4, 4, 0, 0]} />
                 
+                {/* 折れ線グラフ：次回予約率（KPI） */}
                 <Line 
                   yAxisId="right"
-                  name="全体予約率 (%)" 
+                  name="全体 次回予約率 (%)" 
                   type="monotone" 
                   dataKey="nextBookingRatio" 
                   stroke="#f59e0b" 
@@ -361,7 +475,7 @@ export default function AdvancedCharts() {
       </Card>
 
       {/* Occupancy Trend Chart */}
-      <Card className="bg-white border-none shadow-sm">
+      <Card className="bg-white border-none shadow-sm md:col-span-2">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <Activity size={20} className="text-rose-500" />
@@ -444,10 +558,10 @@ export default function AdvancedCharts() {
                 
                 <Bar name="六甲:通常" dataKey="stores.六甲.regular" stackId="rokko" fill="#10b981" />
                 <Bar name="六甲:ミニモ" dataKey="stores.六甲.minimo" stackId="rokko" fill="#059669" radius={[4, 4, 0, 0]} />
-                <Bar name="元町:通常" dataKey="stores.元町.regular" stackId="moto" fill="#6366f1" />
-                <Bar name="元町:ミニモ" dataKey="stores.元町.minimo" stackId="moto" fill="#4f46e5" radius={[4, 4, 0, 0]} />
                 <Bar name="神戸:通常" dataKey="stores.神戸.regular" stackId="kobe" fill="#f43f5e" />
                 <Bar name="神戸:ミニモ" dataKey="stores.神戸.minimo" stackId="kobe" fill="#e11d48" radius={[4, 4, 0, 0]} />
+                <Bar name="元町:通常" dataKey="stores.元町.regular" stackId="moto" fill="#6366f1" />
+                <Bar name="元町:ミニモ" dataKey="stores.元町.minimo" stackId="moto" fill="#4f46e5" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
             </div>

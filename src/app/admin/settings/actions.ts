@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, getDocs } from "firebase/firestore";
 import { revalidatePath } from "next/cache";
 
 export type StoreReservationSettings = {
@@ -56,6 +56,59 @@ export async function saveReservationSettings(settings: ReservationSettings) {
     return { success: true };
   } catch (error: any) {
     console.error("Failed to save reservation settings:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export type LineSettingsMap = Record<string, string>;
+
+export async function getLineSettings(): Promise<LineSettingsMap> {
+  try {
+    const colRef = collection(db, "line_integrations");
+    const snapshot = await getDocs(colRef);
+    const result: LineSettingsMap = {};
+    snapshot.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.storeName && data.channelAccessToken) {
+        result[data.storeName] = data.channelAccessToken;
+      }
+    });
+    return result;
+  } catch (error) {
+    console.error("Failed to fetch LINE settings:", error);
+    return {};
+  }
+}
+
+export async function saveLineSettings(storeName: string, channelAccessToken: string) {
+  try {
+    const q = query(collection(db, "line_integrations"));
+    const snapshot = await getDocs(q);
+    
+    // Find if the store already has an integration
+    let docId = "";
+    snapshot.docs.forEach(d => {
+      if (d.data().storeName === storeName) {
+        docId = d.id;
+      }
+    });
+
+    if (docId) {
+      await setDoc(doc(db, "line_integrations", docId), {
+        storeName,
+        channelAccessToken
+      }, { merge: true });
+    } else {
+      await setDoc(doc(collection(db, "line_integrations")), {
+        storeName,
+        channelAccessToken
+      });
+    }
+
+    revalidatePath("/admin/settings");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to save LINE settings:", error);
     return { success: false, error: error.message };
   }
 }

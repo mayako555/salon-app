@@ -23,17 +23,13 @@ function getColorClasses(res: Reservation) {
   if (res.type === "schedule") return "bg-slate-200/80 border-slate-300 text-slate-700 shadow-none";
 
   if (res.status === 'cancelled') return "bg-slate-100 border-slate-200 text-slate-400 opacity-50 line-through";
-  if (res.status === 'completed') return "bg-slate-200 border-slate-300 text-slate-500 opacity-60";
+  if (res.status === 'completed') return "bg-slate-200 border-slate-300 text-slate-500 opacity-70"; // 会計後はグレー
   
   if (res.is_caution) return "bg-rose-100 border-rose-300 text-rose-800";
   if (res.is_next_booking) return "bg-purple-100 border-purple-300 text-purple-800";
   
-  switch (res.customer_type) {
-    case "新規": return "bg-blue-50 border-blue-300 text-blue-900";
-    case "再来": return "bg-green-50 border-green-300 text-green-900";
-    case "モデル": return "bg-slate-100 border-slate-300 text-slate-700";
-    default: return "bg-white border-slate-300 text-slate-800"; // fallback
-  }
+  // デフォルトは黄色（予約受付前・来店中）
+  return "bg-[#fff8d6] border-amber-300 text-slate-800";
 }
 
 function getMenuIcon(menuName: string, isSchedule = false) {
@@ -159,6 +155,7 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
   return (
     <>
       <div
+        onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => handlePointerDown(e, 'move')}
         onContextMenu={handleContextMenu}
         onDoubleClick={(e) => { e.stopPropagation(); onClick(res); }}
@@ -187,11 +184,16 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
             </span>
           )}
           {res.type !== 'schedule' && res.is_caution && <AlertCircle className="w-2.5 h-2.5 text-red-500 fill-white" />}
+          {res.type !== 'schedule' && res.same_day_cancel_count && res.same_day_cancel_count > 0 && (
+            <span className="bg-rose-600 text-white px-1 rounded flex items-center gap-0.5 text-[8px] font-black">
+              ▼{res.same_day_cancel_count})
+            </span>
+          )}
           {res.type !== 'schedule' && res.status === 'arrived' && <span className="bg-emerald-500 text-white px-0.5 rounded">来</span>}
           {res.type !== 'schedule' && res.status === 'completed' && <span className="bg-slate-800 text-white px-0.5 rounded">済</span>}
         </div>
         <span className="text-[10px] font-black truncate leading-tight pointer-events-none tracking-tight">
-          {res.type === 'schedule' ? res.menu_name : res.customer_name}
+          {res.type === 'schedule' ? res.menu_name : (res.customer_name?.trim() ? res.customer_name : res.customer_kana)}
         </span>
         {res.type !== 'schedule' && (
           <span className="text-[8px] truncate opacity-80 leading-tight mt-px pointer-events-none">{res.menu_name}</span>
@@ -234,9 +236,14 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
                 <span className="text-slate-400 block">来店回数</span>
                 <span className="font-bold text-slate-700">5回</span>
               </div>
-              <div className="col-span-2">
+              <div className="col-span-2 mt-1">
                 <span className="text-slate-400 block">注意事項・アレルギー</span>
                 <span className="font-bold text-rose-600">テープかぶれあり。右目目尻上がりやすい。</span>
+                {res.same_day_cancel_count && res.same_day_cancel_count > 0 && (
+                  <span className="block mt-1 bg-rose-100 text-rose-700 px-2 py-1 rounded text-[10px] font-black">
+                    ⚠️ 当日キャンセル履歴あり ({res.same_day_cancel_count}回)
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -256,12 +263,45 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
               <MessageSquare className="w-4 h-4 text-slate-400" /> 詳細・編集を開く
             </button>
             <div className="h-px bg-slate-100 my-1" />
-            <button className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-emerald-700 flex items-center gap-2" onClick={() => { alert('来店処理しました'); setContextMenu(null); }}>
+            <button className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-emerald-700 flex items-center gap-2" onClick={async () => { 
+              const { updateReservationStatus } = await import('@/app/reservations/actions');
+              await updateReservationStatus(res.id, 'arrived');
+              onUpdateComplete();
+              setContextMenu(null); 
+            }}>
               <User className="w-4 h-4 text-emerald-500" /> 来店済にする
             </button>
             <div className="h-px bg-slate-100 my-1" />
-            <button className="w-full text-left px-4 py-2 hover:bg-rose-50 text-rose-700 flex items-center gap-2" onClick={() => { alert('削除しました'); setContextMenu(null); }}>
-              <AlertCircle className="w-4 h-4 text-rose-500" /> 予約をキャンセル
+            <button className="w-full text-left px-4 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2" onClick={async () => { 
+              if (confirm('お客様都合でキャンセルしますか？\n（当日キャンセルの場合は自動的にカウントされます）')) {
+                const { updateReservationStatus } = await import('@/app/reservations/actions');
+                await updateReservationStatus(res.id, 'cancelled', true);
+                onUpdateComplete();
+              }
+              setContextMenu(null); 
+            }}>
+              <AlertCircle className="w-4 h-4 text-rose-500" /> キャンセル (お客様都合)
+            </button>
+            <button className="w-full text-left px-4 py-2 hover:bg-orange-50 text-orange-600 flex items-center gap-2" onClick={async () => { 
+              if (confirm('店舗都合（または操作ミス等）でキャンセルしますか？\n（当日キャンセルとしてカウントされません）')) {
+                const { updateReservationStatus } = await import('@/app/reservations/actions');
+                await updateReservationStatus(res.id, 'cancelled', false);
+                onUpdateComplete();
+              }
+              setContextMenu(null); 
+            }}>
+              <AlertCircle className="w-4 h-4 text-orange-500" /> キャンセル (店舗都合/ミス)
+            </button>
+            <div className="h-px bg-slate-100 my-1" />
+            <button className="w-full text-left px-4 py-2 hover:bg-rose-100 text-rose-700 flex items-center gap-2 font-bold" onClick={async () => { 
+              if (confirm('この予約を完全に削除しますか？この操作は取り消せません。')) {
+                const { deleteReservation } = await import('@/app/reservations/actions');
+                await deleteReservation(res.id);
+                onUpdateComplete();
+              }
+              setContextMenu(null); 
+            }}>
+              <AlertCircle className="w-4 h-4 text-rose-600" /> 完全に削除する
             </button>
           </div>
         </>

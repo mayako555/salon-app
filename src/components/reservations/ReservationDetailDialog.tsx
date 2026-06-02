@@ -2,17 +2,20 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Reservation } from "@/app/reservations/actions";
-import { UserCircle, Calendar, Clock, MapPin, Tag, MessageSquare, CreditCard } from "lucide-react";
+import { UserCircle, Calendar, Clock, MapPin, Tag, MessageSquare, CreditCard, Edit, Search } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type Props = {
   reservation: Reservation;
   isOpen: boolean;
   onClose: () => void;
+  onEdit?: () => void;
+  onRefresh?: () => void;
 };
 
-export default function ReservationDetailDialog({ reservation, isOpen, onClose }: Props) {
+export default function ReservationDetailDialog({ reservation, isOpen, onClose, onEdit, onRefresh }: Props) {
   if (!reservation) return null;
 
   return (
@@ -37,12 +40,17 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose }
             </div>
             <DialogTitle className="text-xl font-black text-slate-800 flex items-center gap-2">
               <UserCircle className="text-slate-400" />
-              {reservation.customer_name} <span className="text-sm font-medium text-slate-500">様</span>
+              {reservation.customer_name?.trim() ? reservation.customer_name : reservation.customer_kana} <span className="text-sm font-medium text-slate-500">様</span>
             </DialogTitle>
-            {reservation.customer_kana && (
+            {reservation.customer_name?.trim() && reservation.customer_kana && (
               <p className="text-xs text-slate-400 mt-0.5 ml-8">{reservation.customer_kana}</p>
             )}
           </div>
+          {onEdit && reservation.status !== 'completed' && reservation.status !== 'cancelled' && (
+            <Button variant="ghost" size="icon" onClick={onEdit} className="text-blue-500 hover:bg-blue-50">
+              <Edit className="w-5 h-5" />
+            </Button>
+          )}
         </DialogHeader>
 
         <div className="p-4 space-y-4">
@@ -93,28 +101,45 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose }
         </div>
 
         <div className="p-4 bg-white border-t border-slate-200 flex gap-2">
-          {reservation.status !== 'cancelled' && reservation.status !== 'completed' && (
+          <div className="flex-1 flex gap-2">
+            {reservation.status !== 'cancelled' && reservation.status !== 'completed' && (
+              <Button 
+                variant="outline" 
+                className="flex-1 text-rose-600 border-rose-200 hover:bg-rose-50"
+                onClick={async () => {
+                  if (confirm('この予約をキャンセルしますか？')) {
+                    const { updateReservationStatus } = await import('@/app/reservations/actions');
+                    await updateReservationStatus(reservation.id, 'cancelled');
+                    onClose();
+                    if (onRefresh) onRefresh();
+                  }
+                }}
+              >
+                キャンセル
+              </Button>
+            )}
             <Button 
               variant="destructive" 
               className="flex-1"
               onClick={async () => {
-                if (confirm('この予約をキャンセルしますか？')) {
-                  const { updateReservationStatus } = await import('@/app/reservations/actions');
-                  await updateReservationStatus(reservation.id, 'cancelled');
+                if (confirm('この予約を完全に削除しますか？この操作は取り消せません。')) {
+                  const { deleteReservation } = await import('@/app/reservations/actions');
+                  await deleteReservation(reservation.id);
                   onClose();
-                  window.location.reload();
+                  if (onRefresh) onRefresh();
                 }
               }}
             >
-              キャンセル
+              完全削除
             </Button>
-          )}
-          <Button variant="outline" className="flex-1" onClick={onClose}>閉じる</Button>
+          </div>
+          <Button variant="outline" className="w-24 shrink-0" onClick={onClose}>閉じる</Button>
           
-          {reservation.status !== 'completed' && reservation.status !== 'cancelled' && (
+          {reservation.status !== 'cancelled' && (
             <Link href={`/staff-portal/sales?res_id=${reservation.id}`} className="flex-[2]">
-              <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-2">
-                <CreditCard className="w-4 h-4" /> お会計へ進む
+              <Button className={cn("w-full font-bold flex items-center gap-2 text-white", reservation.status === 'completed' ? "bg-amber-500 hover:bg-amber-600" : "bg-emerald-600 hover:bg-emerald-700")}>
+                {reservation.status === 'completed' ? <Search className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
+                {reservation.status === 'completed' ? "お会計を編集" : "お会計へ進む"}
               </Button>
             </Link>
           )}

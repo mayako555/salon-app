@@ -4,10 +4,12 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { FileUp, Loader2 } from "lucide-react";
 import { importHotPepperCsv } from "./actions";
+import { useAuth } from "@/lib/auth-context";
 
 export default function CSVUploadButton() {
+  const { availableStores } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
-  const [store, setStore] = useState("神戸");
+  const [store, setStore] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,6 +43,14 @@ export default function CSVUploadButton() {
     }
   };
 
+  const handleUploadClick = () => {
+    if (!store) {
+      alert("CSVを取り込む店舗を選択してください。");
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
   return (
     <div className="flex items-center gap-2">
       <select 
@@ -48,9 +58,10 @@ export default function CSVUploadButton() {
         onChange={(e) => setStore(e.target.value)}
         className="h-9 px-3 py-1 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
       >
-        <option value="六甲">六甲店</option>
-        <option value="元町">元町店</option>
-        <option value="神戸">神戸店</option>
+        <option value="" disabled>店舗を選択</option>
+        {availableStores.map(s => (
+          <option key={s} value={s}>{s}</option>
+        ))}
       </select>
       <input
         type="file"
@@ -60,7 +71,7 @@ export default function CSVUploadButton() {
         className="hidden"
       />
       <Button 
-        onClick={() => fileInputRef.current?.click()}
+        onClick={handleUploadClick}
         disabled={isUploading}
         className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white flex-1 md:flex-none"
       >

@@ -15,7 +15,8 @@ import {
   deleteDoc,
   writeBatch,
   Timestamp,
-  serverTimestamp
+  serverTimestamp,
+  getDoc
 } from "firebase/firestore";
 import { SalesMasterItem, seedSalesMasterData } from "./seeds";
 import { addAuditLog } from "../audit/actions";
@@ -53,8 +54,10 @@ export type SalesRecord = {
   cancel_fee: number;
   status: "draft" | "closed";
   source: SalesSource;
+  source_reservation_id?: string; // Links back to the original reservation
   next_booking_date?: string; // 次回予約日
   next_booking_time?: string; // 次回予約時間
+  next_booking_staff_name?: string; // 次回予約担当者
   next_booking_line_reminder?: boolean; // 2日前のリマインダー送付
   customer_id?: string;
   is_minimo?: boolean;
@@ -144,6 +147,23 @@ export async function duplicateSalesMasterItem(id: string) {
   } catch (error: any) {
     console.error("Error duplicating master item:", error);
     return { success: false, error: error.message };
+  }
+}
+
+export async function getSaleByReservationId(resId: string): Promise<SalesRecord | null> {
+  try {
+    const q = query(
+      collection(db, SALES_COLLECTION),
+      where("source_reservation_id", "==", resId),
+      limit(1)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+    const doc = snap.docs[0];
+    return { id: doc.id, ...doc.data() } as SalesRecord;
+  } catch (error) {
+    console.error("Error fetching sale by res id:", error);
+    return null;
   }
 }
 
@@ -251,6 +271,7 @@ export async function addCheckout(formData: FormData) {
     const nextBookingStaffName = formData.get("next_booking_staff_name") as string || staffName;
     const isMinimo = formData.get("is_minimo") === "true" || reservationRoute.includes("ミニモ");
     const treatmentMinutes = parseInt(formData.get("treatment_minutes") as string || "60", 10);
+    const sourceReservationId = formData.get("source_reservation_id") as string || "";
 
     if (!staffName || !date) {
       return { success: false, error: "必須項目が入力されていません。" };
@@ -291,11 +312,18 @@ export async function addCheckout(formData: FormData) {
       treatment_minutes: treatmentMinutes,
       status: "draft",
       source: "checkout" as SalesSource,
+      source_reservation_id: sourceReservationId || null,
       created_at: serverTimestamp()
     };
 
     const colRef = collection(db, SALES_COLLECTION);
     const docRef = await addDoc(colRef, payload);
+    
+    // Automatically update reservation status if linked
+    if (sourceReservationId) {
+      const { updateReservationStatus } = await import('@/app/reservations/actions');
+      await updateReservationStatus(sourceReservationId, 'completed');
+    }
 
     // --- Create Auto Reservation for Next Booking ---
     if (nextBookingDate && nextBookingTime) {

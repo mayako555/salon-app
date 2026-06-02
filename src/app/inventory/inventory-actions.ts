@@ -16,16 +16,49 @@ import {
 } from "firebase/firestore";
 import { addNotification } from "@/lib/notifications";
 
+import { getCurrentUserContext, verifyPermission } from "@/lib/auth-server";
+
+export async function getAvailableStores() {
+  try {
+    const ctx = await getCurrentUserContext();
+    if (ctx.role === "systemOwner") {
+      // システム管理者は全社・全店舗見れる（今回は固定の3店舗を仮置きか、Companyマスタから引くべきだが、一旦既存のリストをベースに拡張）
+      return ["六甲", "神戸", "元町"];
+    }
+    // companyOwner や manager, staff の場合は自分が所属する salonIds を返す
+    // salonIds に直接店舗名が入っている想定（既存の運用ベース）
+    if (ctx.salonIds && ctx.salonIds.length > 0) {
+      return ctx.salonIds;
+    }
+    return ["六甲"]; // フォールバック
+  } catch (err) {
+    return ["六甲"];
+  }
+}
+
 export async function getInventory(storeName: string) {
+  const ctx = await getCurrentUserContext();
   const colRef = collection(db, "inventory");
-  const q = query(colRef, where("storeName", "==", storeName), orderBy("name", "asc"));
+  const q = query(
+    colRef, 
+    where("storeName", "==", storeName),
+    where("companyId", "==", ctx.companyId),
+    orderBy("name", "asc")
+  );
   const snapshot = await getDocs(q);
   return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
 export async function getInventoryLogs(storeName: string) {
+  const ctx = await getCurrentUserContext();
   const colRef = collection(db, "inventory_logs");
-  const q = query(colRef, where("storeName", "==", storeName), orderBy("date", "desc"), limit(20));
+  const q = query(
+    colRef, 
+    where("storeName", "==", storeName), 
+    where("companyId", "==", ctx.companyId),
+    orderBy("date", "desc"), 
+    limit(20)
+  );
   const snapshot = await getDocs(q);
   return snapshot.docs.map(d => ({ 
     id: d.id, 
@@ -36,9 +69,14 @@ export async function getInventoryLogs(storeName: string) {
 
 export async function updateStock(itemId: string, count: number, type: string, staffName: string) {
   try {
+    const ctx = await getCurrentUserContext();
     const itemRef = doc(db, "inventory", itemId);
     const itemSnap = await getDocs(query(collection(db, "inventory"), where("__name__", "==", itemId)));
     const itemData = itemSnap.docs[0].data();
+
+    if (itemData.companyId && itemData.companyId !== ctx.companyId && ctx.role !== "systemOwner") {
+      throw new Error("権限がありません");
+    }
 
     const batch = writeBatch(db);
     batch.update(itemRef, {
@@ -54,7 +92,8 @@ export async function updateStock(itemId: string, count: number, type: string, s
       type,
       staffName,
       date: serverTimestamp(),
-      storeName: itemData.storeName
+      storeName: itemData.storeName,
+      companyId: itemData.companyId || ctx.companyId
     });
 
     await batch.commit();
@@ -78,7 +117,13 @@ export async function updateStock(itemId: string, count: number, type: string, s
 }
 
 export async function getInventoryOrders(storeName: string) {
-  const q = query(collection(db, "inventory_orders"), where("storeName", "==", storeName), orderBy("createdAt", "desc"));
+  const ctx = await getCurrentUserContext();
+  const q = query(
+    collection(db, "inventory_orders"), 
+    where("storeName", "==", storeName), 
+    where("companyId", "==", ctx.companyId),
+    orderBy("createdAt", "desc")
+  );
   const snapshot = await getDocs(q);
   return snapshot.docs.map(d => ({
     id: d.id,
@@ -89,8 +134,13 @@ export async function getInventoryOrders(storeName: string) {
 
 export async function requestOrder(itemId: string, count: number, staffName: string) {
   try {
+    const ctx = await getCurrentUserContext();
     const itemSnap = await getDocs(query(collection(db, "inventory"), where("__name__", "==", itemId)));
     const itemData = itemSnap.docs[0].data();
+
+    if (itemData.companyId && itemData.companyId !== ctx.companyId && ctx.role !== "systemOwner") {
+      throw new Error("権限がありません");
+    }
 
     await addDoc(collection(db, "inventory_orders"), {
       itemId,
@@ -99,7 +149,8 @@ export async function requestOrder(itemId: string, count: number, staffName: str
       staffName,
       status: "pending",
       createdAt: serverTimestamp(),
-      storeName: itemData.storeName
+      storeName: itemData.storeName,
+      companyId: itemData.companyId || ctx.companyId
     });
 
     await addNotification({
@@ -179,8 +230,9 @@ export async function syncInventoryFromSale(sale: any, action: "deduct" | "retur
   }
 }
 
-export async function bulkRequestOrders(orders: { itemId: string, itemName: string, count: number, storeName: string }[], staffName: string) {
+export async function bulkRequestOrders(orders: { itemId: string, itemName: string, count: number, storeName: string, companyId?: string }[], staffName: string) {
   try {
+    const ctx = await getCurrentUserContext();
     const batch = writeBatch(db);
     const colRef = collection(db, "inventory_orders");
     
@@ -190,7 +242,8 @@ export async function bulkRequestOrders(orders: { itemId: string, itemName: stri
         ...order,
         staffName,
         status: "pending",
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        companyId: order.companyId || ctx.companyId
       });
     });
     
@@ -204,7 +257,14 @@ export async function bulkRequestOrders(orders: { itemId: string, itemName: stri
 
 export async function updateInventoryItem(itemId: string, data: any) {
   try {
+    const ctx = await getCurrentUserContext();
     const docRef = doc(db, "inventory", itemId);
+    const snap = await getDocs(query(collection(db, "inventory"), where("__name__", "==", itemId)));
+    
+    if (!snap.empty && snap.docs[0].data().companyId && snap.docs[0].data().companyId !== ctx.companyId && ctx.role !== "systemOwner") {
+      throw new Error("権限がありません");
+    }
+
     await updateDoc(docRef, {
       ...data,
       updatedAt: serverTimestamp()

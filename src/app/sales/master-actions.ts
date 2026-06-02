@@ -14,33 +14,41 @@ import {
   deleteDoc
 } from "firebase/firestore";
 import { SalesMasterItem } from "./seeds";
+import { getCurrentUserContext } from "@/lib/auth-server";
 import { addAuditLog } from "../audit/actions";
 
 const MASTER_COLLECTION = "sales_master";
 
 export async function getMasterItems(store?: string): Promise<SalesMasterItem[]> {
   try {
+    const ctx = await getCurrentUserContext();
     const colRef = collection(db, MASTER_COLLECTION);
     
-    // インデックスエラーを避けるため、一旦全件取得（データ量が少ないマスタではこの方が安全）
+    // Instead of getting all docs, we query by companyId.
+    // If we can't query by companyId due to missing indexes, we get all and filter in memory,
+    // but querying is much better. Let's assume companyId is added. If not, we filter in memory.
     const snapshot = await getDocs(colRef);
     let items = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
         id: doc.id,
         ...data,
-        // Timestampオブジェクトをミリ秒に変換してプレーンなオブジェクトにする
         created_at: data.created_at?.toMillis?.() || data.created_at || null,
         updated_at: data.updated_at?.toMillis?.() || data.updated_at || null,
       };
-    }) as SalesMasterItem[];
+    }) as (SalesMasterItem & { companyId?: string })[];
 
-    // 店舗フィルタ（特定店舗 + 共通）
+    // --- SaaS Security: Enforce companyId isolation ---
+    // For older records without companyId, we treat them as company_default
+    items = items.filter(item => {
+      const itemCompanyId = item.companyId || "company_default";
+      return itemCompanyId === ctx.companyId;
+    });
+
     if (store && store !== "all") {
       items = items.filter(item => item.store === store || item.store === "共通");
     }
 
-    // メモリ上で並べ替え（並び順、店舗、アイテムタイプ、名前の順）
     return items.sort((a, b) => {
       const orderA = a.sortOrder ?? 999;
       const orderB = b.sortOrder ?? 999;
@@ -57,9 +65,11 @@ export async function getMasterItems(store?: string): Promise<SalesMasterItem[]>
 
 export async function upsertMasterItem(data: Partial<SalesMasterItem>) {
   try {
+    const ctx = await getCurrentUserContext();
     const colRef = collection(db, MASTER_COLLECTION);
     
     const payload = {
+      companyId: ctx.companyId, // Force the injected companyId
       store: data.store,
       itemType: data.itemType,
       category: data.category || "",

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Sparkles, TrendingUp, Presentation, AlertCircle, AreaChart } from "lucide-react";
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useAuth } from "@/lib/auth-context";
 
 const TARGET_VARIABLES = ["売上", "来店人数"];
 const FORECAST_DAYS = [
@@ -26,6 +27,7 @@ const PERIODS = [
 const EXOGENOUS_FEATURES = ["曜日", "天気", "祝日", "イベント日", "デビュー済稼働人数", "研修中稼働人数"];
 
 export default function SarimaxForecast() {
+  const { availableStores } = useAuth();
   const [store, setStore] = useState("全店舗");
   const [targetY, setTargetY] = useState("売上");
   const [forecastDays, setForecastDays] = useState(7);
@@ -85,9 +87,9 @@ export default function SarimaxForecast() {
                 <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="全店舗">全店舗</SelectItem>
-                  <SelectItem value="六甲店">六甲店</SelectItem>
-                  <SelectItem value="神戸店">神戸店</SelectItem>
-                  <SelectItem value="元町店">元町店</SelectItem>
+                  {availableStores.map(s => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -8,8 +8,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { AlertCircle, ArrowRight } from "lucide-react";
 import { getRepeatAnalysis } from "./actions";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth-context";
 
 export default function RepeatAnalysis() {
+  const { availableStores } = useAuth();
   const [store, setStore] = useState("全店舗");
   const [months, setMonths] = useState(6);
   const [loading, setLoading] = useState(false);
@@ -40,8 +42,11 @@ export default function RepeatAnalysis() {
             </div>
           ))}
           <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-500 space-y-1">
-            <p>通常(新規): {payload[0]?.payload.normalNewTotal}人 / 通常(リピ): {payload[0]?.payload.normalRepeatTotal}人</p>
-            <p>ミニモ(新規): {payload[0]?.payload.minimoNewTotal}人 / ミニモ(リピ): {payload[0]?.payload.minimoRepeatTotal}人</p>
+            {(payload[0]?.payload.routes || []).map((route: string) => (
+              <p key={route}>
+                {route}(新規): {payload[0]?.payload[`${route}NewTotal`] || 0}人 / {route}(リピ): {payload[0]?.payload[`${route}RepeatTotal`] || 0}人
+              </p>
+            ))}
           </div>
         </div>
       );
@@ -49,7 +54,7 @@ export default function RepeatAnalysis() {
     return null;
   };
 
-  const renderRankingTable = (data: any[], title: string, nameKey: string) => (
+  const renderRankingTable = (data: any[], title: string, nameKey: string, allRoutes: string[]) => (
     <Card className="border-slate-200 shadow-sm overflow-hidden">
       <div className="bg-slate-50 border-b border-slate-200 px-4 py-3">
         <h3 className="font-bold text-slate-700">{title}</h3>
@@ -60,10 +65,12 @@ export default function RepeatAnalysis() {
             <tr>
               <th className="px-3 py-3 w-8">順位</th>
               <th className="px-3 py-3">{nameKey === "staff_name" ? "スタッフ" : "メニュー"}</th>
-              <th className="px-3 py-3">通常(新規)再来</th>
-              <th className="px-3 py-3">ミニモ(新規)再来</th>
-              <th className="px-3 py-3">通常(リピ)再来</th>
-              <th className="px-3 py-3">ミニモ(リピ)再来</th>
+              {allRoutes.map(route => (
+                <th key={`${route}-new`} className="px-3 py-3">{route}(新規)再来</th>
+              ))}
+              {allRoutes.map(route => (
+                <th key={`${route}-repeat`} className="px-3 py-3">{route}(リピ)再来</th>
+              ))}
               <th className="px-3 py-3">総客数</th>
             </tr>
           </thead>
@@ -72,16 +79,22 @@ export default function RepeatAnalysis() {
               <tr key={i} className="border-b border-slate-100 hover:bg-slate-50">
                 <td className="px-3 py-2 font-bold text-slate-400">#{i + 1}</td>
                 <td className="px-3 py-2 font-bold text-slate-700 whitespace-nowrap">{row[nameKey]}</td>
-                <td className="px-3 py-2 font-bold text-emerald-600">{row.normalNewRate.toFixed(1)}% <span className="text-[10px] text-slate-400 font-normal">({row.normalNewTotal})</span></td>
-                <td className="px-3 py-2 font-bold text-teal-600">{row.minimoNewRate.toFixed(1)}% <span className="text-[10px] text-slate-400 font-normal">({row.minimoNewTotal})</span></td>
-                <td className="px-3 py-2 font-bold text-blue-600">{row.normalRepeatRate.toFixed(1)}% <span className="text-[10px] text-slate-400 font-normal">({row.normalRepeatTotal})</span></td>
-                <td className="px-3 py-2 font-bold text-sky-600">{row.minimoRepeatRate.toFixed(1)}% <span className="text-[10px] text-slate-400 font-normal">({row.minimoRepeatTotal})</span></td>
+                {allRoutes.map(route => (
+                  <td key={`${route}-new`} className="px-3 py-2 font-bold text-emerald-600">
+                    {(row[`${route}NewRate`] || 0).toFixed(1)}% <span className="text-[10px] text-slate-400 font-normal">({row[`${route}NewTotal`] || 0})</span>
+                  </td>
+                ))}
+                {allRoutes.map(route => (
+                  <td key={`${route}-repeat`} className="px-3 py-2 font-bold text-blue-600">
+                    {(row[`${route}RepeatRate`] || 0).toFixed(1)}% <span className="text-[10px] text-slate-400 font-normal">({row[`${route}RepeatTotal`] || 0})</span>
+                  </td>
+                ))}
                 <td className="px-3 py-2 text-slate-500">{row.totalVisits}人</td>
               </tr>
             ))}
             {data.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-400">データがありません</td>
+                <td colSpan={allRoutes.length * 2 + 3} className="px-4 py-8 text-center text-slate-400">データがありません</td>
               </tr>
             )}
           </tbody>
@@ -89,6 +102,21 @@ export default function RepeatAnalysis() {
       </div>
     </Card>
   );
+
+  // Collect all unique routes for rendering dynamic bars and table columns
+  const allRoutes = result ? Array.from(new Set([
+    ...result.staffRanking.flatMap((r: any) => r.routes || []),
+    ...result.menuRanking.flatMap((r: any) => r.routes || [])
+  ])) as string[] : [];
+  
+  // Predefined colors for dynamic routes
+  const COLORS = [
+    { new: "#059669", repeat: "#2563eb" }, // Emerald / Blue
+    { new: "#0d9488", repeat: "#0284c7" }, // Teal / Sky
+    { new: "#d97706", repeat: "#9333ea" }, // Amber / Purple
+    { new: "#db2777", repeat: "#4f46e5" }, // Pink / Indigo
+    { new: "#ea580c", repeat: "#e11d48" }, // Orange / Rose
+  ];
 
   return (
     <div className="space-y-6">
@@ -112,9 +140,9 @@ export default function RepeatAnalysis() {
                 <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="全店舗">全店舗</SelectItem>
-                  <SelectItem value="六甲店">六甲店</SelectItem>
-                  <SelectItem value="神戸店">神戸店</SelectItem>
-                  <SelectItem value="元町店">元町店</SelectItem>
+                  {availableStores.map(s => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -175,15 +203,17 @@ export default function RepeatAnalysis() {
                           <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" />
                           <Tooltip content={<CustomTooltip />} />
                           <Legend wrapperStyle={{ fontSize: '10px' }} />
-                          <Bar name="通常(新規)再来" dataKey="normalNewRate" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={20} />
-                          <Bar name="ミニモ(新規)再来" dataKey="minimoNewRate" fill="#0d9488" radius={[4, 4, 0, 0]} maxBarSize={20} />
-                          <Bar name="通常(リピ)再来" dataKey="normalRepeatRate" fill="#2563eb" radius={[4, 4, 0, 0]} maxBarSize={20} />
-                          <Bar name="ミニモ(リピ)再来" dataKey="minimoRepeatRate" fill="#0284c7" radius={[4, 4, 0, 0]} maxBarSize={20} />
+                          {allRoutes.map((route, idx) => (
+                            <Bar key={`${route}-new`} name={`${route}(新規)再来`} dataKey={`${route}NewRate`} fill={COLORS[idx % COLORS.length].new} radius={[4, 4, 0, 0]} maxBarSize={20} />
+                          ))}
+                          {allRoutes.map((route, idx) => (
+                            <Bar key={`${route}-rep`} name={`${route}(リピ)再来`} dataKey={`${route}RepeatRate`} fill={COLORS[idx % COLORS.length].repeat} radius={[4, 4, 0, 0]} maxBarSize={20} />
+                          ))}
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
                   </Card>
-                  {renderRankingTable(result.staffRanking, "スタッフ別ランキング (新規再来率順 トップ10)", "staff_name")}
+                  {renderRankingTable(result.staffRanking, "スタッフ別ランキング (新規再来率順 トップ10)", "staff_name", allRoutes)}
                 </>
               ) : (
                 <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300">
@@ -217,15 +247,17 @@ export default function RepeatAnalysis() {
                           <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" />
                           <Tooltip content={<CustomTooltip />} />
                           <Legend wrapperStyle={{ fontSize: '10px' }} />
-                          <Bar name="通常(新規)再来" dataKey="normalNewRate" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={20} />
-                          <Bar name="ミニモ(新規)再来" dataKey="minimoNewRate" fill="#0d9488" radius={[4, 4, 0, 0]} maxBarSize={20} />
-                          <Bar name="通常(リピ)再来" dataKey="normalRepeatRate" fill="#2563eb" radius={[4, 4, 0, 0]} maxBarSize={20} />
-                          <Bar name="ミニモ(リピ)再来" dataKey="minimoRepeatRate" fill="#0284c7" radius={[4, 4, 0, 0]} maxBarSize={20} />
+                          {allRoutes.map((route, idx) => (
+                            <Bar key={`${route}-new`} name={`${route}(新規)再来`} dataKey={`${route}NewRate`} fill={COLORS[idx % COLORS.length].new} radius={[4, 4, 0, 0]} maxBarSize={20} />
+                          ))}
+                          {allRoutes.map((route, idx) => (
+                            <Bar key={`${route}-rep`} name={`${route}(リピ)再来`} dataKey={`${route}RepeatRate`} fill={COLORS[idx % COLORS.length].repeat} radius={[4, 4, 0, 0]} maxBarSize={20} />
+                          ))}
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
                   </Card>
-                  {renderRankingTable(result.menuRanking, "メニュー別ランキング (新規再来率順 トップ10)", "menu_name")}
+                  {renderRankingTable(result.menuRanking, "メニュー別ランキング (新規再来率順 トップ10)", "menu_name", allRoutes)}
                 </>
               ) : (
                 <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300">

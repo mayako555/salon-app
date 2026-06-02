@@ -4,7 +4,7 @@ import { db } from "@/lib/firebase";
 import { isNationalHoliday, isSalonEvent } from "@/lib/seasonal-events";
 import { fetchHistoricalWeather } from "@/lib/weather";
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
-import { format, subMonths, eachDayOfInterval, isWeekend, getDate, getDay, isAfter, isBefore, addDays, subDays, endOfMonth } from "date-fns";
+import { format, subMonths, addMonths, eachDayOfInterval, isWeekend, getDate, getDay, isAfter, isBefore, addDays, subDays, endOfMonth } from "date-fns";
 
 // Minimal Matrix Math for Multiple Linear Regression
 function invertMatrix(M: number[][]): number[][] {
@@ -853,7 +853,7 @@ export async function getRepeatAnalysis(params: RepeatAnalysisParams) {
     const salesSnap = await getDocs(qSales);
 
     // 顧客ごとの来店履歴を整理
-    type Visit = { date: string; staff_name: string; menu_name: string; customer_type: string; is_minimo: boolean };
+    type Visit = { date: string; staff_name: string; menu_name: string; customer_type: string; route: string };
     const customerVisits: Record<string, Visit[]> = {};
 
     salesSnap.forEach(doc => {
@@ -866,31 +866,37 @@ export async function getRepeatAnalysis(params: RepeatAnalysisParams) {
       if (!customerVisits[customerId]) {
         customerVisits[customerId] = [];
       }
+      
+      let route = data.reservation_route || "";
+      if (!route) {
+        if (data.is_minimo || (data.menu_name || "").includes("ミニモ")) {
+          route = "ミニモ";
+        } else {
+          route = "通常";
+        }
+      }
+
       customerVisits[customerId].push({
         date: data.date,
         staff_name: data.staff_name || "不明",
         menu_name: data.menu_name || "不明",
         customer_type: data.customer_type || "リピ",
-        is_minimo: data.is_minimo || (data.reservation_route || "").includes("ミニモ") || (data.menu_name || "").includes("ミニモ")
+        route
       });
     });
 
     // スタッフ別・メニュー別の集計用オブジェクト
-    type Stats = { 
-      normalNewTotal: number; normalNewReturned: number; 
-      normalRepeatTotal: number; normalRepeatReturned: number;
-      minimoNewTotal: number; minimoNewReturned: number;
-      minimoRepeatTotal: number; minimoRepeatReturned: number;
-    };
+    type RouteStat = { newTotal: number; newReturned: number; repeatTotal: number; repeatReturned: number };
+    type Stats = { routes: Record<string, RouteStat> };
     const staffStats: Record<string, Stats> = {};
     const menuStats: Record<string, Stats> = {};
 
-    const initStats = () => ({ 
-      normalNewTotal: 0, normalNewReturned: 0, 
-      normalRepeatTotal: 0, normalRepeatReturned: 0,
-      minimoNewTotal: 0, minimoNewReturned: 0,
-      minimoRepeatTotal: 0, minimoRepeatReturned: 0
-    });
+    const getRouteStat = (stats: Stats, route: string) => {
+      if (!stats.routes[route]) {
+        stats.routes[route] = { newTotal: 0, newReturned: 0, repeatTotal: 0, repeatReturned: 0 };
+      }
+      return stats.routes[route];
+    };
 
     Object.values(customerVisits).forEach(visits => {
       // 日付順にソート
@@ -900,29 +906,22 @@ export async function getRepeatAnalysis(params: RepeatAnalysisParams) {
         const v = visits[i];
         const staff = v.staff_name;
         const menu = v.menu_name;
-        const isMinimo = v.is_minimo;
+        const route = v.route;
 
-        if (!staffStats[staff]) staffStats[staff] = initStats();
-        if (!menuStats[menu]) menuStats[menu] = initStats();
+        if (!staffStats[staff]) staffStats[staff] = { routes: {} };
+        if (!menuStats[menu]) menuStats[menu] = { routes: {} };
+
+        const staffRoute = getRouteStat(staffStats[staff], route);
+        const menuRoute = getRouteStat(menuStats[menu], route);
 
         const returned = (i < visits.length - 1); // 次の来店があるか
 
         if (v.customer_type === "新規") {
-          if (isMinimo) {
-            staffStats[staff].minimoNewTotal++; menuStats[menu].minimoNewTotal++;
-            if (returned) { staffStats[staff].minimoNewReturned++; menuStats[menu].minimoNewReturned++; }
-          } else {
-            staffStats[staff].normalNewTotal++; menuStats[menu].normalNewTotal++;
-            if (returned) { staffStats[staff].normalNewReturned++; menuStats[menu].normalNewReturned++; }
-          }
+          staffRoute.newTotal++; menuRoute.newTotal++;
+          if (returned) { staffRoute.newReturned++; menuRoute.newReturned++; }
         } else {
-          if (isMinimo) {
-            staffStats[staff].minimoRepeatTotal++; menuStats[menu].minimoRepeatTotal++;
-            if (returned) { staffStats[staff].minimoRepeatReturned++; menuStats[menu].minimoRepeatReturned++; }
-          } else {
-            staffStats[staff].normalRepeatTotal++; menuStats[menu].normalRepeatTotal++;
-            if (returned) { staffStats[staff].normalRepeatReturned++; menuStats[menu].normalRepeatReturned++; }
-          }
+          staffRoute.repeatTotal++; menuRoute.repeatTotal++;
+          if (returned) { staffRoute.repeatReturned++; menuRoute.repeatReturned++; }
         }
       }
     });
@@ -930,23 +929,38 @@ export async function getRepeatAnalysis(params: RepeatAnalysisParams) {
     // 配列化して率を計算
     const formatStats = (record: Record<string, Stats>, keyName: string) => {
       return Object.entries(record).map(([name, s]) => {
+        let totalVisits = 0;
+        let overallNewTotal = 0;
+        let overallNewReturned = 0;
+        
+        const routeData: Record<string, any> = {};
+        
+        Object.entries(s.routes).forEach(([route, r]) => {
+          totalVisits += r.newTotal + r.repeatTotal;
+          overallNewTotal += r.newTotal;
+          overallNewReturned += r.newReturned;
+          
+          routeData[`${route}NewTotal`] = r.newTotal;
+          routeData[`${route}NewRate`] = r.newTotal > 0 ? (r.newReturned / r.newTotal) * 100 : 0;
+          routeData[`${route}RepeatTotal`] = r.repeatTotal;
+          routeData[`${route}RepeatRate`] = r.repeatTotal > 0 ? (r.repeatReturned / r.repeatTotal) * 100 : 0;
+        });
+
+        // Backend compatibility for sorting by overall new rate
+        const overallNewRate = overallNewTotal > 0 ? (overallNewReturned / overallNewTotal) * 100 : 0;
+
         return {
           [keyName]: name,
-          normalNewTotal: s.normalNewTotal,
-          normalNewRate: s.normalNewTotal > 0 ? (s.normalNewReturned / s.normalNewTotal) * 100 : 0,
-          normalRepeatTotal: s.normalRepeatTotal,
-          normalRepeatRate: s.normalRepeatTotal > 0 ? (s.normalRepeatReturned / s.normalRepeatTotal) * 100 : 0,
-          minimoNewTotal: s.minimoNewTotal,
-          minimoNewRate: s.minimoNewTotal > 0 ? (s.minimoNewReturned / s.minimoNewTotal) * 100 : 0,
-          minimoRepeatTotal: s.minimoRepeatTotal,
-          minimoRepeatRate: s.minimoRepeatTotal > 0 ? (s.minimoRepeatReturned / s.minimoRepeatTotal) * 100 : 0,
-          totalVisits: s.normalNewTotal + s.normalRepeatTotal + s.minimoNewTotal + s.minimoRepeatTotal
+          totalVisits,
+          overallNewRate, // used for sorting
+          routes: Object.keys(s.routes), // list of route names for dynamic rendering
+          ...routeData
         };
       }).filter(s => s.totalVisits > 0);
     };
 
-    const staffRanking = formatStats(staffStats, "staff_name").sort((a, b) => b.normalNewRate - a.normalNewRate);
-    const menuRanking = formatStats(menuStats, "menu_name").sort((a, b) => b.normalNewRate - a.normalNewRate);
+    const staffRanking = formatStats(staffStats, "staff_name").sort((a, b) => b.overallNewRate - a.overallNewRate);
+    const menuRanking = formatStats(menuStats, "menu_name").sort((a, b) => b.overallNewRate - a.overallNewRate);
 
     // デバッグ情報
     const debugInfo = {
@@ -954,8 +968,7 @@ export async function getRepeatAnalysis(params: RepeatAnalysisParams) {
       startDate: startStr,
       endDate: endStr,
       storeFilter: store,
-      customerIdsFound: Object.keys(customerVisits).length,
-      sampleSales: salesSnap.docs.slice(0, 2).map(d => d.data())
+      customerIdsFound: Object.keys(customerVisits).length
     };
 
     return {
@@ -968,6 +981,211 @@ export async function getRepeatAnalysis(params: RepeatAnalysisParams) {
     };
   } catch (err: any) {
     console.error("Repeat Analysis Error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+export type LTVForecastParams = {
+  store: string;
+  forecastMonths: number;
+};
+
+export async function predictLTVAndRepeaters(params: LTVForecastParams) {
+  try {
+    const { store, forecastMonths } = params;
+    const now = new Date();
+    // 過去24ヶ月分のデータを取得
+    const startDate = subMonths(now, 24);
+    const startStr = format(startDate, "yyyy-MM-dd");
+    const endStr = format(now, "yyyy-MM-dd");
+
+    const salesCol = collection(db, "sales");
+    const qSales = query(salesCol, where("date", ">=", startStr), where("date", "<=", endStr));
+    const salesSnap = await getDocs(qSales);
+
+    // 顧客ごとの来店月履歴
+    const customerVisits: Record<string, Set<string>> = {};
+    const customerFirstVisit: Record<string, string> = {}; // yyyy-MM
+    let totalSalesAmt = 0;
+    let totalVisitCount = 0;
+
+    salesSnap.forEach(doc => {
+      const data = doc.data();
+      if (store !== "全店舗" && data.store_name !== store.replace("店", "")) return;
+      
+      const cid = data.customer_id || data.customer_name;
+      if (!cid) return;
+
+      const mStr = data.date.substring(0, 7);
+      
+      if (!customerVisits[cid]) {
+        customerVisits[cid] = new Set();
+      }
+      customerVisits[cid].add(mStr);
+      
+      // 最初の来店月を記録（データ期間内での初回来店）
+      if (!customerFirstVisit[cid] || mStr < customerFirstVisit[cid]) {
+        customerFirstVisit[cid] = mStr;
+      }
+
+      const amount = (data.tech_sales || 0) + (data.product_sales || 0) + (data.hpb_points || 0) - (data.discount || 0);
+      totalSalesAmt += amount;
+      totalVisitCount++;
+    });
+
+    const avgTicketSize = totalVisitCount > 0 ? Math.round(totalSalesAmt / totalVisitCount) : 0;
+
+    // 月ごとの新規顧客数（コホートサイズ）N_t を集計
+    const cohortSizes: Record<string, number> = {};
+    const allMonths = eachDayOfInterval({ start: startDate, end: now })
+      .filter(d => getDate(d) === 1)
+      .map(d => format(d, "yyyy-MM"));
+
+    allMonths.forEach(m => cohortSizes[m] = 0);
+
+    Object.entries(customerFirstVisit).forEach(([cid, mStr]) => {
+      if (cohortSizes[mStr] !== undefined) {
+        cohortSizes[mStr]++;
+      }
+    });
+
+    // P(k): 新規来店から kヶ月後に来店する確率
+    const visitsAtK: Record<number, number> = {};
+    const potentialAtK: Record<number, number> = {};
+    
+    // 最大24ヶ月
+    for (let k = 1; k <= 24; k++) {
+      visitsAtK[k] = 0;
+      potentialAtK[k] = 0;
+    }
+
+    const currentMonthStr = format(now, "yyyy-MM");
+    const currentMonthIndex = allMonths.indexOf(currentMonthStr);
+
+    Object.entries(customerVisits).forEach(([cid, visits]) => {
+      const firstM = customerFirstVisit[cid];
+      const firstIndex = allMonths.indexOf(firstM);
+      if (firstIndex === -1) return;
+
+      visits.forEach(vM => {
+        const vIndex = allMonths.indexOf(vM);
+        const k = vIndex - firstIndex;
+        if (k > 0 && k <= 24) {
+          visitsAtK[k]++;
+        }
+      });
+    });
+
+    for (let k = 1; k <= 24; k++) {
+      // 経過月数が k 以上のコホートのサイズの合計
+      for (let i = 0; i <= currentMonthIndex - k; i++) {
+        potentialAtK[k] += cohortSizes[allMonths[i]];
+      }
+    }
+
+    const P: number[] = [1.0]; // k=0 は100% (新規月)
+    for (let k = 1; k <= 24; k++) {
+      P[k] = potentialAtK[k] > 0 ? visitsAtK[k] / potentialAtK[k] : 0;
+    }
+
+    // 直近6ヶ月の平均新規客数
+    let recentNewTotal = 0;
+    const recentMonths = 6;
+    for (let i = Math.max(0, currentMonthIndex - recentMonths); i < currentMonthIndex; i++) {
+      recentNewTotal += cohortSizes[allMonths[i]];
+    }
+    const avgNewCustomers = Math.round(recentNewTotal / Math.min(recentMonths, currentMonthIndex || 1));
+
+    // シミュレーション (過去データプロット + 未来予測)
+    const chartData = [];
+    
+    // 過去実績 (直近12ヶ月分を表示)
+    for (let i = Math.max(0, currentMonthIndex - 11); i <= currentMonthIndex; i++) {
+      const mStr = allMonths[i];
+      // 実際の新規数とリピート数をカウント
+      let actualNew = cohortSizes[mStr];
+      let actualRepeat = 0;
+      
+      Object.entries(customerVisits).forEach(([cid, visits]) => {
+        if (visits.has(mStr) && customerFirstVisit[cid] !== mStr) {
+          actualRepeat++;
+        }
+      });
+
+      chartData.push({
+        month: format(new Date(mStr + "-01"), "yyyy/MM"),
+        newCustomers: actualNew,
+        existingRepeaters: actualRepeat,
+        futureRepeaters: 0,
+        isForecast: false
+      });
+    }
+
+    // 未来予測 (forecastMonths ヶ月分)
+    let totalLtvIncrease = 0;
+    const futureCohorts: Record<number, number> = {}; // k (未来のインデックス) -> 予測新規客数
+
+    for (let f = 1; f <= forecastMonths; f++) {
+      const targetIndex = currentMonthIndex + f;
+      const targetDate = addMonths(now, f);
+      const targetMStr = format(targetDate, "yyyy/MM");
+
+      futureCohorts[targetIndex] = avgNewCustomers;
+
+      let predictedExistingRepeaters = 0;
+      let predictedFutureRepeaters = 0; // 未来に獲得した新規がリピートした数
+
+      // 過去のコホートからのリピート予測
+      for (let i = 0; i <= currentMonthIndex; i++) {
+        const k = targetIndex - i;
+        if (k <= 24) {
+          predictedExistingRepeaters += cohortSizes[allMonths[i]] * P[k];
+        }
+      }
+
+      // 未来のコホートからのリピート予測
+      for (let i = currentMonthIndex + 1; i < targetIndex; i++) {
+        const k = targetIndex - i;
+        if (k <= 24) {
+          predictedFutureRepeaters += futureCohorts[i] * P[k];
+        }
+      }
+
+      predictedExistingRepeaters = Math.round(predictedExistingRepeaters);
+      predictedFutureRepeaters = Math.round(predictedFutureRepeaters);
+      
+      const totalVisits = avgNewCustomers + predictedExistingRepeaters + predictedFutureRepeaters;
+      totalLtvIncrease += totalVisits * avgTicketSize;
+
+      chartData.push({
+        month: targetMStr,
+        newCustomers: avgNewCustomers,
+        existingRepeaters: predictedExistingRepeaters,
+        futureRepeaters: predictedFutureRepeaters,
+        isForecast: true
+      });
+    }
+
+    // 平均継続期間とLTVの計算
+    // 生存確率（再来店確率）の総和 = 平均来店回数
+    let expectedVisitsPerCustomer = 0;
+    for (let k = 0; k <= 24; k++) expectedVisitsPerCustomer += P[k];
+    const estimatedLTV = Math.round(expectedVisitsPerCustomer * avgTicketSize);
+
+    return {
+      success: true,
+      data: {
+        chartData,
+        avgTicketSize,
+        avgNewCustomers,
+        estimatedLTV,
+        expectedVisitsPerCustomer,
+        totalLtvIncrease,
+        retentionCurve: P.map((p, k) => ({ k, rate: Math.round(p * 100) }))
+      }
+    };
+  } catch (err: any) {
+    console.error("LTV Forecast Error:", err);
     return { success: false, error: err.message };
   }
 }

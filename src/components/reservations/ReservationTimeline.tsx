@@ -24,6 +24,7 @@ export const ROW_HEIGHT = 48; // h-12 = 48px
 
 export default function ReservationTimeline({ reservations, staffList, shifts = [], date, storeName = "六甲", settings, onRefresh }: Props) {
   const [selectedRes, setSelectedRes] = useState<Reservation | null>(null);
+  const [editRes, setEditRes] = useState<Reservation | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [clickData, setClickData] = useState({ staff: "", time: "" });
   
@@ -246,21 +247,30 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
           reservation={selectedRes} 
           isOpen={!!selectedRes} 
           onClose={() => setSelectedRes(null)} 
+          onRefresh={onRefresh}
+          onEdit={() => {
+            setClickData({ staff: selectedRes.staff_name, time: selectedRes.start_time });
+            setFormOpen(true);
+            setSelectedRes(null);
+            setEditRes(selectedRes);
+          }}
         />
       )}
 
       {formOpen && (
         <ReservationFormDialog 
           isOpen={formOpen}
-          onClose={() => setFormOpen(false)}
+          onClose={() => { setFormOpen(false); setEditRes(null); }}
           onSuccess={() => {
             setFormOpen(false);
+            setEditRes(null);
             if (onRefresh) onRefresh();
           }}
           defaultStaff={clickData.staff}
           defaultTime={clickData.time}
           defaultDate={date}
           storeName={storeName}
+          initialData={editRes || undefined}
         />
       )}
     </div>

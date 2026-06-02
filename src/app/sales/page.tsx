@@ -576,16 +576,6 @@ export default function SalesPage({
                 </div>
                 
                 <div className="flex gap-4 items-center">
-                  {profile?.role === 'admin' && selectedIds.size > 0 && (
-                    <Button 
-                      variant="destructive" 
-                      size="sm" 
-                      onClick={() => handleBatchDelete(Array.from(selectedIds))}
-                      className="h-8 px-3 text-xs font-bold"
-                    >
-                      選択中の{selectedIds.size}件を削除
-                    </Button>
-                  )}
                   
                   {profile?.role === 'admin' && filteredSales.length > 0 && (selectedStaffs.size > 0 || selectedStores.size > 0 || searchQuery) && (
                     <Button 
@@ -741,9 +731,14 @@ export default function SalesPage({
                             </TableCell>
                             <TableCell>
                               {profile?.role === 'admin' && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-500" onClick={() => handleDeleteSale(sale.id)}>
-                                  <Trash2 size={14} />
-                                </Button>
+                                <div className="flex gap-1 justify-end">
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-emerald-600" onClick={() => handleEditClick(sale)}>
+                                    <Search size={14} />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-500" onClick={() => handleDeleteSale(sale.id)}>
+                                    <Trash2 size={14} />
+                                  </Button>
+                                </div>
                               )}
                             </TableCell>
                           </TableRow>
@@ -759,6 +754,33 @@ export default function SalesPage({
           </div>
         )}
       </div>
+
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-5 fade-in duration-200">
+          <div className="bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-4 border border-slate-700">
+            <span className="text-sm font-bold">{selectedIds.size}件を選択中</span>
+            <div className="h-4 w-[1px] bg-slate-700" />
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setSelectedIds(new Set())}
+              className="text-slate-300 hover:text-white hover:bg-slate-800 h-8 px-3 text-xs font-bold rounded-full"
+            >
+              選択をクリア
+            </Button>
+            {profile?.role === 'admin' && (
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                onClick={() => handleBatchDelete(Array.from(selectedIds))}
+                className="h-8 px-4 text-xs font-bold rounded-full shadow-md hover:bg-rose-600 bg-rose-500"
+              >
+                削除する
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
     </AuthGuard>
   );
 }

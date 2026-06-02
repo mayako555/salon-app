@@ -2,15 +2,25 @@
 
 import { db } from "./firebase";
 import { doc, getDoc, collection, addDoc } from "firebase/firestore";
+import { getLineConfig } from "./lineConfig";
 
-const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+const FALLBACK_LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
 /**
  * 送信メッセージを生成する
  */
-export async function sendLineMessage(lineUserId: string, message: string) {
-  if (!LINE_CHANNEL_ACCESS_TOKEN) {
-    console.warn("LINE_CHANNEL_ACCESS_TOKEN is not set. Skipping LINE message.");
+export async function sendLineMessage(lineUserId: string, message: string, storeName?: string) {
+  let token = FALLBACK_LINE_CHANNEL_ACCESS_TOKEN;
+  
+  if (storeName) {
+    const config = await getLineConfig(storeName);
+    if (config && config.channelAccessToken) {
+      token = config.channelAccessToken;
+    }
+  }
+
+  if (!token) {
+    console.warn("LINE_CHANNEL_ACCESS_TOKEN is not set for store: ", storeName, ". Skipping LINE message.");
     console.log(`[MOCK LINE TO ${lineUserId}]: ${message}`);
     return { success: false, error: "LINE設定が未完了です" };
   }
@@ -20,7 +30,7 @@ export async function sendLineMessage(lineUserId: string, message: string) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         to: lineUserId,
@@ -53,15 +63,17 @@ export async function sendAndLogLineMessage({
   accountingId,
   lineUserId,
   messageType,
-  messageBody
+  messageBody,
+  storeName
 }: {
   customerId: string;
   accountingId: string;
   lineUserId: string;
   messageType: string;
   messageBody: string;
+  storeName?: string;
 }) {
-  const sendResult = await sendLineMessage(lineUserId, messageBody);
+  const sendResult = await sendLineMessage(lineUserId, messageBody, storeName);
   
   try {
     await addDoc(collection(db, "line_message_logs"), {
@@ -70,6 +82,7 @@ export async function sendAndLogLineMessage({
       line_user_id: lineUserId,
       message_type: messageType,
       message_body: messageBody,
+      storeName: storeName || "不明",
       sent_at: new Date().toISOString(),
       status: sendResult.success ? "success" : "failed",
       error_message: sendResult.error || null
@@ -111,15 +124,15 @@ ${storeName}店
 /**
  * 次回予約確定メッセージを送信する（レガシー互換用・ログ保存なし）
  */
-export async function sendBookingConfirmation(customerName: string, lineUserId: string, date: string, time: string) {
-  const message = await generateBookingConfirmationText(date, time, "六甲道"); // デフォルト
-  return await sendLineMessage(lineUserId, message);
+export async function sendBookingConfirmation(customerName: string, lineUserId: string, date: string, time: string, storeName: string = "六甲道") {
+  const message = await generateBookingConfirmationText(date, time, storeName);
+  return await sendLineMessage(lineUserId, message, storeName);
 }
 
 /**
  * リマインダーメッセージを送信する
  */
-export async function sendBookingReminder(customerName: string, lineUserId: string, date: string, time: string) {
+export async function sendBookingReminder(customerName: string, lineUserId: string, date: string, time: string, storeName: string = "六甲道") {
   const dateObj = new Date(date);
   const dayOfWeek = ["日", "月", "火", "水", "木", "金", "土"][dateObj.getDay()];
   const formattedDate = `${dateObj.getMonth() + 1}／${dateObj.getDate()}（${dayOfWeek}）`;
@@ -131,10 +144,10 @@ export async function sendBookingReminder(customerName: string, lineUserId: stri
 
 ${formattedDate} ${time}〜
 
-🌿 Jasmine Lash 六甲道店 🕊
+🌿 Jasmine Lash ${storeName}店 🕊
 
 日時のご確認をお願いいたします。
 当日お気をつけてお越しくださいませ🤍`;
 
-  return await sendLineMessage(lineUserId, message);
+  return await sendLineMessage(lineUserId, message, storeName);
 }

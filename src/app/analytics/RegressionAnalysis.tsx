@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Sparkles, TrendingUp, TrendingDown, Lightbulb, AlertCircle, BarChart3, Presentation } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, ComposedChart } from "recharts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useAuth } from "@/lib/auth-context";
 
 const TARGET_VARIABLES = [
   "売上", "来店人数", "新規人数", "リピート人数", "客単価", 
@@ -31,6 +32,7 @@ const PERIODS = [
 ];
 
 export default function RegressionAnalysis() {
+  const { availableStores } = useAuth();
   const [store, setStore] = useState("全店舗");
   const [targetY, setTargetY] = useState("売上");
   const [featuresX, setFeaturesX] = useState<string[]>(["曜日", "天気", "スタッフ出勤人数"]);
@@ -90,9 +92,9 @@ export default function RegressionAnalysis() {
                 <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="全店舗">全店舗</SelectItem>
-                  <SelectItem value="六甲店">六甲店</SelectItem>
-                  <SelectItem value="神戸店">神戸店</SelectItem>
-                  <SelectItem value="元町店">元町店</SelectItem>
+                  {availableStores.map(s => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

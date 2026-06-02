@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getCustomerById, Customer, updateCustomer, deleteCustomer } from "@/lib/customers";
+import { getSameDayCancellations, SameDayCancellationRecord, updateSameDayCancellation, addSameDayCancellation, deleteSameDayCancellation } from "@/app/customers/cancellations";
 import { getCounselingByCustomer, CounselingResponse } from "@/lib/counseling";
 import { getKarteByCustomer, KarteRecord } from "@/lib/karte";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,9 @@ import {
   Plus,
   Smartphone,
   Link as LinkIcon,
-  Trash2
+  Trash2,
+  XCircle,
+  Save
 } from "lucide-react";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -55,6 +58,7 @@ export default function CustomerDetailPage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [counseling, setCounseling] = useState<CounselingResponse[]>([]);
   const [karteRecords, setKarteRecords] = useState<KarteRecord[]>([]);
+  const [cancellations, setCancellations] = useState<SameDayCancellationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   
   // State for History Modal
@@ -81,14 +85,16 @@ export default function CustomerDetailPage() {
   useEffect(() => {
     async function load() {
       if (typeof id !== 'string') return;
-      const [cData, qData, kData] = await Promise.all([
+      const [cData, qData, kData, canData] = await Promise.all([
         getCustomerById(id),
         getCounselingByCustomer(id),
-        getKarteByCustomer(id)
+        getKarteByCustomer(id),
+        getSameDayCancellations(id)
       ]);
       setCustomer(cData);
       setCounseling(qData);
       setKarteRecords(kData);
+      setCancellations(canData);
       setLoading(false);
     }
     load();
@@ -136,6 +142,33 @@ export default function CustomerDetailPage() {
       toast.error("更新に失敗しました");
     }
     setIsSaving(false);
+  };
+
+  const handleToggleCancelRecord = async (recordId: string, field: keyof SameDayCancellationRecord, value: boolean | string) => {
+    const res = await updateSameDayCancellation(recordId, { [field]: value });
+    if (res.success) {
+      setCancellations(prev => prev.map(c => c.id === recordId ? { ...c, [field]: value } : c));
+    } else {
+      toast.error("更新に失敗しました");
+    }
+  };
+
+  const handleDeleteCancelRecord = async (recordId: string) => {
+    if (!confirm("本当にこの当日キャンセル履歴を削除しますか？\n（誤って記録された場合のみ削除してください）")) return;
+    const res = await deleteSameDayCancellation(recordId);
+    if (res.success) {
+      toast.success("削除しました");
+      setCancellations(prev => prev.filter(c => c.id !== recordId));
+      
+      // Update customer count if possible (simple decrement)
+      if (customer && customer.same_day_cancel_count && customer.same_day_cancel_count > 0) {
+        const newCount = customer.same_day_cancel_count - 1;
+        await updateCustomer(customer.id, { same_day_cancel_count: newCount });
+        setCustomer({ ...customer, same_day_cancel_count: newCount });
+      }
+    } else {
+      toast.error("削除に失敗しました");
+    }
   };
 
   const handleDeleteCustomer = async () => {
@@ -404,6 +437,96 @@ export default function CustomerDetailPage() {
             </div>
           </Card>
         </div>
+
+        {/* Same Day Cancellation Chart */}
+        {(cancellations.length > 0 || (customer.same_day_cancel_count && customer.same_day_cancel_count > 0)) && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center px-1">
+              <h2 className="text-xl font-black text-rose-700 flex items-center gap-2">
+                <AlertTriangle className="text-rose-500" size={24} /> 当日キャンセル管理表
+              </h2>
+            </div>
+            <Card className="rounded-3xl p-6 border-2 border-rose-100 shadow-sm overflow-hidden bg-white">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[800px]">
+                  <thead>
+                    <tr className="bg-rose-50/50 text-[10px] text-slate-500 uppercase tracking-widest border-b-2 border-rose-100">
+                      <th className="p-3 font-black whitespace-nowrap">当日キャンセル数</th>
+                      <th className="p-3 font-black whitespace-nowrap">キャンセル日</th>
+                      <th className="p-3 font-black whitespace-nowrap">キャンセル料</th>
+                      <th className="p-3 font-black text-center whitespace-nowrap">カルテに記入</th>
+                      <th className="p-3 font-black text-center whitespace-nowrap">全体LINEにおくる</th>
+                      <th className="p-3 font-black text-center whitespace-nowrap">サロンボードに打ち込む</th>
+                      <th className="p-3 font-black text-center whitespace-nowrap">電話・LINEで伝えた</th>
+                      <th className="p-3 font-black text-center whitespace-nowrap">来店時に伝えた</th>
+                      <th className="p-3 font-black whitespace-nowrap">メモ</th>
+                      <th className="p-3 font-black text-center whitespace-nowrap">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-xs font-bold text-slate-700 divide-y divide-slate-100">
+                    {cancellations.map((c) => (
+                      <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="p-3 text-center">
+                          <span className="bg-rose-100 text-rose-700 px-2.5 py-1 rounded-full text-sm font-black">{c.cancel_count}</span>
+                        </td>
+                        <td className="p-3 whitespace-nowrap text-slate-600 font-medium">
+                          R{c.cancel_date ? format(new Date(c.cancel_date), "M/d (E)", { locale: ja }) : ' - '}
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          {c.cancel_fee_type === '無し' ? (
+                            <span className="text-slate-400">{c.cancel_fee_type}</span>
+                          ) : (
+                            <span className="text-rose-600 font-black">{c.cancel_fee_type}</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center">
+                          <input type="checkbox" className="w-5 h-5 rounded border-slate-300 text-rose-500 focus:ring-rose-500 cursor-pointer" 
+                            checked={c.is_karte_recorded} onChange={(e) => handleToggleCancelRecord(c.id, 'is_karte_recorded', e.target.checked)} />
+                        </td>
+                        <td className="p-3 text-center">
+                          <input type="checkbox" className="w-5 h-5 rounded border-slate-300 text-rose-500 focus:ring-rose-500 cursor-pointer" 
+                            checked={c.is_line_sent} onChange={(e) => handleToggleCancelRecord(c.id, 'is_line_sent', e.target.checked)} />
+                        </td>
+                        <td className="p-3 text-center">
+                          <input type="checkbox" className="w-5 h-5 rounded border-slate-300 text-rose-500 focus:ring-rose-500 cursor-pointer" 
+                            checked={c.is_salonboard_updated} onChange={(e) => handleToggleCancelRecord(c.id, 'is_salonboard_updated', e.target.checked)} />
+                        </td>
+                        <td className="p-3 text-center">
+                          <input type="checkbox" className="w-5 h-5 rounded border-slate-300 text-rose-500 focus:ring-rose-500 cursor-pointer" 
+                            checked={c.is_fee_notified} onChange={(e) => handleToggleCancelRecord(c.id, 'is_fee_notified', e.target.checked)} />
+                        </td>
+                        <td className="p-3 text-center">
+                          <input type="checkbox" className="w-5 h-5 rounded border-slate-300 text-rose-500 focus:ring-rose-500 cursor-pointer" 
+                            checked={c.is_fee_collected_at_visit} onChange={(e) => handleToggleCancelRecord(c.id, 'is_fee_collected_at_visit', e.target.checked)} />
+                        </td>
+                        <td className="p-3 min-w-[200px]">
+                          <Input 
+                            value={c.memo || ""} 
+                            placeholder="メモを入力..." 
+                            className="h-8 text-xs border-transparent hover:border-slate-200 focus:border-rose-300 bg-transparent"
+                            onBlur={(e) => handleToggleCancelRecord(c.id, 'memo', e.target.value)}
+                            onChange={(e) => setCancellations(prev => prev.map(p => p.id === c.id ? { ...p, memo: e.target.value } : p))}
+                          />
+                        </td>
+                        <td className="p-3 text-center">
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteCancelRecord(c.id)} className="h-8 w-8 p-0 text-slate-300 hover:text-rose-600 hover:bg-rose-50">
+                            <XCircle size={16} />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-4 p-4 bg-slate-50 rounded-xl text-xs font-bold text-slate-500 flex flex-col gap-1 border border-slate-100">
+                <p>● 当日キャンセル料は必ず伝える（電話で言い忘れた場合は、LINEや来店時に伝える）</p>
+                <p>● 当日キャンセルは店頭次回予約特典がつかなくなる事も伝える</p>
+                <p className="mt-2 text-[10px] text-slate-400">※サロンボードには『▼1) 全て全角で名前の前に記載する』『▼←当日キャンセル料伝え済みマーク』『1) ←当日キャンセル回数』『☆が先になるように打ち込む ☆▼)』というルールで入力してください。</p>
+                <p className="text-[10px] text-slate-400">★当日キャンセルしたときは、1度サロンボードの予約をキャンセルにして再度入力し直して予約を入れる（キャンセル履歴をつけるため）</p>
+              </div>
+            </Card>
+          </div>
+        )}
 
         {/* Karte History Section */}
         <div className="space-y-4">
