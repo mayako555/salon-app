@@ -11,6 +11,8 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, RefreshCw, Search,
 import ReservationTimeline from "@/components/reservations/ReservationTimeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { useAuth } from "@/lib/auth-context";
 
 export default function ReservationsPage() {
@@ -88,9 +90,22 @@ export default function ReservationsPage() {
             </Button>
           </div>
 
-          <div className="text-base font-black text-slate-800 tracking-tight">
-            {format(date, "yyyy年MM月dd日(E)", { locale: ja })}
-          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="flex items-center gap-2 text-base font-black text-slate-800 tracking-tight hover:bg-slate-100 px-2 py-1 rounded-md transition-colors">
+                {format(date, "yyyy年MM月dd日(E)", { locale: ja })}
+                <span className="text-[10px] text-slate-400">▼</span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={(d) => d && setDate(d)}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
 
           <select 
             value={selectedStore} 
@@ -98,7 +113,7 @@ export default function ReservationsPage() {
             className="h-8 px-2 border border-slate-300 rounded text-xs font-bold bg-white min-w-[100px]"
           >
             {allowedStores.map(s => (
-              <option key={s} value={s}>{s}店</option>
+              <option key={s} value={s}>{s}</option>
             ))}
             {isInHouse && <option value="全店舗">全店舗</option>}
           </select>

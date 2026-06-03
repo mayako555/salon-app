@@ -19,7 +19,7 @@ export default function TenantsPage() {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: "", plan: "Basic", status: "active" as "active"|"inactive" });
+  const [formData, setFormData] = useState({ name: "", plan: "Standard", status: "active" as "active"|"inactive" });
 
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [userLoading, setUserLoading] = useState(false);
@@ -68,7 +68,7 @@ export default function TenantsPage() {
 
   const openAddDialog = () => {
     setEditingId(null);
-    setFormData({ name: "", plan: "Basic", status: "active" });
+    setFormData({ name: "", plan: "Standard", status: "active" });
     setIsDialogOpen(true);
   };
 
@@ -206,9 +206,9 @@ export default function TenantsPage() {
                 value={formData.plan}
                 onChange={e => setFormData({...formData, plan: e.target.value})}
               >
-                <option value="Basic">Basic (基本機能のみ)</option>
-                <option value="Premium">Premium (高度分析あり)</option>
-                <option value="Enterprise">Enterprise (専用サポート)</option>
+                <option value="Solo">Solo (ひとりサロン・スタッフなし)</option>
+                <option value="Standard">Standard (スタッフ管理あり)</option>
+                <option value="Premium">Premium (高度分析・全機能)</option>
               </select>
             </div>
 

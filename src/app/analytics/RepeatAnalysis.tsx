@@ -42,11 +42,8 @@ export default function RepeatAnalysis() {
             </div>
           ))}
           <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-500 space-y-1">
-            {(payload[0]?.payload.routes || []).map((route: string) => (
-              <p key={route}>
-                {route}(新規): {payload[0]?.payload[`${route}NewTotal`] || 0}人 / {route}(リピ): {payload[0]?.payload[`${route}RepeatTotal`] || 0}人
-              </p>
-            ))}
+            <p>全体の(新規)客数: {payload[0]?.payload.overallNewTotal || 0}人</p>
+            <p>全体の(リピ)客数: {payload[0]?.payload.overallRepeatTotal || 0}人</p>
           </div>
         </div>
       );
@@ -203,12 +200,8 @@ export default function RepeatAnalysis() {
                           <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" />
                           <Tooltip content={<CustomTooltip />} />
                           <Legend wrapperStyle={{ fontSize: '10px' }} />
-                          {allRoutes.map((route, idx) => (
-                            <Bar key={`${route}-new`} name={`${route}(新規)再来`} dataKey={`${route}NewRate`} fill={COLORS[idx % COLORS.length].new} radius={[4, 4, 0, 0]} maxBarSize={20} />
-                          ))}
-                          {allRoutes.map((route, idx) => (
-                            <Bar key={`${route}-rep`} name={`${route}(リピ)再来`} dataKey={`${route}RepeatRate`} fill={COLORS[idx % COLORS.length].repeat} radius={[4, 4, 0, 0]} maxBarSize={20} />
-                          ))}
+                          <Bar name="全体の(新規)再来率" dataKey="overallNewRate" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                          <Bar name="全体の(リピ)再来率" dataKey="overallRepeatRate" fill="#2563eb" radius={[4, 4, 0, 0]} maxBarSize={30} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -247,12 +240,8 @@ export default function RepeatAnalysis() {
                           <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" />
                           <Tooltip content={<CustomTooltip />} />
                           <Legend wrapperStyle={{ fontSize: '10px' }} />
-                          {allRoutes.map((route, idx) => (
-                            <Bar key={`${route}-new`} name={`${route}(新規)再来`} dataKey={`${route}NewRate`} fill={COLORS[idx % COLORS.length].new} radius={[4, 4, 0, 0]} maxBarSize={20} />
-                          ))}
-                          {allRoutes.map((route, idx) => (
-                            <Bar key={`${route}-rep`} name={`${route}(リピ)再来`} dataKey={`${route}RepeatRate`} fill={COLORS[idx % COLORS.length].repeat} radius={[4, 4, 0, 0]} maxBarSize={20} />
-                          ))}
+                          <Bar name="全体の(新規)再来率" dataKey="overallNewRate" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                          <Bar name="全体の(リピ)再来率" dataKey="overallRepeatRate" fill="#2563eb" radius={[4, 4, 0, 0]} maxBarSize={30} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>

@@ -104,7 +104,7 @@ const staffCategories = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { profile, isAdmin, isManager, isStaff, isSystemOwner } = useAuth();
+  const { profile, isAdmin, isManager, isStaff, isSystemOwner, tenantPlan } = useAuth();
 
   const hasAccess = (role: string) => {
     if (role === "systemOwner") return isSystemOwner;
@@ -177,7 +177,11 @@ export function Sidebar() {
 
           {/* Staff Portal Section */}
           <div className="space-y-6 pt-4 border-t border-slate-100">
-            {staffCategories.map((category) => (
+            {staffCategories.map((category) => {
+              if (tenantPlan === "Solo" && category.title === "マニュアル・規程") {
+                return null;
+              }
+              return (
               <div key={category.title} className="space-y-1">
                 <h3 className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                   {category.title}
@@ -194,7 +198,7 @@ export function Sidebar() {
                   ))}
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         </nav>
       </div>

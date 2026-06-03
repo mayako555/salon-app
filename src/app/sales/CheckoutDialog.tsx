@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, X, Search, Sparkles, Tag, MessageSquare, Calendar, Scissors, Gift, Lock } from "lucide-react";
 import { addCheckout, updateCheckout, getStoreMasterData, SalesRecord } from "./actions";
@@ -375,44 +375,56 @@ export default function CheckoutDialog({
     }
   };
 
+  const dynamicMapping = useMemo(() => {
+    const mapping: Record<string, string[]> = {
+      'クーポン・割引': [],
+      'メニュー': [],
+      'オプション': [],
+      '店販': []
+    };
+
+    storeMasterData.filter(i => i.isActive !== false && i.itemType !== 'store' && i.itemType !== 'reservationRoute').forEach(item => {
+      const cat = item.category || "その他";
+      let mTab = 'メニュー';
+      
+      if (item.itemType === 'product' || cat === '店販') mTab = '店販';
+      else if (item.itemType === 'discount' || cat === '割引' || item.itemType === 'coupon' || item.itemType === 'messageCoupon' || cat.includes('クーポン')) mTab = 'クーポン・割引';
+      else if (item.itemType === 'option' || cat.includes('オプション') || cat === '毛質変更' || cat === '付け替えオフ' || item.itemType === 'fee') mTab = 'オプション';
+      
+      if (!mapping[mTab].includes(cat)) {
+        mapping[mTab].push(cat);
+      }
+    });
+
+    // Ensure default categories exist if missing
+    if (mapping['クーポン・割引'].length === 0) mapping['クーポン・割引'].push('割引');
+    if (mapping['店販'].length === 0) mapping['店販'].push('店販');
+
+    return mapping;
+  }, [storeMasterData]);
+
+  const majorTabs = ['クーポン・割引', 'メニュー', 'オプション', '店販'];
+  const tabs = dynamicMapping[majorTab] || [];
+
+  // 大分類が切り替わった際に、小分類の初期値を設定する
+  useEffect(() => {
+    const availableTabs = dynamicMapping[majorTab] || [];
+    if (availableTabs.length > 0 && !availableTabs.includes(tab)) {
+      setTab(availableTabs[0]);
+    }
+  }, [majorTab, dynamicMapping, tab]);
+
   const filteredMaster = storeMasterData.filter(item => {
     if (item.isActive === false) return false;
     
-    const cat = item.category || "";
+    const cat = item.category || "その他";
     
-    if (tab === 'リピクーポン') if (cat !== '再来' && !cat.includes('リピ')) return false;
-    if (tab === '新規クーポン') if (cat !== '新規' && !cat.includes('新規')) return false;
-    if (tab === '学割') if (cat !== '学割') return false;
-    if (tab === '通常メニュー') if (cat !== '通常メニュー' && !cat.includes('マツエク') && !cat.includes('パーマ') && cat !== '元町特有') return false;
-    if (tab === 'メンズアイブロウ') if (cat !== 'アイブロウ' && !item.name.includes('メンズ')) return false;
-    if (tab === '毛質変更') if (cat !== '毛質変更' && !['セーブル', 'カシミア', 'カラー', 'LED', 'アンドヘルシー'].some(k => item.name.includes(k))) return false;
-    if (tab === 'その他オプション') if (cat !== 'オプション' && cat !== 'その他オプション' && cat !== 'その他' && ['セーブル', 'カシミア', 'カラー', 'LED', 'アンドヘルシー'].some(k => item.name.includes(k))) return false; // Exclude hair quality if in other
-    if (tab === '割引') if (item.itemType !== 'discount' && cat !== '割引') return false;
-    if (tab === '店販') if (item.itemType !== 'product' && cat !== '店販') return false;
+    // Tab filter
+    if (tab && cat !== tab) return false;
     
     if (menuSearch) return item.name.includes(menuSearch) || cat.includes(menuSearch);
     return true;
   }).sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
-
-  const allTabs = ['リピクーポン', '新規クーポン', '学割', '通常メニュー', 'メンズアイブロウ', '毛質変更', 'その他オプション', '割引', '店販'];
-
-  const majorTabs = ['クーポン・割引', 'メニュー', 'オプション', '店販'];
-  const majorTabMapping: Record<string, string[]> = {
-    'クーポン・割引': ['リピクーポン', '新規クーポン', '学割', '割引'],
-    'メニュー': ['通常メニュー', 'メンズアイブロウ'],
-    'オプション': ['毛質変更', 'その他オプション'],
-    '店販': ['店販']
-  };
-
-  const tabs = allTabs.filter(t => majorTabMapping[majorTab]?.includes(t));
-
-  // 大分類が切り替わった際に、小分類の初期値を設定する
-  useEffect(() => {
-    const availableTabs = majorTabMapping[majorTab] || [];
-    if (availableTabs.length > 0 && !availableTabs.includes(tab)) {
-      setTab(availableTabs[0]);
-    }
-  }, [majorTab]);
 
   // 選択済みのメニュー情報を取得
   const currentMenus = menuCourse ? menuCourse.split(' + ') : [];
@@ -427,6 +439,11 @@ export default function CheckoutDialog({
   const defaultRoutes = ['電話（自社）', '電話（HOT PEPPER Beauty）', '直接来店', 'ミニモ', '次回予約', 'スレッズ', '公式LINE', '自社サイト', 'Instagram'];
   const routes = routeMaster.length > 0 ? routeMaster.map(m => m.name) : defaultRoutes;
   const allRoutes = [...new Set([route, ...routes].filter(Boolean))];
+
+  // 支払い方法マスタの取得
+  const paymentMaster = storeMasterData.filter(m => m.itemType === 'paymentMethod');
+  const defaultPayments = ['現金', 'クレジットカード', 'PayPay', '楽天Pay', 'ミニモ事前決済', 'その他'];
+  const paymentMethods = paymentMaster.length > 0 ? paymentMaster.map(m => m.name) : defaultPayments;
 
   return (
     <>
@@ -695,8 +712,8 @@ export default function CheckoutDialog({
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-slate-700 mb-1">支払方法</label>
-                  <select name="payment_method" defaultValue={initialData?.payment_method || "現金"} className="w-full h-9 px-3 border border-slate-300 rounded-md text-sm font-bold bg-emerald-50 text-emerald-800">
-                    {['現金', 'クレジットカード', 'PayPay', '楽天Pay', 'ミニモ事前決済', 'その他'].map(pm => <option key={pm} value={pm}>{pm}</option>)}
+                  <select name="payment_method" defaultValue={initialData?.payment_method || (paymentMethods.includes("現金") ? "現金" : paymentMethods[0])} className="w-full h-9 px-3 border border-slate-300 rounded-md text-sm font-bold bg-emerald-50 text-emerald-800">
+                    {paymentMethods.map(pm => <option key={pm} value={pm}>{pm}</option>)}
                   </select>
                 </div>
               </div>

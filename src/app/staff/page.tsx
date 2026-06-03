@@ -21,6 +21,7 @@ import DeleteStaffButton from "./DeleteStaffButton";
 import Link from "next/link";
 import { format } from "date-fns";
 import AuthGuard from "@/components/AuthGuard";
+import { useAuth } from "@/lib/auth-context";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { 
@@ -159,12 +160,15 @@ function cn(...classes: any[]) {
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function StaffPage() {
+  const { loading: authLoading } = useAuth();
   const [staffList, setStaffList] = useState<StaffProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadStaff();
-  }, []);
+    if (!authLoading) {
+      loadStaff();
+    }
+  }, [authLoading]);
 
   async function loadStaff() {
     setLoading(true);

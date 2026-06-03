@@ -36,7 +36,7 @@ export default function BulkOrderDialog({ isOpen, onOpenChange, items, storeName
   // Group items by base name (e.g. "フラットラッシュ C")
   const groups: Record<string, InventoryItem[]> = {};
   items.forEach(item => {
-    if (item.category !== "lash") return;
+    if (item.category !== "material") return;
     const baseName = item.name;
     if (!groups[baseName]) groups[baseName] = [];
     groups[baseName].push(item);

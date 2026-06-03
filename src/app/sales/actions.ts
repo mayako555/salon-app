@@ -204,7 +204,7 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
     ]);
 
     const snapshot = await getDocsWithTimeout as any;
-    return snapshot.docs.map((d: any) => {
+    const sales = snapshot.docs.map((d: any) => {
       const data = d.data();
       return {
         id: d.id,
@@ -221,6 +221,19 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
         return sCompanyId === (ctx.companyId || "company_default");
       });
     }
+
+    const { getStaffList } = await import("../staff/actions");
+    const staffList = await getStaffList();
+    filteredSales = filteredSales.map(sale => {
+      if (sale.staff_id) {
+        const staff = staffList.find(s => s.id === sale.staff_id);
+        if (staff && staff.name) {
+          return { ...sale, staff_name: staff.name };
+        }
+      }
+      return sale;
+    });
+
     return filteredSales;
   } catch (error: any) {
     console.error("Error fetching sales from Firestore:", error);

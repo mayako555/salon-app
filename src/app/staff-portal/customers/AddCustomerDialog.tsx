@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { registerManualCustomer } from "./actions";
+import { useAuth } from "@/lib/auth-context";
 
 interface AddCustomerDialogProps {
   isOpen: boolean;
@@ -14,13 +15,14 @@ interface AddCustomerDialogProps {
 }
 
 export default function AddCustomerDialog({ isOpen, onClose, onSuccess }: AddCustomerDialogProps) {
+  const { availableStores, selectedStore } = useAuth();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     customer_no: "",
     name: "",
     name_kana: "",
     phone: "",
-    store_name: "神戸"
+    store_name: selectedStore || (availableStores.length > 0 ? availableStores[0] : "未設定")
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,7 +38,7 @@ export default function AddCustomerDialog({ isOpen, onClose, onSuccess }: AddCus
 
     if (res.success) {
       toast.success("顧客を登録しました");
-      setForm({ customer_no: "", name: "", name_kana: "", phone: "", store_name: "神戸" });
+      setForm({ customer_no: "", name: "", name_kana: "", phone: "", store_name: selectedStore || (availableStores.length > 0 ? availableStores[0] : "未設定") });
       onSuccess();
       onClose();
     } else {
@@ -44,7 +46,7 @@ export default function AddCustomerDialog({ isOpen, onClose, onSuccess }: AddCus
     }
   };
 
-  const stores = ["神戸", "六甲", "元町"];
+  const stores = availableStores;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

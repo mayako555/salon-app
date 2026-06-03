@@ -20,7 +20,7 @@ function pixelsToTime(px: number, startHour: number, totalHours: number): string
 }
 
 function getColorClasses(res: Reservation) {
-  if (res.type === "schedule") return "bg-slate-200/80 border-slate-300 text-slate-700 shadow-none";
+  if (res.type === "schedule") return "bg-slate-300/80 border-slate-300/80 text-slate-600 shadow-none !rounded-none";
 
   if (res.status === 'cancelled') return "bg-slate-100 border-slate-200 text-slate-400 opacity-50 line-through";
   if (res.status === 'completed') return "bg-slate-200 border-slate-300 text-slate-500 opacity-70"; // 会計後はグレー
@@ -167,31 +167,34 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
           transform: `translateY(${currentTop}px)`,
           zIndex: isDragging ? 50 : (showHover ? 40 : 10)
         }}
-        className={`absolute top-0.5 bottom-0.5 rounded-sm border flex flex-col p-0.5 overflow-hidden transition-colors text-left select-none shadow-sm
+        className={`absolute top-0.5 bottom-0.5 border flex flex-col p-0.5 overflow-hidden transition-colors text-left select-none
+          ${res.type !== 'schedule' ? 'rounded-sm shadow-sm' : ''}
           ${colorClass}
           ${!isCompleted ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
-          ${isDragging ? 'opacity-90 scale-[1.02] shadow-xl ring-2 ring-blue-500' : ''}
-          ${isResizing ? 'bg-blue-50 border-blue-400' : ''}
+          ${isDragging ? 'opacity-90 scale-[1.02] shadow-xl ring-2 ring-blue-500 z-50' : ''}
+          ${isResizing ? 'bg-blue-50 border-blue-400 z-50' : ''}
         `}
       >
-        <div className="flex items-center gap-1 text-[8px] font-bold opacity-90 leading-none pointer-events-none mb-0.5">
-          <span className={`px-0.5 rounded flex items-center gap-0.5 border border-black/5 ${res.type === 'schedule' ? 'bg-slate-300/50' : 'bg-white/60'}`}>
-            {getMenuIcon(res.menu_name || "", res.type === 'schedule')} {res.type !== 'schedule' ? res.portal : ""}
-          </span>
-          {res.type !== 'schedule' && res.customer_type && (
-            <span className={`px-0.5 rounded text-white ${res.customer_type === '新規' ? 'bg-blue-500' : res.customer_type === '再来' ? 'bg-green-500' : 'bg-slate-500'}`}>
-              {res.customer_type.charAt(0)}
+        {res.type !== 'schedule' && (
+          <div className="flex items-center gap-1 text-[8px] font-bold opacity-90 leading-none pointer-events-none mb-0.5">
+            <span className="px-0.5 rounded flex items-center gap-0.5 border border-black/5 bg-white/60">
+              {getMenuIcon(res.menu_name || "")} {res.portal}
             </span>
-          )}
-          {res.type !== 'schedule' && res.is_caution && <AlertCircle className="w-2.5 h-2.5 text-red-500 fill-white" />}
-          {res.type !== 'schedule' && res.same_day_cancel_count && res.same_day_cancel_count > 0 && (
-            <span className="bg-rose-600 text-white px-1 rounded flex items-center gap-0.5 text-[8px] font-black">
-              ▼{res.same_day_cancel_count})
-            </span>
-          )}
-          {res.type !== 'schedule' && res.status === 'arrived' && <span className="bg-emerald-500 text-white px-0.5 rounded">来</span>}
-          {res.type !== 'schedule' && res.status === 'completed' && <span className="bg-slate-800 text-white px-0.5 rounded">済</span>}
-        </div>
+            {res.customer_type && (
+              <span className={`px-0.5 rounded text-white ${res.customer_type === '新規' ? 'bg-blue-500' : res.customer_type === '再来' ? 'bg-green-500' : 'bg-slate-500'}`}>
+                {res.customer_type.charAt(0)}
+              </span>
+            )}
+            {res.is_caution && <AlertCircle className="w-2.5 h-2.5 text-red-500 fill-white" />}
+            {res.same_day_cancel_count && res.same_day_cancel_count > 0 && (
+              <span className="bg-rose-600 text-white px-1 rounded flex items-center gap-0.5 text-[8px] font-black">
+                ▼{res.same_day_cancel_count})
+              </span>
+            )}
+            {res.status === 'arrived' && <span className="bg-emerald-500 text-white px-0.5 rounded">来</span>}
+            {res.status === 'completed' && <span className="bg-slate-800 text-white px-0.5 rounded">済</span>}
+          </div>
+        )}
         <span className="text-[10px] font-black truncate leading-tight pointer-events-none tracking-tight">
           {res.type === 'schedule' ? res.menu_name : (res.customer_name?.trim() ? res.customer_name : res.customer_kana)}
         </span>

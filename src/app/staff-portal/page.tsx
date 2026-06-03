@@ -53,6 +53,7 @@ export default function StaffDashboardPage() {
   // Derived auth state
   const isInHouse = !profile?.companyId || profile?.companyId === "company_default" || profile?.role === "systemOwner";
   const allowedStores = isInHouse ? contextAvailableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : contextAvailableStores);
+  const canViewRestrictedStats = profile?.role === "systemOwner" || profile?.role === "companyOwner" || profile?.role === "admin";
 
   // My Dashboard State
   const [mySales, setMySales] = useState({ techSales: 0, productSales: 0, count: 0, cashlessSales: 0, nominations: 0 });
@@ -90,7 +91,7 @@ export default function StaffDashboardPage() {
       
       // Filter today's shifts and sort by staff sort_order
       const tShifts = mShifts
-        .filter((s: any) => s.date === today && s.type === 'work' && (localIsInHouse || s.segments?.some((seg: any) => localAvailableStores.includes(seg.store))))
+        .filter((s: any) => s.date === today && s.type === 'work' && (localIsInHouse || s.segments?.some((seg: any) => localAvailableStores.some((ls: string) => ls.includes(seg.store) || seg.store.includes(ls.replace("店", ""))))))
         .sort((a, b) => {
           const staffA = sList.find(s => s.id === a.staff_id);
           const staffB = sList.find(s => s.id === b.staff_id);
@@ -179,7 +180,7 @@ export default function StaffDashboardPage() {
         <div className="flex justify-between items-center mb-6">
           <div>
             <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">
-              Welcome back, {profile?.name || "Staff"}
+              Welcome back, {profile?.name || "担当者"}
             </p>
             <h1 className="text-2xl font-bold">Timecard</h1>
           </div>
@@ -190,8 +191,9 @@ export default function StaffDashboardPage() {
         </div>
 
         {/* Timecard Section */}
-        <div className="bg-white/10 p-5 rounded-3xl backdrop-blur-xl border border-white/20 shadow-2xl mb-8">
-           {!attendance ? (
+        {canViewRestrictedStats && (
+          <div className="bg-white/10 p-5 rounded-3xl backdrop-blur-xl border border-white/20 shadow-2xl mb-8">
+             {!attendance ? (
              <div className="flex flex-col gap-4">
                <div className="flex items-center gap-4">
                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 flex items-center justify-center text-emerald-400">
@@ -228,7 +230,8 @@ export default function StaffDashboardPage() {
                </div>
              </div>
            )}
-        </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-md border border-white/10">
@@ -258,6 +261,7 @@ export default function StaffDashboardPage() {
 
       <div className="-mt-6 px-4 space-y-6">
         {/* 🔥 マイダッシュボード */}
+        {canViewRestrictedStats && (
         <Card className="p-5 rounded-[2rem] border-slate-100 shadow-sm bg-white overflow-hidden relative">
           <div className="absolute top-0 right-0 w-32 h-32 bg-rose-50 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
           
@@ -366,10 +370,12 @@ export default function StaffDashboardPage() {
             </div>
           )}
         </Card>
+        )}
 
         {/* 暗証番号（タイムカード用パスコード）の設定 */}
-        <Card className="p-5 rounded-[2rem] border-slate-100 shadow-sm bg-white space-y-4">
-          <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+        {canViewRestrictedStats && (
+          <Card className="p-5 rounded-[2rem] border-slate-100 shadow-sm bg-white space-y-4">
+            <div className="flex items-center justify-between border-b pb-3 border-slate-100">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-blue-50/80 flex items-center justify-center text-blue-600">
                 <Sparkles size={16} className="animate-pulse" />
@@ -386,6 +392,7 @@ export default function StaffDashboardPage() {
 
           <PasscodeChangeSection staffId={profile?.id} currentPasscode={profile?.passcode} />
         </Card>
+        )}
 
         {/* Alerts Section */}
         {riskAlerts.length > 0 && (
@@ -510,7 +517,7 @@ export default function StaffDashboardPage() {
           <div className="grid grid-cols-1 gap-3">
             {contextAvailableStores.filter(store => isInHouse || allowedStores.includes(store)).map(store => {
               const staffAtStore = todayShifts.filter(s => 
-                s.segments?.some((seg: any) => seg.store === store)
+                s.segments?.some((seg: any) => store.includes(seg.store) || seg.store.includes(store.replace("店", "")))
               );
               
               return (
@@ -550,6 +557,7 @@ export default function StaffDashboardPage() {
         </div>
 
         {/* Store Sales Targets */}
+        {canViewRestrictedStats && (
         <div>
           <div className="flex justify-between items-center mb-3 px-1">
             <h2 className="font-bold text-slate-800 flex items-center gap-2">
@@ -592,6 +600,7 @@ export default function StaffDashboardPage() {
             </div>
           </Card>
         </div>
+        )}
 
         {/* Recent Registrations */}
         <div>

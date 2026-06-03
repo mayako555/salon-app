@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { saveOJTSession, OJTSession, getCurriculum, CurriculumItem } from "../../../../training-actions";
 import { getStaffList, StaffProfile } from "../../../../../staff/actions";
+import { OJT_SCHEDULE } from "./schedule-data";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +67,20 @@ export default function NewOJTLogPage() {
     }
     load();
   }, []);
+
+  useEffect(() => {
+    if (formData.date && OJT_SCHEDULE[formData.date]) {
+      const defaultData = OJT_SCHEDULE[formData.date];
+      setFormData(prev => ({
+        ...prev,
+        subject_name: defaultData.subject_name,
+        curriculum_content: defaultData.curriculum_content,
+        content: defaultData.content,
+        duration_hours: defaultData.duration_hours,
+        instructor_name: defaultData.instructor_name || prev.instructor_name,
+      }));
+    }
+  }, [formData.date]);
 
   const handleCurriculumSelect = (c: CurriculumItem) => {
     setFormData(prev => ({

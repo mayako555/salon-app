@@ -932,6 +932,8 @@ export async function getRepeatAnalysis(params: RepeatAnalysisParams) {
         let totalVisits = 0;
         let overallNewTotal = 0;
         let overallNewReturned = 0;
+        let overallRepeatTotal = 0;
+        let overallRepeatReturned = 0;
         
         const routeData: Record<string, any> = {};
         
@@ -939,6 +941,8 @@ export async function getRepeatAnalysis(params: RepeatAnalysisParams) {
           totalVisits += r.newTotal + r.repeatTotal;
           overallNewTotal += r.newTotal;
           overallNewReturned += r.newReturned;
+          overallRepeatTotal += r.repeatTotal;
+          overallRepeatReturned += r.repeatReturned;
           
           routeData[`${route}NewTotal`] = r.newTotal;
           routeData[`${route}NewRate`] = r.newTotal > 0 ? (r.newReturned / r.newTotal) * 100 : 0;
@@ -946,13 +950,16 @@ export async function getRepeatAnalysis(params: RepeatAnalysisParams) {
           routeData[`${route}RepeatRate`] = r.repeatTotal > 0 ? (r.repeatReturned / r.repeatTotal) * 100 : 0;
         });
 
-        // Backend compatibility for sorting by overall new rate
         const overallNewRate = overallNewTotal > 0 ? (overallNewReturned / overallNewTotal) * 100 : 0;
+        const overallRepeatRate = overallRepeatTotal > 0 ? (overallRepeatReturned / overallRepeatTotal) * 100 : 0;
 
         return {
           [keyName]: name,
           totalVisits,
           overallNewRate, // used for sorting
+          overallNewTotal,
+          overallRepeatRate,
+          overallRepeatTotal,
           routes: Object.keys(s.routes), // list of route names for dynamic rendering
           ...routeData
         };

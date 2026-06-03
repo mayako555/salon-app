@@ -29,7 +29,7 @@ export default function SalesPage({
   searchParams: Promise<{ month?: string }>
 }) {
   const params = use(searchParams);
-  const { profile } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
   const targetDateStr = params.month || format(new Date(), "yyyy-MM");
   const [yearNum, monthNum] = targetDateStr.split("-").map(Number);
   const year = yearNum;
@@ -40,6 +40,7 @@ export default function SalesPage({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
     async function load() {
       const [salesData, staffData] = await Promise.all([
         getMonthlySales(year, month),
@@ -50,7 +51,7 @@ export default function SalesPage({
       setLoading(false);
     }
     load();
-  }, [year, month]);
+  }, [year, month, authLoading]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStaffs, setSelectedStaffs] = useState<Set<string>>(new Set());

@@ -2,7 +2,7 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Reservation } from "@/app/reservations/actions";
-import { UserCircle, Calendar, Clock, MapPin, Tag, MessageSquare, CreditCard, Edit, Search } from "lucide-react";
+import { UserCircle, Calendar, Clock, MapPin, Tag, MessageSquare, CreditCard, Edit, Search, FileText } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -100,49 +100,60 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
           )}
         </div>
 
-        <div className="p-4 bg-white border-t border-slate-200 flex gap-2">
-          <div className="flex-1 flex gap-2">
-            {reservation.status !== 'cancelled' && reservation.status !== 'completed' && (
+        <div className="p-4 bg-white border-t border-slate-200 flex flex-col gap-3">
+          {reservation.status !== 'cancelled' && (
+            <div className="flex gap-2 w-full">
+              {reservation.customer_id && (
+                <Link href={`/staff-portal/customers/${reservation.customer_id}/karte/new?reservation_id=${reservation.id}`} className="flex-1">
+                  <Button className="w-full font-bold flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white h-11">
+                    <FileText className="w-4 h-4" /> カルテ記入
+                  </Button>
+                </Link>
+              )}
+              <Link href={`/staff-portal/sales?res_id=${reservation.id}`} className="flex-1">
+                <Button className={cn("w-full font-bold flex items-center gap-2 text-white h-11", reservation.status === 'completed' ? "bg-amber-500 hover:bg-amber-600" : "bg-emerald-600 hover:bg-emerald-700")}>
+                  {reservation.status === 'completed' ? <Search className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
+                  {reservation.status === 'completed' ? "お会計を編集" : "お会計へ進む"}
+                </Button>
+              </Link>
+            </div>
+          )}
+
+          <div className="flex gap-2 w-full">
+            <div className="flex-1 flex gap-2">
+              {reservation.status !== 'cancelled' && reservation.status !== 'completed' && (
+                <Button 
+                  variant="outline" 
+                  className="flex-1 text-rose-600 border-rose-200 hover:bg-rose-50"
+                  onClick={async () => {
+                    if (confirm('この予約をキャンセルしますか？')) {
+                      const { updateReservationStatus } = await import('@/app/reservations/actions');
+                      await updateReservationStatus(reservation.id, 'cancelled');
+                      onClose();
+                      if (onRefresh) onRefresh();
+                    }
+                  }}
+                >
+                  キャンセル
+                </Button>
+              )}
               <Button 
-                variant="outline" 
-                className="flex-1 text-rose-600 border-rose-200 hover:bg-rose-50"
+                variant="destructive" 
+                className="flex-1"
                 onClick={async () => {
-                  if (confirm('この予約をキャンセルしますか？')) {
-                    const { updateReservationStatus } = await import('@/app/reservations/actions');
-                    await updateReservationStatus(reservation.id, 'cancelled');
+                  if (confirm('この予約を完全に削除しますか？この操作は取り消せません。')) {
+                    const { deleteReservation } = await import('@/app/reservations/actions');
+                    await deleteReservation(reservation.id);
                     onClose();
                     if (onRefresh) onRefresh();
                   }
                 }}
               >
-                キャンセル
+                完全削除
               </Button>
-            )}
-            <Button 
-              variant="destructive" 
-              className="flex-1"
-              onClick={async () => {
-                if (confirm('この予約を完全に削除しますか？この操作は取り消せません。')) {
-                  const { deleteReservation } = await import('@/app/reservations/actions');
-                  await deleteReservation(reservation.id);
-                  onClose();
-                  if (onRefresh) onRefresh();
-                }
-              }}
-            >
-              完全削除
-            </Button>
+            </div>
+            <Button variant="outline" className="w-24 shrink-0" onClick={onClose}>閉じる</Button>
           </div>
-          <Button variant="outline" className="w-24 shrink-0" onClick={onClose}>閉じる</Button>
-          
-          {reservation.status !== 'cancelled' && (
-            <Link href={`/staff-portal/sales?res_id=${reservation.id}`} className="flex-[2]">
-              <Button className={cn("w-full font-bold flex items-center gap-2 text-white", reservation.status === 'completed' ? "bg-amber-500 hover:bg-amber-600" : "bg-emerald-600 hover:bg-emerald-700")}>
-                {reservation.status === 'completed' ? <Search className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
-                {reservation.status === 'completed' ? "お会計を編集" : "お会計へ進む"}
-              </Button>
-            </Link>
-          )}
         </div>
       </DialogContent>
     </Dialog>

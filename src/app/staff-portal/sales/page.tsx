@@ -148,12 +148,8 @@ export default function StaffPortalSalesPage() {
              await updateReservationStatus(autoCheckoutRes.id, "completed");
              setAutoCheckoutRes(null);
              
-             // Try to go back to the previous page (e.g., /reservations or /staff-portal/reservations)
-             if (window.history.length > 2) {
-               window.history.back();
-             } else {
-               window.location.replace('/staff-portal/reservations');
-             }
+             // Explicitly navigate to reservations schedule
+             window.location.href = '/staff-portal/reservations';
           }}
           onOpenChangeControlled={(open) => {
             if (!open) {
@@ -174,11 +170,8 @@ export default function StaffPortalSalesPage() {
           readOnly={autoEditSale.status === 'closed'}
           onSuccess={async () => {
              setAutoEditSale(null);
-             if (window.history.length > 2) {
-               window.history.back();
-             } else {
-               window.location.replace('/staff-portal/reservations');
-             }
+             // Explicitly navigate to reservations schedule
+             window.location.href = '/staff-portal/reservations';
           }}
           onOpenChangeControlled={(open) => {
             if (!open) {
@@ -198,6 +191,9 @@ export default function StaffPortalSalesPage() {
               defaultStaffName={profile?.name || ""} 
               defaultStoreName="六甲" 
               staffList={staffNames} 
+              onSuccess={() => {
+                window.location.href = '/staff-portal/reservations';
+              }}
             />
           </div>
         </div>
@@ -244,6 +240,9 @@ export default function StaffPortalSalesPage() {
                         staffList={staffNames}
                         defaultStoreName={sale.store_name}
                         readOnly={sale.status === 'closed'}
+                        onSuccess={() => {
+                          window.location.href = '/staff-portal/reservations';
+                        }}
                         trigger={
                           <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-emerald-600 transition-colors">
                             {sale.status === 'closed' ? <Search size={16} /> : <Database size={16} />}
@@ -285,14 +284,14 @@ export default function StaffPortalSalesPage() {
               <div key={sale.id} className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">
-                    {sale.staff_name.charAt(0)}
+                    {sale.customer_name ? sale.customer_name.charAt(0) : sale.staff_name.charAt(0)}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-slate-700">{sale.staff_name}</span>
+                      <span className="font-bold text-sm text-slate-700">{sale.customer_name || "お客様"} 様</span>
                       <span className="text-[10px] text-slate-400">{sale.time}</span>
                     </div>
-                    <p className="text-[10px] text-slate-500">{sale.store_name}店 / {sale.menu_course || "メニュー不明"}</p>
+                    <p className="text-[10px] text-slate-500">{sale.store_name} / 担当: {sale.staff_name} / {sale.menu_course || "メニュー不明"}</p>
                   </div>
                 </div>
                 <div className="text-right">

@@ -35,7 +35,8 @@ import {
   Clock,
   Tag,
   Copy,
-  Store
+  Store,
+  CreditCard
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -119,6 +120,7 @@ function SortableItem({
             item.itemType === 'coupon' ? 'bg-rose-400' :
             item.itemType === 'messageCoupon' ? 'bg-amber-400' :
             item.itemType === 'discount' ? 'bg-rose-500' :
+            item.itemType === 'paymentMethod' ? 'bg-fuchsia-500' :
             item.itemType === 'store' ? 'bg-indigo-500' :
             'bg-slate-300'
           )} />
@@ -138,10 +140,14 @@ function SortableItem({
           </div>
 
             <div className="text-right flex flex-col items-end gap-1 px-4 border-l border-slate-50">
-              {item.itemType === 'store' ? (
+              {item.itemType === 'store' || item.itemType === 'reservationRoute' || item.itemType === 'paymentMethod' ? (
                 <div className="flex flex-col items-end">
-                  <p className="text-xs font-black text-slate-700">営業時間</p>
-                  <p className="text-sm font-black text-slate-500">{item.openTime || "10:00"} - {item.closeTime || "19:00"}</p>
+                  {item.itemType === 'store' && (
+                    <>
+                      <p className="text-xs font-black text-slate-700">営業時間</p>
+                      <p className="text-sm font-black text-slate-500">{item.openTime || "10:00"} - {item.closeTime || "19:00"}</p>
+                    </>
+                  )}
                 </div>
               ) : (
                 <>
@@ -368,6 +374,8 @@ export default function MasterManagementPage() {
         if (item.itemType !== "product") return false;
       } else if (typeFilter === "reservationRoute") {
         if (item.itemType !== "reservationRoute") return false;
+      } else if (typeFilter === "paymentMethod") {
+        if (item.itemType !== "paymentMethod") return false;
       } else if (typeFilter === "discount") {
         if (item.itemType !== "discount") return false;
       } else if (typeFilter === "store") {
@@ -406,7 +414,7 @@ export default function MasterManagementPage() {
                   <AlertTriangle size={16} className="mr-2" /> マスタ初期化
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md rounded-3xl">
+              <DialogContent className="max-w-md rounded-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="text-xl font-black text-rose-600 flex items-center gap-2">
                     <AlertTriangle /> マスタデータの初期化
@@ -447,7 +455,7 @@ export default function MasterManagementPage() {
                 一括インポート
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>メニュー・商品データの一括読み込み</DialogTitle>
               </DialogHeader>
@@ -496,6 +504,13 @@ export default function MasterManagementPage() {
               <Tag size={16} className="mr-1" /> 割引追加
             </Button>
             <Button onClick={() => {
+              setEditingItem({ store: "共通", itemType: "paymentMethod", category: "支払い方法", price: 0, isActive: true });
+              setTypeFilter("paymentMethod");
+              setIsDialogOpen(true);
+            }} className="rounded-xl bg-fuchsia-600 hover:bg-fuchsia-700 shadow-md font-black text-white px-4 h-11">
+              <CreditCard size={16} className="mr-1" /> 支払い追加
+            </Button>
+            <Button onClick={() => {
               setEditingItem({ store: "共通", itemType: "store", category: "店舗", price: 0, isActive: true });
               setTypeFilter("store");
               setIsDialogOpen(true);
@@ -512,6 +527,7 @@ export default function MasterManagementPage() {
           { id: "menu", label: "メニュー・クーポン", icon: Plus },
           { id: "product", label: "店販商品", icon: Zap },
           { id: "reservationRoute", label: "予約経路", icon: ArrowUpDown },
+          { id: "paymentMethod", label: "支払い方法", icon: CreditCard },
           { id: "discount", label: "割引", icon: Tag },
           { id: "store", label: "店舗", icon: Store },
         ].map(tab => (
@@ -629,15 +645,17 @@ export default function MasterManagementPage() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl rounded-3xl border-none shadow-2xl">
+        <DialogContent className="max-w-2xl rounded-3xl border-none shadow-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-2">
               {editingItem?.itemType === 'product' ? <Zap className="text-emerald-500" /> : 
                editingItem?.itemType === 'reservationRoute' ? <Database className="text-amber-500" /> : 
+               editingItem?.itemType === 'paymentMethod' ? <CreditCard className="text-fuchsia-500" /> : 
                <Plus className="text-blue-500" />}
               {editingItem?.id ? "アイテムを編集" : 
                editingItem?.itemType === 'product' ? "店販商品を新規作成" :
                editingItem?.itemType === 'reservationRoute' ? "予約経路を新規作成" :
+               editingItem?.itemType === 'paymentMethod' ? "支払い方法を新規作成" :
                editingItem?.itemType === 'store' ? "店舗を新規作成" :
                "メニューを新規作成"}
             </DialogTitle>
@@ -683,6 +701,7 @@ export default function MasterManagementPage() {
                     <option value="discount">割引</option>
                     <option value="fee">キャンセル料</option>
                     <option value="reservationRoute">予約経路</option>
+                    <option value="paymentMethod">支払い方法</option>
                     <option value="store">店舗</option>
                   </select>
                 </div>
@@ -697,6 +716,7 @@ export default function MasterManagementPage() {
                   className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
                   placeholder={
                     editingItem?.itemType === 'reservationRoute' ? "例：ホットペッパー、インスタなど" : 
+                    editingItem?.itemType === 'paymentMethod' ? "例：現金、PayPayなど" : 
                     editingItem?.itemType === 'store' ? "例：渋谷本店、横浜店など" : "名前を入力"
                   }
                 />
@@ -724,7 +744,7 @@ export default function MasterManagementPage() {
               </div>
             )}
 
-            {editingItem?.itemType !== 'reservationRoute' && editingItem?.itemType !== 'store' && (
+            {editingItem?.itemType !== 'reservationRoute' && editingItem?.itemType !== 'paymentMethod' && editingItem?.itemType !== 'store' && (
               <div className="grid grid-cols-2 gap-4">
                 {editingItem?.itemType !== 'product' && (
                   <div className="space-y-2">

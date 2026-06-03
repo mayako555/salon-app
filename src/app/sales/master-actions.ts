@@ -127,7 +127,7 @@ export async function upsertMasterItem(data: Partial<SalesMasterItem>) {
           await addDoc(collection(db, "inventory"), {
             name: payload.name,
             storeName: payload.store,
-            category: payload.itemType === "product" ? "product" : "lash",
+            category: payload.itemType === "product" ? "product" : "material",
             subCategory: payload.category,
             currentStock: 0,
             threshold: 3,

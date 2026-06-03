@@ -17,7 +17,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function StaffPortalLayout({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading, selectedStore, setSelectedStore, availableStores } = useAuth();
+  const { user, profile, loading, selectedStore, setSelectedStore, availableStores, tenantPlan } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -44,6 +44,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
   };
 
   const isAdminOrManager = profile?.role === "admin" || profile?.role === "manager";
+  const canViewTimecard = profile?.role === "systemOwner" || profile?.role === "companyOwner" || profile?.role === "admin";
   const isInHouse = !profile?.companyId || profile?.companyId === "company_default" || profile?.role === "systemOwner";
   const allowedStores = isInHouse ? availableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : availableStores);
 
@@ -58,13 +59,17 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
       { name: "メニュー・商品設定", href: "/admin/master/operations", icon: Database },
       { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste },
     ] : []),
-    { name: "タイムカード", href: "/attendance", icon: Clock },
+    ...(canViewTimecard ? [
+      { name: "タイムカード", href: "/attendance", icon: Clock },
+    ] : []),
     { name: "在庫・発注", href: "/staff-portal/inventory", icon: Database },
-    { name: "交通費申請", href: "/staff-portal/transport", icon: Train },
-    { name: "希望休申請", href: "/staff-portal/holidays", icon: Calendar },
-    { name: "給与明細確認", href: "/staff-portal/payroll", icon: Calculator },
+    ...(tenantPlan !== "Solo" ? [
+      { name: "交通費申請", href: "/staff-portal/transport", icon: Train },
+      { name: "希望休申請", href: "/staff-portal/holidays", icon: Calendar },
+      { name: "給与明細確認", href: "/staff-portal/payroll", icon: Calculator },
+      { name: "マニュアル", href: "/manuals", icon: BookOpen },
+    ] : []),
     { name: "経費精算", href: "/staff-portal/expenses", icon: Wallet },
-    { name: "マニュアル", href: "/manuals", icon: BookOpen },
   ];
 
   return (
@@ -120,7 +125,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
               {profile?.name?.charAt(0)}
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-black text-white truncate">{profile?.name || "No Profile"}</p>
+              <p className="text-xs font-black text-white truncate">{profile?.name || "担当者"}</p>
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{profile?.role || "staff"}</p>
             </div>
           </div>

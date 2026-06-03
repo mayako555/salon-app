@@ -1,7 +1,7 @@
 export type InventoryItem = {
   id: string;
   name: string;
-  category: "lash" | "product" | "consumable";
+  category: "material" | "product" | "consumable";
   subCategory?: string;
   currentStock: number;
   threshold: number;

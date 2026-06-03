@@ -4,7 +4,7 @@ import { collection, writeBatch, doc, serverTimestamp } from "firebase/firestore
 export type SalesMasterItem = {
   id?: string;
   store: "六甲" | "神戸" | "元町" | "共通";
-  itemType: "menu" | "coupon" | "messageCoupon" | "option" | "discount" | "fee" | "karteTemplate" | "product" | "reservationRoute" | "store";
+  itemType: "menu" | "coupon" | "messageCoupon" | "option" | "discount" | "fee" | "karteTemplate" | "product" | "reservationRoute" | "paymentMethod" | "store";
   category: string;
   name: string;
   internalName?: string;

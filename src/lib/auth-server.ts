@@ -25,15 +25,27 @@ export async function getCurrentUserContext(): Promise<UserContext> {
     // セッショントークンを検証
     const decodedClaims = await adminAuth.verifySessionCookie(session, true);
     const uid = decodedClaims.uid;
+    const email = decodedClaims.email;
 
-    // users/{uid} ではなく、現状の仕様に合わせて staff_profiles/{uid} から取得
-    const userDoc = await adminDb.collection("staff_profiles").doc(uid).get();
+    // users/{uid} ではなく、現状の仕様に合わせて staff_profiles を email で検索
+    let snapshot;
+    if (email) {
+      snapshot = await adminDb.collection("staff_profiles").where("email", "==", email).limit(1).get();
+    } else {
+      snapshot = await adminDb.collection("staff_profiles").where("uid", "==", uid).limit(1).get();
+    }
     
-    if (!userDoc.exists) {
-      throw new Error("権限がありません");
+    if (snapshot.empty) {
+      // Create a default systemOwner context if they have an Auth account but no staff profile
+      return {
+        uid,
+        role: "systemOwner",
+        companyId: "company_default",
+        salonIds: [],
+      };
     }
 
-    const userData = userDoc.data();
+    const userData = snapshot.docs[0].data();
     
     return {
       uid,

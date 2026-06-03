@@ -159,7 +159,7 @@ export default function StaffPayrollPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right font-bold text-lg text-slate-800">
-                        ¥{stmt.final_paid_amount.toLocaleString()}
+                        ¥{(stmt.base_amount + stmt.total_allowances + (stmt.details.tax_addition || 0)).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-center">
                         <span className={`text-xs px-2 py-1 rounded-md font-bold ${

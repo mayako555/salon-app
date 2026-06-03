@@ -287,7 +287,7 @@ async function seedInventory(storeName: string) {
       if (curl === "D" && len < 10) return;
       if (curl === "CC" && len < 9) return;
       items.push({
-        name: `フラットラッシュ ${curl}`, category: "lash", subCategory: `${curl}${len}`, currentStock: 5, threshold: 2, unit: "ケース", vendor: "フーラストア", costPrice: 2400, price: 1848
+        name: `カラー剤 ${curl}`, category: "material", subCategory: `${curl}${len}`, currentStock: 5, threshold: 2, unit: "ケース", vendor: "ビューティガレージ", costPrice: 2400, price: 1848
       });
     });
   });
@@ -325,7 +325,7 @@ async function seedInventory(storeName: string) {
     ["J", "C"].forEach(curl => {
       [6, 7, 8, 9, 10, 11, 12, 13].forEach(len => {
         items.push({
-          name: `シルク ${thickness}`, category: "lash", subCategory: `${curl}${len}`, currentStock: 5, threshold: 1, unit: "ケース", vendor: "はまざき", costPrice: 1500, price: 1848
+          name: `パーマ液 1剤 ${thickness}`, category: "material", subCategory: `${curl}${len}`, currentStock: 5, threshold: 1, unit: "ケース", vendor: "ビューティガレージ", costPrice: 1500, price: 1848
         });
       });
     });
@@ -334,7 +334,7 @@ async function seedInventory(storeName: string) {
   ["J", "C", "D"].forEach(curl => {
     [8, 9, 10, 11, 12, 13, 14].forEach(len => {
       items.push({
-        name: "ボリューム 0.06", category: "lash", subCategory: `${curl}${len}`, currentStock: 3, threshold: 1, unit: "ケース", vendor: "はまざき", costPrice: 2000, price: 2420
+        name: "パーマ液 2剤", category: "material", subCategory: `${curl}${len}`, currentStock: 3, threshold: 1, unit: "ケース", vendor: "ビューティガレージ", costPrice: 2000, price: 2420
       });
     });
   });
@@ -364,7 +364,7 @@ async function seedInventory(storeName: string) {
     ["J", "C", "D"].forEach(curl => {
       [6, 7, 8, 9, 10, 11, 12, 13, 14].forEach(len => {
         items.push({
-          name: `セーブル ${thickness}`, category: "lash", subCategory: `${curl}${len}`, currentStock: 4, threshold: 1, unit: "ケース", vendor: "BIJOUBEAU", costPrice: 1800, price: 1848
+          name: `トリートメントA ${thickness}`, category: "material", subCategory: `${curl}${len}`, currentStock: 4, threshold: 1, unit: "ケース", vendor: "MILBON", costPrice: 1800, price: 1848
         });
       });
     });
@@ -375,7 +375,7 @@ async function seedInventory(storeName: string) {
     ["J", "C", "D"].forEach(curl => {
       [8, 9, 10, 11, 12, 13, 14].forEach(len => {
         items.push({
-          name: `カシミア ${thickness}`, category: "lash", subCategory: `${curl}${len}`, currentStock: 5, threshold: 1, unit: "ケース", vendor: "EMEDA", costPrice: 2500, price: 1200
+          name: `トリートメントB ${thickness}`, category: "material", subCategory: `${curl}${len}`, currentStock: 5, threshold: 1, unit: "ケース", vendor: "MILBON", costPrice: 2500, price: 1200
         });
       });
     });

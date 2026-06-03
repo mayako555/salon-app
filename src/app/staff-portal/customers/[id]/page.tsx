@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getCustomerById, Customer, updateCustomer, deleteCustomer } from "@/lib/customers";
+import { useAuth } from "@/lib/auth-context";
 import { getSameDayCancellations, SameDayCancellationRecord, updateSameDayCancellation, addSameDayCancellation, deleteSameDayCancellation } from "@/app/customers/cancellations";
 import { getCounselingByCustomer, CounselingResponse } from "@/lib/counseling";
 import { getKarteByCustomer, KarteRecord } from "@/lib/karte";
@@ -76,11 +77,12 @@ export default function CustomerDetailPage() {
   const [entryUrl, setEntryUrl] = useState(""); // New: Entry URL
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
 
-  const LINE_OA_IDS: Record<string, string> = {
-    "六甲": process.env.NEXT_PUBLIC_LINE_OA_ROKKO || "@625gnrws",
-    "神戸": process.env.NEXT_PUBLIC_LINE_OA_KOBE || "@935poklc",
-    "元町": process.env.NEXT_PUBLIC_LINE_OA_MOTOMACHI || "@344pdgme",
-  };
+  const { availableStores } = useAuth();
+
+  const LINE_OA_IDS = availableStores.reduce((acc, store) => {
+    acc[store] = process.env.NEXT_PUBLIC_LINE_OA_ID || "@dummy_line_id";
+    return acc;
+  }, {} as Record<string, string>);
 
   useEffect(() => {
     async function load() {

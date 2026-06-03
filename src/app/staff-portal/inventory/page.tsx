@@ -37,7 +37,7 @@ function cn(...inputs: ClassValue[]) {
 
 const CATEGORIES = [
   { id: "all", label: "すべて", icon: Boxes },
-  { id: "lash", label: "ラッシュ", icon: Package },
+  { id: "material", label: "業務用・商材", icon: Package },
   { id: "product", label: "店販品", icon: Package },
   { id: "consumable", label: "消耗品", icon: Package },
 ];
