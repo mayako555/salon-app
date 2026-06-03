@@ -188,22 +188,13 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
     const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
 
-    const colRef = collection(db, SALES_COLLECTION);
-    const q = query(
-      colRef, 
-      where("date", ">=", startDate), 
-      where("date", "<=", endDate),
-      orderBy("date", "asc")
-    );
-
-    const getDocsWithTimeout = Promise.race([
-      getDocs(q),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Firestore fetch timed out (10s)")), 10000)
-      )
-    ]);
-
-    const snapshot = await getDocsWithTimeout as any;
+    const { adminDb } = await import("@/lib/firebase-admin");
+    const snapshot = await adminDb
+      .collection(SALES_COLLECTION)
+      .where("date", ">=", startDate)
+      .where("date", "<=", endDate)
+      .orderBy("date", "asc")
+      .get();
     const sales = snapshot.docs.map((d: any) => {
       const data = d.data();
       return {

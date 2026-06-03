@@ -24,23 +24,16 @@ const STAFF_COLLECTION = "staff_profiles";
 
 export async function getContractsList(): Promise<StaffContract[]> {
   try {
-    const colRef = collection(db, CONTRACTS_COLLECTION);
-    const q = query(colRef, orderBy("valid_from", "desc"));
-    
-    const getDocsWithTimeout = Promise.race([
-      getDocs(q),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Firestore fetch timed out (10s)")), 10000)
-      )
-    ]);
-
-    const snapshot = await getDocsWithTimeout as any;
+    const { adminDb } = await import("@/lib/firebase-admin");
+    const snapshot = await adminDb
+      .collection(CONTRACTS_COLLECTION)
+      .orderBy("valid_from", "desc")
+      .get();
     
     // Fetch all staff to map names
-    const staffCol = collection(db, STAFF_COLLECTION);
-    const staffSnapshot = await getDocs(staffCol);
+    const staffSnapshot = await adminDb.collection(STAFF_COLLECTION).get();
     const staffMap = new Map();
-    staffSnapshot.docs.forEach(doc => {
+    staffSnapshot.docs.forEach((doc: any) => {
       staffMap.set(doc.id, doc.data().name);
     });
 

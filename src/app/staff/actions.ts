@@ -55,18 +55,8 @@ import { getCurrentUserContext } from "@/lib/auth-server";
 export async function getStaffList(): Promise<StaffProfile[]> {
   try {
     const ctx = await getCurrentUserContext();
-    const colRef = collection(db, STAFF_COLLECTION);
-    // Remove orderBy from the query itself to ensure records without sort_order are also fetched
-    const q = query(colRef);
-    
-    const getDocsWithTimeout = Promise.race([
-      getDocs(q),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Firestore fetch timed out (10s)")), 10000)
-      )
-    ]);
-
-    const snapshot = await getDocsWithTimeout as any;
+    const { adminDb } = await import("@/lib/firebase-admin");
+    const snapshot = await adminDb.collection(STAFF_COLLECTION).get();
     
     if (snapshot.empty) {
       return [];
