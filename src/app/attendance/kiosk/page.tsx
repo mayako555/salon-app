@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { getDailyAttendance, recordClockIn, recordClockOut } from "../actions";
-import { getStaffList } from "@/app/staff/actions";
+import { getKioskStaffList } from "../actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
@@ -47,11 +47,11 @@ function KioskContent() {
       const today = format(new Date(), "yyyy-MM-dd");
       // Use getStaffList to respect the sort_order set in staff management
       const [staffData, attRecords] = await Promise.all([
-        getStaffList(),
+        getKioskStaffList(),
         getDailyAttendance(today)
       ]);
 
-      const staff = staffData.map(s => ({ ...s }));
+      const staff = staffData.map((s: any) => ({ ...s }));
       const attMap: Record<string, any> = {};
       attRecords.forEach(rec => {
         if (!rec.clock_out) {

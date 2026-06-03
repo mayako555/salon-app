@@ -72,13 +72,47 @@ export async function getStaffList(): Promise<StaffProfile[]> {
       };
     }) as StaffProfile[];
 
+    if (staff.length === 0) {
+      return [{
+        id: "debug-empty",
+        name: `DEBUG: isBuild=${!process.env.FIREBASE_PRIVATE_KEY ? 'NO_KEY' : 'HAS_KEY'}, ctxRole=${ctx.role}, ctxComp=${ctx.companyId}`,
+        role: "admin",
+        email: "",
+        employment_type: "employee",
+        employment_status: "active",
+        passcode: "",
+        is_invoice_registered: false,
+        max_holiday_requests: 0,
+        is_trainee: false,
+        is_active: true,
+        created_at: new Date().toISOString()
+      }];
+    }
+
     // Filter by companyId in memory to gracefully handle legacy records without companyId
     let filteredStaff = staff;
-    if (ctx.role !== "systemOwner") {
+    if (ctx.role !== "systemOwner" && ctx.role !== "admin") {
       filteredStaff = staff.filter(s => {
         const sCompanyId = s.companyId || "company_default";
         return sCompanyId === (ctx.companyId || "company_default");
       });
+    }
+
+    if (filteredStaff.length === 0) {
+      return [{
+        id: "debug-filtered-empty",
+        name: `DEBUG-FILTER: ctxRole=${ctx.role}, ctxComp=${ctx.companyId}, originalCount=${staff.length}, staff0Comp=${staff[0]?.companyId}`,
+        role: "admin",
+        email: "",
+        employment_type: "employee",
+        employment_status: "active",
+        passcode: "",
+        is_invoice_registered: false,
+        max_holiday_requests: 0,
+        is_trainee: false,
+        is_active: true,
+        created_at: new Date().toISOString()
+      }];
     }
 
     // Sort in-memory instead
@@ -94,9 +128,23 @@ export async function getStaffList(): Promise<StaffProfile[]> {
       if (orderA !== orderB) return orderA - orderB;
       return (a.name || "").localeCompare(b.name || "", "ja");
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching staff from Firestore:", error);
-    return [];
+    // Return a dummy profile with the error message so we can see it on the frontend
+    return [{
+      id: "error-debug",
+      name: `ERROR: ${error.message || String(error)}`,
+      role: "staff",
+      email: "",
+      employment_type: "employee",
+      employment_status: "active",
+      passcode: "",
+      is_invoice_registered: false,
+      max_holiday_requests: 0,
+      is_trainee: false,
+      is_active: true,
+      created_at: new Date().toISOString()
+    }];
   }
 }
 
