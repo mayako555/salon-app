@@ -50,8 +50,13 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
       const shift = shifts?.find(sh => sh.staff_id === s.id);
       
       // 2. 「全店舗」なら全員がWorkingHere扱い
+      // storeNameは「六甲店」のように「店」がつく場合があるが、shiftのstoreは「六甲」のような形式のため正規化する
+      const normalizedStoreName = storeName.replace(/店$/, "");
       const isWorkingHere = storeName === "全店舗" || 
-        (shift?.type === "work" && shift.segments?.some(seg => seg.store === storeName));
+        (shift?.type === "work" && shift.segments?.some(seg => {
+           const normalizedSegStore = seg.store.replace(/店$/, "");
+           return normalizedSegStore === normalizedStoreName;
+        }));
       const hasReservation = staffWithRes.has(s.name);
       
       const isOffOrOtherStore = !isWorkingHere && !hasReservation;

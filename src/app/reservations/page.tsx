@@ -143,7 +143,9 @@ export default function ReservationsPage() {
                   shifts.forEach(shift => {
                     if (shift.type === "work") {
                       (shift.segments || []).forEach(seg => {
-                        if (selectedStore === "全店舗" || seg.store === selectedStore) {
+                        const normalizedSelectedStore = selectedStore.replace(/店$/, "");
+                        const normalizedSegStore = seg.store.replace(/店$/, "");
+                        if (selectedStore === "全店舗" || normalizedSegStore === normalizedSelectedStore) {
                           const [h1, m1] = seg.start_time.split(":").map(Number);
                           const [h2, m2] = seg.end_time.split(":").map(Number);
                           totalWorkMinutes += (h2 * 60 + m2) - (h1 * 60 + m1);
