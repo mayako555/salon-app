@@ -22,26 +22,34 @@ export default function StaffPortalSalesPage() {
   const month = new Date().getMonth() + 1;
   const todayStr = format(new Date(), "yyyy-MM-dd");
 
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   useEffect(() => {
     async function load() {
-      const data = await getMonthlySales(year, month);
-      setSales(data);
-      setLoading(false);
+      try {
+        const data = await getMonthlySales(year, month);
+        setSales(data);
 
-      // Check URL for res_id
-      const params = new URLSearchParams(window.location.search);
-      const resId = params.get("res_id");
-      if (resId) {
-        const res = await getReservationById(resId);
-        if (res && res.status !== "completed") {
-          setAutoCheckoutRes(res);
-        } else if (res && res.status === "completed") {
-          const { getSaleByReservationId } = await import('@/app/sales/actions');
-          const sale = await getSaleByReservationId(resId);
-          if (sale) {
-            setAutoEditSale(sale);
+        // Check URL for res_id
+        const params = new URLSearchParams(window.location.search);
+        const resId = params.get("res_id");
+        if (resId) {
+          const res = await getReservationById(resId);
+          if (res && res.status !== "completed") {
+            setAutoCheckoutRes(res);
+          } else if (res && res.status === "completed") {
+            const { getSaleByReservationId } = await import('@/app/sales/actions');
+            const sale = await getSaleByReservationId(resId);
+            if (sale) {
+              setAutoEditSale(sale);
+            }
           }
         }
+      } catch (err: any) {
+        console.error("Failed to load sales data:", err);
+        setErrorMsg(err.message || String(err));
+      } finally {
+        setLoading(false);
       }
     }
     load();
@@ -118,6 +126,7 @@ export default function StaffPortalSalesPage() {
   const staffNames = Array.from(new Set(sales.map(s => s.staff_name))).sort();
 
   if (loading) return <div className="p-10 text-center animate-pulse text-slate-400 font-bold">会計データを読込中...</div>;
+  if (errorMsg) return <div className="p-10 text-center text-red-500 font-bold">Error: {errorMsg}</div>;
 
   return (
     <div className="pb-24">

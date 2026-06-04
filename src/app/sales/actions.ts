@@ -197,10 +197,21 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
       .get();
     const sales = snapshot.docs.map((d: any) => {
       const data = d.data();
+      // Firestore TimestampやDateオブジェクトなどのシリアライズ不可能なオブジェクトをプレーンな値に変換
+      const serializedData: any = {};
+      for (const [key, value] of Object.entries(data)) {
+        if (value && typeof (value as any).toMillis === 'function') {
+          serializedData[key] = (value as any).toMillis();
+        } else if (value instanceof Date) {
+          serializedData[key] = value.getTime();
+        } else {
+          serializedData[key] = value;
+        }
+      }
+      
       return {
         id: d.id,
-        ...data,
-        created_at: data.created_at?.toMillis?.() || data.created_at || null
+        ...serializedData
       };
     }) as SalesRecord[];
 
