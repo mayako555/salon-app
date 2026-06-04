@@ -29,16 +29,41 @@ try {
     const admin = require("firebase-admin");
 
     const getPrivateKey = () => {
-      // ... (existing code for getPrivateKey)
+      // Vercelなどで環境変数として設定する場合、改行コードがエスケープされたり
+      // 意図しない空白が混入することがあるため、それを適切に処理する
       const key = process.env.FIREBASE_PRIVATE_KEY;
       if (!key) return null;
+      
+      let parsedKey = key;
       if (key.trim().startsWith('{')) {
         try {
           const parsed = JSON.parse(key);
-          if (parsed.private_key) return parsed.private_key.replace(/\\n/g, "\n");
+          if (parsed.private_key) parsedKey = parsed.private_key;
         } catch (e) {}
       }
-      return key.replace(/\\n/g, "\n").replace(/\"/g, "").trim();
+      
+      // 先頭・末尾のクォーテーションやリテラルの\nを実際の改行に変換
+      parsedKey = parsedKey.replace(/\\n/g, "\n").replace(/\"/g, "").trim();
+      
+      // base64のペイロード部分に意図せず空白やバックスラッシュ(\)が混入した場合、
+      // PEMフォーマットエラー(Invalid PEM formatted message)になるため、
+      // Base64として有効な文字以外をすべて除去し、64文字ごとに再フォーマットする
+      const header = "-----BEGIN PRIVATE KEY-----";
+      const footer = "-----END PRIVATE KEY-----";
+      if (parsedKey.includes(header) && parsedKey.includes(footer)) {
+        const payloadStart = parsedKey.indexOf(header) + header.length;
+        const payloadEnd = parsedKey.indexOf(footer);
+        const payload = parsedKey.substring(payloadStart, payloadEnd);
+        
+        // Base64として有効な文字 (A-Z, a-z, 0-9, +, /, =) 以外をすべて削除
+        const cleanedPayload = payload.replace(/[^A-Za-z0-9+/=]/g, "");
+        
+        // 64文字ごとに改行を挿入して再構築
+        const wrappedPayload = cleanedPayload.match(/.{1,64}/g)?.join("\n") || cleanedPayload;
+        parsedKey = header + "\n" + wrappedPayload + "\n" + footer;
+      }
+      
+      return parsedKey;
     };
 
     const getClientEmail = () => {

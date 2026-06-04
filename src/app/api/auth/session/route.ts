@@ -42,3 +42,25 @@ export async function DELETE() {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
+
+export async function GET() {
+  try {
+    const cookieStore = await cookies();
+    const session = cookieStore.get("session")?.value;
+    if (!session) return NextResponse.json({ error: "No session" });
+    
+    try {
+      const decodedClaims = await adminAuth.verifySessionCookie(session, true);
+      return NextResponse.json({ success: true, uid: decodedClaims.uid });
+    } catch (e: any) {
+      return NextResponse.json({ 
+        error: "verifySessionCookie failed", 
+        message: e.message || String(e),
+        code: e.code,
+        sessionValue: session.substring(0, 20) + "..."
+      });
+    }
+  } catch (error: any) {
+    return NextResponse.json({ error: "Global error", message: error.message });
+  }
+}
