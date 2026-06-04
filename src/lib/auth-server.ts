@@ -18,7 +18,7 @@ export async function getCurrentUserContext(): Promise<UserContext> {
   const session = cookieStore.get("session")?.value;
 
   if (!session) {
-    throw new Error("権限がありません");
+    throw new Error("セッションが見つかりません (Missing Session Cookie)");
   }
 
   try {
@@ -35,7 +35,7 @@ export async function getCurrentUserContext(): Promise<UserContext> {
       snapshot = await adminDb.collection("staff_profiles").where("uid", "==", uid).limit(1).get();
     }
     
-    if (snapshot.empty) {
+    if (!snapshot || snapshot.empty) {
       // Create a default systemOwner context if they have an Auth account but no staff profile
       return {
         uid,
@@ -45,7 +45,10 @@ export async function getCurrentUserContext(): Promise<UserContext> {
       };
     }
 
-    const userData = snapshot.docs[0].data();
+    const userData = snapshot.docs[0]?.data();
+    if (!userData) {
+      throw new Error("ユーザーデータが空です (Empty User Data)");
+    }
     
     return {
       uid,
@@ -53,9 +56,9 @@ export async function getCurrentUserContext(): Promise<UserContext> {
       companyId: userData?.companyId || "company_default", // 後方互換のためデフォルト値を設定
       salonIds: userData?.salonIds || [],
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Auth verification failed:", error);
-    throw new Error("権限がありません");
+    throw new Error(`認証エラー: ${error.message || String(error)}`);
   }
 }
 
