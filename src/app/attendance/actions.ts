@@ -275,10 +275,23 @@ export async function getKioskStaffList() {
   try {
     const { adminDb } = await import("@/lib/firebase-admin");
     const snap = await adminDb.collection("staff_profiles").get();
-    const staffList = snap.docs.map((doc: any) => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    const staffList = snap.docs.map((doc: any) => {
+      const data = doc.data();
+      const serializedData: any = {};
+      for (const [key, value] of Object.entries(data)) {
+        if (value && typeof (value as any).toMillis === 'function') {
+          serializedData[key] = (value as any).toMillis();
+        } else if (value instanceof Date) {
+          serializedData[key] = value.getTime();
+        } else {
+          serializedData[key] = value;
+        }
+      }
+      return {
+        id: doc.id,
+        ...serializedData
+      };
+    });
     
     // Default fallback to company_default since kiosk has no session context
     const filteredStaff = staffList.filter((s: any) => {
