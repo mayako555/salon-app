@@ -75,7 +75,8 @@ function SortableItem({
   onToggle, 
   onEdit, 
   onDelete,
-  onDuplicate
+  onDuplicate,
+  onOrderChange
 }: { 
   item: SalesMasterItem; 
   index: number; 
