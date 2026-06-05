@@ -5,6 +5,7 @@ export type SalesMasterItem = {
   id?: string;
   store: "六甲" | "神戸" | "元町" | "共通";
   itemType: "menu" | "coupon" | "messageCoupon" | "option" | "discount" | "fee" | "karteTemplate" | "product" | "reservationRoute" | "paymentMethod" | "store";
+  majorCategory?: string; // 施術、店販、割引・サービス、オプションなど
   category: string;
   name: string;
   internalName?: string;

@@ -84,6 +84,7 @@ function SortableItem({
   onEdit: (item: SalesMasterItem) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
+  onOrderChange: (id: string, newOrder: number) => void;
 }) {
   const {
     attributes,
@@ -100,6 +101,12 @@ function SortableItem({
     zIndex: isDragging ? 50 : 1,
     position: 'relative' as any,
   };
+
+  const [orderVal, setOrderVal] = useState(item.sortOrder ?? index);
+
+  useEffect(() => {
+    setOrderVal(item.sortOrder ?? index);
+  }, [item.sortOrder, index]);
 
   return (
     <div ref={setNodeRef} style={style}>
@@ -131,9 +138,25 @@ function SortableItem({
                 {item.store}
               </Badge>
               <span className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">{item.category}</span>
-              <Badge variant="secondary" className="text-[9px] font-bold h-5 bg-slate-100 text-slate-500">
-                #{item.sortOrder || index}
-              </Badge>
+              <div className="flex items-center bg-slate-100 rounded-md overflow-hidden border border-slate-200">
+                <span className="text-[10px] font-bold text-slate-400 pl-2">#</span>
+                <input 
+                  type="number"
+                  className="w-12 h-5 bg-transparent border-none text-[10px] font-bold text-slate-600 focus:ring-0 p-0 text-center no-spinners"
+                  value={orderVal}
+                  onChange={(e) => setOrderVal(parseInt(e.target.value) || 0)}
+                  onBlur={() => {
+                    if (orderVal !== (item.sortOrder ?? index)) {
+                      onOrderChange(item.id!, orderVal);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.currentTarget.blur();
+                    }
+                  }}
+                />
+              </div>
             </div>
             <h3 className="font-black text-slate-800 truncate">{item.name}</h3>
             {item.hpbName && <p className="text-[10px] text-slate-400 truncate mt-0.5">{item.hpbName}</p>}
@@ -368,7 +391,7 @@ export default function MasterManagementPage() {
     
     if (typeFilter !== "all") {
       if (typeFilter === "menu") {
-        const menuTypes = ["menu", "coupon", "messageCoupon", "option", "discount", "fee"];
+        const menuTypes = ["menu", "coupon", "messageCoupon", "option", "fee"];
         if (!menuTypes.includes(item.itemType)) return false;
       } else if (typeFilter === "product") {
         if (item.itemType !== "product") return false;
@@ -635,6 +658,23 @@ export default function MasterManagementPage() {
                           toast.error("複製に失敗しました");
                         }
                       }}
+                      onOrderChange={async (id, newOrder) => {
+                        // 楽観的UI更新
+                        setItems(prev => {
+                          const newItems = prev.map(p => p.id === id ? { ...p, sortOrder: newOrder } : p);
+                          return newItems.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+                        });
+                        
+                        // DB保存
+                        const promise = updateMasterItemOrder(id, newOrder);
+                        toast.promise(promise, {
+                          loading: '順番を保存中...',
+                          success: '順番を保存しました',
+                          error: '順番の保存に失敗しました'
+                        });
+                        await promise;
+                        loadItems(); // Refresh to ensure DB sync
+                      }}
                     />
                   ))}
                 </SortableContext>
@@ -747,27 +787,59 @@ export default function MasterManagementPage() {
             {editingItem?.itemType !== 'reservationRoute' && editingItem?.itemType !== 'paymentMethod' && editingItem?.itemType !== 'store' && (
               <div className="grid grid-cols-2 gap-4">
                 {editingItem?.itemType !== 'product' && (
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Category</label>
-                    <select 
-                      className="w-full h-12 bg-slate-50 border-none rounded-2xl px-4 font-bold text-sm"
-                      value={editingItem?.category}
-                      onChange={(e) => setEditingItem({ ...editingItem!, category: e.target.value })}
-                    >
-                      <option value="">選択してください</option>
-                      <option value="アイブロウメニュー">アイブロウメニュー</option>
-                      <option value="マツエクメニュー">マツエクメニュー</option>
-                      <option value="まつ毛パーマメニュー">まつ毛パーマメニュー</option>
-                      <option value="毛質変更">毛質変更</option>
-                      <option value="付け替えオフ">付け替えオフ</option>
-                      <option value="その他オプション">その他オプション</option>
-                      <option value="割引">割引</option>
-                      <option value="店販">店販</option>
-                      <option value="予約経路">予約経路</option>
-                      <option value="店舗">店舗</option>
-                      <option value="その他">その他</option>
-                    </select>
-                  </div>
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Major Category (大分類タブ)</label>
+                      <select 
+                        className="w-full h-12 bg-slate-50 border-none rounded-2xl px-4 font-bold text-sm"
+                        value={editingItem?.majorCategory || ""}
+                        onChange={(e) => setEditingItem({ ...editingItem!, majorCategory: e.target.value })}
+                      >
+                        <option value="">選択（デフォルト: 施術）</option>
+                        <option value="施術">施術</option>
+                        <option value="店販">店販</option>
+                        <option value="割引・サービス">割引・サービス</option>
+                        <option value="オプション">オプション</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Category (小分類タブ)</label>
+                      <select 
+                        className="w-full h-12 bg-slate-50 border-none rounded-2xl px-4 font-bold text-sm"
+                        value={editingItem?.category || ""}
+                        onChange={(e) => setEditingItem({ ...editingItem!, category: e.target.value })}
+                      >
+                        <option value="">選択してください</option>
+                        {(!editingItem?.majorCategory || editingItem?.majorCategory === "施術") && (
+                          <optgroup label="施術">
+                            <option value="新規クーポン">新規クーポン</option>
+                            <option value="再来クーポン">再来クーポン</option>
+                            <option value="通常メニュー">通常メニュー</option>
+                          </optgroup>
+                        )}
+                        {(!editingItem?.majorCategory || editingItem?.majorCategory === "店販") && (
+                          <optgroup label="店販">
+                            <option value="店販">店販</option>
+                            <option value="社販">社販</option>
+                          </optgroup>
+                        )}
+                        {(!editingItem?.majorCategory || editingItem?.majorCategory === "割引・サービス") && (
+                          <optgroup label="割引・サービス">
+                            <option value="割引">割引</option>
+                            <option value="サービス">サービス</option>
+                          </optgroup>
+                        )}
+                        {(!editingItem?.majorCategory || editingItem?.majorCategory === "オプション") && (
+                          <optgroup label="オプション">
+                            <option value="毛質変更">毛質変更</option>
+                            <option value="オプション">オプション</option>
+                            <option value="付け替えオフ">付け替えオフ</option>
+                          </optgroup>
+                        )}
+                        <option value="その他">その他</option>
+                      </select>
+                    </div>
+                  </>
                 )}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Price</label>

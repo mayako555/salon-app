@@ -303,8 +303,22 @@ export default function StaffPortalSalesPage() {
                     <p className="text-[10px] text-slate-500">{sale.store_name} / 担当: {sale.staff_name} / {sale.menu_course || "メニュー不明"}</p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="flex items-center gap-3 text-right">
                   <span className="font-bold text-slate-700 text-sm">¥{(sale.tech_sales + sale.product_sales + (sale.hpb_points || 0) - (sale.discount || 0)).toLocaleString()}</span>
+                  <CheckoutDialog 
+                    initialData={sale}
+                    staffList={staffNames}
+                    defaultStoreName={sale.store_name}
+                    readOnly={sale.status === 'closed'}
+                    onSuccess={() => {
+                      window.location.href = '/staff-portal/reservations';
+                    }}
+                    trigger={
+                      <button className="p-2 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-emerald-600 transition-colors">
+                        {sale.status === 'closed' ? <Search size={16} /> : <Database size={16} />}
+                      </button>
+                    }
+                  />
                 </div>
               </div>
             ))}

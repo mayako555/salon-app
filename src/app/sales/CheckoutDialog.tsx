@@ -377,33 +377,48 @@ export default function CheckoutDialog({
 
   const dynamicMapping = useMemo(() => {
     const mapping: Record<string, string[]> = {
-      'クーポン・割引': [],
-      'メニュー': [],
-      'オプション': [],
-      '店販': []
+      '施術': [],
+      '店販': [],
+      '割引・サービス': [],
+      'オプション': []
     };
 
-    storeMasterData.filter(i => i.isActive !== false && i.itemType !== 'store' && i.itemType !== 'reservationRoute').forEach(item => {
+    storeMasterData.filter(i => i.isActive !== false && i.itemType !== 'store' && i.itemType !== 'reservationRoute' && i.itemType !== 'paymentMethod').forEach(item => {
       const cat = item.category || "その他";
-      let mTab = 'メニュー';
+      const mTab = item.majorCategory || '施術';
       
-      if (item.itemType === 'product' || cat === '店販') mTab = '店販';
-      else if (item.itemType === 'discount' || cat === '割引' || item.itemType === 'coupon' || item.itemType === 'messageCoupon' || cat.includes('クーポン')) mTab = 'クーポン・割引';
-      else if (item.itemType === 'option' || cat.includes('オプション') || cat === '毛質変更' || cat === '付け替えオフ' || item.itemType === 'fee') mTab = 'オプション';
+      if (!mapping[mTab]) {
+        mapping[mTab] = [];
+      }
       
       if (!mapping[mTab].includes(cat)) {
         mapping[mTab].push(cat);
       }
     });
 
-    // Ensure default categories exist if missing
-    if (mapping['クーポン・割引'].length === 0) mapping['クーポン・割引'].push('割引');
-    if (mapping['店販'].length === 0) mapping['店販'].push('店販');
+    // Custom sorting to match user request where possible
+    const sortOrders: Record<string, string[]> = {
+      '施術': ['新規クーポン', '再来クーポン', '通常メニュー'],
+      '店販': ['店販', '社販'],
+      '割引・サービス': ['割引', 'サービス'],
+      'オプション': ['毛質変更', 'オプション', '付け替えオフ']
+    };
+
+    Object.keys(mapping).forEach(key => {
+      mapping[key].sort((a, b) => {
+        const orderA = sortOrders[key]?.indexOf(a) ?? 999;
+        const orderB = sortOrders[key]?.indexOf(b) ?? 999;
+        if (orderA !== 999 && orderB !== 999) return orderA - orderB;
+        if (orderA !== 999) return -1;
+        if (orderB !== 999) return 1;
+        return a.localeCompare(b);
+      });
+    });
 
     return mapping;
   }, [storeMasterData]);
 
-  const majorTabs = ['クーポン・割引', 'メニュー', 'オプション', '店販'];
+  const majorTabs = ['施術', '店販', '割引・サービス', 'オプション'];
   const tabs = dynamicMapping[majorTab] || [];
 
   // 大分類が切り替わった際に、小分類の初期値を設定する
@@ -536,11 +551,11 @@ export default function CheckoutDialog({
                     <div className="grid grid-cols-2 gap-2">
                       <div className="relative">
                         <span className="absolute left-2 top-2.5 text-[10px] text-slate-400 font-bold pointer-events-none">セイ</span>
-                        <input required type="text" name="last_name_kana" autoComplete="off" placeholder="ヤマダ" value={lastNameKana} onChange={(e) => { setLastNameKana(toKatakana(e.target.value)); setShowCustomerResults(true); if (selectedCustomer) setSelectedCustomer(null); }} onFocus={() => setShowCustomerResults(true)} className="w-full h-9 pl-10 pr-3 border border-slate-300 rounded-md text-[11px] font-bold bg-slate-50" />
+                        <input required type="text" name="last_name_kana" autoComplete="off" placeholder="ヤマダ" value={lastNameKana} onChange={(e) => { setLastNameKana(e.target.value); setShowCustomerResults(true); if (selectedCustomer) setSelectedCustomer(null); }} onBlur={() => setLastNameKana(toKatakana(lastNameKana))} onFocus={() => setShowCustomerResults(true)} className="w-full h-9 pl-10 pr-3 border border-slate-300 rounded-md text-[11px] font-bold bg-slate-50" />
                       </div>
                       <div className="relative">
                         <span className="absolute left-2 top-2.5 text-[10px] text-slate-400 font-bold pointer-events-none">メイ</span>
-                        <input required type="text" name="first_name_kana" autoComplete="off" placeholder="ハナコ" value={firstNameKana} onChange={(e) => { setFirstNameKana(toKatakana(e.target.value)); setShowCustomerResults(true); if (selectedCustomer) setSelectedCustomer(null); }} onFocus={() => setShowCustomerResults(true)} className="w-full h-9 pl-10 pr-3 border border-slate-300 rounded-md text-[11px] font-bold bg-slate-50" />
+                        <input required type="text" name="first_name_kana" autoComplete="off" placeholder="ハナコ" value={firstNameKana} onChange={(e) => { setFirstNameKana(e.target.value); setShowCustomerResults(true); if (selectedCustomer) setSelectedCustomer(null); }} onBlur={() => setFirstNameKana(toKatakana(firstNameKana))} onFocus={() => setShowCustomerResults(true)} className="w-full h-9 pl-10 pr-3 border border-slate-300 rounded-md text-[11px] font-bold bg-slate-50" />
                       </div>
                     </div>
                     <input type="hidden" name="customer_id" value={selectedCustomer?.id || ""} />
