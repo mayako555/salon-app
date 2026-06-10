@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { addCashTransaction, CashTransactionType } from "@/app/cash/actions";
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/lib/auth-context";
 import { Wallet, Banknote, Edit3 } from "lucide-react";
 
 type Props = {

@@ -9,7 +9,7 @@ import {
   verifyCashTransaction,
   deleteCashTransaction
 } from "@/app/cash/actions";
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, CheckCircle, Clock, Trash2, Wallet, Banknote, RefreshCcw } from "lucide-react";
