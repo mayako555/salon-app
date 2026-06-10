@@ -16,7 +16,7 @@ type Props = {
 };
 
 export default function CashTransactionDialog({ isOpen, onClose, onSuccess, storeName, isAdmin }: Props) {
-  const { userContext } = useAuth();
+  const { profile } = useAuth();
   const [type, setType] = useState<CashTransactionType>("deposit");
   const [amount, setAmount] = useState<string>("");
   const [date, setDate] = useState(new Date().toLocaleDateString("sv-SE")); // YYYY-MM-DD
@@ -43,7 +43,7 @@ export default function CashTransactionDialog({ isOpen, onClose, onSuccess, stor
       date,
       amount: Number(amount),
       type,
-      staff_name: userContext?.name || "Unknown",
+      staff_name: profile?.name || "Unknown",
       status,
       note
     });

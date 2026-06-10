@@ -16,20 +16,20 @@ import { Plus, CheckCircle, Clock, Trash2, Wallet, Banknote, RefreshCcw } from "
 import CashTransactionDialog from "./CashTransactionDialog";
 
 export default function CashManagementPage() {
-  const { userContext } = useAuth();
+  const { profile, isAdmin, selectedStore } = useAuth();
   const [transactions, setTransactions] = useState<CashTransactionRecord[]>([]);
   const [currentCash, setCurrentCash] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [storeName, setStoreName] = useState<string>("六甲"); // Default or from context
+  const [storeName, setStoreName] = useState<string>("六甲店"); // Default or from context
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
 
   useEffect(() => {
-    if (userContext?.salonIds && userContext.salonIds.length > 0) {
-      setStoreName(userContext.salonIds[0]);
+    if (selectedStore) {
+      setStoreName(selectedStore);
     }
-  }, [userContext]);
+  }, [selectedStore]);
 
   const loadData = async () => {
     if (!storeName) return;
@@ -52,17 +52,15 @@ export default function CashManagementPage() {
 
   const handleVerify = async (id: string) => {
     if (!confirm("入金を確認済みにしますか？")) return;
-    await verifyCashTransaction(id, userContext?.name || "Unknown");
+    await verifyCashTransaction(id, profile?.name || "Unknown");
     loadData();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("この記録を削除しますか？")) return;
-    await deleteCashTransaction(id, userContext?.name || "Unknown");
+    await deleteCashTransaction(id, profile?.name || "Unknown");
     loadData();
   };
-
-  const isAdmin = ["systemOwner", "companyOwner", "manager"].includes(userContext?.role || "");
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -176,7 +174,7 @@ export default function CashManagementPage() {
                           着金を確認
                         </Button>
                       )}
-                      {(isAdmin || t.staff_name === userContext?.name) && (
+                      {(isAdmin || t.staff_name === profile?.name) && (
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDelete(t.id!)}>
                           <Trash2 className="w-4 h-4" />
                         </Button>
