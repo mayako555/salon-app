@@ -193,19 +193,7 @@ export default function StaffPortalSalesPage() {
       )}
 
       <div className="-mt-6 px-4 space-y-6">
-        <div className="bg-white rounded-xl shadow-md border border-slate-100 p-6 flex flex-col items-center justify-center">
-          <p className="text-slate-500 font-bold mb-4">{format(new Date(), "yyyy年M月d日 (E)", { locale: ja })} の売上登録</p>
-          <div className="w-full flex justify-center">
-            <CheckoutDialog 
-              defaultStaffName={profile?.name || ""} 
-              defaultStoreName="六甲" 
-              staffList={staffNames} 
-              onSuccess={() => {
-                window.location.href = '/staff-portal/reservations';
-              }}
-            />
-          </div>
-        </div>
+
 
         <div className="space-y-3">
           <h2 className="font-bold text-slate-800 ml-1 flex items-center gap-2">

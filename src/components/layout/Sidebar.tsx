@@ -39,9 +39,11 @@ const managementCategories = [
   {
     title: "日常業務",
     items: [
-      { name: "ダッシュボード", href: "/dashboard", icon: LayoutDashboard, role: "staff" },
-      { name: "予約スケジュール管理", href: "/reservations", icon: CalendarDays, role: "staff" },
+      { name: "スタッフホーム", href: "/staff-portal", icon: LayoutDashboard, role: "staff" },
+      { name: "予約カレンダー", href: "/staff-portal/reservations", icon: CalendarDays, role: "staff" },
+      { name: "顧客管理", href: "/staff-portal/customers", icon: Users, role: "staff" },
       { name: "売上管理・レジ締め", href: "/sales", icon: Coins, role: "staff" },
+      { name: "管理者ダッシュボード", href: "/dashboard", icon: LayoutDashboard, role: "manager" },
     ]
   },
   {
@@ -154,28 +156,26 @@ export function Sidebar() {
       
       <div className="flex flex-1 flex-col overflow-y-auto py-4">
         <nav className="flex-1 space-y-6 px-3 pb-8">
-          {/* Management Section */}
-          {(isAdmin || isManager) && (
-            <div className="space-y-6">
-              {managementCategories.map((category) => {
-                const visibleItems = category.items.filter(item => hasAccess(item.role));
-                if (visibleItems.length === 0) return null;
-                
-                return (
-                  <div key={category.title} className="space-y-1">
-                    <h3 className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                      {category.title}
-                    </h3>
-                    <div className="space-y-1">
-                      {visibleItems.map((item) => (
-                        <NavItem key={item.name} item={item} />
-                      ))}
-                    </div>
+          {/* Management & Operations Section */}
+          <div className="space-y-6">
+            {managementCategories.map((category) => {
+              const visibleItems = category.items.filter(item => hasAccess(item.role));
+              if (visibleItems.length === 0) return null;
+              
+              return (
+                <div key={category.title} className="space-y-1">
+                  <h3 className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                    {category.title}
+                  </h3>
+                  <div className="space-y-1">
+                    {visibleItems.map((item) => (
+                      <NavItem key={item.name} item={item} />
+                    ))}
                   </div>
-                );
-              })}
-            </div>
-          )}
+                </div>
+              );
+            })}
+          </div>
 
           {/* Staff Portal Section */}
           <div className="space-y-6 pt-4 border-t border-slate-100">

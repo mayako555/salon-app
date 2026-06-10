@@ -121,14 +121,7 @@ export default function DailyScheduleView({
                           </div>
                         </div>
                       ) : (
-                        <button 
-                          onClick={() => onAddClick(staff, time)}
-                          className="absolute inset-0 w-full h-full opacity-0 group-hover/cell:opacity-100 bg-blue-50/50 flex items-center justify-center transition-opacity"
-                        >
-                          <div className="bg-white p-1.5 rounded-lg shadow-sm border border-blue-100 text-blue-600">
-                            <Plus size={16} />
-                          </div>
-                        </button>
+                        <div className="absolute inset-0 w-full h-full bg-transparent flex items-center justify-center transition-opacity" />
                       )}
                     </div>
                   );
@@ -149,10 +142,7 @@ export default function DailyScheduleView({
           <div className="w-3 h-3 bg-slate-100 border border-slate-200 rounded-sm" />
           <span>会計済み / ロック中</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Plus size={12} className="text-blue-500" />
-          <span>クリックして枠に会計を追加</span>
-        </div>
+
         <div className="ml-auto flex gap-3">
           <div className="flex items-center gap-1">
             <Scissors size={12} className="text-blue-400" />

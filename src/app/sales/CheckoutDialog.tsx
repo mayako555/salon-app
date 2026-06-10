@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, X, Search, Sparkles, Tag, MessageSquare, Calendar, Scissors, Gift, Lock, ClipboardEdit } from "lucide-react";
-import { addCheckout, updateCheckout, getStoreMasterData, SalesRecord } from "./actions";
+import { Plus, X, Search, Sparkles, Tag, MessageSquare, Calendar, Scissors, Gift, Lock, ClipboardEdit, Trash2 } from "lucide-react";
+import { addCheckout, updateCheckout, getStoreMasterData, SalesRecord, deleteSale } from "./actions";
 import { format } from "date-fns";
 import { SalesMasterItem } from "./seeds";
 import { getStaffList, StaffProfile } from "../staff/actions";
@@ -95,6 +95,10 @@ export default function CheckoutDialog({
   const [showLinePreview, setShowLinePreview] = useState(false);
   const [previewLineText, setPreviewLineText] = useState("");
   const [pendingFormData, setPendingFormData] = useState<FormData | null>(null);
+
+  // Deletion state
+  const [showDeletePrompt, setShowDeletePrompt] = useState(false);
+  const [deletingStaff, setDeletingStaff] = useState("");
 
   useEffect(() => {
     if (isOpen) {
@@ -341,6 +345,25 @@ export default function CheckoutDialog({
     }
     
     await executeSubmit(formData);
+  };
+
+  // Handle explicit delete
+  const handleDelete = async () => {
+    if (!initialData?.id) return;
+    if (!deletingStaff) {
+      alert("削除を実行するスタッフを選択してください。");
+      return;
+    }
+    
+    setIsSubmitting(true);
+    const res = await deleteSale(initialData.id, deletingStaff);
+    if (res.success) {
+      setIsOpen(false);
+      if (onSuccess) onSuccess();
+    } else {
+      alert("削除に失敗しました: " + res.error);
+    }
+    setIsSubmitting(false);
   };
 
   const executeSubmit = async (formData: FormData) => {
@@ -802,17 +825,59 @@ export default function CheckoutDialog({
                       カルテ入力へ
                     </Button>
                   )}
-                </div>
-                <div className="flex gap-3">
-                  <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={isSubmitting}>
-                    {readOnly ? "閉じる" : "キャンセル"}
-                  </Button>
-                  {!readOnly && (
-                    <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[120px]">
-                      {isSubmitting ? "処理中..." : "保存する"}
+                  {initialData?.id && !readOnly && (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="ml-2 text-rose-600 border-rose-200 hover:bg-rose-50 shadow-sm font-bold" 
+                      onClick={() => setShowDeletePrompt(true)}
+                      disabled={isSubmitting || showDeletePrompt}
+                    >
+                      <Trash2 size={16} className="sm:mr-2" />
+                      <span className="hidden sm:inline">この会計を削除</span>
                     </Button>
                   )}
                 </div>
+                
+                {showDeletePrompt ? (
+                  <div className="flex items-center gap-2 bg-rose-50 p-2 rounded-lg border border-rose-200">
+                    <select 
+                      className="h-9 px-2 border border-rose-300 rounded text-sm text-rose-800 bg-white"
+                      value={deletingStaff}
+                      onChange={(e) => setDeletingStaff(e.target.value)}
+                    >
+                      <option value="">削除担当者を選択</option>
+                      {dbStaffList.map(staff => <option key={staff.id} value={staff.name}>{staff.name}</option>)}
+                    </select>
+                    <Button 
+                      type="button" 
+                      onClick={handleDelete} 
+                      disabled={isSubmitting || !deletingStaff} 
+                      className="bg-rose-600 hover:bg-rose-700 text-white text-xs h-9 px-3"
+                    >
+                      本当に削除する
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      onClick={() => setShowDeletePrompt(false)} 
+                      className="h-9 px-2 text-rose-600 hover:bg-rose-100 text-xs"
+                    >
+                      やめる
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={isSubmitting}>
+                      {readOnly ? "閉じる" : "キャンセル"}
+                    </Button>
+                    {!readOnly && (
+                      <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[120px]">
+                        {isSubmitting ? "処理中..." : "保存する"}
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             </form>
           </div>

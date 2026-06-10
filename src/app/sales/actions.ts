@@ -314,6 +314,14 @@ export async function addCheckout(formData: FormData) {
       return { success: false, error: "必須項目が入力されていません。" };
     }
 
+    if (sourceReservationId) {
+      const q = query(collection(db, SALES_COLLECTION), where("source_reservation_id", "==", sourceReservationId), limit(1));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        return { success: false, error: "この予約はすでに会計済みです（二重会計エラー）。" };
+      }
+    }
+
     const payload = {
       staff_id: staffId || "staff-" + staffName,
       staff_name: staffName,
@@ -633,24 +641,66 @@ export async function importHotPepperCsv(formData: FormData) {
     const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, dynamicTyping: true });
     const rows = parsed.data as any[];
 
-    // Step 1: Group rows by Accounting ID
+    // Helper for date formatting
+    const formatDate = (rawDate: string) => {
+      let dateFormatted = rawDate;
+      if (rawDate.includes("/")) {
+        const parts = rawDate.split("/");
+        dateFormatted = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      } else if (rawDate.includes("-")) {
+        const parts = rawDate.split("-");
+        dateFormatted = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      } else if (rawDate.length === 8) {
+        dateFormatted = `${rawDate.substring(0, 4)}-${rawDate.substring(4, 6)}-${rawDate.substring(6, 8)}`;
+      }
+      return dateFormatted;
+    };
+
+    // Step 1: Group rows by Accounting ID and collect min/max dates
     const groups: Record<string, any[]> = {};
+    let minDate = "9999-99-99";
+    let maxDate = "0000-00-00";
+
     rows.forEach(row => {
       const accountingId = row["会計ID"] || row["予約ID"] || "";
-      const customerName = row["お客様名"] || row["顧客名"] || row["顧客氏名"] || row["customer"] || "不明";
-      const rawDate = row["会計日"] || row["来店日"] || "";
-      const rawTime = row["会計時間"] || row["来店時間"] || "";
+      const customerName = String(row["お客様名"] || row["顧客名"] || row["顧客氏名"] || row["customer"] || "不明").trim();
+      const rawDate = String(row["会計日"] || row["来店日"] || "");
+      const rawTime = String(row["会計時間"] || row["来店時間"] || "");
       
       const groupId = accountingId || `${customerName}_${rawDate}_${rawTime}`;
       if (!groups[groupId]) groups[groupId] = [];
       groups[groupId].push(row);
+
+      const fDate = formatDate(rawDate);
+      if (fDate && fDate < minDate) minDate = fDate;
+      if (fDate && fDate > maxDate) maxDate = fDate;
     });
 
-    const batch = writeBatch(db);
     const colRef = collection(db, SALES_COLLECTION);
-    let importCount = 0;
+    
+    // Step 2: Fetch existing records to prevent duplicates
+    const existingKeys = new Set<string>();
+    if (minDate !== "9999-99-99" && maxDate !== "0000-00-00") {
+      const q = query(colRef, 
+        where("date", ">=", minDate), 
+        where("date", "<=", maxDate)
+      );
+      const snapshot = await getDocs(q);
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        if (d.source === "hotpepper") {
+          // Generate a deduplication key
+          const key = `${d.customer_name}_${d.date}_${d.time}`;
+          existingKeys.add(key);
+        }
+      });
+    }
 
-    // Step 2: Process each group
+    const batch = writeBatch(db);
+    let importCount = 0;
+    let skipCount = 0;
+
+    // Step 3: Process each group
     Object.values(groups).forEach(groupRows => {
       const firstRow = groupRows[0];
       const rawStaffName = groupRows.find(r => r["スタッフ"] || r["担当スタッフ"] || r["スタッフ名"])?.["スタッフ"] || "フリー";
@@ -688,18 +738,15 @@ export async function importHotPepperCsv(formData: FormData) {
 
       if (groupRows.some(r => String(r["会計区分"] || "").includes("取り消し")) && (techSales + prodSales === 0)) return;
 
-      let dateFormatted = rawDate;
-      if (rawDate.includes("/")) {
-        const parts = rawDate.split("/");
-        dateFormatted = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-      } else if (rawDate.includes("-")) {
-        const parts = rawDate.split("-");
-        dateFormatted = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-      } else if (rawDate.length === 8) {
-        dateFormatted = `${rawDate.substring(0, 4)}-${rawDate.substring(4, 6)}-${rawDate.substring(6, 8)}`;
-      }
-
+      const dateFormatted = formatDate(rawDate);
       let timeFormatted = rawTime.includes(":") ? rawTime : `${rawTime.padStart(4, '0').substring(0, 2)}:${rawTime.padStart(4, '0').substring(2, 4)}`;
+
+      // Deduplication check
+      const dupKey = `${customerName}_${dateFormatted}_${timeFormatted}`;
+      if (existingKeys.has(dupKey)) {
+        skipCount++;
+        return; // Skip this duplicate record
+      }
 
       const docRef = doc(colRef);
       batch.set(docRef, {
@@ -728,7 +775,7 @@ export async function importHotPepperCsv(formData: FormData) {
 
     await batch.commit();
     revalidatePath("/staff-portal/sales");
-    return { success: true, count: importCount };
+    return { success: true, count: importCount, skipped: skipCount };
   } catch (error: any) {
     console.error("Error importing CSV:", error);
     return { success: false, error: error.message };
@@ -750,13 +797,34 @@ export async function closeDailySales(date: string) {
   }
 }
 
-export async function deleteSale(id: string) {
+export async function deleteSale(id: string, deletedByStaffName?: string) {
   try {
     const docRef = doc(db, SALES_COLLECTION, id);
     const snap = await getDocs(query(collection(db, SALES_COLLECTION), where("__name__", "==", id)));
     if (!snap.empty) {
-      const saleData = { id: snap.docs[0].id, ...snap.docs[0].data() };
+      const saleData = { id: snap.docs[0].id, ...snap.docs[0].data() } as any;
       await syncInventoryFromSale(saleData, "return");
+      
+      // 削除時に元の予約のステータスを戻す
+      if (saleData.source_reservation_id) {
+        try {
+          await updateDoc(doc(db, "reservations", saleData.source_reservation_id), { 
+            status: "booked",
+            updated_at: serverTimestamp()
+          });
+        } catch (e) {
+          console.error("Failed to revert reservation status:", e);
+        }
+      }
+
+      await addAuditLog({
+        table_name: SALES_COLLECTION,
+        record_id: id,
+        action: "DELETE",
+        old_data: saleData,
+        new_data: null,
+        actor: deletedByStaffName || "不明スタッフ"
+      });
     }
     await deleteDoc(docRef);
     revalidatePath("/staff-portal/sales");
