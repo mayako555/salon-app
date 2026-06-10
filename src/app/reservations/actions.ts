@@ -30,6 +30,8 @@ export type Reservation = {
   memo?: string;
   expected_price?: number;
   same_day_cancel_count?: number; // Optional flag to show on calendar
+  customer_notes?: string;
+  customer_allergies?: string[];
   created_at: any;
   updated_at: any;
 };
@@ -62,17 +64,33 @@ export async function getReservations(store: string, dateStr: string): Promise<R
       // Split into chunks of 10 for 'in' queries
       const { doc, getDoc } = await import('firebase/firestore');
       const counts: Record<string, number> = {};
+      const customerInfo: Record<string, { notes: string, allergies: string[] }> = {};
       
       // Better to fetch individually if few, or bulk fetch if many. Let's do simple getDoc for now since daily reservations aren't massive.
       await Promise.all(customerIds.map(async id => {
         const cRef = doc(db, 'customers', id);
         const cSnap = await getDoc(cRef);
         if (cSnap.exists()) {
-          counts[id] = cSnap.data().same_day_cancel_count || 0;
+          const data = cSnap.data();
+          counts[id] = data.same_day_cancel_count || 0;
+          customerInfo[id] = {
+            notes: data.notes || "",
+            allergies: data.allergies || []
+          };
         }
       }));
 
-      results = results.map(r => r.customer_id && counts[r.customer_id] ? { ...r, same_day_cancel_count: counts[r.customer_id] } : r);
+      results = results.map(r => {
+        if (r.customer_id && customerInfo[r.customer_id]) {
+          return { 
+            ...r, 
+            same_day_cancel_count: counts[r.customer_id],
+            customer_notes: customerInfo[r.customer_id].notes,
+            customer_allergies: customerInfo[r.customer_id].allergies
+          };
+        }
+        return r;
+      });
     }
 
     if (store !== "全店舗") {

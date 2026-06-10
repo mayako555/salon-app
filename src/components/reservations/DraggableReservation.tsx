@@ -231,6 +231,7 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
             <div className="flex items-center gap-2"><User className="w-3.5 h-3.5 text-slate-400" /> 担当: {res.staff_name}</div>
             
             <div className="mt-2 pt-2 border-t border-slate-100 grid grid-cols-2 gap-2 text-[10px]">
+              {/* 
               <div>
                 <span className="text-slate-400 block">前回来店</span>
                 <span className="font-bold text-slate-700">2026/04/10</span>
@@ -239,11 +240,24 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
                 <span className="text-slate-400 block">来店回数</span>
                 <span className="font-bold text-slate-700">5回</span>
               </div>
+              */}
               <div className="col-span-2 mt-1">
                 <span className="text-slate-400 block">注意事項・アレルギー</span>
-                <span className="font-bold text-rose-600">テープかぶれあり。右目目尻上がりやすい。</span>
+                {res.customer_allergies && res.customer_allergies.length > 0 && (
+                  <span className="font-bold text-rose-600 block">{res.customer_allergies.join(", ")}</span>
+                )}
+                {res.customer_notes && (
+                  <span className="font-bold text-slate-700 block whitespace-pre-wrap">{res.customer_notes}</span>
+                )}
+                {res.memo && (
+                  <span className="font-bold text-amber-600 block whitespace-pre-wrap mt-1">📝 予約メモ: {res.memo}</span>
+                )}
+                {!(res.customer_allergies?.length) && !res.customer_notes && !res.memo && (
+                  <span className="text-slate-400 font-bold block">特になし</span>
+                )}
+                
                 {res.same_day_cancel_count && res.same_day_cancel_count > 0 && (
-                  <span className="block mt-1 bg-rose-100 text-rose-700 px-2 py-1 rounded text-[10px] font-black">
+                  <span className="block mt-2 bg-rose-100 text-rose-700 px-2 py-1 rounded text-[10px] font-black">
                     ⚠️ 当日キャンセル履歴あり ({res.same_day_cancel_count}回)
                   </span>
                 )}

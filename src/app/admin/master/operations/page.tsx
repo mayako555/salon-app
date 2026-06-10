@@ -7,6 +7,7 @@ import {
   deleteMasterItem, 
   toggleItemStatus,
   updateMasterItemOrder,
+  updateMasterItemOrders,
   duplicateMasterItem
 } from "@/app/sales/master-actions";
 import { resetSalesMasterData } from "@/app/sales/actions";
@@ -176,7 +177,7 @@ function SortableItem({
               ) : (
                 <>
                   <p className="text-lg font-black text-slate-900 tracking-tight">
-                    {item.itemType === 'discount' ? '-¥' : '¥'}{item.price.toLocaleString()}
+                    {item.itemType === 'discount' ? '-¥' : '¥'}{(item.price || 0).toLocaleString()}
                   </p>
                   {item.duration && <p className="text-[10px] font-black text-slate-400 flex items-center gap-1"><Clock size={10} /> {item.duration}</p>}
                 </>
@@ -244,6 +245,9 @@ export default function MasterManagementPage() {
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [bulkText, setBulkText] = useState("");
+  
+  const [hasPendingOrderChanges, setHasPendingOrderChanges] = useState(false);
+  const [pendingOrders, setPendingOrders] = useState<Record<string, number>>({});
 
   useEffect(() => {
     loadItems();
@@ -324,15 +328,32 @@ export default function MasterManagementPage() {
       return [...otherItems, ...updatedWithOrder].sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
     });
 
-    // Persist to Firestore
-    toast.promise(
-      Promise.all(updatedWithOrder.map(item => updateMasterItemOrder(item.id!, item.sortOrder!))),
-      {
-        loading: '順番を保存中...',
-        success: '順番を保存しました',
-        error: '順番の保存に失敗しました'
-      }
-    );
+    // Track pending changes
+    setPendingOrders(prev => {
+      const newPending = { ...prev };
+      updatedWithOrder.forEach(item => {
+        newPending[item.id!] = item.sortOrder!;
+      });
+      return newPending;
+    });
+    setHasPendingOrderChanges(true);
+  };
+
+  const handleSaveOrderChanges = async () => {
+    const updates = Object.entries(pendingOrders).map(([id, sortOrder]) => ({ id, sortOrder }));
+    if (updates.length === 0) return;
+
+    setLoading(true);
+    const res = await updateMasterItemOrders(updates);
+    if (res.success) {
+      toast.success("並び順を保存しました");
+      setHasPendingOrderChanges(false);
+      setPendingOrders({});
+      loadItems();
+    } else {
+      toast.error("エラー: " + res.error);
+      setLoading(false);
+    }
   };
 
   const handleBulkImport = async () => {
@@ -659,22 +680,19 @@ export default function MasterManagementPage() {
                           toast.error("複製に失敗しました");
                         }
                       }}
-                      onOrderChange={async (id, newOrder) => {
+                      onOrderChange={(id, newOrder) => {
                         // 楽観的UI更新
                         setItems(prev => {
                           const newItems = prev.map(p => p.id === id ? { ...p, sortOrder: newOrder } : p);
                           return newItems.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
                         });
                         
-                        // DB保存
-                        const promise = updateMasterItemOrder(id, newOrder);
-                        toast.promise(promise, {
-                          loading: '順番を保存中...',
-                          success: '順番を保存しました',
-                          error: '順番の保存に失敗しました'
-                        });
-                        await promise;
-                        loadItems(); // Refresh to ensure DB sync
+                        // トラッキング
+                        setPendingOrders(prev => ({
+                          ...prev,
+                          [id]: newOrder
+                        }));
+                        setHasPendingOrderChanges(true);
                       }}
                     />
                   ))}
@@ -938,6 +956,23 @@ export default function MasterManagementPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {hasPendingOrderChanges && (
+        <div className="fixed bottom-8 right-8 z-50">
+          <Button 
+            onClick={handleSaveOrderChanges}
+            disabled={loading}
+            className="rounded-full bg-blue-600 hover:bg-blue-700 font-black text-white h-14 px-8 shadow-2xl shadow-blue-500/30 active:scale-95 transition-all text-lg"
+          >
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-3" />
+            ) : (
+              <Save size={20} className="mr-3" />
+            )}
+            順番の変更を保存する
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

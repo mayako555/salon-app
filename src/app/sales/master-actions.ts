@@ -11,7 +11,8 @@ import {
   orderBy,
   serverTimestamp,
   addDoc,
-  deleteDoc
+  deleteDoc,
+  writeBatch
 } from "firebase/firestore";
 import { SalesMasterItem } from "./seeds";
 import { getCurrentUserContext } from "@/lib/auth-server";
@@ -40,10 +41,12 @@ export async function getMasterItems(store?: string): Promise<SalesMasterItem[]>
 
     // --- SaaS Security: Enforce companyId isolation ---
     // For older records without companyId, we treat them as company_default
-    items = items.filter(item => {
-      const itemCompanyId = item.companyId || "company_default";
-      return itemCompanyId === ctx.companyId;
-    });
+    if (ctx.role !== "admin" && ctx.role !== "systemOwner") {
+      items = items.filter(item => {
+        const itemCompanyId = item.companyId || "company_default";
+        return itemCompanyId === ctx.companyId;
+      });
+    }
 
     if (store && store !== "all") {
       items = items.filter(item => item.store === store || item.store === "共通");
@@ -53,9 +56,9 @@ export async function getMasterItems(store?: string): Promise<SalesMasterItem[]>
       const orderA = a.sortOrder ?? 999;
       const orderB = b.sortOrder ?? 999;
       if (orderA !== orderB) return orderA - orderB;
-      if (a.store !== b.store) return a.store.localeCompare(b.store);
-      if (a.itemType !== b.itemType) return a.itemType.localeCompare(b.itemType);
-      return a.name.localeCompare(b.name);
+      if (a.store !== b.store) return (a.store || "").localeCompare(b.store || "");
+      if (a.itemType !== b.itemType) return (a.itemType || "").localeCompare(b.itemType || "");
+      return (a.name || "").localeCompare(b.name || "");
     });
   } catch (error: any) {
     console.error("Error fetching master items:", error);
@@ -200,7 +203,9 @@ export async function toggleItemStatus(id: string, active: boolean) {
     console.error("Error toggling status:", error);
     return { success: false, error: error.message };
   }
-}export async function updateMasterItemOrder(id: string, newOrder: number) {
+}
+
+export async function updateMasterItemOrder(id: string, newOrder: number) {
   try {
     await Promise.race([
       setDoc(doc(db, MASTER_COLLECTION, id), { sortOrder: newOrder }, { merge: true }),
@@ -211,6 +216,39 @@ export async function toggleItemStatus(id: string, active: boolean) {
     return { success: true };
   } catch (error: any) {
     console.error("Error updating order:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateMasterItemOrders(updates: { id: string, sortOrder: number }[]) {
+  try {
+    const batch = writeBatch(db);
+    
+    updates.forEach(update => {
+      const docRef = doc(db, MASTER_COLLECTION, update.id);
+      batch.set(docRef, { sortOrder: update.sortOrder }, { merge: true });
+    });
+    
+    await Promise.race([
+      batch.commit(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Firestore operation timed out (10s)")), 10000)
+      )
+    ]);
+
+    // Optional: Audit log for batch order update
+    await addAuditLog({
+      table_name: MASTER_COLLECTION,
+      record_id: "batch_update",
+      action: "UPDATE",
+      old_data: null,
+      new_data: { type: "batch_sort_order", count: updates.length },
+      actor: "管理者"
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating batch orders:", error);
     return { success: false, error: error.message };
   }
 }

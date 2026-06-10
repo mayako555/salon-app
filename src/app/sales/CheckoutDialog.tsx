@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, X, Search, Sparkles, Tag, MessageSquare, Calendar, Scissors, Gift, Lock } from "lucide-react";
+import { Plus, X, Search, Sparkles, Tag, MessageSquare, Calendar, Scissors, Gift, Lock, ClipboardEdit } from "lucide-react";
 import { addCheckout, updateCheckout, getStoreMasterData, SalesRecord } from "./actions";
 import { format } from "date-fns";
 import { SalesMasterItem } from "./seeds";
@@ -376,11 +376,19 @@ export default function CheckoutDialog({
   };
 
   const dynamicMapping = useMemo(() => {
+    // Custom sorting to match user request where possible
+    const sortOrders: Record<string, string[]> = {
+      '施術': ['新規クーポン', '再来クーポン', '通常メニュー'],
+      '店販': ['店販', '社販'],
+      '割引・サービス': ['割引', 'サービス'],
+      'オプション': ['毛質変更', 'オプション', '付け替えオフ']
+    };
+
     const mapping: Record<string, string[]> = {
-      '施術': [],
-      '店販': [],
-      '割引・サービス': [],
-      'オプション': []
+      '施術': [...sortOrders['施術']],
+      '店販': [...sortOrders['店販']],
+      '割引・サービス': [...sortOrders['割引・サービス']],
+      'オプション': [...sortOrders['オプション']]
     };
 
     storeMasterData.filter(i => i.isActive !== false && i.itemType !== 'store' && i.itemType !== 'reservationRoute' && i.itemType !== 'paymentMethod').forEach(item => {
@@ -395,14 +403,6 @@ export default function CheckoutDialog({
         mapping[mTab].push(cat);
       }
     });
-
-    // Custom sorting to match user request where possible
-    const sortOrders: Record<string, string[]> = {
-      '施術': ['新規クーポン', '再来クーポン', '通常メニュー'],
-      '店販': ['店販', '社販'],
-      '割引・サービス': ['割引', 'サービス'],
-      'オプション': ['毛質変更', 'オプション', '付け替えオフ']
-    };
 
     Object.keys(mapping).forEach(key => {
       mapping[key].sort((a, b) => {
@@ -789,15 +789,30 @@ export default function CheckoutDialog({
               </div>
               </div>
 
-              <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
-                <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={isSubmitting}>
-                  {readOnly ? "閉じる" : "キャンセル"}
-                </Button>
-                {!readOnly && (
-                  <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[120px]">
-                    {isSubmitting ? "処理中..." : "保存する"}
+              <div className="pt-4 flex justify-between items-center gap-3 border-t border-slate-100">
+                <div>
+                  {selectedCustomer?.id && (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="text-amber-600 border-amber-200 hover:bg-amber-50 shadow-sm font-bold" 
+                      onClick={() => window.open(`/staff-portal/customers/${selectedCustomer.id}/karte/new`, '_blank')}
+                    >
+                      <ClipboardEdit size={16} className="mr-2" />
+                      カルテ入力へ
+                    </Button>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={isSubmitting}>
+                    {readOnly ? "閉じる" : "キャンセル"}
                   </Button>
-                )}
+                  {!readOnly && (
+                    <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[120px]">
+                      {isSubmitting ? "処理中..." : "保存する"}
+                    </Button>
+                  )}
+                </div>
               </div>
             </form>
           </div>

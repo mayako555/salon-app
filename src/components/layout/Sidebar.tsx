@@ -23,7 +23,8 @@ import {
   Package,
   Award,
   Wallet,
-  Sparkles
+  Sparkles,
+  Banknote
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -90,6 +91,7 @@ const staffCategories = [
       { name: "自分の明細を確認", href: "/staff-portal/payroll", icon: Calculator },
       { name: "交通費の申請", href: "/staff-portal/transport", icon: Train },
       { name: "経費の申請", href: "/staff-portal/expenses", icon: Wallet },
+      { name: "現金・入金管理", href: "/staff-portal/cash", icon: Banknote },
       { name: "希望休の提出", href: "/staff-portal/holidays", icon: CalendarDays },
     ]
   },

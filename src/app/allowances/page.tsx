@@ -31,14 +31,22 @@ export default function AllowancesPage({
 
   const [tasks, setTasks] = useState<AllowanceTaskStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
   const [selectedTask, setSelectedTask] = useState<AllowanceTaskStatus | null>(null);
   const [detailStaff, setDetailStaff] = useState<AllowanceTaskStatus | null>(null);
 
   const loadTasks = async () => {
-    setLoading(true);
-    const data = await getMonthlyAllowanceTasks(year, month);
-    setTasks(data);
-    setLoading(false);
+    try {
+      setLoading(true);
+      setErrorMsg("");
+      const data = await getMonthlyAllowanceTasks(year, month);
+      setTasks(data);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || String(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -138,6 +146,11 @@ export default function AllowancesPage({
         </div>
 
         <Table>
+          {errorMsg && (
+            <div className="p-4 bg-rose-50 text-rose-600 text-sm font-bold border-b border-rose-100">
+              データの読み込みに失敗しました: {errorMsg}
+            </div>
+          )}
           <TableHeader>
             <TableRow className="bg-slate-50/50">
               <TableHead className="w-[100px]">ステータス</TableHead>

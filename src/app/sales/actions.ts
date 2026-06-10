@@ -360,6 +360,14 @@ export async function addCheckout(formData: FormData) {
     if (sourceReservationId) {
       const { updateReservationStatus } = await import('@/app/reservations/actions');
       await updateReservationStatus(sourceReservationId, 'completed');
+      
+      // If customer was newly created or linked, make sure reservation is updated with customer ID
+      if (customerId) {
+        await updateDoc(doc(db, 'reservations', sourceReservationId), {
+          customer_id: customerId,
+          updated_at: serverTimestamp()
+        });
+      }
     }
 
     // --- Create Auto Reservation for Next Booking ---
@@ -530,6 +538,14 @@ export async function updateCheckout(id: string, formData: FormData) {
     const oldData = oldDoc.exists() ? oldDoc.data() : null;
     
     await updateDoc(docRef, payload);
+
+    if (oldData?.source_reservation_id && customerId) {
+      // Ensure the source reservation is linked to this customer
+      await updateDoc(doc(db, 'reservations', oldData.source_reservation_id), {
+        customer_id: customerId,
+        updated_at: serverTimestamp()
+      });
+    }
 
     // --- Auto Create/Update Reservation for Next Booking ---
     if (nextBookingDate && nextBookingTime) {
