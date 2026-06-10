@@ -188,7 +188,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[700px] bg-slate-50 p-0 overflow-hidden border-slate-300">
+      <DialogContent className="w-[95vw] sm:max-w-[700px] bg-slate-50 p-0 overflow-hidden border-slate-300">
         <DialogHeader className="bg-white border-b border-slate-200 px-4 py-3 flex flex-row items-center justify-between">
           <DialogTitle className="text-lg font-black text-slate-800 flex items-center gap-2">
             <FileText className="text-blue-500 w-5 h-5" /> 新規登録
@@ -224,8 +224,8 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                 {/* Left side: Form Fields */}
                 <div className="flex-1 p-2 grid gap-2 text-xs">
                   {/* Kana */}
-                  <div className="flex items-center bg-orange-50/50 p-1 border-b border-slate-100 pb-2">
-                    <div className="w-28 font-bold text-slate-700 flex items-center justify-between pr-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center bg-orange-50/50 p-2 sm:p-1 border-b border-slate-100 pb-3 sm:pb-2 gap-2 sm:gap-0">
+                    <div className="w-full sm:w-28 font-bold text-slate-700 flex items-center justify-between pr-2">
                       氏名（カナ） <span className="w-2 h-2 rounded-full bg-rose-500 block"></span>
                     </div>
                     <div className="flex-1 flex gap-2">
@@ -240,8 +240,8 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                     </div>
                   </div>
                   {/* Kanji */}
-                  <div className="flex items-center p-1 border-b border-slate-100 pb-2">
-                    <div className="w-28 font-bold text-slate-700 pr-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center p-2 sm:p-1 border-b border-slate-100 pb-3 sm:pb-2 gap-2 sm:gap-0">
+                    <div className="w-full sm:w-28 font-bold text-slate-700 pr-2">
                       氏名（漢字）
                     </div>
                     <div className="flex-1 flex gap-2">
@@ -250,21 +250,21 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                     </div>
                   </div>
                   {/* Phone */}
-                  <div className="flex items-center bg-orange-50/50 p-1 border-b border-slate-100 pb-2">
-                    <div className="w-28 font-bold text-slate-700 pr-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center bg-orange-50/50 p-2 sm:p-1 border-b border-slate-100 pb-3 sm:pb-2 gap-2 sm:gap-0">
+                    <div className="w-full sm:w-28 font-bold text-slate-700 pr-2">
                       電話番号
                     </div>
                     <div className="flex-1">
-                      <input type="tel" name="customer_phone" placeholder="ハイフンなしで入力してください" className="w-full h-7 px-2 border border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none max-w-[200px]" value={formDataState.phone} onChange={e => setFormDataState({...formDataState, phone: e.target.value})} />
+                      <input type="tel" name="customer_phone" placeholder="ハイフンなしで入力してください" className="w-full h-8 sm:h-7 px-2 border border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none sm:max-w-[200px]" value={formDataState.phone} onChange={e => setFormDataState({...formDataState, phone: e.target.value})} />
                     </div>
                   </div>
                   {/* Customer Type */}
-                  <div className="flex items-center p-1">
-                    <div className="w-28 font-bold text-slate-700 pr-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center p-2 sm:p-1 gap-2 sm:gap-0">
+                    <div className="w-full sm:w-28 font-bold text-slate-700 pr-2">
                       顧客区分
                     </div>
                     <div className="flex-1">
-                      <select name="customer_type" className="h-7 px-2 border border-slate-300 bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none min-w-[150px]" value={formDataState.type} onChange={e => setFormDataState({...formDataState, type: e.target.value as any})}>
+                      <select name="customer_type" className="w-full sm:w-auto h-8 sm:h-7 px-2 border border-slate-300 bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none min-w-[150px]" value={formDataState.type} onChange={e => setFormDataState({...formDataState, type: e.target.value as any})}>
                         <option value="新規">新規</option>
                         <option value="再来">再来</option>
                         <option value="モデル">モデル</option>
@@ -348,7 +348,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
             <div className="bg-white p-4 border border-slate-200 rounded-lg shadow-sm">
               <h3 className="text-sm font-black text-slate-800 mb-3 border-b border-slate-100 pb-2">予約内容</h3>
               
-              <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                 <div>
                   <label className="block mb-1">予約日</label>
                   <input required type="date" name="date" defaultValue={defaultDate} className="w-full h-8 px-2 border border-slate-300 rounded bg-white" />
@@ -371,7 +371,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block mb-1">担当スタッフ</label>
                   <select name="staff_name" defaultValue={initialData?.staff_name || defaultStaff} className="w-full h-8 px-2 border border-slate-300 rounded bg-white">
@@ -394,7 +394,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
               </div>
 
               {recordType === "reservation" ? (
-              <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div className="col-span-2">
                   <label className="block mb-1">メニュー・クーポン</label>
                   <div className="flex gap-2">
@@ -431,7 +431,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
 
             {/* フラグ・連携ブロック */}
             {recordType === "reservation" && (
-            <div className="bg-white p-4 border border-slate-200 rounded-lg shadow-sm grid grid-cols-2 gap-4">
+            <div className="bg-white p-4 border border-slate-200 rounded-lg shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
                <label className="flex items-center gap-2 cursor-pointer">
                  <input type="checkbox" name="is_nomination" className="w-4 h-4 rounded border-slate-300" />
                  指名予約
@@ -453,9 +453,9 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
             
           </div>
 
-          <div className="bg-white border-t border-slate-200 p-4 flex items-center justify-between shrink-0">
-            <Button type="button" variant="outline" onClick={onClose} className="w-32 font-bold">キャンセル</Button>
-            <Button type="submit" disabled={loading} className="w-48 bg-blue-600 hover:bg-blue-700 font-bold text-white">
+          <div className="bg-white border-t border-slate-200 p-4 flex flex-col sm:flex-row items-center justify-between shrink-0 gap-3 sm:gap-0">
+            <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-32 font-bold order-2 sm:order-1">キャンセル</Button>
+            <Button type="submit" disabled={loading} className="w-full sm:w-48 bg-blue-600 hover:bg-blue-700 font-bold text-white order-1 sm:order-2">
               {loading ? "保存中..." : (initialData?.id ? "更新する" : "予約を確定する")}
             </Button>
           </div>
