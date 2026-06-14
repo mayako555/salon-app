@@ -229,7 +229,7 @@ export default function StaffPortalSalesPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <span className="font-bold text-slate-800 text-sm">¥{(sale.tech_sales + sale.product_sales + (sale.hpb_points || 0) - (sale.discount || 0)).toLocaleString()}</span>
+                        <span className="font-bold text-slate-800 text-sm">¥{(sale.tech_sales + sale.product_sales - (sale.discount || 0)).toLocaleString()}</span>
                       </div>
                       
                       <CheckoutDialog 
@@ -292,7 +292,7 @@ export default function StaffPortalSalesPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 text-right">
-                  <span className="font-bold text-slate-700 text-sm">¥{(sale.tech_sales + sale.product_sales + (sale.hpb_points || 0) - (sale.discount || 0)).toLocaleString()}</span>
+                  <span className="font-bold text-slate-700 text-sm">¥{(sale.tech_sales + sale.product_sales - (sale.discount || 0)).toLocaleString()}</span>
                   <CheckoutDialog 
                     initialData={sale}
                     staffList={staffNames}

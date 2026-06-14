@@ -31,7 +31,7 @@ export async function getStaffPerformanceStats(year: number, month: number) {
         }
         return false;
       });
-      const currentTotal = staffSales.reduce((acc, s) => acc + (s.tech_sales || 0) + (s.product_sales || 0) + (s.hpb_points || 0) - (s.discount || 0), 0);
+      const currentTotal = staffSales.reduce((acc, s) => acc + (s.tech_sales || 0) + (s.product_sales || 0) - (s.discount || 0), 0);
       
       // 2. Target (Priority: Monthly Target > Fixed Staff Target)
       const target = monthlyTargets[staff.id] || staff.monthly_sales_target || 0;

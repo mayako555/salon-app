@@ -257,7 +257,7 @@ export async function performRegressionAnalysis(params: RegressionParams) {
       if (store !== "全店舗" && data.store_name !== store.replace("店", "")) return;
       
       const sales = dailyData[dStr];
-      const amount = (data.tech_sales || 0) + (data.product_sales || 0) + (data.hpb_points || 0) - (data.discount || 0);
+      const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
       
       sales.total_sales += amount;
       sales.tech_sales += (data.tech_sales || 0);
@@ -609,7 +609,7 @@ export async function performSarimaxForecast(params: SarimaxParams) {
       if (store !== "全店舗" && data.store_name !== store.replace("店", "")) return;
       
       const sales = dailyData[dStr];
-      const amount = (data.tech_sales || 0) + (data.product_sales || 0) + (data.hpb_points || 0) - (data.discount || 0);
+      const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
       sales.total_sales += amount;
       sales.visitors++;
     });
@@ -1035,7 +1035,7 @@ export async function predictLTVAndRepeaters(params: LTVForecastParams) {
         customerFirstVisit[cid] = mStr;
       }
 
-      const amount = (data.tech_sales || 0) + (data.product_sales || 0) + (data.hpb_points || 0) - (data.discount || 0);
+      const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
       totalSalesAmt += amount;
       totalVisitCount++;
     });

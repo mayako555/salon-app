@@ -51,7 +51,7 @@ export async function getDashboardStats() {
     
     monthlySalesSnap.forEach(doc => {
       const data = doc.data();
-      const amount = (data.tech_sales || 0) + (data.product_sales || 0) + (data.hpb_points || 0) - (data.discount || 0);
+      const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
       monthlyTotal += amount;
       
       const route = String(data.reservation_route || "");
@@ -93,7 +93,7 @@ export async function getDashboardStats() {
     todaySalesSnap.forEach(doc => {
       const data = doc.data();
       const store = data.store_name || "不明";
-      const amount = (data.tech_sales || 0) + (data.product_sales || 0) + (data.hpb_points || 0) - (data.discount || 0);
+      const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
       if (storeSummary[store] !== undefined) {
         storeSummary[store] += amount;
       } else {
@@ -109,7 +109,7 @@ export async function getDashboardStats() {
     monthlySalesSnap.forEach(doc => {
       const data = doc.data();
       const store = data.store_name || "不明";
-      const amount = (data.tech_sales || 0) + (data.product_sales || 0) + (data.hpb_points || 0) - (data.discount || 0);
+      const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
       monthlyStoreSales[store] = (monthlyStoreSales[store] || 0) + amount;
     });
 
@@ -190,7 +190,7 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
       
       salesSnap.forEach(doc => {
         const data = doc.data();
-        const amount = (data.tech_sales || 0) + (data.product_sales || 0) + (data.hpb_points || 0) - (data.discount || 0);
+        const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
         total += amount;
         
         const route = String(data.reservation_route || "");

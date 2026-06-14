@@ -58,11 +58,11 @@ export default function DailyCloseDialog() {
 
   dailySales.forEach(s => {
     // Payment Method
-    if (s.payment_method === '現金') totals.cash += s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0);
-    else if (s.payment_method === 'クレジットカード') totals.credit += s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0);
-    else if (['PayPay', '楽天Pay'].includes(s.payment_method)) totals.eMoney += s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0);
-    else if (s.payment_method === 'ミニモ事前決済') totals.smart += s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0);
-    else totals.others += s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0);
+    if (s.payment_method === '現金') totals.cash += s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0) - (s.hpb_points || 0);
+    else if (s.payment_method === 'クレジットカード') totals.credit += s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0) - (s.hpb_points || 0);
+    else if (['PayPay', '楽天Pay'].includes(s.payment_method)) totals.eMoney += s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0) - (s.hpb_points || 0);
+    else if (s.payment_method === 'ミニモ事前決済') totals.smart += s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0) - (s.hpb_points || 0);
+    else totals.others += s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0) - (s.hpb_points || 0);
 
     // Points (HPB Points)
     totals.points += (s.hpb_points || 0);

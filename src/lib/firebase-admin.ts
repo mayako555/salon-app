@@ -89,21 +89,24 @@ try {
     if (!admin.apps.length) {
       const pk = firebaseAdminConfig.privateKey;
       const hasValidKey = pk && pk.includes("-----BEGIN PRIVATE KEY-----");
+      const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "salonapp-ee4d2.firebasestorage.app";
       
       if (firebaseAdminConfig.clientEmail && hasValidKey) {
         admin.initializeApp({
           credential: admin.credential.cert(firebaseAdminConfig),
-          storageBucket: "salonapp-ee4d2.firebasestorage.app"
+          storageBucket: storageBucket
         });
       } else {
         admin.initializeApp({
-          storageBucket: "salonapp-ee4d2.firebasestorage.app"
+          storageBucket: storageBucket
         });
       }
     }
 
     adminAuth = admin.auth();
-    adminDb = admin.firestore();
+    const { getFirestore } = require("firebase-admin/firestore");
+    const databaseId = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID || "(default)";
+    adminDb = getFirestore(admin.app(), databaseId);
     adminStorage = admin.storage();
   }
 } catch (error) {
