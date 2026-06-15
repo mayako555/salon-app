@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import liff from "@line/liff";
 import { getCustomerById, updateCustomer } from "@/lib/customers";
 import { Button } from "@/components/ui/button";
@@ -11,15 +11,22 @@ import { toast } from "sonner";
 
 export default function LinkLinePage() {
   const { customerId } = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<"idle" | "linking" | "success" | "error">("idle");
   const [customerName, setCustomerName] = useState("");
+  const store = searchParams.get("store");
 
   useEffect(() => {
     const initLiff = async () => {
       try {
-        const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+        let liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+        
+        if (store === '六甲道') liffId = process.env.NEXT_PUBLIC_LIFF_ID_ROKKO || liffId;
+        else if (store === '神戸') liffId = process.env.NEXT_PUBLIC_LIFF_ID_KOBE || liffId;
+        else if (store === '元町') liffId = process.env.NEXT_PUBLIC_LIFF_ID_MOTOMACHI || liffId;
+
         if (!liffId) {
           console.error("LIFF ID is missing in environment variables");
           setCustomerName("【設定エラー: LIFF ID未設定】");
@@ -51,7 +58,7 @@ export default function LinkLinePage() {
     };
 
     initLiff();
-  }, [customerId]);
+  }, [customerId, store]);
 
   const handleLink = async () => {
     if (!liff.isLoggedIn()) {

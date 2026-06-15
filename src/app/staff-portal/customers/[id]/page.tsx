@@ -80,7 +80,18 @@ export default function CustomerDetailPage() {
   const { availableStores } = useAuth();
 
   const LINE_OA_IDS = availableStores.reduce((acc, store) => {
-    acc[store] = process.env.NEXT_PUBLIC_LINE_OA_ID || "@dummy_line_id";
+    if (store === '六甲道') acc[store] = process.env.NEXT_PUBLIC_LINE_OA_ROKKO || process.env.NEXT_PUBLIC_LINE_OA_ID || "@dummy_line_id";
+    else if (store === '神戸') acc[store] = process.env.NEXT_PUBLIC_LINE_OA_KOBE || process.env.NEXT_PUBLIC_LINE_OA_ID || "@dummy_line_id";
+    else if (store === '元町') acc[store] = process.env.NEXT_PUBLIC_LINE_OA_MOTOMACHI || process.env.NEXT_PUBLIC_LINE_OA_ID || "@dummy_line_id";
+    else acc[store] = process.env.NEXT_PUBLIC_LINE_OA_ID || "@dummy_line_id";
+    return acc;
+  }, {} as Record<string, string>);
+
+  const LIFF_IDS = availableStores.reduce((acc, store) => {
+    if (store === '六甲道') acc[store] = process.env.NEXT_PUBLIC_LIFF_ID_ROKKO || process.env.NEXT_PUBLIC_LIFF_ID || "2009912937-1KgShdZB";
+    else if (store === '神戸') acc[store] = process.env.NEXT_PUBLIC_LIFF_ID_KOBE || process.env.NEXT_PUBLIC_LIFF_ID || "2009912937-1KgShdZB";
+    else if (store === '元町') acc[store] = process.env.NEXT_PUBLIC_LIFF_ID_MOTOMACHI || process.env.NEXT_PUBLIC_LIFF_ID || "2009912937-1KgShdZB";
+    else acc[store] = process.env.NEXT_PUBLIC_LIFF_ID || "2009912937-1KgShdZB";
     return acc;
   }, {} as Record<string, string>);
 
@@ -189,12 +200,18 @@ export default function CustomerDetailPage() {
   };
 
   const handleShowLinkQr = () => {
-    // LINEアプリが直接立ち上がるようにLIFF URLを使用
-    const liffId = process.env.NEXT_PUBLIC_LIFF_ID || "2009912937-1KgShdZB";
-    setLinkUrl(`https://liff.line.me/${liffId}/link-line/${id}`);
     setSelectedStore(null); // reset store selection
     setIsLinkQrOpen(true);
   };
+
+  useEffect(() => {
+    if (isLinkQrOpen && selectedStore) {
+      const storeLiffId = LIFF_IDS[selectedStore];
+      setLinkUrl(`https://liff.line.me/${storeLiffId}/link-line/${id}?store=${encodeURIComponent(selectedStore)}`);
+    } else {
+      setLinkUrl("");
+    }
+  }, [isLinkQrOpen, selectedStore, id, LIFF_IDS]);
 
   const handleShowEntryQr = () => {
     // Use the current direct URL instead of LIFF to ensure it always opens the entry form
