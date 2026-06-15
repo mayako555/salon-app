@@ -24,10 +24,10 @@ import AuthGuard from "@/components/AuthGuard";
 import { toast } from "sonner";
 
 export default function StaffExpensesPage() {
-  const { profile, selectedStore } = useAuth();
+  const { profile, selectedStore, availableStores } = useAuth();
   
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [storeName, setStoreName] = useState("六甲");
+  const [storeName, setStoreName] = useState(selectedStore || "メイン店舗");
   const [category, setCategory] = useState("消耗品費");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
@@ -43,14 +43,15 @@ export default function StaffExpensesPage() {
   const [pettyCashInput, setPettyCashInput] = useState("");
   const [isUpdatingPettyCash, setIsUpdatingPettyCash] = useState(false);
 
-  const STORES = ["六甲", "元町", "神戸"];
   const CATEGORIES = ["消耗品費", "旅費交通費", "通信費", "水道光熱費", "広告宣伝費", "雑費", "その他"];
 
   useEffect(() => {
     if (selectedStore) {
-      // Normalize selectedStore to match "六甲" or "元町" or "神戸"
-      const matched = STORES.find(s => selectedStore.includes(s));
-      if (matched) setStoreName(matched);
+      if (availableStores.includes(selectedStore)) {
+        setStoreName(selectedStore);
+      } else if (availableStores.length > 0) {
+        setStoreName(availableStores[0]);
+      }
     }
   }, [selectedStore]);
 
@@ -70,7 +71,7 @@ export default function StaffExpensesPage() {
       // Filter logic:
       // 1. Must match the currently selected store (or default selected store if not specified)
       // 2. Exclude mass-imported expenses
-      const matchedStore = STORES.find(s => (selectedStore || "六甲").includes(s)) || "六甲";
+      const matchedStore = availableStores.find(s => s === selectedStore) || availableStores[0] || "メイン店舗";
       
       const filteredItems = list.filter(item => 
         item.store_name === matchedStore && 
@@ -270,8 +271,8 @@ export default function StaffExpensesPage() {
                         <SelectValue placeholder="店舗を選択" />
                       </SelectTrigger>
                       <SelectContent>
-                        {STORES.map(s => (
-                          <SelectItem key={s} value={s}>{s}店</SelectItem>
+                        {availableStores.map(s => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -314,7 +315,7 @@ export default function StaffExpensesPage() {
                     <label className="text-xs font-bold text-slate-600 block">用途・具体的な内容</label>
                     <textarea 
                       className="w-full min-h-[80px] p-3 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all text-slate-800"
-                      placeholder="例：六甲店お手洗い用トイレットペーパー、ハンドソープ"
+                      placeholder={`例：${storeName}お手洗い用トイレットペーパー、ハンドソープ`}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       required

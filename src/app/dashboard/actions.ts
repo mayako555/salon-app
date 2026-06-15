@@ -84,11 +84,7 @@ export async function getDashboardStats() {
       where("date", "==", todayStr)
     );
     const todaySalesSnap = await getDocs(todaySalesQuery);
-    const storeSummary: Record<string, number> = {
-      "六甲店": 0,
-      "神戸店": 0,
-      "元町店": 0
-    };
+    const storeSummary: Record<string, number> = {};
     
     todaySalesSnap.forEach(doc => {
       const data = doc.data();
@@ -182,11 +178,7 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
       let totalTreatmentMinutes = 0;
       let totalNextBookings = 0;
       let totalNextBookingVisits = 0;
-      const storeSales: Record<string, { total: number, minimo: number, nextBookings: number, nextBookingVisits: number, count: number, minimoVisits: number, regularVisits: number, regularNewVisits: number, minimoNewVisits: number }> = { 
-        "六甲": { total: 0, minimo: 0, nextBookings: 0, nextBookingVisits: 0, count: 0, minimoVisits: 0, regularVisits: 0, regularNewVisits: 0, minimoNewVisits: 0 }, 
-        "元町": { total: 0, minimo: 0, nextBookings: 0, nextBookingVisits: 0, count: 0, minimoVisits: 0, regularVisits: 0, regularNewVisits: 0, minimoNewVisits: 0 }, 
-        "神戸": { total: 0, minimo: 0, nextBookings: 0, nextBookingVisits: 0, count: 0, minimoVisits: 0, regularVisits: 0, regularNewVisits: 0, minimoNewVisits: 0 } 
-      };
+      const storeSales: Record<string, { total: number, minimo: number, nextBookings: number, nextBookingVisits: number, count: number, minimoVisits: number, regularVisits: number, regularNewVisits: number, minimoNewVisits: number }> = {};
       
       salesSnap.forEach(doc => {
         const data = doc.data();
@@ -229,11 +221,14 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
           totalTreatmentMinutes += data.treatment_minutes || 60; // 実際の施術時間がない場合は後方互換で60分とする
         }
         
-        const rawStore = data.store_name || "不明";
-        const storeKey = rawStore.includes("六甲") ? "六甲" : rawStore.includes("元町") ? "元町" : rawStore.includes("神戸") ? "神戸" : "不明";
+        const storeKey = data.store_name || "不明";
+        
+        if (!storeSales[storeKey]) {
+          storeSales[storeKey] = { total: 0, minimo: 0, nextBookings: 0, nextBookingVisits: 0, count: 0, minimoVisits: 0, regularVisits: 0, regularNewVisits: 0, minimoNewVisits: 0 };
+        }
         
         // Only count as a 'visit' for unit price calculation if they actually had technical sales
-        if (storeSales[storeKey] !== undefined && (data.tech_sales || 0) > 0) {
+        if ((data.tech_sales || 0) > 0) {
           storeSales[storeKey].total += amount;
           storeSales[storeKey].count++;
           

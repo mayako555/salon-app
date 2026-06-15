@@ -18,6 +18,7 @@ interface AuthContextType {
   setSelectedStore: (store: string) => void;
   availableStores: string[];
   tenantPlan: string;
+  isCompanyOwner: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -32,6 +33,7 @@ const AuthContext = createContext<AuthContextType>({
   setSelectedStore: () => {},
   availableStores: [],
   tenantPlan: "Standard",
+  isCompanyOwner: false,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -113,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
                 .map(d => d.name);
                 
-              const finalStores = stores.length > 0 ? stores : ["六甲店", "神戸店", "元町店"]; // Fallback
+              const finalStores = stores.length > 0 ? stores : ["メイン店舗"]; // Fallback
               setAvailableStores(finalStores);
 
               const savedStore = localStorage.getItem("selected_store");
@@ -126,13 +128,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
             } catch (err) {
               console.error("Error fetching stores:", err);
-              const defaultStores = ["六甲店", "神戸店", "元町店"];
+              const defaultStores = ["メイン店舗"];
               setAvailableStores(defaultStores);
               setSelectedStore(defaultStores[0]);
             }
           } else {
             // No profile found, but user is authenticated via Auth. Give them default systemOwner access.
-            const defaultStores = ["六甲店", "神戸店", "元町店"];
+            const defaultStores = ["メイン店舗"];
             const fallbackName = firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : "管理者");
             setProfile({
               id: "admin_" + firebaseUser.uid,
@@ -166,10 +168,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     profile,
     loading,
-    isAdmin: profile?.role === "admin" || profile?.role === "systemOwner",
+    isAdmin: profile?.role === "admin" || profile?.role === "systemOwner" || profile?.role === "companyOwner",
     isSystemOwner: profile?.role === "systemOwner" || (profile?.role === "admin" && (!profile?.companyId || profile?.companyId === "company_default")),
-    isManager: profile?.role === "manager" || profile?.role === "storeManager" || profile?.role === "admin" || profile?.role === "systemOwner",
+    isManager: profile?.role === "manager" || profile?.role === "storeManager" || profile?.role === "admin" || profile?.role === "systemOwner" || profile?.role === "companyOwner",
     isStaff: true,
+    isCompanyOwner: profile?.role === "companyOwner",
     selectedStore,
     setSelectedStore,
     availableStores,

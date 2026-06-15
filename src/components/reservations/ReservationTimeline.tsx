@@ -22,7 +22,7 @@ type Props = {
 export const HOUR_WIDTH = 120; // 120px per hour
 export const ROW_HEIGHT = 48; // h-12 = 48px
 
-export default function ReservationTimeline({ reservations, staffList, shifts = [], date, storeName = "六甲", settings, onRefresh }: Props) {
+export default function ReservationTimeline({ reservations, staffList, shifts = [], date, storeName = "メイン店舗", settings, onRefresh }: Props) {
   const [selectedRes, setSelectedRes] = useState<Reservation | null>(null);
   const [editRes, setEditRes] = useState<Reservation | null>(null);
   const [formOpen, setFormOpen] = useState(false);

@@ -16,12 +16,12 @@ import { Plus, CheckCircle, Clock, Trash2, Wallet, Banknote, RefreshCcw } from "
 import CashTransactionDialog from "./CashTransactionDialog";
 
 export default function CashManagementPage() {
-  const { profile, isAdmin, selectedStore } = useAuth();
+  const { profile, isAdmin, selectedStore, availableStores } = useAuth();
   const [transactions, setTransactions] = useState<CashTransactionRecord[]>([]);
   const [currentCash, setCurrentCash] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [storeName, setStoreName] = useState<string>("六甲店"); // Default or from context
+  const [storeName, setStoreName] = useState<string>(selectedStore || "メイン店舗"); // Default or from context
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
 
@@ -74,16 +74,13 @@ export default function CashManagementPage() {
         </div>
         
         {/* Stores Select if Admin */}
-        {isAdmin && (
+        {isAdmin && availableStores.length > 1 && (
           <select 
             value={storeName} 
             onChange={(e) => setStoreName(e.target.value)}
             className="border-slate-300 rounded-md text-sm py-2 px-3 focus:border-emerald-500 focus:ring-emerald-500"
           >
-            <option value="六甲">六甲</option>
-            <option value="元町">元町</option>
-            <option value="神戸">神戸</option>
-            <option value="三宮">三宮</option>
+            {availableStores.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         )}
       </div>

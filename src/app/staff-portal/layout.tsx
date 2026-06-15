@@ -86,22 +86,31 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
           </div>
 
           <div className="mb-4">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2 px-2">勤務店舗</label>
-            <div className="grid grid-cols-1 gap-1">
-              {allowedStores.map(store => (
-                <button
-                  key={store}
-                  onClick={() => setSelectedStore(store)}
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-2 rounded-xl transition-all font-bold text-xs",
-                    selectedStore === store ? "bg-white/10 text-white" : "text-slate-500 hover:text-slate-300"
-                  )}
-                >
-                  <div className={cn("w-2 h-2 rounded-full", selectedStore === store ? "bg-emerald-400 animate-pulse" : "bg-slate-700")} />
-                  {store}
-                </button>
-              ))}
-            </div>
+            {allowedStores.length > 1 ? (
+              <>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2 px-2">勤務店舗</label>
+                <div className="grid grid-cols-1 gap-1">
+                  {allowedStores.map(store => (
+                    <button
+                      key={store}
+                      onClick={() => setSelectedStore(store)}
+                      className={cn(
+                        "flex items-center gap-3 px-4 py-2 rounded-xl transition-all font-bold text-xs",
+                        selectedStore === store ? "bg-white/10 text-white" : "text-slate-500 hover:text-slate-300"
+                      )}
+                    >
+                      <div className={cn("w-2 h-2 rounded-full", selectedStore === store ? "bg-emerald-400 animate-pulse" : "bg-slate-700")} />
+                      {store}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center gap-3 px-4 py-2 rounded-xl font-bold text-xs bg-white/5 text-white">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                {allowedStores[0] || "メイン店舗"}
+              </div>
+            )}
           </div>
         </div>
 
@@ -161,13 +170,19 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
           <span className="text-sm font-black tracking-tighter">SALON PORTAL</span>
         </div>
         <div className="flex items-center gap-3">
-          <select 
-            value={selectedStore} 
-            onChange={(e) => setSelectedStore(e.target.value)}
-            className="bg-slate-800 text-[10px] font-black px-2 py-1 rounded border-none outline-none text-blue-400"
-          >
-            {["六甲", "神戸", "元町"].map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+          {allowedStores.length > 1 ? (
+            <select 
+              value={selectedStore} 
+              onChange={(e) => setSelectedStore(e.target.value)}
+              className="bg-slate-800 text-[10px] font-black px-2 py-1 rounded border-none outline-none text-blue-400"
+            >
+              {allowedStores.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          ) : (
+            <span className="bg-slate-800 text-[10px] font-black px-2 py-1 rounded text-blue-400">
+              {allowedStores[0] || "メイン店舗"}
+            </span>
+          )}
           {isAdminOrManager && (
             <Link href="/dashboard" className="text-blue-400">
               <Settings size={18} />

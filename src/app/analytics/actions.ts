@@ -111,10 +111,8 @@ function pseudoRandom(dateStr: string, salt: string) {
 
 function getDailyAdSpend(store: string, date: Date) {
   const daysInMonth = getDate(endOfMonth(date));
-  let monthlyCost = 88000 + 55000 + 55000; // 全店舗
-  if (store.includes("六甲")) monthlyCost = 88000;
-  if (store.includes("神戸")) monthlyCost = 55000;
-  if (store.includes("元町")) monthlyCost = 55000;
+  let monthlyCost = 55000; // Default for a single store
+  if (store === "全店舗") monthlyCost = 55000 * 3; // Estimate for multiple stores if "全店舗"
   return Math.round(monthlyCost / daysInMonth);
 }
 
@@ -159,7 +157,7 @@ function getDayFactors(date: Date, store: string = "全店舗", weatherData: any
 }
 
 export type RegressionParams = {
-  store: string; // "全店舗", "六甲店", "神戸店", "元町店"
+  store: string; // "全店舗" or specific store name
   targetY: string; // "売上", "来店人数", etc.
   featuresX: string[]; // "曜日", "天気", "気温", etc.
   period: string; // "this_month", "last_3m", "last_6m", "last_1y"
