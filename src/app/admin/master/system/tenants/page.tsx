@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getTenants, addTenant, updateTenant, createTenantAdmin, CompanyTenant } from "../tenant-actions";
+import { getTenants, addTenant, updateTenant, createTenantAdmin, CompanyTenant, getTenantAdmins, updateTenantAdmin } from "../tenant-actions";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,8 @@ export default function TenantsPage() {
   const [userLoading, setUserLoading] = useState(false);
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
   const [userFormData, setUserFormData] = useState({ name: "", email: "", password: "" });
+  const [admins, setAdmins] = useState<any[]>([]);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isSystemOwner) {
@@ -78,35 +80,54 @@ export default function TenantsPage() {
     setIsDialogOpen(true);
   };
 
-  const openUserDialog = (tenantId: string) => {
+  const openUserDialog = async (tenantId: string) => {
     setSelectedTenantId(tenantId);
     setUserFormData({ name: "", email: "", password: "" });
+    setAdmins([]);
+    setEditingUserId(null);
     setIsUserDialogOpen(true);
+    const res = await getTenantAdmins(tenantId);
+    if (res.success && res.users) {
+      setAdmins(res.users);
+    }
   };
 
   const handleCreateUser = async () => {
-    if (!userFormData.name || !userFormData.email || !userFormData.password) {
-      toast.error("全ての項目を入力してください");
+    if (!userFormData.name || !userFormData.email) {
+      toast.error("名前とメールアドレスは必須です");
       return;
     }
-    if (userFormData.password.length < 6) {
+    if (!editingUserId && (!userFormData.password || userFormData.password.length < 6)) {
+      toast.error("パスワードは6文字以上にしてください");
+      return;
+    }
+    if (editingUserId && userFormData.password && userFormData.password.length < 6) {
       toast.error("パスワードは6文字以上にしてください");
       return;
     }
     if (!selectedTenantId) return;
 
     setUserLoading(true);
-    const res = await createTenantAdmin({
-      ...userFormData,
-      companyId: selectedTenantId
-    });
+    let res;
+    if (editingUserId) {
+      res = await updateTenantAdmin(editingUserId, {
+        name: userFormData.name,
+        email: userFormData.email,
+        password: userFormData.password || undefined
+      });
+    } else {
+      res = await createTenantAdmin({
+        ...userFormData,
+        companyId: selectedTenantId
+      });
+    }
     setUserLoading(false);
 
     if (res.success) {
-      toast.success("初期アカウントを発行しました");
+      toast.success(editingUserId ? "アカウント情報を更新しました" : "アカウントを発行しました");
       setIsUserDialogOpen(false);
     } else {
-      toast.error("アカウント発行に失敗しました: " + res.error);
+      toast.error((editingUserId ? "更新" : "発行") + "に失敗しました: " + res.error);
     }
   };
 
@@ -168,7 +189,7 @@ export default function TenantsPage() {
                     className="w-full text-indigo-600 border-indigo-200 hover:bg-indigo-50 font-bold"
                   >
                     <Key size={14} className="mr-2" />
-                    初期アカウント発行
+                    アカウント管理
                   </Button>
                 </div>
               </CardContent>
@@ -238,13 +259,34 @@ export default function TenantsPage() {
       <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle className="text-xl font-black">初期アカウント発行</DialogTitle>
+            <DialogTitle className="text-xl font-black">{editingUserId ? "アカウント情報の編集" : admins.length > 0 ? "アカウント管理" : "初期アカウント発行"}</DialogTitle>
             <DialogDescription className="text-slate-500 text-sm">
-              このテナントの管理者（オーナー）としてログインするためのアカウントを作成します。
+              {editingUserId ? "パスワードを変更する場合は新しいパスワードを入力してください。" : admins.length > 0 ? "登録済みのアカウントを選択して編集するか、新規作成してください。" : "このテナントの管理者（オーナー）としてログインするためのアカウントを作成します。"}
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
+          {!editingUserId && admins.length > 0 ? (
+            <div className="space-y-3 py-4">
+              <p className="text-xs font-bold text-slate-500">登録済みアカウント</p>
+              {admins.map(admin => (
+                <div key={admin.id} className="flex items-center justify-between p-3 border rounded-lg bg-slate-50">
+                  <div>
+                    <p className="font-bold text-sm text-slate-800">{admin.name}</p>
+                    <p className="text-xs text-slate-500">{admin.email}</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => { setEditingUserId(admin.id); setUserFormData({ name: admin.name || "", email: admin.email || "", password: "" }); }}>
+                    編集
+                  </Button>
+                </div>
+              ))}
+              <div className="pt-4 flex justify-end">
+                 <Button variant="outline" size="sm" onClick={() => { setEditingUserId(null); setUserFormData({ name: "", email: "", password: "" }); setAdmins([]); }}>
+                    + 新規管理者を追加
+                 </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-xs font-black text-slate-500">管理者名</label>
               <Input 
@@ -267,22 +309,27 @@ export default function TenantsPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-black text-slate-500">初期パスワード (6文字以上)</label>
+              <label className="text-xs font-black text-slate-500">{editingUserId ? "新しいパスワード (変更する場合のみ)" : "初期パスワード (6文字以上)"}</label>
               <Input 
                 type="text"
                 value={userFormData.password} 
                 onChange={e => setUserFormData({...userFormData, password: e.target.value})}
-                placeholder="password123"
+                placeholder={editingUserId ? "（変更しない場合は空欄）" : "password123"}
                 className="font-bold h-11"
               />
             </div>
           </div>
+          )}
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsUserDialogOpen(false)} className="h-11">キャンセル</Button>
-            <Button onClick={handleCreateUser} disabled={userLoading} className="bg-emerald-600 hover:bg-emerald-700 text-white h-11">
-              {userLoading ? "作成中..." : "発行する"}
+            <Button variant="outline" onClick={() => { if (editingUserId && admins.length > 0) { setEditingUserId(null); } else { setIsUserDialogOpen(false); } }} className="h-11">
+              {editingUserId && admins.length > 0 ? "戻る" : "キャンセル"}
             </Button>
+            {(!admins.length || editingUserId) && (
+              <Button onClick={handleCreateUser} disabled={userLoading} className="bg-emerald-600 hover:bg-emerald-700 text-white h-11">
+                {userLoading ? "処理中..." : editingUserId ? "更新する" : "発行する"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

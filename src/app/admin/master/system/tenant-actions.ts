@@ -104,7 +104,7 @@ export async function createTenantAdmin(payload: { email: string, password: stri
     await adminDb.collection("users").doc(userRecord.uid).set({
       email: payload.email,
       name: payload.name,
-      role: "admin", // Initial owner role for the tenant
+      role: "companyOwner", // Initial owner role for the tenant
       companyId: payload.companyId,
       createdAt: new Date()
     });
@@ -115,3 +115,48 @@ export async function createTenantAdmin(payload: { email: string, password: stri
     return { success: false, error: error.message };
   }
 }
+
+export async function getTenantAdmins(companyId: string) {
+  try {
+    const { adminDb } = require("@/lib/firebase-admin");
+    const snapshot = await adminDb.collection("users")
+      .where("companyId", "==", companyId)
+      .get();
+    
+    const users: any[] = [];
+    snapshot.forEach((doc: any) => {
+      users.push({ id: doc.id, ...doc.data() });
+    });
+    return { success: true, users };
+  } catch (error: any) {
+    console.error("Error fetching tenant admins:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateTenantAdmin(uid: string, payload: { email?: string, password?: string, name?: string }) {
+  try {
+    const { adminAuth, adminDb } = require("@/lib/firebase-admin");
+    
+    const authUpdates: any = {};
+    if (payload.email) authUpdates.email = payload.email;
+    if (payload.password) authUpdates.password = payload.password;
+    if (payload.name) authUpdates.displayName = payload.name;
+
+    if (Object.keys(authUpdates).length > 0) {
+      await adminAuth.updateUser(uid, authUpdates);
+    }
+
+    const dbUpdates: any = {};
+    if (payload.email) dbUpdates.email = payload.email;
+    if (payload.name) dbUpdates.name = payload.name;
+
+    if (Object.keys(dbUpdates).length > 0) {
+      await adminDb.collection("users").doc(uid).update(dbUpdates);
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating tenant admin:", error);
+    return { success: false, error: error.message };
+  }
