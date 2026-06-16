@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { addReservation, updateReservation, Reservation } from "@/app/reservations/actions";
 import { getAllCustomers, Customer } from "@/lib/customers";
+import { StaffProfile } from "@/app/staff/actions";
 import { Button } from "@/components/ui/button";
 import { Search, UserPlus, FileText, CheckCircle, SearchX } from "lucide-react";
 
@@ -16,9 +17,10 @@ type Props = {
   defaultDate: string;
   storeName: string;
   initialData?: Reservation;
+  staffList: StaffProfile[];
 };
 
-export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defaultStaff, defaultTime, defaultDate, storeName, initialData }: Props) {
+export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defaultStaff, defaultTime, defaultDate, storeName, initialData, staffList }: Props) {
   const [loading, setLoading] = useState(false);
   const [isNewCustomer, setIsNewCustomer] = useState(false);
   
@@ -389,9 +391,15 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                 <div>
                   <label className="block mb-1">担当スタッフ</label>
                   <select name="staff_name" defaultValue={initialData?.staff_name || defaultStaff} className="w-full h-8 px-2 border border-slate-300 rounded bg-white">
-                    <option value={defaultStaff}>{defaultStaff}</option>
-                    <option value="大谷奈津子">大谷奈津子</option>
-                    <option value="山田花子">山田花子</option>
+                    {staffList.map(s => (
+                      <option key={s.id} value={s.name}>{s.name}</option>
+                    ))}
+                    {!staffList.some(s => s.name === defaultStaff) && defaultStaff && (
+                      <option value={defaultStaff}>{defaultStaff}</option>
+                    )}
+                    {initialData?.staff_name && !staffList.some(s => s.name === initialData.staff_name) && initialData.staff_name !== defaultStaff && (
+                      <option value={initialData.staff_name}>{initialData.staff_name}</option>
+                    )}
                   </select>
                 </div>
                 {recordType === "reservation" && (

@@ -276,6 +276,7 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
           defaultDate={date}
           storeName={storeName}
           initialData={editRes || undefined}
+          staffList={staffList}
         />
       )}
     </div>
