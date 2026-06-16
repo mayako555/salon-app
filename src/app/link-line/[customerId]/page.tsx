@@ -23,9 +23,7 @@ export default function LinkLinePage() {
       try {
         let liffId = process.env.NEXT_PUBLIC_LIFF_ID;
         
-        if (store === '六甲道') liffId = process.env.NEXT_PUBLIC_LIFF_ID_ROKKO || liffId;
-        else if (store === '神戸') liffId = process.env.NEXT_PUBLIC_LIFF_ID_KOBE || liffId;
-        else if (store === '元町') liffId = process.env.NEXT_PUBLIC_LIFF_ID_MOTOMACHI || liffId;
+        liffId = process.env[`NEXT_PUBLIC_LIFF_ID_${store}`] || liffId;
 
         if (!liffId) {
           console.error("LIFF ID is missing in environment variables");

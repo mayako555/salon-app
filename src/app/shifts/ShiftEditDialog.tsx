@@ -34,7 +34,7 @@ export default function ShiftEditDialog({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const { availableStores } = useAuth();
-  const defaultStore = availableStores.length > 0 ? availableStores[0] : "神戸";
+  const defaultStore = availableStores.length > 0 ? availableStores[0] : "メイン店舗";
 
   const [formData, setFormData] = useState<Omit<ShiftRecord, "id"> & { id?: string }>({
     staff_id: "",

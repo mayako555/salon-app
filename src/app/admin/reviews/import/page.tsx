@@ -51,10 +51,10 @@ export default function ReviewImportPage() {
   const [reviewerName, setReviewerName] = useState("");
   const [rating, setRating] = useState<number>(5);
   const [reviewText, setReviewText] = useState("");
-  const [storeName, setStoreName] = useState("六甲");
+  const [storeName, setStoreName] = useState(availableStores[0] || "メイン店舗");
   const [isSaving, setIsSaving] = useState(false);
 
-  const STORES = ["六甲", "元町", "神戸"];
+  
   const YEARS = [2025, 2026, 2027];
   const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -82,7 +82,7 @@ export default function ReviewImportPage() {
   // Open modal to add review for a specific staff member
   const handleOpenAddModal = (staff: StaffProfile) => {
     setSelectedStaff(staff);
-    setStoreName((staff as any).store || "六甲");
+    setStoreName((staff as any).store || availableStores[0] || "メイン店舗");
     setPastedText("");
     setReviewDate(`${year}-${String(month).padStart(2, '0')}-01`);
     setReviewerName("");

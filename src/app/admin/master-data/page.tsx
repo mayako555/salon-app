@@ -21,7 +21,7 @@ import { getMasterItems, upsertMasterItem, deleteMasterItem, toggleItemStatus } 
 import { SalesMasterItem } from "@/app/sales/seeds";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-const STORES = ["六甲", "神戸", "元町"];
+
 const ITEM_TYPES = [
   { id: "menu", label: "通常メニュー" },
   { id: "coupon", label: "クーポン" },
@@ -34,7 +34,7 @@ const ITEM_TYPES = [
 export default function MasterDataPage() {
   const [items, setItems] = useState<SalesMasterItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedStore, setSelectedStore] = useState<string>("六甲");
+  const [selectedStore, setSelectedStore] = useState<string>(availableStores[0] || "メイン店舗");
   const [selectedType, setSelectedType] = useState<string>("menu");
   const [searchQuery, setSearchQuery] = useState("");
   const [editingItem, setEditingItem] = useState<Partial<SalesMasterItem> | null>(null);

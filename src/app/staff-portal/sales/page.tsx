@@ -148,7 +148,7 @@ export default function StaffPortalSalesPage() {
       {autoCheckoutRes && (
         <CheckoutDialog 
           defaultStaffName={profile?.name || ""} 
-          defaultStoreName="六甲" 
+          defaultStoreName="メイン店舗" 
           staffList={staffNames}
           initialData={mapReservationToSalesRecord(autoCheckoutRes)}
           isOpenControlled={true}

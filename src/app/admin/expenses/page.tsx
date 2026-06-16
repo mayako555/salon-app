@@ -173,13 +173,13 @@ export default function AdminExpensesDashboard() {
   // New Expense Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newDate, setNewDate] = useState(format(now, "yyyy-MM-dd"));
-  const [newStore, setNewStore] = useState("六甲");
+  const [newStore, setNewStore] = useState(availableStores[0] || "メイン店舗");
   const [newCategory, setNewCategory] = useState("消耗品費");
   const [newAmount, setNewAmount] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [isSavingExpense, setIsSavingExpense] = useState(false);
 
-  const STORES = ["六甲", "元町", "神戸"];
+  // STORES array removed
   const CATEGORIES = ["消耗品費", "旅費交通費", "通信費", "水道光熱費", "広告宣伝費", "雑費", "地代家賃", "給料手当", "その他"];
 
   useEffect(() => {
@@ -415,7 +415,7 @@ export default function AdminExpensesDashboard() {
     try {
       // Map to ExpenseRecord format
       const expensesToSave = validExpenses.map(tx => ({
-        store_name: store === "すべて" ? "六甲" : store, // fallback if needed
+        store_name: store === "すべて" ? (availableStores[0] || "メイン店舗") : store, // fallback if needed
         date: tx.date,
         category: tx.category,
         amount: tx.amount,

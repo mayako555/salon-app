@@ -160,3 +160,4 @@ export async function updateTenantAdmin(uid: string, payload: { email?: string, 
     console.error("Error updating tenant admin:", error);
     return { success: false, error: error.message };
   }
+}

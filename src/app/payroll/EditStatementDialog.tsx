@@ -403,15 +403,15 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                         <div className="flex gap-2">
                           <a href="https://beauty.hotpepper.jp/kr/slnH000391382/review/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 flex items-center gap-0.5">
                             <MessageSquare size={10} />
-                            六甲
+                            メイン店舗
                           </a>
                           <a href="https://beauty.hotpepper.jp/kr/slnH000650559/review/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 flex items-center gap-0.5">
                             <MessageSquare size={10} />
-                            神戸
+                            店舗B
                           </a>
                           <a href="https://beauty.hotpepper.jp/kr/slnH000799074/review/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 flex items-center gap-0.5">
                             <MessageSquare size={10} />
-                            元町
+                            店舗C
                           </a>
                         </div>
                       </span>
@@ -431,15 +431,15 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                         <div className="flex gap-2">
                           <a href="https://beauty.hotpepper.jp/kr/slnH000391382/blog/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 flex items-center gap-0.5">
                             <MessageSquare size={10} />
-                            六甲
+                            メイン店舗
                           </a>
                           <a href="https://beauty.hotpepper.jp/kr/slnH000650559/blog/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 flex items-center gap-0.5">
                             <MessageSquare size={10} />
-                            神戸
+                            店舗B
                           </a>
                           <a href="https://beauty.hotpepper.jp/kr/slnH000799074/blog/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 flex items-center gap-0.5">
                             <MessageSquare size={10} />
-                            元町
+                            店舗C
                           </a>
                         </div>
                       </span>

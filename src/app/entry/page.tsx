@@ -353,7 +353,7 @@ function CustomerEntryFormContent() {
             <div className="bg-gradient-to-br from-rose-400 to-rose-600 p-1.5 rounded-lg text-white shadow-md">
               <Scissors size={18} />
             </div>
-            <span className="font-extrabold text-slate-900 tracking-tighter text-xl">Jasmine Lash</span>
+            <span className="font-extrabold text-slate-900 tracking-tighter text-xl">当サロン</span>
           </div>
           <div className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Counseling System</div>
         </div>

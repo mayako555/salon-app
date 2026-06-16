@@ -400,7 +400,7 @@ export default function ShiftsView({
                 </tr>
               </thead>
               <tbody>
-                {["神戸", "元町", "六甲"].map((store) => {
+                {availableStores.map((store) => {
                   // Calculate Averages for this store
                   let totalAllVisits = 0;
                   let totalDebutedVisits = 0;

@@ -24,7 +24,7 @@ export default function SalonBoardImportPage() {
   const [parsedData, setParsedData] = useState<any[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [step, setStep] = useState(1); // 1: Paste, 2: Preview
-  const [storeName, setStoreName] = useState("六甲");
+  const [storeName, setStoreName] = useState(availableStores[0] || "メイン店舗");
   const [lastImportDate, setLastImportDate] = useState<string | null>(null);
 
   useEffect(() => {
@@ -164,7 +164,7 @@ export default function SalonBoardImportPage() {
                 <div className="mb-6">
                   <label className="text-sm font-bold text-slate-700 block mb-3">取り込み先の店舗を選択してください：</label>
                   <div className="flex gap-3">
-                    {["六甲", "元町", "神戸"].map((s) => (
+                    {availableStores.map((s) => (
                       <Button
                         key={s}
                         variant={storeName === s ? "default" : "outline"}

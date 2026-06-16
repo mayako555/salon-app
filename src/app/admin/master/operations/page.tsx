@@ -373,7 +373,7 @@ export default function MasterManagementPage() {
       if (category.includes("料")) itemType = "fee";
 
       await upsertMasterItem({
-        store: category.includes("六甲") ? "六甲" : "共通",
+        store: "共通",
         itemType,
         category,
         name,
@@ -616,7 +616,7 @@ export default function MasterManagementPage() {
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Store Filter</label>
               <div className="grid grid-cols-1 gap-1">
-                {["all", "共通", "六甲", "神戸", "元町"].map(s => (
+                {["all", "共通", ...availableStores].map(s => (
                   <button
                     key={s}
                     onClick={() => setStoreFilter(s)}
@@ -737,9 +737,7 @@ export default function MasterManagementPage() {
                   {/* Fallbacks */}
                   {!items.some(i => i.itemType === 'store') && (
                     <>
-                      <option value="六甲">六甲</option>
-                      <option value="神戸">神戸</option>
-                      <option value="元町">元町</option>
+                      {availableStores.map(s => <option key={s} value={s}>{s}</option>)}
                     </>
                   )}
                 </select>

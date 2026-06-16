@@ -32,7 +32,7 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList }: BulkShif
   });
   const [type, setType] = useState<ShiftType>("work");
   const { availableStores } = useAuth();
-  const defaultStore = availableStores.length > 0 ? availableStores[0] : "神戸";
+  const defaultStore = availableStores.length > 0 ? availableStores[0] : "メイン店舗";
 
   const [segments, setSegments] = useState<ShiftSegment[]>([
     { start_time: "10:00", end_time: "19:00", store: defaultStore as StoreLocation }

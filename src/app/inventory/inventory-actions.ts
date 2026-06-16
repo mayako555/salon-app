@@ -25,16 +25,16 @@ export async function getAvailableStores() {
     const ctx = await getCurrentUserContext();
     if (ctx.role === "systemOwner") {
       // システム管理者は全社・全店舗見れる（今回は固定の3店舗を仮置きか、Companyマスタから引くべきだが、一旦既存のリストをベースに拡張）
-      return ["六甲", "神戸", "元町"];
+      return ["メイン店舗"];
     }
     // companyOwner や manager, staff の場合は自分が所属する salonIds を返す
     // salonIds に直接店舗名が入っている想定（既存の運用ベース）
     if (ctx.salonIds && ctx.salonIds.length > 0) {
       return ctx.salonIds;
     }
-    return ["六甲"]; // フォールバック
+    return ["メイン店舗"]; // フォールバック
   } catch (err) {
-    return ["六甲"];
+    return ["メイン店舗"];
   }
 }
 

@@ -60,7 +60,7 @@ export async function importCustomersFromSalonBoard(customers: any[]) {
           phone: "", // Missing from list view
           allergies: [],
           has_allergy: false,
-          main_store: c.main_store || "六甲",
+          main_store: c.main_store || "メイン店舗",
           created_at: serverTimestamp(),
           updated_at: serverTimestamp(),
           notes: "SalonBoardからインポートされました"

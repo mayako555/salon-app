@@ -193,7 +193,7 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
           <div className="space-y-2">
             <label className="block text-sm font-medium text-slate-700">SNS投稿担当（連携アカウント）</label>
             <div className="grid grid-cols-2 gap-2">
-              {["BROW GYM", "Jasmine Lash", "JL Academy", "岡田万耶子"].map(acc => (
+              {["BROW GYM", "当サロン", "JL Academy", "岡田万耶子"].map(acc => (
                 <label key={acc} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
                   <input 
                     type="checkbox" 

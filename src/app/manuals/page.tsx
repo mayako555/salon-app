@@ -122,7 +122,7 @@ export default function ManualsPage() {
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-4">
              <span className="bg-emerald-500 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">Official Manual</span>
-             <span className="text-slate-400 text-xs font-bold">Jasmine Lash 運営基準</span>
+             <span className="text-slate-400 text-xs font-bold">当サロン 運営基準</span>
           </div>
           <h1 className="text-4xl font-black tracking-tighter mb-4">
             業務マニュアル

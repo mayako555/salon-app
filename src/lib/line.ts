@@ -124,7 +124,7 @@ ${storeName}店
 /**
  * 次回予約確定メッセージを送信する（レガシー互換用・ログ保存なし）
  */
-export async function sendBookingConfirmation(customerName: string, lineUserId: string, date: string, time: string, storeName: string = "六甲道") {
+export async function sendBookingConfirmation(customerName: string, lineUserId: string, date: string, time: string, storeName: string = "メイン店舗") {
   const message = await generateBookingConfirmationText(date, time, storeName);
   return await sendLineMessage(lineUserId, message, storeName);
 }
@@ -132,7 +132,7 @@ export async function sendBookingConfirmation(customerName: string, lineUserId: 
 /**
  * リマインダーメッセージを送信する
  */
-export async function sendBookingReminder(customerName: string, lineUserId: string, date: string, time: string, storeName: string = "六甲道") {
+export async function sendBookingReminder(customerName: string, lineUserId: string, date: string, time: string, storeName: string = "メイン店舗") {
   const dateObj = new Date(date);
   const dayOfWeek = ["日", "月", "火", "水", "木", "金", "土"][dateObj.getDay()];
   const formattedDate = `${dateObj.getMonth() + 1}／${dateObj.getDate()}（${dayOfWeek}）`;
@@ -144,7 +144,7 @@ export async function sendBookingReminder(customerName: string, lineUserId: stri
 
 ${formattedDate} ${time}〜
 
-🌿 Jasmine Lash ${storeName}店 🕊
+🌿 当サロン ${storeName} 🕊
 
 日時のご確認をお願いいたします。
 当日お気をつけてお越しくださいませ🤍`;

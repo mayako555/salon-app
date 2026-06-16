@@ -29,7 +29,7 @@ export default function SalesPage({
   searchParams: Promise<{ month?: string }>
 }) {
   const params = use(searchParams);
-  const { profile, loading: authLoading } = useAuth();
+  const { profile, loading: authLoading, availableStores } = useAuth();
   const targetDateStr = params.month || format(new Date(), "yyyy-MM");
   const [yearNum, monthNum] = targetDateStr.split("-").map(Number);
   const year = yearNum;
@@ -189,7 +189,7 @@ export default function SalesPage({
   const cashProductSales = cashSales.reduce((sum, s) => sum + s.product_sales, 0);
   const cashlessProductSales = cashlessSales.reduce((sum, s) => sum + s.product_sales, 0);
 
-  const stores = ["六甲", "元町", "神戸"];
+  const stores = availableStores && availableStores.length > 0 ? availableStores : ["メイン店舗"];
   
   const sortedProfiles = [...staffProfiles].sort((a, b) => {
     const orderA = a.sort_order ?? 999;
