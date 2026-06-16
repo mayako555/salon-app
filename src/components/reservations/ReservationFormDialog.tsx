@@ -41,6 +41,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
   // Search state
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isFetchingCustomers, setIsFetchingCustomers] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [hasLoadedCustomers, setHasLoadedCustomers] = useState(false);
 
@@ -109,9 +110,11 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
     }
 
     if (!hasLoadedCustomers) {
+      setIsFetchingCustomers(true);
       const data = await getAllCustomers();
       setCustomers(data);
       setHasLoadedCustomers(true);
+      setIsFetchingCustomers(false);
     }
   };
 
@@ -315,7 +318,12 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                     />
                   </div>
                   
-                  {searchQuery && filteredCustomers.length > 0 && (
+                  {isFetchingCustomers && (
+                    <div className="text-center py-4 text-blue-600 font-bold animate-pulse">
+                      顧客データを検索中...
+                    </div>
+                  )}
+                  {!isFetchingCustomers && searchQuery && filteredCustomers.length > 0 && (
                     <div className="border border-slate-300 bg-white shadow-sm max-w-2xl mx-auto text-xs">
                       <div className="grid grid-cols-4 bg-slate-100 font-bold text-slate-600 p-2 border-b border-slate-300 text-center">
                         <div>お名前</div>
@@ -340,12 +348,12 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                       ))}
                     </div>
                   )}
-                  {searchQuery && filteredCustomers.length === 0 && (
+                  {!isFetchingCustomers && searchQuery && filteredCustomers.length === 0 && (
                     <div className="text-center py-4 text-slate-500">
                       見つかりませんでした
                     </div>
                   )}
-                  {!searchQuery && (
+                  {!isFetchingCustomers && !searchQuery && (
                     <div className="text-center py-3 text-slate-400 text-xs">
                       検索キーワードを入力してください
                     </div>
@@ -371,7 +379,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                 </div>
                 <div>
                   <label className="block mb-1">開始時間</label>
-                  <input required={!isAllDay} type="time" name="start_time" defaultValue={isAllDay ? "09:00" : defaultTime} disabled={isAllDay} className="w-full h-8 px-2 border border-slate-300 rounded bg-white disabled:bg-slate-100 disabled:text-slate-400" />
+                  <input required={!isAllDay} type="time" name="start_time" defaultValue={initialData?.start_time || (isAllDay ? "09:00" : defaultTime)} disabled={isAllDay} className="w-full h-8 px-2 border border-slate-300 rounded bg-white disabled:bg-slate-100 disabled:text-slate-400" />
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">

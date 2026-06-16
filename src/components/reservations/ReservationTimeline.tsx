@@ -29,8 +29,8 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
   const [clickData, setClickData] = useState({ staff: "", time: "" });
   
   const storeSettings = settings?.stores[storeName] || settings?.stores["共通"] || { startHour: 8, endHour: 22, slotDuration: 30 };
-  const START_HOUR = storeSettings.startHour;
-  const END_HOUR = storeSettings.endHour;
+  const START_HOUR = Number(storeSettings.startHour) || 8;
+  const END_HOUR = Number(storeSettings.endHour) || 22;
   const TOTAL_HOURS = END_HOUR - START_HOUR;
   const TOTAL_WIDTH = TOTAL_HOURS * HOUR_WIDTH;
   const slotDuration = storeSettings.slotDuration;

@@ -77,6 +77,7 @@ export default function StaffPortalSalesPage() {
       store_name: res.store_name,
       date: res.date,
       time: res.start_time,
+      customer_id: res.customer_id,
       customer_name: cName,
       last_name: nameParts[0] || "",
       first_name: nameParts[1] || "",
