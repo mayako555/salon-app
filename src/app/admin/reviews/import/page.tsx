@@ -32,7 +32,9 @@ import { getStaffList, StaffProfile } from "@/app/staff/actions";
 import { toast } from "sonner";
 import AuthGuard from "@/components/AuthGuard";
 
+import { useAuth } from "@/lib/auth-context";
 export default function ReviewImportPage() {
+  const { availableStores } = useAuth();
   const now = new Date();
   const [year, setYear] = useState<number>(now.getFullYear());
   const [month, setMonth] = useState<number>(now.getMonth() + 1);
@@ -539,7 +541,7 @@ export default function ReviewImportPage() {
                         <SelectValue placeholder="店舗" />
                       </SelectTrigger>
                       <SelectContent>
-                        {STORES.map(s => <SelectItem key={s} value={s}>{s}店</SelectItem>)}
+                        {availableStores.map(s => <SelectItem key={s} value={s}>{s}店</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>

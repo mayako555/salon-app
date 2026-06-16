@@ -133,7 +133,7 @@ function calculateAccurateTaxes(
 }
 
 export default function AdminExpensesDashboard() {
-  const { profile } = useAuth();
+  const { profile, availableStores } = useAuth();
   
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -558,7 +558,7 @@ export default function AdminExpensesDashboard() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="すべて">全店</SelectItem>
-                {STORES.map(s => <SelectItem key={s} value={s}>{s}店</SelectItem>)}
+                {availableStores.map(s => <SelectItem key={s} value={s}>{s}店</SelectItem>)}
               </SelectContent>
             </Select>
 
@@ -985,7 +985,7 @@ export default function AdminExpensesDashboard() {
                       <SelectValue placeholder="店舗" />
                     </SelectTrigger>
                     <SelectContent>
-                      {STORES.map(s => <SelectItem key={s} value={s}>{s}店</SelectItem>)}
+                      {availableStores.map(s => <SelectItem key={s} value={s}>{s}店</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

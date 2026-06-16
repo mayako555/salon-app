@@ -19,7 +19,9 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 
+import { useAuth } from "@/lib/auth-context";
 export default function SalonBoardImportPage() {
+  const { availableStores } = useAuth();
   const [pasteData, setPasteData] = useState("");
   const [parsedData, setParsedData] = useState<any[]>([]);
   const [isImporting, setIsImporting] = useState(false);
@@ -164,7 +166,7 @@ export default function SalonBoardImportPage() {
                 <div className="mb-6">
                   <label className="text-sm font-bold text-slate-700 block mb-3">取り込み先の店舗を選択してください：</label>
                   <div className="flex gap-3">
-                    {availableStores.map((s) => (
+                    {availableStores.map((s: string) => (
                       <Button
                         key={s}
                         variant={storeName === s ? "default" : "outline"}

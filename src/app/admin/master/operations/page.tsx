@@ -234,7 +234,7 @@ function cn(...classes: any[]) {
 }
 
 export default function MasterManagementPage() {
-  const { profile } = useAuth();
+  const { profile, availableStores } = useAuth();
   const [items, setItems] = useState<SalesMasterItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");

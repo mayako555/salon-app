@@ -31,7 +31,9 @@ const ITEM_TYPES = [
   { id: "reservationRoute", label: "予約経路" }
 ];
 
+import { useAuth } from "@/lib/auth-context";
 export default function MasterDataPage() {
+  const { availableStores } = useAuth();
   const [items, setItems] = useState<SalesMasterItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStore, setSelectedStore] = useState<string>(availableStores[0] || "メイン店舗");
@@ -117,7 +119,7 @@ export default function MasterDataPage() {
           </div>
           
           <div className="flex bg-slate-100 p-1 rounded-lg">
-            {STORES.map(store => (
+            {availableStores.map(store => (
               <button
                 key={store}
                 onClick={() => setSelectedStore(store)}
