@@ -44,6 +44,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
 
   // Form state for autofill
   const [formDataState, setFormDataState] = useState({
+    customer_id: initialData?.customer_id || null as string | null,
     last_name: "",
     first_name: "",
     last_name_kana: "",
@@ -71,6 +72,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
         const nameParts = cName.split(/[\s　]+/);
         const kanaParts = kName.split(/[\s　]+/);
         setFormDataState({
+          customer_id: initialData.customer_id || null,
           last_name: nameParts[0] || "",
           first_name: nameParts[1] || "",
           last_name_kana: kanaParts[0] || "",
@@ -80,6 +82,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
         });
       } else {
         setFormDataState({
+          customer_id: null,
           last_name: "",
           first_name: "",
           last_name_kana: "",
@@ -112,6 +115,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
 
   const handleSelectCustomer = (c: Customer) => {
     setFormDataState({
+      customer_id: c.id,
       last_name: c.last_name || c.name?.split(" ")[0] || "",
       first_name: c.first_name || c.name?.split(" ")[1] || "",
       last_name_kana: (c as any).last_name_kana || "",
@@ -158,6 +162,7 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
       staff_id: initialData?.staff_id || "manual", 
       staff_name: formData.get("staff_name") as string,
       type: recordType,
+      customer_id: recordType === "reservation" ? (formDataState.customer_id || undefined) : undefined,
       customer_name: recordType === "reservation" ? customerName : "",
       customer_kana: recordType === "reservation" ? customerKana : "",
       customer_type: recordType === "reservation" ? (formData.get("customer_type") as any) : undefined,
@@ -245,8 +250,13 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                   </div>
                   {/* Kanji */}
                   <div className="flex flex-col sm:flex-row sm:items-center p-2 sm:p-1 border-b border-slate-100 pb-3 sm:pb-2 gap-2 sm:gap-0">
-                    <div className="w-full sm:w-28 font-bold text-slate-700 pr-2">
+                    <div className="w-full sm:w-28 font-bold text-slate-700 pr-2 flex flex-col justify-center gap-1">
                       氏名（漢字）
+                      {formDataState.customer_id && (
+                        <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded flex items-center gap-1 w-fit">
+                          <CheckCircle className="w-2.5 h-2.5" /> 連携済
+                        </span>
+                      )}
                     </div>
                     <div className="flex-1 flex gap-2">
                       <input type="text" name="last_name" placeholder="氏" className="w-full h-7 px-2 border border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" value={formDataState.last_name} onChange={e => setFormDataState({...formDataState, last_name: e.target.value})} />
