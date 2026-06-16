@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getReservations, Reservation } from "./actions";
 import { getStaffList, StaffProfile } from "@/app/staff/actions";
-import { getMonthlyShifts, ShiftRecord } from "@/app/shifts/actions";
+import { getShiftsForDate, ShiftRecord } from "@/app/shifts/actions";
 import { getReservationSettings, ReservationSettings } from "@/app/admin/settings/actions";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -32,7 +32,7 @@ export default function ReservationsPage() {
       const [resData, staffData, shiftsData, settingsData] = await Promise.all([
         getReservations("全店舗", dateStr), // タイムラインには他店舗の予約も出すために一旦全店舗分取得
         getStaffList(),
-        getMonthlyShifts(date.getFullYear(), date.getMonth() + 1),
+        getShiftsForDate(dateStr),
         getReservationSettings()
       ]);
       setReservations(resData);
@@ -40,7 +40,7 @@ export default function ReservationsPage() {
       setSettings(settingsData);
       
       // Filter shifts for the selected date
-      const dailyShifts = shiftsData.filter(s => s.date === dateStr);
+      const dailyShifts = shiftsData;
       setShifts(dailyShifts);
     } catch (e) {
       console.error(e);

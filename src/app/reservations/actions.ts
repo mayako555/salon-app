@@ -66,18 +66,26 @@ export async function getReservations(store: string, dateStr: string): Promise<R
       const counts: Record<string, number> = {};
       const customerInfo: Record<string, { notes: string, allergies: string[] }> = {};
       
-      // Better to fetch individually if few, or bulk fetch if many. Let's do simple getDoc for now since daily reservations aren't massive.
-      await Promise.all(customerIds.map(async id => {
-        const cRef = doc(db, 'customers', id);
-        const cSnap = await getDoc(cRef);
-        if (cSnap.exists()) {
+      const { collection, getDocs, query, where, documentId } = await import('firebase/firestore');
+      
+      // Chunk into 10s for 'in' queries
+      const chunkSize = 10;
+      const chunks = [];
+      for (let i = 0; i < customerIds.length; i += chunkSize) {
+        chunks.push(customerIds.slice(i, i + chunkSize));
+      }
+      
+      await Promise.all(chunks.map(async chunk => {
+        const q = query(collection(db, 'customers'), where(documentId(), 'in', chunk));
+        const snap = await getDocs(q);
+        snap.forEach(cSnap => {
           const data = cSnap.data();
-          counts[id] = data.same_day_cancel_count || 0;
-          customerInfo[id] = {
+          counts[cSnap.id] = data.same_day_cancel_count || 0;
+          customerInfo[cSnap.id] = {
             notes: data.notes || "",
             allergies: data.allergies || []
           };
-        }
+        });
       }));
 
       results = results.map(r => {

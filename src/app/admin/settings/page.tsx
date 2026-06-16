@@ -10,7 +10,7 @@ import { Save, Settings, MessageCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 export default function SystemSettingsPage() {
-  const { profile } = useAuth();
+  const { profile, isAdmin, availableStores } = useAuth();
   const [settings, setSettings] = useState<ReservationSettings | null>(null);
   const [lineSettings, setLineSettings] = useState<LineSettingsMap>({});
   const [loading, setLoading] = useState(true);
@@ -29,7 +29,7 @@ export default function SystemSettingsPage() {
     load();
   }, []);
 
-  if (profile?.role !== "admin") {
+  if (!isAdmin) {
     return <div className="p-12 text-center text-slate-400 font-bold">アクセス権限がありません</div>;
   }
 
@@ -99,7 +99,7 @@ export default function SystemSettingsPage() {
       </div>
 
       <div className="space-y-6">
-        {Object.entries(settings.stores).filter(([store]) => store !== "共通").map(([store, storeSettings]) => (
+        {availableStores.filter(store => store !== "共通" && store !== "全店舗").map(store => { const storeSettings = settings.stores[store] || { startHour: 8, endHour: 22, slotDuration: 30 }; return (
           <Card key={store} className="border-none shadow-lg shadow-slate-200/50 rounded-3xl overflow-hidden bg-white">
             <CardHeader className="bg-slate-50 border-b border-slate-100">
               <CardTitle className="text-lg font-black text-slate-800">{store}店の予約台帳設定</CardTitle>
@@ -153,7 +153,7 @@ export default function SystemSettingsPage() {
               </div>
             </CardContent>
           </Card>
-        ))}
+        ); })}
 
         <div className="pt-8 pb-4">
           <h2 className="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2">
@@ -162,7 +162,7 @@ export default function SystemSettingsPage() {
           <p className="text-slate-500 font-medium">各店舗のLINE Messaging API（チャネルアクセストークン）の設定</p>
         </div>
 
-        {Object.keys(settings.stores).filter(store => store !== "共通").map((store) => (
+        {availableStores.filter(store => store !== "共通" && store !== "全店舗").map((store) => (
           <Card key={`line-${store}`} className="border-none shadow-lg shadow-slate-200/50 rounded-3xl overflow-hidden bg-white">
             <CardHeader className="bg-green-50 border-b border-green-100">
               <CardTitle className="text-lg font-black text-slate-800">{store}店 LINE設定</CardTitle>
