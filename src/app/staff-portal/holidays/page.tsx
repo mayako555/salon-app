@@ -17,8 +17,8 @@ export default function StaffPortalHolidaysPage() {
   const deadlineDate = new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth() - 2, 20);
 
   const [maxRequests] = useState(3);
-  const [requestedDays, setRequestedDays] = useState<string[]>([]);
-  const [paidLeaveDays, setPaidLeaveDays] = useState<string[]>([]);
+  const [requestedDays, setRequestedDays] = useState<Record<string, number>>({});
+  const [paidLeaveDays, setPaidLeaveDays] = useState<Record<string, number>>({});
   const [requestMode, setRequestMode] = useState<"regular" | "pto">("regular");
   const [submitted, setSubmitted] = useState(false);
 
@@ -30,31 +30,45 @@ export default function StaffPortalHolidaysPage() {
 
   const toggleDay = (dateStr: string) => {
     if (requestMode === "regular") {
-       if (paidLeaveDays.includes(dateStr)) return;
+       if (paidLeaveDays[dateStr]) return;
        setRequestedDays(prev => {
-         if (prev.includes(dateStr)) {
-           return prev.filter(d => d !== dateStr);
-         } else {
-           if (prev.length >= maxRequests) {
-             alert(`希望休は${maxRequests}日までしか選択できません。それ以上はマネージャーへ直接ご相談ください。`);
-             return prev;
-           }
-           return [...prev, dateStr];
+         const current = prev[dateStr] || 0;
+         let next = 0;
+         if (current === 0) next = 1;
+         else if (current === 1) next = 0.5;
+         else next = 0;
+         
+         const total = Object.values(prev).reduce((a, b) => a + b, 0) - current + next;
+         
+         if (next > current && total > maxRequests) {
+           alert(`希望休は${maxRequests}日までしか選択できません。それ以上はマネージャーへ直接ご相談ください。`);
+           return prev;
          }
+         const newObj = { ...prev };
+         if (next === 0) delete newObj[dateStr];
+         else newObj[dateStr] = next;
+         return newObj;
        });
     } else {
-       if (requestedDays.includes(dateStr)) return;
+       if (requestedDays[dateStr]) return;
        setPaidLeaveDays(prev => {
-         if (prev.includes(dateStr)) {
-           return prev.filter(d => d !== dateStr);
-         } else {
-           const balance = profile?.paid_leave_balance ?? 0;
-           if (prev.length >= balance) {
-             alert(`有給残日数（${balance}日）を超えて申請することはできません。`);
-             return prev;
-           }
-           return [...prev, dateStr];
+         const current = prev[dateStr] || 0;
+         let next = 0;
+         if (current === 0) next = 1;
+         else if (current === 1) next = 0.5;
+         else next = 0;
+
+         const total = Object.values(prev).reduce((a, b) => a + b, 0) - current + next;
+         const balance = profile?.paid_leave_balance ?? 0;
+         
+         if (next > current && total > balance) {
+           alert(`有給残日数（${balance}日）を超えて申請することはできません。`);
+           return prev;
          }
+         const newObj = { ...prev };
+         if (next === 0) delete newObj[dateStr];
+         else newObj[dateStr] = next;
+         return newObj;
        });
     }
   };
@@ -66,19 +80,21 @@ export default function StaffPortalHolidaysPage() {
     try {
       const promises = [];
       
-      for (const date of requestedDays) {
+      for (const [date, amount] of Object.entries(requestedDays)) {
         promises.push(submitHolidayRequest({
           staff_id: profile.id,
           staff_name: profile.name,
           date,
+          amount
         }));
       }
       
-      for (const date of paidLeaveDays) {
+      for (const [date, amount] of Object.entries(paidLeaveDays)) {
         promises.push(submitHolidayRequest({
           staff_id: profile.id,
           staff_name: profile.name,
           date,
+          amount,
           reason: "有給休暇"
         }));
       }
@@ -86,8 +102,8 @@ export default function StaffPortalHolidaysPage() {
       await Promise.all(promises);
       
       alert("希望休を提出しました！");
-      setRequestedDays([]);
-      setPaidLeaveDays([]);
+      setRequestedDays({});
+      setPaidLeaveDays({});
     } catch (error) {
       alert("エラーが発生しました。もう一度やり直してください。");
     } finally {
@@ -154,9 +170,12 @@ export default function StaffPortalHolidaysPage() {
             {days.map((day) => {
               const dateStr = format(day, "yyyy-MM-dd");
               const isCurrentMonth = isSameMonth(day, targetMonthDate);
-              const isSelectedRegular = requestedDays.includes(dateStr);
-              const isSelectedPto = paidLeaveDays.includes(dateStr);
+              const regularAmount = requestedDays[dateStr];
+              const ptoAmount = paidLeaveDays[dateStr];
+              const isSelectedRegular = !!regularAmount;
+              const isSelectedPto = !!ptoAmount;
               const isSelected = isSelectedRegular || isSelectedPto;
+              const isHalf = regularAmount === 0.5 || ptoAmount === 0.5;
 
               if (!isCurrentMonth) {
                 return (
@@ -180,10 +199,10 @@ export default function StaffPortalHolidaysPage() {
                     {format(day, "d")}
                   </span>
                   {isSelectedRegular && (
-                    <span className="text-[8px] opacity-90 mt-0.5 font-medium leading-none">休</span>
+                    <span className="text-[8px] opacity-90 mt-0.5 font-medium leading-none">{regularAmount === 0.5 ? "半休" : "休"}</span>
                   )}
                   {isSelectedPto && (
-                    <span className="text-[8px] opacity-90 mt-0.5 font-bold leading-none">有給</span>
+                    <span className="text-[8px] opacity-90 mt-0.5 font-bold leading-none">{ptoAmount === 0.5 ? "半有給" : "有給"}</span>
                   )}
                 </button>
               );
@@ -196,9 +215,9 @@ export default function StaffPortalHolidaysPage() {
         <Button 
           className="w-full h-12 text-base font-bold rounded-xl shadow-md gap-2" 
           onClick={handleSubmit}
-          disabled={submitted || (requestedDays.length === 0 && paidLeaveDays.length === 0)}
+          disabled={submitted || (Object.keys(requestedDays).length === 0 && Object.keys(paidLeaveDays).length === 0)}
         >
-           {submitted ? "送信中..." : `提出する (希望休${requestedDays.length}日/有給${paidLeaveDays.length}日)`}
+           {submitted ? "送信中..." : `提出する (希望休${Object.values(requestedDays).reduce((a,b)=>a+b,0)}日/有給${Object.values(paidLeaveDays).reduce((a,b)=>a+b,0)}日)`}
         </Button>
       </div>
 
@@ -206,9 +225,9 @@ export default function StaffPortalHolidaysPage() {
         <Button 
           className="w-full h-12 text-base font-bold rounded-xl shadow-md gap-2" 
           onClick={handleSubmit}
-          disabled={submitted || (requestedDays.length === 0 && paidLeaveDays.length === 0)}
+          disabled={submitted || (Object.keys(requestedDays).length === 0 && Object.keys(paidLeaveDays).length === 0)}
         >
-          {submitted ? "送信中..." : `提出する (希望休${requestedDays.length}日/有給${paidLeaveDays.length}日)`}
+          {submitted ? "送信中..." : `提出する (希望休${Object.values(requestedDays).reduce((a,b)=>a+b,0)}日/有給${Object.values(paidLeaveDays).reduce((a,b)=>a+b,0)}日)`}
         </Button>
       </div>
     </div>

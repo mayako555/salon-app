@@ -45,6 +45,15 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
             {reservation.customer_name?.trim() && reservation.customer_kana && (
               <p className="text-xs text-slate-400 mt-0.5 ml-8">{reservation.customer_kana}</p>
             )}
+            {reservation.customer_id && (
+              <div className="mt-2 ml-8">
+                <Link href={`/staff-portal/customers/${reservation.customer_id}`}>
+                  <Button variant="outline" size="sm" className="h-7 text-[10px] font-bold text-blue-600 border-blue-200 hover:bg-blue-50">
+                    <UserCircle className="w-3 h-3 mr-1" /> 顧客詳細・来店履歴を見る
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
           {onEdit && reservation.status !== 'completed' && reservation.status !== 'cancelled' && (
             <Button variant="ghost" size="icon" onClick={onEdit} className="text-blue-500 hover:bg-blue-50">

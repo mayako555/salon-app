@@ -319,6 +319,7 @@ export type HolidayRequest = {
   staff_id: string;
   staff_name: string;
   date: string;
+  amount?: number; // 1 or 0.5
   reason?: string;
   status: "pending" | "approved" | "rejected";
   shift_id?: string; // Link to the shift record

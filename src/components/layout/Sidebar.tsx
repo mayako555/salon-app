@@ -24,7 +24,8 @@ import {
   Award,
   Wallet,
   Sparkles,
-  Banknote
+  Banknote,
+  Briefcase
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -65,6 +66,7 @@ const managementCategories = [
   {
     title: "スタッフ・教育",
     items: [
+      { name: "採用管理", href: "/admin/recruitment", icon: Briefcase, role: "admin" },
       { name: "スタッフ管理", href: "/staff", icon: Users, role: "admin" },
       { name: "スタッフ評価", href: "/evaluations", icon: Award, role: "companyOwner" },
       { name: "新人教育", href: "/training", icon: GraduationCap, role: "companyOwner" },

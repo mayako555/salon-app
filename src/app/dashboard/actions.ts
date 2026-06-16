@@ -88,7 +88,8 @@ export async function getDashboardStats() {
     
     todaySalesSnap.forEach(doc => {
       const data = doc.data();
-      const store = data.store_name || "不明";
+      const rawStore = data.store_name || "不明";
+      const store = rawStore.endsWith("店") ? rawStore.slice(0, -1) : rawStore;
       const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
       if (storeSummary[store] !== undefined) {
         storeSummary[store] += amount;
@@ -104,7 +105,8 @@ export async function getDashboardStats() {
     const monthlyStoreSales: Record<string, number> = {};
     monthlySalesSnap.forEach(doc => {
       const data = doc.data();
-      const store = data.store_name || "不明";
+      const rawStore = data.store_name || "不明";
+      const store = rawStore.endsWith("店") ? rawStore.slice(0, -1) : rawStore;
       const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
       monthlyStoreSales[store] = (monthlyStoreSales[store] || 0) + amount;
     });
@@ -113,12 +115,24 @@ export async function getDashboardStats() {
     const isInHouse = !ctx.companyId || ctx.companyId === "company_default" || ctx.role === "systemOwner";
     
     // In-house can see all store targets. Franchise users see their salonIds (or all their company stores if salonIds is empty)
-    const availableStores = isInHouse ? storeTargets.map(t => t.store_name) : (ctx.salonIds && ctx.salonIds.length > 0 ? ctx.salonIds : storeTargets.map(t => t.store_name));
-    
+    const availableStores = isInHouse 
+      ? storeTargets.map(t => t.store_name.endsWith("店") ? t.store_name.slice(0, -1) : t.store_name) 
+      : (ctx.salonIds && ctx.salonIds.length > 0 
+          ? ctx.salonIds.map(s => s.endsWith("店") ? s.slice(0, -1) : s) 
+          : storeTargets.map(t => t.store_name.endsWith("店") ? t.store_name.slice(0, -1) : t.store_name));
+          
     const uniqueStores = Array.from(new Set(availableStores));
+    
+    // Initialize summary to 0 for unique stores
+    uniqueStores.forEach(name => {
+      if (storeSummary[name] === undefined) storeSummary[name] = 0;
+    });
 
     const storeStats = uniqueStores.map(name => {
-      const target = storeTargets.find(t => t.store_name === name)?.target || 0;
+      const target = storeTargets.find(t => {
+        const tName = t.store_name.endsWith("店") ? t.store_name.slice(0, -1) : t.store_name;
+        return tName === name;
+      })?.target || 0;
       const current = monthlyStoreSales[name] || 0;
       return {
         name,
@@ -221,7 +235,8 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
           totalTreatmentMinutes += data.treatment_minutes || 60; // 実際の施術時間がない場合は後方互換で60分とする
         }
         
-        const storeKey = data.store_name || "不明";
+        const rawStoreKey = data.store_name || "不明";
+        const storeKey = rawStoreKey.endsWith("店") ? rawStoreKey.slice(0, -1) : rawStoreKey;
         
         if (!storeSales[storeKey]) {
           storeSales[storeKey] = { total: 0, minimo: 0, nextBookings: 0, nextBookingVisits: 0, count: 0, minimoVisits: 0, regularVisits: 0, regularNewVisits: 0, minimoNewVisits: 0 };
