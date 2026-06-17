@@ -175,12 +175,12 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">希望休上限（日）</label>
-            <input required type="number" name="max_holiday_requests" defaultValue={staff?.max_holiday_requests ?? 3} min="0" className="w-full h-10 px-3 border border-slate-300 rounded-md shadow-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none" />
+            <input required type="number" name="max_holiday_requests" defaultValue={staff?.max_holiday_requests ?? 3} min="0" step="0.5" className="w-full h-10 px-3 border border-slate-300 rounded-md shadow-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none" />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1 font-bold text-amber-600">有給残日数（日）</label>
-            <input required type="number" name="paid_leave_balance" defaultValue={staff?.paid_leave_balance ?? 0} min="0" className="w-full h-10 px-3 border-2 border-amber-100 rounded-md shadow-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none font-bold" />
+            <input required type="number" name="paid_leave_balance" defaultValue={staff?.paid_leave_balance ?? 0} min="0" step="0.5" className="w-full h-10 px-3 border-2 border-amber-100 rounded-md shadow-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none font-bold" />
             <p className="text-[10px] text-slate-400 mt-1">※ スタッフの現在の有給残日数。付与・調整時に手動で変更してください。</p>
           </div>
 
@@ -193,7 +193,7 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
           <div className="space-y-2">
             <label className="block text-sm font-medium text-slate-700">SNS投稿担当（連携アカウント）</label>
             <div className="grid grid-cols-2 gap-2">
-              {["BROW GYM", "当サロン", "JL Academy", "岡田万耶子"].map(acc => (
+              {["BROW GYM", "Jasmine Lash", "JL Academy", "岡田万耶子"].map(acc => (
                 <label key={acc} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
                   <input 
                     type="checkbox" 

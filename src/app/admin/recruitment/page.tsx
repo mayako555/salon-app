@@ -63,7 +63,53 @@ export default function RecruitmentDashboard() {
 
   const barData = Object.entries(roleStats).map(([name, value]) => ({ name, value }));
 
-  const activeCount = applicants.filter(a => !["不採用", "辞退", "採用"].includes(a.status)).length;
+  // Yearly Experience Stats
+  const yearlyStatsMap = applicants.reduce((acc, curr) => {
+    if (!curr.application_date) return acc;
+    const year = new Date(curr.application_date).getFullYear().toString();
+    if (!acc[year]) {
+      acc[year] = { year, "新卒": 0, "未経験": 0, "経験3年未満": 0, "経験3年以上": 0, "その他": 0 };
+    }
+    const cat = curr.category || "";
+    let normalized = "その他";
+    if (cat.includes("新卒")) normalized = "新卒";
+    else if (cat.includes("未経験") || cat.includes("スクール")) normalized = "未経験";
+    else if (cat.includes("未満") || cat.includes("1年") || cat.includes("2年")) normalized = "経験3年未満";
+    else if (cat.includes("3年以上") || cat.includes("3年") || cat.includes("経験あり")) normalized = "経験3年以上";
+
+    acc[year][normalized] += 1;
+    return acc;
+  }, {} as Record<string, any>);
+
+  const yearlyData = Object.values(yearlyStatsMap).sort((a: any, b: any) => a.year.localeCompare(b.year));
+
+  // Monthly Application Stats
+  const monthlyStatsMap = applicants.reduce((acc, curr) => {
+    if (!curr.application_date) return acc;
+    const month = curr.application_date.substring(0, 7); // YYYY-MM
+    if (!acc[month]) {
+      acc[month] = { month, 応募数: 0, 採用数: 0, "新卒": 0, "未経験": 0, "経験3年未満": 0, "経験3年以上": 0, "その他": 0 };
+    }
+    acc[month].応募数 += 1;
+    if (curr.status === "採用") {
+      acc[month].採用数 += 1;
+    }
+
+    const cat = curr.category || "";
+    let normalized = "その他";
+    if (cat.includes("新卒")) normalized = "新卒";
+    else if (cat.includes("未経験") || cat.includes("スクール")) normalized = "未経験";
+    else if (cat.includes("未満") || cat.includes("1年") || cat.includes("2年")) normalized = "経験3年未満";
+    else if (cat.includes("3年以上") || cat.includes("3年") || cat.includes("経験あり")) normalized = "経験3年以上";
+
+    acc[month][normalized] += 1;
+
+    return acc;
+  }, {} as Record<string, any>);
+
+  const monthlyData = Object.values(monthlyStatsMap).sort((a: any, b: any) => a.month.localeCompare(b.month));
+
+  const activeCount = applicants.filter(a => !["不採用", "辞退", "採用", "見学のみ終了", "退職済"].includes(a.status)).length;
 
   return (
     <div className="flex flex-col h-full bg-slate-50 p-6 overflow-y-auto">
@@ -149,6 +195,72 @@ export default function RecruitmentDashboard() {
               </ResponsiveContainer>
             </div>
           </div>
+
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 h-80 flex flex-col">
+            <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" /> 年別・経験区分別の推移
+            </h3>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={yearlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="year" tick={{fontSize: 12}} />
+                  <YAxis tick={{fontSize: 12}} />
+                  <Tooltip cursor={{fill: '#f8fafc'}} />
+                  <Legend wrapperStyle={{fontSize: 10, paddingTop: 10}} />
+                  <Bar dataKey="新卒" stackId="a" fill="#34d399" />
+                  <Bar dataKey="未経験" stackId="a" fill="#60a5fa" />
+                  <Bar dataKey="経験3年未満" stackId="a" fill="#f472b6" />
+                  <Bar dataKey="経験3年以上" stackId="a" fill="#a78bfa" />
+                  <Bar dataKey="その他" stackId="a" fill="#94a3b8" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 h-80 flex flex-col">
+            <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+              <CalendarDays className="w-4 h-4" /> 月別の応募推移
+            </h3>
+            <div className="flex-1 min-h-0 overflow-x-auto custom-scrollbar">
+              <div className="h-full min-w-[500px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="month" tick={{fontSize: 10}} />
+                    <YAxis tick={{fontSize: 12}} />
+                    <Tooltip 
+                      cursor={{fill: '#f8fafc'}} 
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const d = payload[0].payload;
+                          return (
+                            <div className="bg-white p-3 border border-slate-200 shadow-xl rounded-lg text-xs min-w-[140px]">
+                              <p className="font-bold text-slate-800 mb-2 border-b border-slate-100 pb-1">{label}</p>
+                              <div className="space-y-1 mb-2">
+                                <p className="text-slate-700 font-bold flex justify-between"><span>応募数</span> <span>{d.応募数}</span></p>
+                                {d.新卒 > 0 && <p className="text-emerald-500 pl-2 flex justify-between"><span>新卒</span> <span>{d.新卒}</span></p>}
+                                {d.未経験 > 0 && <p className="text-blue-500 pl-2 flex justify-between"><span>未経験</span> <span>{d.未経験}</span></p>}
+                                {d.経験3年未満 > 0 && <p className="text-pink-500 pl-2 flex justify-between"><span>経験3年未満</span> <span>{d.経験3年未満}</span></p>}
+                                {d.経験3年以上 > 0 && <p className="text-purple-500 pl-2 flex justify-between"><span>経験3年以上</span> <span>{d.経験3年以上}</span></p>}
+                                {d.その他 > 0 && <p className="text-slate-500 pl-2 flex justify-between"><span>その他</span> <span>{d.その他}</span></p>}
+                              </div>
+                              <div className="h-px bg-slate-100 my-1"></div>
+                              <p className="text-emerald-600 font-bold flex justify-between mt-1"><span>採用数</span> <span>{d.採用数}</span></p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Legend wrapperStyle={{fontSize: 10, paddingTop: 10}} />
+                    <Bar dataKey="応募数" fill="#94a3b8" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="採用数" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -209,8 +321,9 @@ export default function RecruitmentDashboard() {
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold
                         ${app.status === '採用' ? 'bg-emerald-100 text-emerald-800' : 
-                          app.status === '不採用' || app.status === '辞退' ? 'bg-slate-100 text-slate-600' : 
+                          app.status === '不採用' || app.status === '辞退' || app.status === '見学のみ終了' || app.status === '退職済' ? 'bg-slate-100 text-slate-600' : 
                           app.status.includes('面接') ? 'bg-blue-100 text-blue-800' :
+                          app.status.includes('見学') ? 'bg-purple-100 text-purple-800' :
                           'bg-amber-100 text-amber-800'}`}>
                         {app.status}
                       </span>

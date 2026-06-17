@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ const SOURCES = [
 
 const ROLES = [
   "アイリスト",
+  "アイブロウリスト",
   "ネイリスト",
   "エステティシャン",
   "フロント・受付",
@@ -33,13 +34,18 @@ const ROLES = [
 
 const STATUSES: ApplicantStatus[] = [
   "応募受付",
+  "サロン見学調整中",
+  "サロン見学予定",
+  "サロン見学済",
   "面接調整中",
   "面接確定",
   "面接済",
   "内定",
   "採用",
   "不採用",
-  "辞退"
+  "辞退",
+  "見学のみ終了",
+  "退職済"
 ];
 
 type Props = {
@@ -54,28 +60,34 @@ export default function ApplicantFormDialog({ isOpen, onClose, onRefresh, initia
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [formData, setFormData] = useState<Partial<Applicant>>(initialData || {
-    application_date: "",
-    name: "",
-    name_kana: "",
-    age: "",
-    category: "",
-    phone: "",
-    email: "",
-    desired_role: ROLES[0],
-    application_source: SOURCES[0],
-    status: "応募受付",
-    salon_tour_date: "",
-    interview_date: "",
-    recruitment_cost: "",
-    school_name: "",
-    decision_date: "",
-    join_date: "",
-    contract_type: "",
-    interviewer: "",
-    notes: "",
-    resume_url: ""
-  });
+  const [formData, setFormData] = useState<Partial<Applicant>>({});
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(initialData || {
+        application_date: "",
+        name: "",
+        name_kana: "",
+        age: "",
+        category: "",
+        phone: "",
+        email: "",
+        desired_role: ROLES[0],
+        application_source: SOURCES[0],
+        status: "応募受付",
+        salon_tour_date: "",
+        interview_date: "",
+        recruitment_cost: "",
+        school_name: "",
+        decision_date: "",
+        join_date: "",
+        contract_type: "",
+        interviewer: "",
+        notes: "",
+        resume_url: ""
+      });
+    }
+  }, [initialData, isOpen]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -158,8 +170,8 @@ export default function ApplicantFormDialog({ isOpen, onClose, onRefresh, initia
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>電話番号 <span className="text-rose-500">*</span></Label>
-                <Input required name="phone" value={formData.phone || ""} onChange={handleChange} placeholder="090-0000-0000" />
+                <Label>電話番号</Label>
+                <Input name="phone" value={formData.phone || ""} onChange={handleChange} placeholder="090-0000-0000" />
               </div>
               <div className="space-y-2">
                 <Label>メールアドレス</Label>

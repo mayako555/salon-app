@@ -16,7 +16,20 @@ import {
 
 const APPLICANTS_COLLECTION = "applicants";
 
-export type ApplicantStatus = "応募受付" | "面接調整中" | "面接確定" | "面接済" | "内定" | "採用" | "不採用" | "辞退";
+export type ApplicantStatus = 
+  | "応募受付" 
+  | "サロン見学調整中"
+  | "サロン見学予定"
+  | "サロン見学済"
+  | "面接調整中" 
+  | "面接確定" 
+  | "面接済" 
+  | "内定" 
+  | "採用" 
+  | "不採用" 
+  | "辞退"
+  | "見学のみ終了"
+  | "退職済";
 
 export type Applicant = {
   id: string;
