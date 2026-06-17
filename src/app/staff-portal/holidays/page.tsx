@@ -112,7 +112,7 @@ export default function StaffPortalHolidaysPage() {
   };
 
   return (
-    <div className="pb-24">
+    <div className="pb-36">
       <div className="bg-gradient-to-br from-rose-500 to-pink-500 p-6 text-white pb-8">
         <h1 className="text-xl font-bold mb-1">希望休の提出</h1>
         <p className="opacity-90 text-sm">カレンダーをタップして希望休を選択してください。</p>
@@ -211,13 +211,13 @@ export default function StaffPortalHolidaysPage() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.05)] w-full block sm:hidden pb-safe">
+      <div className="fixed bottom-[64px] left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-slate-200 p-4 shadow-[0_-10px_15px_-3px_rgb(0,0,0,0.05)] w-full block sm:hidden z-30 pb-safe">
         <Button 
           className="w-full h-12 text-base font-bold rounded-xl shadow-md gap-2" 
           onClick={handleSubmit}
           disabled={submitted || (Object.keys(requestedDays).length === 0 && Object.keys(paidLeaveDays).length === 0)}
         >
-           {submitted ? "送信中..." : `提出する (希望休${Object.values(requestedDays).reduce((a,b)=>a+b,0)}日/有給${Object.values(paidLeaveDays).reduce((a,b)=>a+b,0)}日)`}
+           {submitted ? "送信中..." : `選択を完了して提出 (希望休${Object.values(requestedDays).reduce((a,b)=>a+b,0)}日/有給${Object.values(paidLeaveDays).reduce((a,b)=>a+b,0)}日)`}
         </Button>
       </div>
 
