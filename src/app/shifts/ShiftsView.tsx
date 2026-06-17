@@ -233,18 +233,19 @@ export default function ShiftsView({
         </div>
 
         {viewMode === "calendar" ? (
-          <div className="flex flex-col">
-            <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
-              {["月", "火", "水", "木", "金", "土", "日"].map((day, i) => (
-                <div key={day} className={`py-3 text-center text-xs font-semibold ${
-                  i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-slate-500"
-                }`}>
-                  {day}
-                </div>
-              ))}
-            </div>
+          <div className="overflow-x-auto custom-scrollbar">
+            <div className="flex flex-col min-w-[800px] sm:min-w-[100%]">
+              <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
+                {["月", "火", "水", "木", "金", "土", "日"].map((day, i) => (
+                  <div key={day} className={`py-3 text-center text-xs font-semibold ${
+                    i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-slate-500"
+                  }`}>
+                    {day}
+                  </div>
+                ))}
+              </div>
 
-            <div className="grid grid-cols-7 bg-slate-200 gap-px">
+              <div className="grid grid-cols-7 bg-slate-200 gap-px">
               {days.map((day) => {
                 const dateStr = format(day, "yyyy-MM-dd");
                 const dayShifts = getShiftsForDate(dateStr);
@@ -312,6 +313,7 @@ export default function ShiftsView({
                   </div>
                 );
               })}
+            </div>
             </div>
           </div>
         ) : viewMode === "staff" ? (

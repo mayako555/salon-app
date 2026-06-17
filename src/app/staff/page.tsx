@@ -73,20 +73,21 @@ function SortableStaffItem({
         isDragging && "shadow-2xl ring-2 ring-blue-500 ring-offset-2 scale-[1.01] z-50",
         staff.employment_status === "retired" && "opacity-60 bg-slate-100 grayscale-[0.5]"
       )}>
-        <CardContent className="p-4 flex items-center gap-4">
-          {/* Drag Handle */}
-          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-2 hover:bg-slate-50 rounded-lg text-slate-300 hover:text-slate-600 transition-colors">
-            <GripVertical size={20} />
-          </div>
-
-          <div className="flex-1 min-w-0 flex items-center gap-4">
-            <div className="bg-slate-100 w-12 h-12 rounded-full flex items-center justify-center text-slate-400 shrink-0">
-              <Users size={24} />
+        <CardContent className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex-1 min-w-0 flex items-center gap-3 sm:gap-4">
+            {/* Drag Handle */}
+            <div {...attributes} {...listeners} className="shrink-0 cursor-grab active:cursor-grabbing p-1.5 sm:p-2 hover:bg-slate-50 rounded-lg text-slate-300 hover:text-slate-600 transition-colors">
+              <GripVertical size={20} />
             </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-1">
+
+            <div className="bg-slate-100 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-slate-400 shrink-0">
+              <Users className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+            
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1">
                 <span className={cn(
-                  "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest",
+                  "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap",
                   staff.employment_type === 'employee' ? 'bg-blue-100 text-blue-700' :
                   staff.employment_type === 'part_time' ? 'bg-amber-100 text-amber-700' :
                   'bg-emerald-100 text-emerald-700'
@@ -95,22 +96,22 @@ function SortableStaffItem({
                    staff.employment_type === 'part_time' ? 'パート' : '業務委託'}
                 </span>
                 {staff.is_invoice_registered && (
-                  <Badge variant="outline" className="text-[9px] font-bold border-emerald-200 text-emerald-600 h-5">インボイス登録</Badge>
+                  <Badge variant="outline" className="text-[9px] font-bold border-emerald-200 text-emerald-600 h-5 whitespace-nowrap">インボイス登録</Badge>
                 )}
                 {staff.employment_status === "leave" && (
-                  <Badge variant="outline" className="text-[9px] font-bold border-amber-200 bg-amber-50 text-amber-700 h-5">休職中</Badge>
+                  <Badge variant="outline" className="text-[9px] font-bold border-amber-200 bg-amber-50 text-amber-700 h-5 whitespace-nowrap">休職中</Badge>
                 )}
                 {staff.employment_status === "retired" && (
-                  <Badge variant="outline" className="text-[9px] font-bold border-slate-300 bg-slate-200 text-slate-600 h-5">退職済</Badge>
+                  <Badge variant="outline" className="text-[9px] font-bold border-slate-300 bg-slate-200 text-slate-600 h-5 whitespace-nowrap">退職済</Badge>
                 )}
               </div>
               {staff.name_kana && (
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mb-0.5 leading-none">{staff.name_kana}</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mb-0.5 leading-none truncate">{staff.name_kana}</p>
               )}
-              <h3 className="font-black text-slate-800 truncate text-lg leading-tight">{staff.name}</h3>
-              <div className="flex items-center gap-3 mt-1">
-                <p className="text-[10px] text-slate-400 flex items-center gap-1"><Mail size={10} /> {staff.email || "メール未設定"}</p>
-                <p className="text-[10px] text-slate-400 flex items-center gap-1"><Briefcase size={10} /> {staff.role}</p>
+              <h3 className="font-black text-slate-800 truncate text-base sm:text-lg leading-tight">{staff.name}</h3>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mt-1.5 sm:mt-1">
+                <p className="text-[10px] text-slate-400 flex items-center gap-1 min-w-0"><Mail size={10} className="shrink-0" /> <span className="truncate">{staff.email || "メール未設定"}</span></p>
+                <p className="text-[10px] text-slate-400 flex items-center gap-1 shrink-0"><Briefcase size={10} className="shrink-0" /> {staff.role}</p>
               </div>
             </div>
           </div>
@@ -135,13 +136,13 @@ function SortableStaffItem({
             <p className="text-lg font-black text-amber-600 tracking-tight">{staff.paid_leave_balance ?? 0}日</p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pl-10 sm:pl-0 self-end sm:self-auto shrink-0 mt-2 sm:mt-0">
             <Link 
               href={`/contracts?staffId=${staff.id}`}
-              className="rounded-xl h-10 px-4 text-xs font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 flex items-center gap-1 transition-all"
+              className="rounded-xl h-9 sm:h-10 px-3 sm:px-4 text-xs font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 flex items-center gap-1 transition-all border border-slate-200 sm:border-transparent"
             >
               <FileText size={16} />
-              <span className="hidden sm:inline">契約</span>
+              <span className="inline">契約</span>
             </Link>
             <StaffFormDialog staff={staff} />
             <DeleteStaffButton id={staff.id} uid={staff.uid} name={staff.name} />
