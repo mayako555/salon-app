@@ -16,7 +16,7 @@ export default function StaffPortalHolidaysPage() {
   const targetMonthDate = addMonths(currentDate, targetMonthOffset);
   const deadlineDate = new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth() - 2, 20);
 
-  const [maxRequests] = useState(3);
+  const maxRequests = profile?.max_holiday_requests ?? 3;
   const [requestedDays, setRequestedDays] = useState<Record<string, number>>({});
   const [paidLeaveDays, setPaidLeaveDays] = useState<Record<string, number>>({});
   const [requestMode, setRequestMode] = useState<"regular" | "pto">("regular");
