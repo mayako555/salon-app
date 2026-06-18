@@ -29,6 +29,7 @@ export type AttendanceRecord = {
   break_minutes: number;
   status: AttendanceStatus;
   store?: string; // Which store they clocked into
+  is_auto_clock_out?: boolean;
 };
 
 const ATTENDANCE_COLLECTION = "attendance";
@@ -41,7 +42,7 @@ export async function getDailyAttendance(dateStr: string): Promise<AttendanceRec
       .where("date", "==", dateStr)
       .get();
     
-    return snapshot.docs.map((doc: any) => {
+    const records = snapshot.docs.map((doc: any) => {
       const data = doc.data();
       return {
         id: doc.id,
@@ -50,6 +51,8 @@ export async function getDailyAttendance(dateStr: string): Promise<AttendanceRec
         updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : (data.updated_at || null)
       } as any;
     }) as AttendanceRecord[];
+    
+    return await autoFixMissingClockOuts(records, adminDb);
   } catch (error) {
     console.error("Error fetching daily attendance:", error);
     return [];
@@ -68,8 +71,9 @@ export async function getMonthlyAttendance(year: number, month: number): Promise
       orderBy("date", "asc")
     );
     const snapshot = await getDocs(q);
+    const { adminDb } = await import("@/lib/firebase-admin");
     
-    return snapshot.docs.map(doc => {
+    const records = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
         id: doc.id,
@@ -78,10 +82,80 @@ export async function getMonthlyAttendance(year: number, month: number): Promise
         updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : (data.updated_at || null)
       } as any;
     }) as AttendanceRecord[];
+
+    return await autoFixMissingClockOuts(records, adminDb);
   } catch (error) {
     console.error("Error fetching monthly attendance:", error);
     return [];
   }
+}
+
+async function autoFixMissingClockOuts(records: AttendanceRecord[], adminDb: any): Promise<AttendanceRecord[]> {
+  const todayStr = new Date().toISOString().split("T")[0];
+  const needsFix = records.filter(r => !r.clock_out && r.date < todayStr);
+  
+  if (needsFix.length === 0) return records;
+
+  const staffSnap = await adminDb.collection("staff_profiles").get();
+  const staffProfiles = staffSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+  
+  // Only apply to "employee" (正社員)
+  const employeeIds = new Set(staffProfiles.filter((s: any) => s.employment_type === "employee").map((s: any) => s.id));
+  const employeeRecords = needsFix.filter(r => employeeIds.has(r.staff_id));
+  
+  if (employeeRecords.length === 0) return records;
+
+  const datesToFetch = Array.from(new Set(employeeRecords.map(r => r.date)));
+  const shiftPromises = datesToFetch.map(date => 
+    adminDb.collection("shifts").where("date", "==", date).get()
+  );
+  
+  const shiftSnaps = await Promise.all(shiftPromises);
+  const shifts: any[] = [];
+  shiftSnaps.forEach(snap => {
+    snap.docs.forEach((doc: any) => shifts.push({ id: doc.id, ...doc.data() }));
+  });
+
+  const batch = adminDb.batch();
+  let updatedCount = 0;
+
+  for (const record of employeeRecords) {
+    const shift = shifts.find(s => s.staff_id === record.staff_id && s.date === record.date);
+    if (shift && shift.segments && shift.segments.length > 0) {
+      // Filter by store if applicable
+      const targetSegments = record.store 
+        ? shift.segments.filter((s: any) => s.store === record.store) 
+        : shift.segments;
+      const segmentsToUse = targetSegments.length > 0 ? targetSegments : shift.segments;
+      
+      const shiftEnds = segmentsToUse.map((s: any) => s.end_time).sort();
+      const lastEnd = shiftEnds[shiftEnds.length - 1]; // e.g. "19:00"
+      
+      const endDate = new Date(`${record.date}T${lastEnd}:00`);
+      endDate.setHours(endDate.getHours() - 1); // 1 hour before shift end
+      
+      const autoOutTime = endDate.toISOString();
+      const docRef = adminDb.collection(ATTENDANCE_COLLECTION).doc(record.id);
+      
+      batch.update(docRef, {
+        clock_out: autoOutTime,
+        effective_clock_out: autoOutTime,
+        is_auto_clock_out: true,
+        updated_at: new Date()
+      });
+      
+      record.clock_out = autoOutTime;
+      record.effective_clock_out = autoOutTime;
+      record.is_auto_clock_out = true;
+      updatedCount++;
+    }
+  }
+
+  if (updatedCount > 0) {
+    await batch.commit();
+  }
+
+  return records;
 }
 
 export async function recordClockIn(staffId: string, staffName: string, store?: string) {
@@ -101,7 +175,12 @@ export async function recordClockIn(staffId: string, staffName: string, store?: 
     if (!shiftSnap.empty) {
       const shift = shiftSnap.docs[0].data();
       if (shift.segments && shift.segments.length > 0) {
-        const shiftStarts = shift.segments.map((s: any) => s.start_time).sort();
+        const targetSegments = store 
+          ? shift.segments.filter((s: any) => s.store === store) 
+          : shift.segments;
+        const segmentsToUse = targetSegments.length > 0 ? targetSegments : shift.segments;
+        
+        const shiftStarts = segmentsToUse.map((s: any) => s.start_time).sort();
         const scheduledStart = shiftStarts[0];
         const schedIn = new Date(`${dateStr}T${scheduledStart}:00`);
         
@@ -172,7 +251,13 @@ export async function recordClockOut(staffId: string) {
       if (!shiftSnap.empty) {
         const shift = shiftSnap.docs[0].data();
         if (shift.segments && shift.segments.length > 0) {
-          const shiftEnds = shift.segments.map((s: any) => s.end_time).sort();
+          const attStore = snapshot.docs[0].data().store;
+          const targetSegments = attStore 
+            ? shift.segments.filter((s: any) => s.store === attStore) 
+            : shift.segments;
+          const segmentsToUse = targetSegments.length > 0 ? targetSegments : shift.segments;
+          
+          const shiftEnds = segmentsToUse.map((s: any) => s.end_time).sort();
           const scheduledEnd = shiftEnds[shiftEnds.length - 1];
           const schedOut = new Date(`${dateStr}T${scheduledEnd}:00`);
           

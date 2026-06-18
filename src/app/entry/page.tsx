@@ -20,7 +20,8 @@ import {
   Sparkles,
   Signature,
   MessageSquare,
-  Smartphone
+  Smartphone,
+  Search
 } from "lucide-react";
 import { addCustomer, getCustomerById, updateCustomer } from "@/lib/customers";
 import { addCounselingResponse, calculateRiskFlags, ServiceType } from "@/lib/counseling";
@@ -483,7 +484,41 @@ function CustomerEntryFormContent() {
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-1.5 block ml-1">郵便番号</label>
-                  <Input placeholder="6570000" className="h-12 rounded-xl bg-slate-50 border-none font-bold" value={formData.postal_code} onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })} />
+                  <div className="flex gap-2">
+                    <Input 
+                      placeholder="6570000" 
+                      className="flex-1 h-12 rounded-xl bg-slate-50 border-none font-bold" 
+                      value={formData.postal_code} 
+                      onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })} 
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="h-12 px-4 rounded-xl border-slate-200 text-slate-600 font-bold bg-white" 
+                      onClick={async () => {
+                        if (!formData.postal_code || formData.postal_code.replace(/-/g, '').length < 7) {
+                          toast.error("郵便番号は7桁で入力してください");
+                          return;
+                        }
+                        try {
+                          const zip = formData.postal_code.replace(/-/g, '');
+                          const res = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zip}`);
+                          const data = await res.json();
+                          if (data.status === 200 && data.results) {
+                            const result = data.results[0];
+                            const address = `${result.address1}${result.address2}${result.address3}`;
+                            setFormData(prev => ({ ...prev, address }));
+                          } else {
+                            toast.error("住所が見つかりませんでした");
+                          }
+                        } catch (e) {
+                          toast.error("住所検索に失敗しました");
+                        }
+                      }}
+                    >
+                      <Search className="w-4 h-4 mr-2" /> 検索
+                    </Button>
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-1.5 block ml-1">住所</label>

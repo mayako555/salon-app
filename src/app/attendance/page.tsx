@@ -6,8 +6,8 @@ import { getDailyAttendance, AttendanceRecord, getAllStaffProfiles, bulkImportAt
 import { getMonthlyShifts, ShiftRecord } from "@/app/shifts/actions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Edit2, Search, Calendar as CalendarIcon, Clock, ArrowRight, Upload, ShieldAlert, FileText, AlertCircle } from "lucide-react";
-import { format } from "date-fns";
+import { Edit2, Search, Calendar as CalendarIcon, Clock, ArrowRight, Upload, ShieldAlert, FileText, AlertCircle, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { format, addDays, subDays, parseISO } from "date-fns";
 import { ja } from "date-fns/locale";
 import AuthGuard from "@/components/AuthGuard";
 import AttendanceCSVButton from "./AttendanceCSVButton";
@@ -31,7 +31,7 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const targetDateStr = format(new Date(), "yyyy-MM-dd");
+  const [targetDateStr, setTargetDateStr] = useState(format(new Date(), "yyyy-MM-dd"));
 
   // Google Form Import States
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -40,14 +40,14 @@ export default function AttendancePage() {
   const [roundingRule, setRoundingRule] = useState<'none' | '15' | '30'>('30');
   const [staffProfiles, setStaffProfiles] = useState<any[]>([]);
 
+  // Manual Add States
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [addRecordData, setAddRecordData] = useState<any>({ staffId: "", clockIn: "", clockOut: "", store: "元町", breakMinutes: 60, status: "normal" });
+  const [isAdding, setIsAdding] = useState(false);
+
   const applyRounding = (isoStr: string | null, type: 'in' | 'out', rule: 'none' | '15' | '30') => {
     if (!isoStr) return "";
     let d = new Date(isoStr);
-    
-    // Add 30 minutes delay for clock-in (preparation time outside working hours)
-    if (type === 'in') {
-      d = new Date(d.getTime() + 30 * 60 * 1000);
-    }
     
     if (rule === 'none') {
       return format(d, "HH:mm");
@@ -275,6 +275,53 @@ export default function AttendancePage() {
     }
   };
 
+  const handleManualAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addRecordData.staffId || !addRecordData.clockIn || !addRecordData.clockOut) {
+      toast.error("スタッフ、出勤時間、退勤時間は必須です");
+      return;
+    }
+    setIsAdding(true);
+    try {
+      const staff = staffProfiles.find((s: any) => s.id === addRecordData.staffId) || { name: "不明" };
+      const dateObjIn = new Date(`${targetDateStr}T${addRecordData.clockIn}`);
+      const dateObjOut = new Date(`${targetDateStr}T${addRecordData.clockOut}`);
+      
+      const roundedIn = applyRounding(dateObjIn.toISOString(), 'in', '30');
+      const roundedOut = applyRounding(dateObjOut.toISOString(), 'out', '30');
+      
+      const effIn = new Date(`${targetDateStr}T${roundedIn}`).toISOString();
+      const effOut = new Date(`${targetDateStr}T${roundedOut}`).toISOString();
+
+      const newRecord = {
+        staff_id: addRecordData.staffId,
+        staff_name: staff.name,
+        date: targetDateStr,
+        clock_in: dateObjIn.toISOString(),
+        clock_out: dateObjOut.toISOString(),
+        effective_clock_in: effIn,
+        effective_clock_out: effOut,
+        break_minutes: addRecordData.breakMinutes,
+        status: addRecordData.status as any,
+        store: addRecordData.store
+      };
+
+      const res = await bulkImportAttendanceRecords([newRecord]);
+      if (res.success) {
+        toast.success("勤怠記録を追加しました");
+        setIsAddDialogOpen(false);
+        setAddRecordData({ staffId: "", clockIn: "", clockOut: "", store: "元町", breakMinutes: 60, status: "normal" });
+        loadData();
+      } else {
+        toast.error("追加に失敗しました: " + res.error);
+      }
+    } catch (error: any) {
+      toast.error("エラーが発生しました");
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
   const loadData = async () => {
     if (!profile) return;
     setLoading(true);
@@ -286,6 +333,11 @@ export default function AttendancePage() {
     
     const dayShifts = allShifts.filter(s => s.date === targetDateStr);
     setShifts(dayShifts);
+
+    if (staffProfiles.length === 0) {
+      const resProfiles = await getAllStaffProfiles();
+      if (resProfiles.success) setStaffProfiles(resProfiles.data || []);
+    }
 
     if (isAdmin || isManager) {
       setAttendanceRecords(allRecords);
@@ -306,6 +358,7 @@ export default function AttendancePage() {
     const res = await updateAttendanceRecord(editingRecord.id, {
       break_minutes: editingRecord.break_minutes,
       status: editingRecord.status,
+      store: editingRecord.store,
       effective_clock_in: editingRecord.effective_clock_in,
       effective_clock_out: editingRecord.effective_clock_out,
       is_effective_manual: true
@@ -331,15 +384,34 @@ export default function AttendancePage() {
         </div>
         {(isAdmin || isManager) && (
           <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-            <div className="relative">
-              <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
-              <input 
-                type="date" 
-                defaultValue={targetDateStr}
-                className="pl-9 pr-4 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 text-slate-700 bg-slate-50 h-9"
-              />
+            <div className="flex items-center gap-1">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-9 w-9" 
+                onClick={() => setTargetDateStr(format(subDays(parseISO(targetDateStr), 1), "yyyy-MM-dd"))}
+              >
+                <ChevronLeft size={16} />
+              </Button>
+              <div className="relative">
+                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
+                <input 
+                  type="date" 
+                  value={targetDateStr}
+                  onChange={(e) => setTargetDateStr(e.target.value)}
+                  className="pl-9 pr-4 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 text-slate-700 bg-slate-50 h-9 w-[150px]"
+                />
+              </div>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-9 w-9" 
+                onClick={() => setTargetDateStr(format(addDays(parseISO(targetDateStr), 1), "yyyy-MM-dd"))}
+              >
+                <ChevronRight size={16} />
+              </Button>
             </div>
-            <Button className="h-9 gap-2 w-full sm:w-auto">
+            <Button className="h-9 gap-2 w-full sm:w-auto" onClick={() => loadData()}>
               <Search size={16} />
               <span>表示</span>
             </Button>
@@ -355,6 +427,82 @@ export default function AttendancePage() {
             </h2>
             <div className="flex gap-2">
               {(isAdmin || isManager) && (
+                <>
+                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-500 text-white hover:text-white font-bold border-none gap-2 shadow-sm h-9"
+                    >
+                      <Plus size={14} />
+                      勤怠を手動追加
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-800">
+                        打刻を手動追加
+                      </DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleManualAdd} className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500">スタッフ</label>
+                        <select 
+                          value={addRecordData.staffId}
+                          onChange={(e) => setAddRecordData({...addRecordData, staffId: e.target.value})}
+                          className="w-full h-10 px-3 rounded-lg bg-slate-50 border-slate-200 text-sm font-bold"
+                          required
+                        >
+                          <option value="">選択してください</option>
+                          {staffProfiles.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500">出勤時間</label>
+                          <Input type="time" required value={addRecordData.clockIn} onChange={(e) => setAddRecordData({...addRecordData, clockIn: e.target.value})} className="h-10 bg-slate-50 font-mono font-bold" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500">退勤時間</label>
+                          <Input type="time" required value={addRecordData.clockOut} onChange={(e) => setAddRecordData({...addRecordData, clockOut: e.target.value})} className="h-10 bg-slate-50 font-mono font-bold" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500">休憩時間 (分)</label>
+                          <Input type="number" required value={addRecordData.breakMinutes} onChange={(e) => setAddRecordData({...addRecordData, breakMinutes: parseInt(e.target.value)||0})} className="h-10 bg-slate-50 font-bold" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500">状態</label>
+                          <select value={addRecordData.status} onChange={(e) => setAddRecordData({...addRecordData, status: e.target.value})} className="w-full h-10 px-3 rounded-lg bg-slate-50 border-slate-200 text-sm font-bold">
+                            <option value="normal">通常出勤</option>
+                            <option value="leave">有給休暇</option>
+                            <option value="absence">欠勤</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500">出勤店舗</label>
+                        <select 
+                          value={addRecordData.store} 
+                          onChange={(e) => setAddRecordData({...addRecordData, store: e.target.value})} 
+                          className="w-full h-10 px-3 rounded-lg bg-slate-50 border-slate-200 text-sm font-bold"
+                        >
+                          <option value="元町">元町</option>
+                          <option value="神戸">神戸</option>
+                          <option value="六甲">六甲</option>
+                        </select>
+                      </div>
+                      <DialogFooter className="pt-4 border-t border-slate-100">
+                        <Button type="button" variant="ghost" onClick={() => setIsAddDialogOpen(false)}>キャンセル</Button>
+                        <Button type="submit" disabled={isAdding} className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-8">
+                          {isAdding ? "追加中..." : "追加する"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
                 <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
                   <DialogTrigger asChild>
                     <Button
@@ -553,6 +701,7 @@ export default function AttendancePage() {
                     </div>
                   </DialogContent>
                 </Dialog>
+                </>
               )}
               <AttendanceCSVButton records={attendanceRecords} date={targetDateStr} shifts={shifts} />
             </div>
@@ -580,7 +729,7 @@ export default function AttendancePage() {
                   acc[record.staff_id] = { ...record, _allRecords: [record] };
                 } else {
                   // Merge logic
-                  acc[record.staff_id].break_minutes += record.break_minutes;
+                  acc[record.staff_id].break_minutes = Math.max(acc[record.staff_id].break_minutes, record.break_minutes);
                   acc[record.staff_id]._allRecords.push(record);
                                     // Keep earliest clock_in and latest clock_out for display
                   const currentIn = acc[record.staff_id].clock_in;
@@ -627,12 +776,15 @@ export default function AttendancePage() {
                 const cout = record.effective_clock_out || record.clock_out;
 
                 let workingHoursText = "--";
-                if (cin && cout) {
-                  const ms = new Date(cout!).getTime() - new Date(cin!).getTime();
-                  const totalMinutes = Math.floor(ms / 60000) - record.break_minutes;
-                  const hrs = Math.floor(totalMinutes / 60);
-                  const mins = totalMinutes % 60;
-                  workingHoursText = `${hrs}時間${Math.max(0, mins)}分`;
+                if (effInTime !== "--:--" && effOutTime !== "--:--") {
+                  const [inH, inM] = effInTime.split(':').map(Number);
+                  const [outH, outM] = effOutTime.split(':').map(Number);
+                  const totalMinutes = (outH * 60 + outM) - (inH * 60 + inM) - record.break_minutes;
+                  if (totalMinutes > 0) {
+                    const hrs = Math.floor(totalMinutes / 60);
+                    const mins = totalMinutes % 60;
+                    workingHoursText = `${hrs}時間${mins}分`;
+                  }
                 }
 
                 const isEffDifferent = effInTime !== clockInTime || effOutTime !== clockOutTime;
@@ -658,6 +810,7 @@ export default function AttendancePage() {
                       <div className={`flex items-center gap-1 font-mono text-sm ${isEffDifferent ? 'text-blue-600 font-bold' : 'text-slate-700'}`}>
                         {effInTime} - {effOutTime}
                         {record.is_effective_manual && <span className="text-[9px] bg-blue-100 text-blue-700 px-1 rounded ml-1">修正済</span>}
+                        {(record as any).is_auto_clock_out && <span className="text-[9px] bg-purple-100 text-purple-700 px-1 rounded ml-1">自動退勤</span>}
                       </div>
                     </TableCell>
                     {(isAdmin || isManager) && <TableCell>{record.break_minutes} 分</TableCell>}
@@ -720,31 +873,63 @@ export default function AttendancePage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase ml-1">有効出勤時間</label>
-                <Input 
-                  type="datetime-local" 
-                  value={editingRecord?.effective_clock_in ? editingRecord.effective_clock_in.slice(0, 16) : ""} 
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val) {
-                      setEditingRecord({...editingRecord!, effective_clock_in: new Date(val).toISOString()});
-                    }
-                  }}
-                  className="h-10 rounded-lg bg-slate-50 border-none font-bold text-xs"
-                />
+                <div className="flex gap-2">
+                  <Input 
+                    type="date" 
+                    value={editingRecord?.effective_clock_in ? format(new Date(editingRecord.effective_clock_in), "yyyy-MM-dd") : ""} 
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val) {
+                        const timeStr = editingRecord?.effective_clock_in ? format(new Date(editingRecord.effective_clock_in), "HH:mm") : "00:00";
+                        setEditingRecord({...editingRecord!, effective_clock_in: new Date(`${val}T${timeStr}`).toISOString()});
+                      }
+                    }}
+                    className="h-10 rounded-lg bg-slate-50 border-none font-bold text-xs flex-1"
+                  />
+                  <Input 
+                    type="time" 
+                    step="1800"
+                    value={editingRecord?.effective_clock_in ? format(new Date(editingRecord.effective_clock_in), "HH:mm") : ""} 
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val) {
+                        const dateStr = editingRecord?.effective_clock_in ? format(new Date(editingRecord.effective_clock_in), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
+                        setEditingRecord({...editingRecord!, effective_clock_in: new Date(`${dateStr}T${val}`).toISOString()});
+                      }
+                    }}
+                    className="h-10 rounded-lg bg-slate-50 border-none font-bold text-xs w-24"
+                  />
+                </div>
               </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase ml-1">有効退勤時間</label>
-                <Input 
-                  type="datetime-local" 
-                  value={editingRecord?.effective_clock_out ? editingRecord.effective_clock_out.slice(0, 16) : ""} 
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val) {
-                      setEditingRecord({...editingRecord!, effective_clock_out: new Date(val).toISOString()});
-                    }
-                  }}
-                  className="h-10 rounded-lg bg-slate-50 border-none font-bold text-xs"
-                />
+                <div className="flex gap-2">
+                  <Input 
+                    type="date" 
+                    value={editingRecord?.effective_clock_out ? format(new Date(editingRecord.effective_clock_out), "yyyy-MM-dd") : ""} 
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val) {
+                        const timeStr = editingRecord?.effective_clock_out ? format(new Date(editingRecord.effective_clock_out), "HH:mm") : "00:00";
+                        setEditingRecord({...editingRecord!, effective_clock_out: new Date(`${val}T${timeStr}`).toISOString()});
+                      }
+                    }}
+                    className="h-10 rounded-lg bg-slate-50 border-none font-bold text-xs flex-1"
+                  />
+                  <Input 
+                    type="time" 
+                    step="1800"
+                    value={editingRecord?.effective_clock_out ? format(new Date(editingRecord.effective_clock_out), "HH:mm") : ""} 
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val) {
+                        const dateStr = editingRecord?.effective_clock_out ? format(new Date(editingRecord.effective_clock_out), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
+                        setEditingRecord({...editingRecord!, effective_clock_out: new Date(`${dateStr}T${val}`).toISOString()});
+                      }
+                    }}
+                    className="h-10 rounded-lg bg-slate-50 border-none font-bold text-xs w-24"
+                  />
+                </div>
               </div>
             </div>
 
@@ -758,17 +943,32 @@ export default function AttendancePage() {
               />
             </div>
             
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase ml-1">出勤ステータス</label>
-              <select 
-                className="w-full h-10 rounded-lg bg-slate-50 border-none px-4 font-bold text-sm"
-                value={editingRecord?.status}
-                onChange={(e) => setEditingRecord({...editingRecord!, status: e.target.value as any})}
-              >
-                <option value="normal">通常出勤</option>
-                <option value="leave">有給休暇</option>
-                <option value="absence">欠勤</option>
-              </select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase ml-1">出勤ステータス</label>
+                <select 
+                  className="w-full h-10 rounded-lg bg-slate-50 border-none px-4 font-bold text-sm"
+                  value={editingRecord?.status}
+                  onChange={(e) => setEditingRecord({...editingRecord!, status: e.target.value as any})}
+                >
+                  <option value="normal">通常出勤</option>
+                  <option value="leave">有給休暇</option>
+                  <option value="absence">欠勤</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase ml-1">出勤店舗</label>
+                <select 
+                  className="w-full h-10 rounded-lg bg-slate-50 border-none px-4 font-bold text-sm"
+                  value={editingRecord?.store || "元町"}
+                  onChange={(e) => setEditingRecord({...editingRecord!, store: e.target.value})}
+                >
+                  <option value="元町">元町</option>
+                  <option value="神戸">神戸</option>
+                  <option value="六甲">六甲</option>
+                </select>
+              </div>
             </div>
 
             <DialogFooter className="pt-4">

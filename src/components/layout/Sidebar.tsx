@@ -61,6 +61,7 @@ const managementCategories = [
       { name: "シフト管理", href: "/shifts", icon: CalendarDays, role: "manager" },
       { name: "勤怠管理", href: "/attendance", icon: Clock, role: "companyOwner" },
       { name: "店舗用タイムカード", href: "/attendance/setup", icon: Clock, role: "companyOwner" },
+      { name: "有給管理", href: "/admin/paid-leaves", icon: CalendarDays, role: "admin" },
     ]
   },
   {

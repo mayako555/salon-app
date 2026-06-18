@@ -1,0 +1,16 @@
+--- src/app/admin/paid-leaves/page.tsx
++++ src/app/admin/paid-leaves/page.tsx
+@@ -4,6 +4,13 @@
+ import { useAuth } from "@/lib/auth-context";
+ import { getStaffList, StaffProfile } from "@/app/staff/actions";
+ import { getPaidLeaveTransactions, addPaidLeaveTransaction, PaidLeaveTransaction, getPaidLeaveShiftsForStaff } from "@/app/paid-leaves/actions";
++import AuthGuard from "@/components/AuthGuard";
++import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
++import { Button } from "@/components/ui/button";
++import { CalendarDays, Gift, History, Loader2, AlertCircle } from "lucide-react";
++import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
++import { Input } from "@/components/ui/input";
++import { toast } from "sonner";
++import { differenceInMonths, differenceInYears, parseISO } from "date-fns";
+ 
+ export default function PaidLeavesPage() {

@@ -154,12 +154,8 @@ export default function StaffPortalSalesPage() {
           initialData={mapReservationToSalesRecord(autoCheckoutRes)}
           isOpenControlled={true}
           onSuccess={async () => {
-             // Mark reservation as completed (handled by addCheckout as well)
-             await updateReservationStatus(autoCheckoutRes.id, "completed");
-             setAutoCheckoutRes(null);
-             
              // Explicitly navigate to reservations schedule
-             window.location.href = '/staff-portal/reservations';
+             window.location.replace('/staff-portal/reservations');
           }}
           onOpenChangeControlled={(open) => {
             if (!open) {
@@ -179,9 +175,8 @@ export default function StaffPortalSalesPage() {
           isOpenControlled={true}
           readOnly={autoEditSale.status === 'closed'}
           onSuccess={async () => {
-             setAutoEditSale(null);
              // Explicitly navigate to reservations schedule
-             window.location.href = '/staff-portal/reservations';
+             window.location.replace('/staff-portal/reservations');
           }}
           onOpenChangeControlled={(open) => {
             if (!open) {
@@ -238,9 +233,6 @@ export default function StaffPortalSalesPage() {
                         staffList={staffNames}
                         defaultStoreName={sale.store_name}
                         readOnly={sale.status === 'closed'}
-                        onSuccess={() => {
-                          window.location.href = '/staff-portal/reservations';
-                        }}
                         trigger={
                           <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-emerald-600 transition-colors">
                             {sale.status === 'closed' ? <Search size={16} /> : <Database size={16} />}
@@ -299,9 +291,6 @@ export default function StaffPortalSalesPage() {
                     staffList={staffNames}
                     defaultStoreName={sale.store_name}
                     readOnly={sale.status === 'closed'}
-                    onSuccess={() => {
-                      window.location.href = '/staff-portal/reservations';
-                    }}
                     trigger={
                       <button className="p-2 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-emerald-600 transition-colors">
                         {sale.status === 'closed' ? <Search size={16} /> : <Database size={16} />}

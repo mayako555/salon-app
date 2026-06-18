@@ -1,0 +1,156 @@
+--- src/app/attendance/page.tsx
++++ src/app/attendance/page.tsx
+@@ -9,7 +9,7 @@
+ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+ import { Button } from "@/components/ui/button";
+-import { Edit2, Search, Calendar as CalendarIcon, Clock, ArrowRight, Upload, ShieldAlert, FileText, AlertCircle } from "lucide-react";
++import { Edit2, Search, Calendar as CalendarIcon, Clock, ArrowRight, Upload, ShieldAlert, FileText, AlertCircle, Plus } from "lucide-react";
+ import { format } from "date-fns";
+ import { ja } from "date-fns/locale";
+@@ -40,6 +40,11 @@
+   const [staffProfiles, setStaffProfiles] = useState<any[]>([]);
+ 
++  // Manual Add States
++  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
++  const [addRecordData, setAddRecordData] = useState<any>({ staffId: "", clockIn: "", clockOut: "", store: "元町", breakMinutes: 60, status: "normal" });
++  const [isAdding, setIsAdding] = useState(false);
++
+   const applyRounding = (isoStr: string | null, type: 'in' | 'out', rule: 'none' | '15' | '30') => {
+     if (!isoStr) return "";
+@@ -275,6 +280,48 @@
+   };
+ 
++  const handleManualAdd = async (e: React.FormEvent) => {
++    e.preventDefault();
++    if (!addRecordData.staffId || !addRecordData.clockIn || !addRecordData.clockOut) {
++      toast.error("スタッフ、出勤時間、退勤時間は必須です");
++      return;
++    }
++    setIsAdding(true);
++    try {
++      const staff = staffProfiles.find((s: any) => s.id === addRecordData.staffId) || { name: "不明" };
++      const dateObjIn = new Date(`${targetDateStr}T${addRecordData.clockIn}`);
++      const dateObjOut = new Date(`${targetDateStr}T${addRecordData.clockOut}`);
++      
++      const roundedIn = applyRounding(dateObjIn.toISOString(), 'in', '30');
++      const roundedOut = applyRounding(dateObjOut.toISOString(), 'out', '30');
++      
++      const effIn = new Date(`${targetDateStr}T${roundedIn}`).toISOString();
++      const effOut = new Date(`${targetDateStr}T${roundedOut}`).toISOString();
++
++      const newRecord = {
++        staff_id: addRecordData.staffId,
++        staff_name: staff.name,
++        date: targetDateStr,
++        clock_in: dateObjIn.toISOString(),
++        clock_out: dateObjOut.toISOString(),
++        effective_clock_in: effIn,
++        effective_clock_out: effOut,
++        break_minutes: addRecordData.breakMinutes,
++        status: addRecordData.status as any,
++        store: addRecordData.store
++      };
++
++      const res = await bulkImportAttendanceRecords([newRecord]);
++      if (res.success) {
++        toast.success("勤怠記録を追加しました");
++        setIsAddDialogOpen(false);
++        setAddRecordData({ staffId: "", clockIn: "", clockOut: "", store: "元町", breakMinutes: 60, status: "normal" });
++        loadData();
++      } else {
++        toast.error("追加に失敗しました: " + res.error);
++      }
++    } catch (error: any) {
++      toast.error("エラーが発生しました");
++    } finally {
++      setIsAdding(false);
++    }
++  };
++
+   const loadData = async () => {
+     if (!profile) return;
+@@ -289,6 +336,11 @@
+     const dayShifts = allShifts.filter(s => s.date === targetDateStr);
+     setShifts(dayShifts);
+ 
++    if (staffProfiles.length === 0) {
++      const resProfiles = await getAllStaffProfiles();
++      if (resProfiles.success) setStaffProfiles(resProfiles.data || []);
++    }
++
+     if (isAdmin || isManager) {
+       setAttendanceRecords(allRecords);
+     } else {
+@@ -356,6 +408,82 @@
+             <div className="flex gap-2">
+               {(isAdmin || isManager) && (
++                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
++                  <DialogTrigger asChild>
++                    <Button
++                      variant="outline"
++                      size="sm"
++                      className="bg-blue-600 hover:bg-blue-500 text-white hover:text-white font-bold border-none gap-2 shadow-sm h-9"
++                    >
++                      <Plus size={14} />
++                      勤怠を手動追加
++                    </Button>
++                  </DialogTrigger>
++                  <DialogContent className="sm:max-w-md">
++                    <DialogHeader>
++                      <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-800">
++                        打刻を手動追加
++                      </DialogTitle>
++                    </DialogHeader>
++                    <form onSubmit={handleManualAdd} className="space-y-4 mt-4">
++                      <div className="space-y-2">
++                        <label className="text-xs font-bold text-slate-500">スタッフ</label>
++                        <select 
++                          value={addRecordData.staffId}
++                          onChange={(e) => setAddRecordData({...addRecordData, staffId: e.target.value})}
++                          className="w-full h-10 px-3 rounded-lg bg-slate-50 border-slate-200 text-sm font-bold"
++                          required
++                        >
++                          <option value="">選択してください</option>
++                          {staffProfiles.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
++                        </select>
++                      </div>
++                      <div className="grid grid-cols-2 gap-4">
++                        <div className="space-y-2">
++                          <label className="text-xs font-bold text-slate-500">出勤時間</label>
++                          <Input type="time" required value={addRecordData.clockIn} onChange={(e) => setAddRecordData({...addRecordData, clockIn: e.target.value})} className="h-10 bg-slate-50 font-mono font-bold" />
++                        </div>
++                        <div className="space-y-2">
++                          <label className="text-xs font-bold text-slate-500">退勤時間</label>
++                          <Input type="time" required value={addRecordData.clockOut} onChange={(e) => setAddRecordData({...addRecordData, clockOut: e.target.value})} className="h-10 bg-slate-50 font-mono font-bold" />
++                        </div>
++                      </div>
++                      <div className="grid grid-cols-2 gap-4">
++                        <div className="space-y-2">
++                          <label className="text-xs font-bold text-slate-500">休憩時間 (分)</label>
++                          <Input type="number" required value={addRecordData.breakMinutes} onChange={(e) => setAddRecordData({...addRecordData, breakMinutes: parseInt(e.target.value)||0})} className="h-10 bg-slate-50 font-bold" />
++                        </div>
++                        <div className="space-y-2">
++                          <label className="text-xs font-bold text-slate-500">状態</label>
++                          <select value={addRecordData.status} onChange={(e) => setAddRecordData({...addRecordData, status: e.target.value})} className="w-full h-10 px-3 rounded-lg bg-slate-50 border-slate-200 text-sm font-bold">
++                            <option value="normal">通常出勤</option>
++                            <option value="leave">有給休暇</option>
++                            <option value="absence">欠勤</option>
++                          </select>
++                        </div>
++                      </div>
++                      <div className="space-y-2">
++                        <label className="text-xs font-bold text-slate-500">出勤店舗</label>
++                        <Input value={addRecordData.store} onChange={(e) => setAddRecordData({...addRecordData, store: e.target.value})} className="h-10 bg-slate-50 font-bold" />
++                      </div>
++                      <DialogFooter className="pt-4 border-t border-slate-100">
++                        <Button type="button" variant="ghost" onClick={() => setIsAddDialogOpen(false)}>キャンセル</Button>
++                        <Button type="submit" disabled={isAdding} className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-8">
++                          {isAdding ? "追加中..." : "追加する"}
++                        </Button>
++                      </DialogFooter>
++                    </form>
++                  </DialogContent>
++                </Dialog>
++              )}
++              {(isAdmin || isManager) && (
+                 <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>

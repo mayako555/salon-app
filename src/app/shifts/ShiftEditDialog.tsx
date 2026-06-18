@@ -265,7 +265,7 @@ export default function ShiftEditDialog({
                     <div>
                       <label className="text-[10px] text-slate-500 mb-1 block">店舗</label>
                       <select 
-                        className="w-full h-8 px-2 rounded-md border border-slate-200 bg-white text-xs"
+                        className="w-full h-8 px-2 rounded-md border border-slate-200 bg-white text-xs mb-2"
                         value={seg.store}
                         onChange={(e) => updateSegment(idx, "store", e.target.value as StoreLocation)}
                       >
@@ -273,6 +273,25 @@ export default function ShiftEditDialog({
                           <option key={store} value={store}>{store}</option>
                         ))}
                       </select>
+                      
+                      {seg.store === '六甲' && (
+                        <div className="flex gap-2">
+                          <button 
+                            type="button" 
+                            onClick={() => { updateSegment(idx, 'start_time', '09:00'); updateSegment(idx, 'end_time', '18:00'); }}
+                            className="text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200 px-2 py-1 rounded hover:bg-blue-100 transition-colors"
+                          >
+                            09:00 - 18:00
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={() => { updateSegment(idx, 'start_time', '10:00'); updateSegment(idx, 'end_time', '19:00'); }}
+                            className="text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200 px-2 py-1 rounded hover:bg-blue-100 transition-colors"
+                          >
+                            10:00 - 19:00
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

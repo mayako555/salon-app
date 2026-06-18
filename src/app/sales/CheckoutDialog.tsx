@@ -385,8 +385,13 @@ export default function CheckoutDialog({
              messageBody: previewLineText
            });
         }
+        // Call onSuccess before closing to prevent flashing background page if navigating away
+        if (onSuccess) {
+          await onSuccess();
+        } else {
+          window.location.reload();
+        }
         setIsOpen(false);
-        if(onSuccess) onSuccess(); else window.location.reload();
       } else {
         alert(res.error);
       }

@@ -45,6 +45,7 @@ export type StaffProfile = {
   sns_accounts?: string[];
   sort_order?: number;
   passcode?: string; // Kiosk & Portal Passcode
+  hire_date?: string; // YYYY-MM-DD 入社日
   created_at?: any;
 };
 
@@ -164,14 +165,15 @@ export async function addStaff(formData: FormData) {
     const password = formData.get("password") as string;
     const employment_type = formData.get("employment_type") as "employee" | "outsourcing" | "part_time";
     const is_invoice_registered = formData.get("is_invoice_registered") === "true";
-    const max_holiday_requests = parseInt(formData.get("max_holiday_requests") as string || "3", 10);
+    const max_holiday_requests = parseFloat(formData.get("max_holiday_requests") as string || "3");
     const role = (formData.get("role") as StaffRole) || "staff";
     const monthly_sales_target = parseInt(formData.get("monthly_sales_target") as string || "0", 10);
     const nomination_fee = parseInt(formData.get("nomination_fee") as string || "300", 10);
     const hourly_wage = parseInt(formData.get("hourly_wage") as string || "0", 10);
-    const paid_leave_balance = parseInt(formData.get("paid_leave_balance") as string || "0", 10);
+    const paid_leave_balance = parseFloat(formData.get("paid_leave_balance") as string || "0");
     const passcode = (formData.get("passcode") as string) || "1234";
     const employment_status = (formData.get("employment_status") as "active" | "leave" | "retired") || "active";
+    const hire_date = (formData.get("hire_date") as string) || "";
 
     if (!name || !email) {
       return { success: false, error: "名前、メールアドレスは必須です" };
@@ -218,6 +220,7 @@ export async function addStaff(formData: FormData) {
       paid_leave_balance,
       passcode,
       sns_accounts: formData.getAll("sns_accounts") as string[],
+      hire_date,
       created_at: serverTimestamp()
     };
     
@@ -260,14 +263,15 @@ export async function editStaff(id: string, formData: FormData) {
     const email = formData.get("email") as string;
     const employment_type = formData.get("employment_type") as "employee" | "outsourcing" | "part_time";
     const is_invoice_registered = formData.get("is_invoice_registered") === "true";
-    const max_holiday_requests = parseInt(formData.get("max_holiday_requests") as string || "3", 10);
+    const max_holiday_requests = parseFloat(formData.get("max_holiday_requests") as string || "3");
     const role = (formData.get("role") as StaffRole) || "staff";
     const monthly_sales_target = parseInt(formData.get("monthly_sales_target") as string || "0", 10);
     const nomination_fee = parseInt(formData.get("nomination_fee") as string || "300", 10);
     const hourly_wage = parseInt(formData.get("hourly_wage") as string || "0", 10);
-    const paid_leave_balance = parseInt(formData.get("paid_leave_balance") as string || "0", 10);
+    const paid_leave_balance = parseFloat(formData.get("paid_leave_balance") as string || "0");
     const passcode = formData.get("passcode") as string;
     const employment_status = (formData.get("employment_status") as "active" | "leave" | "retired") || "active";
+    const hire_date = (formData.get("hire_date") as string) || "";
 
     const is_trainee = formData.get("is_trainee") === "true";
 
@@ -330,6 +334,7 @@ export async function editStaff(id: string, formData: FormData) {
       paid_leave_balance,
       ...(passcode !== null && passcode !== undefined ? { passcode } : {}),
       sns_accounts: formData.getAll("sns_accounts") as string[],
+      hire_date,
       updated_at: serverTimestamp()
     };
 

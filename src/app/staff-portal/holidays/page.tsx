@@ -33,12 +33,19 @@ export default function StaffPortalHolidaysPage() {
        if (paidLeaveDays[dateStr]) return;
        setRequestedDays(prev => {
          const current = prev[dateStr] || 0;
+         const currentTotal = Object.values(prev).reduce((a, b) => a + b, 0);
+         const available = maxRequests - currentTotal + current;
+
          let next = 0;
-         if (current === 0) next = 1;
+         if (current === 0) {
+            if (available >= 1) next = 1;
+            else if (available >= 0.5) next = 0.5;
+            else next = 1; // let it fail below
+         }
          else if (current === 1) next = 0.5;
          else next = 0;
          
-         const total = Object.values(prev).reduce((a, b) => a + b, 0) - current + next;
+         const total = currentTotal - current + next;
          
          if (next > current && total > maxRequests) {
            alert(`希望休は${maxRequests}日までしか選択できません。それ以上はマネージャーへ直接ご相談ください。`);
@@ -53,13 +60,20 @@ export default function StaffPortalHolidaysPage() {
        if (requestedDays[dateStr]) return;
        setPaidLeaveDays(prev => {
          const current = prev[dateStr] || 0;
+         const currentTotal = Object.values(prev).reduce((a, b) => a + b, 0);
+         const balance = profile?.paid_leave_balance ?? 0;
+         const available = balance - currentTotal + current;
+
          let next = 0;
-         if (current === 0) next = 1;
+         if (current === 0) {
+            if (available >= 1) next = 1;
+            else if (available >= 0.5) next = 0.5;
+            else next = 1; // let it fail below
+         }
          else if (current === 1) next = 0.5;
          else next = 0;
 
-         const total = Object.values(prev).reduce((a, b) => a + b, 0) - current + next;
-         const balance = profile?.paid_leave_balance ?? 0;
+         const total = currentTotal - current + next;
          
          if (next > current && total > balance) {
            alert(`有給残日数（${balance}日）を超えて申請することはできません。`);
