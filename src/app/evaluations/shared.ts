@@ -16,7 +16,7 @@ export type AutoEvaluationRule = {
 export type ManagerEvaluationItem = {
   id: string;
   label: string;
-  category: "technical" | "customer_service" | "team_contribution" | "company_contribution" | "operations";
+  category: "technical" | "customer_service" | "team_contribution" | "company_contribution" | "operations" | "marketing";
 };
 
 export type EvaluationTemplate = {
