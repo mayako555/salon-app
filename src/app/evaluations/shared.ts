@@ -5,7 +5,7 @@ export type EvaluationRank = "S" | "A" | "B" | "C" | "D";
 export type AutoEvaluationRule = {
   id: string;
   label: string;
-  category: "sales" | "repeat" | "satisfaction" | "tech_quality" | "marketing" | "attendance" | "team_contribution" | "operations";
+  category: "sales" | "repeat" | "satisfaction" | "tech_quality" | "marketing" | "attendance" | "team_contribution" | "operations" | "company_contribution";
   maxScore: number;
   unit: string;
   thresholds: { min: number; score: number }[]; // Needs to handle "less is better" for some (e.g. late count), so maybe "min" isn't enough, but let's assume min means >= for positive, or <= for negative depending on category? Let's just use a simple function or assume min for now. Actually, let's add `operator: ">=" | "<="`.
