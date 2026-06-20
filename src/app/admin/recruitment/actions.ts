@@ -53,6 +53,20 @@ export type Applicant = {
   interviewer?: string; // 担当者名（面接官）
   notes?: string; // 備考
   resume_url?: string; // For the resume file attachment
+  skills?: string[]; // 習得技術
+  tech_quality?: {
+    finish?: number; // 仕上がりの綺麗さ (1-5)
+    retention?: number; // 持ちの良さ (1-5)
+    low_risk?: number; // お直しリスクの低さ (1-5)
+  };
+  service_quality?: {
+    counseling?: number; // カウンセリング力 (1-5)
+    language?: number; // 言葉遣い (1-5)
+    atmosphere?: number; // 雰囲気 (1-5)
+  };
+  proposed_salary?: string | number; // 提案月給
+  requires_trial_review?: boolean; // 試用期間後の見直し有無
+  interview_memo?: string; // 面接メモ
   created_at?: any;
   updated_at?: any;
 };

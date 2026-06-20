@@ -25,7 +25,8 @@ import {
   Wallet,
   Sparkles,
   Banknote,
-  Briefcase
+  Briefcase,
+  Building2
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -38,13 +39,18 @@ import { useAuth } from "@/lib/auth-context";
 
 const managementCategories = [
   {
+    title: "ダッシュボード",
+    items: [
+      { name: "管理者ダッシュボード", href: "/dashboard", icon: LayoutDashboard, role: "manager" },
+    ]
+  },
+  {
     title: "日常業務",
     items: [
       { name: "スタッフホーム", href: "/staff-portal", icon: LayoutDashboard, role: "staff" },
       { name: "予約カレンダー", href: "/staff-portal/reservations", icon: CalendarDays, role: "staff" },
       { name: "顧客管理", href: "/staff-portal/customers", icon: Users, role: "staff" },
       { name: "売上管理・レジ締め", href: "/sales", icon: Coins, role: "staff" },
-      { name: "管理者ダッシュボード", href: "/dashboard", icon: LayoutDashboard, role: "manager" },
     ]
   },
   {
@@ -83,6 +89,7 @@ const managementCategories = [
       { name: "在庫管理", href: "/inventory", icon: Package, role: "manager" },
       { name: "雇用・業務委託契約", href: "/contracts", icon: FileText, role: "companyOwner" },
       { name: "手当管理", href: "/allowances", icon: Gift, role: "companyOwner" },
+      { name: "FC契約・請求管理", href: "/admin/settings/subscription", icon: Building2, role: "companyOwner" },
       { name: "システム設定", href: "/admin/settings", icon: Settings, role: "systemOwner" },
       { name: "監査ログ", href: "/audit", icon: Settings, role: "systemOwner" },
     ]
@@ -105,6 +112,12 @@ const staffCategories = [
     items: [
       { name: "就業規則", href: "/staff-portal/rules", icon: BookOpen },
       { name: "マニュアル", href: "/manuals", icon: Library },
+    ]
+  },
+  {
+    title: "設定",
+    items: [
+      { name: "プロフィール設定", href: "/staff-portal/settings", icon: Settings },
     ]
   }
 ];

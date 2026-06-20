@@ -7,11 +7,11 @@ import { Loader2 } from "lucide-react";
 
 interface AuthGuardProps {
   children: React.ReactNode;
-  requireRole?: "admin" | "manager" | "staff";
+  requireRole?: "admin" | "manager" | "staff" | "systemOwner";
 }
 
 export default function AuthGuard({ children, requireRole = "staff" }: AuthGuardProps) {
-  const { user, profile, loading, isAdmin, isManager, isStaff } = useAuth();
+  const { user, profile, loading, isAdmin, isManager, isStaff, isSystemOwner } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -26,12 +26,14 @@ export default function AuthGuard({ children, requireRole = "staff" }: AuthGuard
       } else if (requireRole === "manager" && !(isManager || isAdmin)) {
         // Manager required but user is not manager/admin
         router.push("/staff-portal");
+      } else if (requireRole === "systemOwner" && !isSystemOwner) {
+        router.push("/dashboard");
       } else if (requireRole === "staff" && !isStaff) {
         // Staff profile required but not found for this user
         router.push("/login?error=profile_not_found");
       }
     }
-  }, [user, profile, loading, requireRole, router, pathname, isAdmin, isManager, isStaff]);
+  }, [user, profile, loading, requireRole, router, pathname, isAdmin, isManager, isStaff, isSystemOwner]);
 
   if (loading) {
     return (
@@ -48,8 +50,9 @@ export default function AuthGuard({ children, requireRole = "staff" }: AuthGuard
   const isAuthorized = 
     user && (
       (requireRole === "staff" && isStaff) ||
-      (requireRole === "manager" && (isManager || isAdmin)) ||
-      (requireRole === "admin" && isAdmin)
+      (requireRole === "manager" && (isManager || isAdmin || isSystemOwner)) ||
+      (requireRole === "admin" && (isAdmin || isSystemOwner)) ||
+      (requireRole === "systemOwner" && isSystemOwner)
     );
 
   if (!isAuthorized) {

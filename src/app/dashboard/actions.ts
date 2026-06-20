@@ -192,7 +192,7 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
       let totalTreatmentMinutes = 0;
       let totalNextBookings = 0;
       let totalNextBookingVisits = 0;
-      const storeSales: Record<string, { total: number, minimo: number, nextBookings: number, nextBookingVisits: number, count: number, minimoVisits: number, regularVisits: number, regularNewVisits: number, minimoNewVisits: number }> = {};
+      const storeSales: Record<string, { total: number, minimo: number, nextBookings: number, nextBookingVisits: number, count: number, minimoVisits: number, regularVisits: number, regularNewVisits: number, minimoNewVisits: number, routes: Record<string, { visits: number, newVisits: number, sales: number }> }> = {};
       
       salesSnap.forEach(doc => {
         const data = doc.data();
@@ -239,7 +239,7 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
         const storeKey = rawStoreKey.endsWith("店") ? rawStoreKey.slice(0, -1) : rawStoreKey;
         
         if (!storeSales[storeKey]) {
-          storeSales[storeKey] = { total: 0, minimo: 0, nextBookings: 0, nextBookingVisits: 0, count: 0, minimoVisits: 0, regularVisits: 0, regularNewVisits: 0, minimoNewVisits: 0 };
+          storeSales[storeKey] = { total: 0, minimo: 0, nextBookings: 0, nextBookingVisits: 0, count: 0, minimoVisits: 0, regularVisits: 0, regularNewVisits: 0, minimoNewVisits: 0, routes: {} };
         }
         
         // Only count as a 'visit' for unit price calculation if they actually had technical sales
@@ -247,7 +247,14 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
           storeSales[storeKey].total += amount;
           storeSales[storeKey].count++;
           
+          if (!storeSales[storeKey].routes[route]) {
+            storeSales[storeKey].routes[route] = { visits: 0, newVisits: 0, sales: 0 };
+          }
+          storeSales[storeKey].routes[route].visits++;
+          storeSales[storeKey].routes[route].sales += amount;
+
           if (data.customer_type === "新規") {
+            storeSales[storeKey].routes[route].newVisits++;
             if (isMinimo) {
               storeSales[storeKey].minimoNewVisits++;
             } else {

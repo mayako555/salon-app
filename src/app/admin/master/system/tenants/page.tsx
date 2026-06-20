@@ -19,7 +19,7 @@ export default function TenantsPage() {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: "", plan: "Standard", status: "active" as "active"|"inactive" });
+  const [formData, setFormData] = useState({ name: "", plan: "Standard", status: "active" as "active"|"inactive", fee: 0, startDate: "", contractPdfUrl: "", termsPdfUrl: "" });
 
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [userLoading, setUserLoading] = useState(false);
@@ -70,13 +70,21 @@ export default function TenantsPage() {
 
   const openAddDialog = () => {
     setEditingId(null);
-    setFormData({ name: "", plan: "Standard", status: "active" });
+    setFormData({ name: "", plan: "Standard", status: "active", fee: 0, startDate: "", contractPdfUrl: "", termsPdfUrl: "" });
     setIsDialogOpen(true);
   };
 
   const openEditDialog = (tenant: CompanyTenant) => {
     setEditingId(tenant.id);
-    setFormData({ name: tenant.name, plan: tenant.plan, status: tenant.status });
+    setFormData({ 
+      name: tenant.name, 
+      plan: tenant.plan, 
+      status: tenant.status,
+      fee: tenant.fee || 0,
+      startDate: tenant.startDate || "",
+      contractPdfUrl: tenant.contractPdfUrl || "",
+      termsPdfUrl: tenant.termsPdfUrl || ""
+    });
     setIsDialogOpen(true);
   };
 
@@ -243,6 +251,47 @@ export default function TenantsPage() {
                 <option value="active">稼働中</option>
                 <option value="inactive">停止中</option>
               </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-500">月額利用料金（円）</label>
+              <Input 
+                type="number"
+                value={formData.fee} 
+                onChange={e => setFormData({...formData, fee: Number(e.target.value)})}
+                placeholder="10000"
+                className="font-bold h-11"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-500">契約開始日</label>
+              <Input 
+                type="date"
+                value={formData.startDate} 
+                onChange={e => setFormData({...formData, startDate: e.target.value})}
+                className="font-bold h-11"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-500">契約書PDF URL</label>
+              <Input 
+                value={formData.contractPdfUrl} 
+                onChange={e => setFormData({...formData, contractPdfUrl: e.target.value})}
+                placeholder="https://..."
+                className="font-bold h-11"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-500">利用規約PDF URL</label>
+              <Input 
+                value={formData.termsPdfUrl} 
+                onChange={e => setFormData({...formData, termsPdfUrl: e.target.value})}
+                placeholder="https://..."
+                className="font-bold h-11"
+              />
             </div>
           </div>
           

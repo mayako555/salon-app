@@ -55,10 +55,30 @@ export default function ShiftEditDialog({
         segments: shift.segments || [],
         request_id: shift.request_id
       });
-    } else if (initialDate) {
-      setFormData(prev => ({ ...prev, date: initialDate }));
+    } else {
+      setFormData({
+        staff_id: "",
+        staff_name: "",
+        date: initialDate || new Date().toISOString().split("T")[0],
+        type: "work",
+        segments: [{ start_time: "10:00", end_time: "19:00", store: defaultStore as StoreLocation }]
+      });
     }
-  }, [shift, initialDate]);
+  }, [shift, initialDate, defaultStore]);
+
+  useEffect(() => {
+    if (!shift && availableStores.length > 0) {
+      setFormData(prev => {
+        const newSegments = prev.segments?.map(seg => {
+          if (!availableStores.includes(seg.store as string)) {
+            return { ...seg, store: availableStores[0] as StoreLocation };
+          }
+          return seg;
+        }) || [];
+        return { ...prev, segments: newSegments };
+      });
+    }
+  }, [availableStores, shift]);
 
   const handleStaffChange = (staffId: string) => {
     const staff = staffList.find(s => s.id === staffId);
@@ -113,7 +133,7 @@ export default function ShiftEditDialog({
     if (!formData.request_id) return;
     setLoading(true);
     try {
-      const result = await updateHolidayRequestStatus(formData.request_id, "approved");
+      const result = await updateHolidayRequestStatus(formData.request_id, "approved", formData.id);
       if (result.success) {
         onClose();
         router.refresh();
@@ -131,7 +151,7 @@ export default function ShiftEditDialog({
     
     setLoading(true);
     try {
-      const result = await updateHolidayRequestStatus(formData.request_id, "rejected");
+      const result = await updateHolidayRequestStatus(formData.request_id, "rejected", formData.id);
       if (result.success) {
         onClose();
         router.refresh();
@@ -246,6 +266,7 @@ export default function ShiftEditDialog({
                         <label className="text-[10px] text-slate-500 mb-1 block">開始</label>
                         <Input 
                           type="time" 
+                          step="1800"
                           value={seg.start_time}
                           onChange={(e) => updateSegment(idx, "start_time", e.target.value)}
                           className="h-8 text-xs px-2"
@@ -255,6 +276,7 @@ export default function ShiftEditDialog({
                         <label className="text-[10px] text-slate-500 mb-1 block">終了</label>
                         <Input 
                           type="time" 
+                          step="1800"
                           value={seg.end_time}
                           onChange={(e) => updateSegment(idx, "end_time", e.target.value)}
                           className="h-8 text-xs px-2"

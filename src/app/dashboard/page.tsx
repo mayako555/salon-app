@@ -25,6 +25,7 @@ import Link from "next/link";
 import AuthGuard from "@/components/AuthGuard";
 import { useEffect, useState } from "react";
 import { getDashboardStats } from "./actions";
+import { getCompanySetupStatus } from "@/app/setup/actions";
 import { toast } from "sonner";
 import { getAllPendingTasks, TaskRecord, generateBookingReply, sendReplyAndCompleteTask } from "@/app/tasks/actions";
 import { updateStoreTarget } from "@/app/stores/actions";
@@ -47,6 +48,7 @@ export default function DashboardPage() {
   const [isEditingTargets, setIsEditingTargets] = useState(false);
   const [editingTargetData, setEditingTargetData] = useState<Record<string, number>>({});
   const [evalReminders, setEvalReminders] = useState<{id: string, name: string}[]>([]);
+  const [setupStatus, setSetupStatus] = useState<{progress: any, rate: number, isComplete: boolean} | null>(null);
 
   const currentQuarter = (() => {
     const now = new Date();
@@ -71,6 +73,12 @@ export default function DashboardPage() {
         }
         const evalRes = await getEvaluationReminders(currentQuarter);
         setEvalReminders(evalRes);
+        
+        // Load setup status
+        const setupRes = await getCompanySetupStatus();
+        if (setupRes.success) {
+          setSetupStatus(setupRes.data as any);
+        }
       }
       const tRes = await getAllPendingTasks();
       setTasks(tRes);
@@ -124,6 +132,31 @@ export default function DashboardPage() {
           </h1>
           <p className="text-slate-500">本日の状況と重要なタスクを確認します。</p>
         </div>
+
+        {/* Setup Warning Banner */}
+        {(isAdmin || isManager) && setupStatus && setupStatus.rate < 100 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 md:p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="bg-amber-100 p-2 rounded-xl text-amber-600 mt-1 md:mt-0">
+                <Settings size={24} />
+              </div>
+              <div>
+                <h3 className="text-amber-800 font-bold text-lg">初期設定が未完了です ({setupStatus.rate}%完了)</h3>
+                <p className="text-amber-700/80 text-sm mt-1">
+                  システムをフルに活用するために、店舗情報やメニューなどの設定を完了させてください。
+                </p>
+                <div className="w-full bg-amber-200/50 rounded-full h-1.5 mt-3 max-w-xs">
+                  <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: `${setupStatus.rate}%` }}></div>
+                </div>
+              </div>
+            </div>
+            <Link href="/setup">
+              <Button className="bg-amber-500 hover:bg-amber-600 text-white font-bold whitespace-nowrap shadow-sm">
+                設定を続ける <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        )}
 
         {/* Staff Quick Links (Visible to all roles) */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -426,6 +459,22 @@ export default function DashboardPage() {
                   <CardContent>
                     <div className="text-xl font-black">スタッフ分析</div>
                     <p className="text-[10px] text-emerald-300/70 mt-1 font-bold">目標までの必要売上を確認</p>
+                  </CardContent>
+                </Card>
+              </Link>
+
+              <Link href="/evaluations" className="col-span-full md:col-span-1">
+                <Card className="bg-purple-900 text-white border-none shadow-xl hover:bg-purple-800 transition-all group cursor-pointer h-full relative overflow-hidden">
+                  <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+                    <Award size={120} />
+                  </div>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-black uppercase tracking-widest text-purple-300">人事評価</CardTitle>
+                    <ArrowRight className="h-4 w-4 text-purple-300 group-hover:translate-x-1 transition-transform" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-xl font-black">スタッフ評価</div>
+                    <p className="text-[10px] text-purple-300/70 mt-1 font-bold">評価と育成状況の管理</p>
                   </CardContent>
                 </Card>
               </Link>

@@ -51,6 +51,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const [childcare, setChildcare] = useState(stmt.details.social_insurance?.childcare?.toString() || "");
 
   const [alreadyPaidAmount, setAlreadyPaidAmount] = useState(stmt.adjustments?.already_paid_amount_override?.toString() || "");
+  const [advanceDeduction, setAdvanceDeduction] = useState(stmt.adjustments?.advance_deduction_override?.toString() || "");
 
   // Metrics State
   const [workedDays, setWorkedDays] = useState(stmt.details.metrics?.worked_days?.toString() || "");
@@ -155,10 +156,11 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const numChildcare = stmt.type === "salary" ? (Number(childcare) || 0) : 0;
   
   const numAlreadyPaid = Number(alreadyPaidAmount) || 0;
+  const numAdvanceDeduction = Number(advanceDeduction) || 0;
 
   const totalDeductions = numHealth + numPension + numEmployment + numIncomeTax + numResidentTax + numChildcare;
   const finalPaidAmount = numBase + numAllowance + numTaxAdd - totalDeductions;
-  const transferAmount = finalPaidAmount - numAlreadyPaid;
+  const transferAmount = finalPaidAmount - numAlreadyPaid - numAdvanceDeduction;
 
   const handleHourlyWageChange = (val: string) => {
     setHourlyWage(val);
@@ -194,6 +196,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
           resident_tax_override: numResidentTax,
           childcare_support_override: numChildcare,
           already_paid_amount_override: numAlreadyPaid,
+          advance_deduction_override: numAdvanceDeduction,
         },
         details: {
           ...stmt.details,
@@ -594,6 +597,16 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                   placeholder="例: 15000"
                 />
               </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 block" title="商品購入や立替等、手取りから天引きする金額">立替金・購入代控除</label>
+                <Input 
+                  type="number" 
+                  value={advanceDeduction} 
+                  onChange={(e) => setAdvanceDeduction(e.target.value)}
+                  className="h-10 text-xs rounded-lg font-bold border-slate-200"
+                  placeholder="例: 5000"
+                />
+              </div>
             </div>
           </div>
 
@@ -624,6 +637,12 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-400">支払済振込額 (控除):</span>
                 <span className="font-bold text-rose-400">-¥{numAlreadyPaid.toLocaleString()}</span>
+              </div>
+            )}
+            {numAdvanceDeduction > 0 && (
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">立替金・購入代控除:</span>
+                <span className="font-bold text-rose-400">-¥{numAdvanceDeduction.toLocaleString()}</span>
               </div>
             )}
             <div className="flex justify-between items-center pt-2 border-t border-slate-800">

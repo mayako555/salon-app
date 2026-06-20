@@ -9,14 +9,21 @@ import { getMonthlyShifts } from "@/app/shifts/actions";
 
 export default function AttendanceCSVButton({ 
   date,
+  isSaaS = false,
 }: { 
   date: string,
+  isSaaS?: boolean,
 }) {
   const [isExporting, setIsExporting] = useState(false);
   
   const roundTime = (timeStr: string | null, type: 'in' | 'out', shiftTime?: string) => {
     if (!timeStr) return "";
     let dateObj = parseISO(timeStr);
+    
+    // SaaSの場合は丸めなし
+    if (isSaaS) {
+      return format(dateObj, "HH:mm");
+    }
     
     // シフト時間によるキャップ処理 (所定労働時間内のみ計算)
     if (shiftTime) {
@@ -82,7 +89,16 @@ export default function AttendanceCSVButton({
         return;
       }
 
-      const headers = [
+      // SaaSモードのヘッダーと直営店モードのヘッダーを分岐
+      const headers = isSaaS ? [
+        "スタッフ名",
+        "日付",
+        "出勤時刻",
+        "退勤時刻",
+        "実働時間(h)",
+        "休憩(分)",
+        "状態"
+      ] : [
         "日付",
         "スタッフ名",
         "打刻(出勤)",
@@ -94,23 +110,52 @@ export default function AttendanceCSVButton({
         "状態"
       ];
 
-      const rows = records.map(r => {
+      // SaaSモード時はスタッフ名＞日付の順にソートする
+      const sortedRecords = [...records].sort((a, b) => {
+        if (isSaaS) {
+          if (a.staff_name !== b.staff_name) {
+            return a.staff_name.localeCompare(b.staff_name);
+          }
+        }
+        return a.date.localeCompare(b.date);
+      });
+
+      const rows = sortedRecords.map(r => {
         // Find shift for this staff on this specific date
         const staffShift = shifts.find(s => s.staff_id === r.staff_id && s.date === r.date);
         const shiftStart = staffShift?.segments?.[0]?.start_time;
         const shiftEnd = staffShift?.segments?.[staffShift.segments.length - 1]?.end_time;
 
-        return [
-          r.date,
-          r.staff_name,
-          r.clock_in ? format(parseISO(r.clock_in), "HH:mm") : "",
-          r.clock_out ? format(parseISO(r.clock_out), "HH:mm") : "",
-          roundTime(r.clock_in, 'in', shiftStart),
-          roundTime(r.clock_out, 'out', shiftEnd),
-          calculateHours(r.clock_in, r.clock_out, r.break_minutes, shiftStart, shiftEnd),
-          r.break_minutes,
-          r.status === 'normal' ? '出勤' : r.status === 'leave' ? '有給' : '欠勤'
-        ].join(",");
+        const clockInStr = r.clock_in ? format(parseISO(r.clock_in), "HH:mm") : "";
+        const clockOutStr = r.clock_out ? format(parseISO(r.clock_out), "HH:mm") : "";
+        const roundedInStr = roundTime(r.clock_in, 'in', shiftStart);
+        const roundedOutStr = roundTime(r.clock_out, 'out', shiftEnd);
+        const hours = calculateHours(r.clock_in, r.clock_out, r.break_minutes, shiftStart, shiftEnd);
+        const statusStr = r.status === 'normal' ? '出勤' : r.status === 'leave' ? '有給' : '欠勤';
+
+        if (isSaaS) {
+          return [
+            r.staff_name,
+            r.date,
+            clockInStr,
+            clockOutStr,
+            hours,
+            r.break_minutes,
+            statusStr
+          ].join(",");
+        } else {
+          return [
+            r.date,
+            r.staff_name,
+            clockInStr,
+            clockOutStr,
+            roundedInStr,
+            roundedOutStr,
+            hours,
+            r.break_minutes,
+            statusStr
+          ].join(",");
+        }
       });
 
       const csvContent = [headers.join(","), ...rows].join("\n");
@@ -140,7 +185,7 @@ export default function AttendanceCSVButton({
       className="bg-white gap-2 font-bold text-slate-600 border-slate-200"
     >
       {isExporting ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
-      月間CSV出力(30分丸め)
+      {isSaaS ? "月間CSV出力(スタッフ別・時間通り)" : "月間CSV出力(30分丸め)"}
     </Button>
   );
 }

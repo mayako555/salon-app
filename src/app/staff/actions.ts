@@ -18,6 +18,7 @@ import { addAuditLog } from "../audit/actions";
 import { revalidatePath } from "next/cache";
 
 export type StaffRole = "systemOwner" | "companyOwner" | "manager" | "storeManager" | "staff" | "admin";
+export type EvaluationRole = "general" | "educator" | "sub_manager" | "manager" | "area_manager";
 
 export type StaffProfile = {
   id: string;
@@ -46,6 +47,11 @@ export type StaffProfile = {
   sort_order?: number;
   passcode?: string; // Kiosk & Portal Passcode
   hire_date?: string; // YYYY-MM-DD 入社日
+  j_course?: string; // J1~J5
+  p_course?: string; // P1~P4
+  m_course?: string; // M1~M4
+  e_course?: string; // E1~E4
+  evaluation_role?: EvaluationRole;
   created_at?: any;
 };
 
@@ -174,6 +180,11 @@ export async function addStaff(formData: FormData) {
     const passcode = (formData.get("passcode") as string) || "1234";
     const employment_status = (formData.get("employment_status") as "active" | "leave" | "retired") || "active";
     const hire_date = (formData.get("hire_date") as string) || "";
+    const j_course = formData.get("j_course") as string || "";
+    const p_course = formData.get("p_course") as string || "";
+    const m_course = formData.get("m_course") as string || "";
+    const e_course = formData.get("e_course") as string || "";
+    const evaluation_role = (formData.get("evaluation_role") as EvaluationRole) || "general";
 
     if (!name || !email) {
       return { success: false, error: "名前、メールアドレスは必須です" };
@@ -221,6 +232,11 @@ export async function addStaff(formData: FormData) {
       passcode,
       sns_accounts: formData.getAll("sns_accounts") as string[],
       hire_date,
+      j_course,
+      p_course,
+      m_course,
+      e_course,
+      evaluation_role,
       created_at: serverTimestamp()
     };
     
@@ -272,6 +288,11 @@ export async function editStaff(id: string, formData: FormData) {
     const passcode = formData.get("passcode") as string;
     const employment_status = (formData.get("employment_status") as "active" | "leave" | "retired") || "active";
     const hire_date = (formData.get("hire_date") as string) || "";
+    const j_course = formData.get("j_course") as string || "";
+    const p_course = formData.get("p_course") as string || "";
+    const m_course = formData.get("m_course") as string || "";
+    const e_course = formData.get("e_course") as string || "";
+    const evaluation_role = (formData.get("evaluation_role") as EvaluationRole) || "general";
 
     const is_trainee = formData.get("is_trainee") === "true";
 
@@ -335,6 +356,11 @@ export async function editStaff(id: string, formData: FormData) {
       ...(passcode !== null && passcode !== undefined ? { passcode } : {}),
       sns_accounts: formData.getAll("sns_accounts") as string[],
       hire_date,
+      j_course,
+      p_course,
+      m_course,
+      e_course,
+      evaluation_role,
       updated_at: serverTimestamp()
     };
 

@@ -93,6 +93,27 @@ export default function ApplicantFormDialog({ isOpen, onClose, onRefresh, initia
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleNestedChange = (category: 'tech_quality' | 'service_quality', key: string, value: number) => {
+    setFormData(prev => ({
+      ...prev,
+      [category]: {
+        ...(prev[category as keyof Applicant] as any || {}),
+        [key]: value
+      }
+    }));
+  };
+
+  const handleCheckboxChange = (skill: string) => {
+    setFormData(prev => {
+      const skills = prev.skills || [];
+      if (skills.includes(skill)) {
+        return { ...prev, skills: skills.filter(s => s !== skill) };
+      } else {
+        return { ...prev, skills: [...skills, skill] };
+      }
+    });
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -243,7 +264,151 @@ export default function ApplicantFormDialog({ isOpen, onClose, onRefresh, initia
             </div>
           </div>
 
-          {/* Section 3: Result & Contract */}
+          {/* Section 3: Interview Evaluation (Mid-career only) */}
+          {(formData.category === "経験3年未満" || formData.category === "経験3年以上") && (
+            <div className="space-y-4 bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
+              <h3 className="text-sm font-bold text-emerald-800 border-b border-emerald-200 pb-1 flex justify-between items-center">
+                <span>中途採用評価・初期給与提案</span>
+                <span className="text-xs font-normal text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">中途経験者用</span>
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-emerald-700">技術習得状況</Label>
+                    <div className="grid grid-cols-2 gap-2 bg-white p-3 rounded-lg border border-emerald-100">
+                      {["ラッシュリフト", "シングルエクステ", "アイブロウ", "ボリュームラッシュ", "＆Healthy"].map(skill => (
+                        <label key={skill} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={(formData.skills || []).includes(skill)}
+                            onChange={() => handleCheckboxChange(skill)}
+                            className="rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          {skill}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-emerald-700">技術品質 (5段階)</Label>
+                    <div className="space-y-2 bg-white p-3 rounded-lg border border-emerald-100">
+                      {[
+                        { key: "finish", label: "仕上がりの綺麗さ" },
+                        { key: "retention", label: "持ちの良さ" },
+                        { key: "low_risk", label: "お直しリスクの低さ" }
+                      ].map(item => (
+                        <div key={item.key} className="flex justify-between items-center text-sm">
+                          <span>{item.label}</span>
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map(val => (
+                              <button
+                                key={val}
+                                type="button"
+                                onClick={() => handleNestedChange("tech_quality", item.key, val)}
+                                className={`w-6 h-6 rounded-full text-xs flex items-center justify-center transition-colors ${
+                                  (formData.tech_quality as any)?.[item.key] === val
+                                    ? "bg-emerald-500 text-white font-bold"
+                                    : "bg-slate-100 text-slate-500 hover:bg-emerald-100"
+                                }`}
+                              >
+                                {val}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-emerald-700">接客品質 (5段階)</Label>
+                    <div className="space-y-2 bg-white p-3 rounded-lg border border-emerald-100">
+                      {[
+                        { key: "counseling", label: "カウンセリング力" },
+                        { key: "language", label: "言葉遣い" },
+                        { key: "atmosphere", label: "雰囲気" }
+                      ].map(item => (
+                        <div key={item.key} className="flex justify-between items-center text-sm">
+                          <span>{item.label}</span>
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map(val => (
+                              <button
+                                key={val}
+                                type="button"
+                                onClick={() => handleNestedChange("service_quality", item.key, val)}
+                                className={`w-6 h-6 rounded-full text-xs flex items-center justify-center transition-colors ${
+                                  (formData.service_quality as any)?.[item.key] === val
+                                    ? "bg-emerald-500 text-white font-bold"
+                                    : "bg-slate-100 text-slate-500 hover:bg-emerald-100"
+                                }`}
+                              >
+                                {val}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="bg-emerald-100/50 p-4 rounded-lg text-xs space-y-3">
+                    <p className="font-bold text-emerald-800">月給参考表</p>
+                    <ul className="space-y-1 text-emerald-700 list-disc pl-4">
+                      <li>ラッシュリフトのみ: 20万円</li>
+                      <li>＋シングル: 21万円</li>
+                      <li>＋アイブロウ: 22万円</li>
+                      <li>＋ボリューム: 23万円</li>
+                      <li>全メニュー(＆H含む): 24万円</li>
+                    </ul>
+                    <p className="font-bold text-emerald-800 mt-2">加算目安</p>
+                    <ul className="space-y-1 text-emerald-700 list-disc pl-4">
+                      <li>技術・接客品質が高い: ＋5千〜1万</li>
+                      <li>前職売上60万以上: ＋5千〜1万</li>
+                      <li>前職売上70万以上: ＋1万〜2万</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-emerald-700">初期給与提案</Label>
+                    <Input 
+                      name="proposed_salary" 
+                      value={formData.proposed_salary || ""} 
+                      onChange={handleChange} 
+                      placeholder="例: 220,000円" 
+                      className="border-emerald-200 focus-visible:ring-emerald-500"
+                    />
+                  </div>
+                  
+                  <label className="flex items-center gap-2 text-sm text-emerald-800 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={formData.requires_trial_review || false}
+                      onChange={(e) => setFormData({ ...formData, requires_trial_review: e.target.checked })}
+                      className="rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    試用期間終了後に再度給与見直しを行う
+                  </label>
+
+                  <div className="space-y-2">
+                    <Label className="text-emerald-700">面接メモ・評価理由</Label>
+                    <textarea
+                      name="interview_memo"
+                      value={formData.interview_memo || ""}
+                      onChange={handleChange}
+                      placeholder="技術チェックの所感、接客の印象、採用理由など"
+                      className="w-full h-24 p-2 text-sm border border-emerald-200 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section 4: Result & Contract */}
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-slate-800 border-b pb-1">採用・契約情報</h3>
             

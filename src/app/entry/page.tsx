@@ -507,7 +507,7 @@ function CustomerEntryFormContent() {
                           if (data.status === 200 && data.results) {
                             const result = data.results[0];
                             const address = `${result.address1}${result.address2}${result.address3}`;
-                            setFormData(prev => ({ ...prev, address }));
+                            setFormData((prev: any) => ({ ...prev, address }));
                           } else {
                             toast.error("住所が見つかりませんでした");
                           }

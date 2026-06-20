@@ -4,119 +4,159 @@ import { db } from "@/lib/firebase";
 import { 
   collection, 
   getDocs, 
-  addDoc, 
-  setDoc,
-  doc, 
-  query, 
-  where, 
+  getDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  query,
   orderBy,
   serverTimestamp,
-  updateDoc
+  where
 } from "firebase/firestore";
-import { StaffEvaluation } from "./constants";
-import { addAuditLog } from "@/app/audit/actions";
+import { StaffEvaluation, calculateDynamicScore, EVALUATION_TEMPLATES } from "./shared";
+import { 
+  subMonths, 
+  startOfMonth, 
+  endOfMonth, 
+  format, 
+  differenceInDays, 
+  isAfter, 
+  isBefore, 
+  parseISO 
+} from "date-fns";
 import { revalidatePath } from "next/cache";
-import { getContractsList } from "@/app/contracts/actions";
-import { getMonthlySales } from "@/app/sales/actions";
-import { getStaffList } from "@/app/staff/actions";
-import { getMonthlyReviews } from "@/app/admin/reviews/actions";
-import { getMonthlyStaffTargets } from "@/lib/staff_targets";
-import { getCurrentUserContext } from "@/lib/auth-server";
 
 const EVALUATIONS_COLLECTION = "staff_evaluations";
 
-export async function getStaffEvaluations(staffId?: string): Promise<StaffEvaluation[]> {
+export async function getEvaluationReminders(quarter: string) {
   try {
-    const ctx = await getCurrentUserContext();
-    const colRef = collection(db, EVALUATIONS_COLLECTION);
-    let q = query(colRef, orderBy("evaluation_date", "desc"));
-    
-    if (staffId) {
-      q = query(colRef, where("staff_id", "==", staffId), orderBy("evaluation_date", "desc"));
-    }
-    
-    const snapshot = await getDocs(q);
-    const evaluations = snapshot.docs
-      .map(doc => {
-        const data = doc.data();
-        return {
-          ...data,
-          id: doc.id,
-          created_at: data.created_at?.toDate?.()?.toISOString() || null,
-          updated_at: data.updated_at?.toDate?.()?.toISOString() || null,
-        } as StaffEvaluation;
-      })
-      .filter(e => (e as any).deleted !== true); // Filter in-memory to handle legacy records missing the field
+    const colRef = collection(db, "staff_profiles");
+    const staffSnap = await getDocs(query(colRef, where("isActive", "==", true)));
+    const staffList = staffSnap.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
 
-    if (ctx.role !== "systemOwner") {
-      const staffList = await getStaffList(); // already filtered by companyId
-      const allowedStaffIds = new Set(staffList.map(s => s.id));
-      return evaluations.filter(e => allowedStaffIds.has(e.staff_id));
-    }
+    const evalCol = collection(db, EVALUATIONS_COLLECTION);
+    const evalSnap = await getDocs(query(evalCol, where("target_quarter", "==", quarter)));
+    const evaluatedStaffIds = new Set(evalSnap.docs.map(doc => doc.data().staff_id));
+
+    return staffList.filter(s => !evaluatedStaffIds.has(s.id));
+  } catch (error) {
+    console.error("Error fetching evaluation reminders:", error);
+    return [];
+  }
+}
+export async function getEvaluationsByStaffId(staffId: string): Promise<StaffEvaluation[]> {
+  try {
+    const colRef = collection(db, EVALUATIONS_COLLECTION);
+    const q = query(colRef, where("staff_id", "==", staffId), orderBy("target_year", "desc"), orderBy("target_quarter", "desc"));
+    const snapshot = await getDocs(q);
     
-    return evaluations;
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null),
+        updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : (data.updated_at || null)
+      };
+    }) as StaffEvaluation[];
   } catch (error) {
     console.error("Error fetching evaluations:", error);
     return [];
   }
 }
 
-export async function upsertEvaluation(data: Partial<StaffEvaluation>) {
+export async function getAllEvaluations(): Promise<StaffEvaluation[]> {
   try {
     const colRef = collection(db, EVALUATIONS_COLLECTION);
+    const q = query(colRef, orderBy("target_year", "desc"), orderBy("target_quarter", "desc"));
+    const snapshot = await getDocs(q);
     
-    // Remove the ID from the payload to avoid nesting it in Firestore
-    const { id, ...cleanData } = data;
-    
-    const payload = {
-      ...cleanData,
-      updated_at: serverTimestamp(),
-      evaluation_date: data.evaluation_date || new Date().toISOString().split('T')[0]
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null),
+        updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : (data.updated_at || null)
+      };
+    }) as StaffEvaluation[];
+  } catch (error) {
+    console.error("Error fetching all evaluations:", error);
+    return [];
+  }
+}
+
+export async function saveEvaluation(data: Omit<StaffEvaluation, "id" | "created_at" | "updated_at" | "calculated_scores" | "rank" | "auto_scores">) {
+  try {
+    const template = Object.values(EVALUATION_TEMPLATES).find(t => t.id === data.template_id) || EVALUATION_TEMPLATES.general;
+    const { calculated_scores, rank, auto_scores } = calculateDynamicScore(template, data.auto_metrics || {}, data.manager_raw_scores || {});
+
+    const saveData = {
+      ...data,
+      auto_scores,
+      calculated_scores,
+      rank,
+      snapshot: data.status === "finalized" ? { template } : undefined,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp()
     };
 
-    let recordId = "";
-    if (id) {
-      recordId = id;
-      const docRef = doc(db, EVALUATIONS_COLLECTION, id);
-      await setDoc(docRef, payload, { merge: true });
-    } else {
-      const docRef = await addDoc(colRef, {
-        ...payload,
-        created_at: serverTimestamp()
-      });
-      recordId = docRef.id;
-    }
-
-    await addAuditLog({
-      table_name: EVALUATIONS_COLLECTION,
-      record_id: recordId,
-      action: id ? "UPDATE" : "INSERT",
-      old_data: id ? { id } : null,
-      new_data: payload,
-      actor: "管理者"
-    });
-
+    const colRef = collection(db, EVALUATIONS_COLLECTION);
+    const docRef = await addDoc(colRef, saveData);
+    
     revalidatePath("/evaluations");
-    revalidatePath("/staff");
-    revalidatePath("/dashboard");
-
-    return { success: true, id: recordId };
+    return { success: true, id: docRef.id };
   } catch (error: any) {
-    console.error("Error upserting evaluation:", error);
+    console.error("Error saving evaluation:", error);
     return { success: false, error: error.message };
   }
 }
 
-export async function deleteEvaluation(evaluationId: string) {
+export async function updateEvaluation(id: string, data: Partial<StaffEvaluation>) {
   try {
-    const docRef = doc(db, EVALUATIONS_COLLECTION, evaluationId);
-    await updateDoc(docRef, { 
-      deleted: true, 
-      updated_at: serverTimestamp() 
-    });
+    const docRef = doc(db, EVALUATIONS_COLLECTION, id);
+    const updateData = { ...data, updated_at: serverTimestamp() };
+    
+    // Recalculate scores if auto_metrics or manager_raw_scores object is updated
+    if (data.auto_metrics || data.manager_raw_scores) {
+      // Need current full data to recalculate correctly, so we fetch it first
+      const currentSnap = await getDoc(docRef);
+      if (currentSnap.exists()) {
+        const current = currentSnap.data() as StaffEvaluation;
+        const newAutoMetrics = data.auto_metrics || current.auto_metrics || {};
+        const newManagerScores = data.manager_raw_scores || current.manager_raw_scores || {};
+        
+        const template = Object.values(EVALUATION_TEMPLATES).find(t => t.id === current.template_id) || EVALUATION_TEMPLATES.general;
+        const { calculated_scores, rank, auto_scores } = calculateDynamicScore(template, newAutoMetrics, newManagerScores);
+        updateData.calculated_scores = calculated_scores;
+        updateData.rank = rank;
+        updateData.auto_scores = auto_scores;
+        
+        if (updateData.status === "finalized" || (!updateData.status && current.status === "finalized")) {
+          updateData.snapshot = { template };
+        }
+      }
+    }
+
+    delete updateData.id;
+    delete updateData.created_at;
+
+    await updateDoc(docRef, updateData);
     
     revalidatePath("/evaluations");
-    revalidatePath("/dashboard");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating evaluation:", error);
+    return { success: false, error: error.message };
+  }
+}
+export async function deleteEvaluation(id: string) {
+  try {
+    const docRef = doc(db, EVALUATIONS_COLLECTION, id);
+    await deleteDoc(docRef);
+    
+    revalidatePath("/evaluations");
     return { success: true };
   } catch (error: any) {
     console.error("Error deleting evaluation:", error);
@@ -124,190 +164,133 @@ export async function deleteEvaluation(evaluationId: string) {
   }
 }
 
-export async function getEvaluationReminders(targetPeriod: string) {
+export async function unfinalizeEvaluation(id: string, reason: string, userId: string, userName: string) {
   try {
-    const evaluations = await getStaffEvaluations();
-    const contracts = await getContractsList();
+    const docRef = doc(db, EVALUATIONS_COLLECTION, id);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) return { success: false, error: "Evaluation not found" };
+
+    const data = snap.data();
     
-    // Get unique active staff IDs from contracts
-    const staffIds = Array.from(new Set(contracts.map(c => c.staff_id)));
-    const evaluatedStaffIds = new Set(
-      evaluations
-        .filter(e => e.target_period === targetPeriod && e.status === "completed")
-        .map(e => e.staff_id)
-    );
-    
-    const pendingStaff = staffIds
-      .filter(id => !evaluatedStaffIds.has(id))
-      .map(id => {
-        const c = contracts.find(x => x.staff_id === id);
-        return {
-          id,
-          name: c?.staff_name || "不明"
-        };
-      });
-      
-    return pendingStaff;
-  } catch (error) {
-    console.error("Error getting evaluation reminders:", error);
-    return [];
+    await updateDoc(docRef, {
+      status: "pending",
+      snapshot: null,
+      updated_at: serverTimestamp()
+    });
+
+    const auditRef = collection(db, "audit_logs");
+    await addDoc(auditRef, {
+      action: "UNFINALIZE_EVALUATION",
+      target_id: id,
+      staff_id: data.staff_id,
+      target_year: data.target_year,
+      target_quarter: data.target_quarter,
+      reason,
+      performed_by_id: userId,
+      performed_by_name: userName,
+      created_at: serverTimestamp()
+    });
+
+    revalidatePath("/evaluations");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error unfinalizing evaluation:", error);
+    return { success: false, error: error.message };
   }
 }
 
-export async function getEvaluationMetrics(staffId: string, targetPeriod: string) {
+
+export async function getStaffAutoMetrics(staffId: string, targetYear: number, targetQuarter: number, hireDateStr?: string) {
   try {
-    const year = parseInt(targetPeriod.substring(0, 4));
-    const quarter = parseInt(targetPeriod.substring(5, 6));
-    const startMonth = (quarter - 1) * 3 + 1; // Q1=1, Q2=4, Q3=7, Q4=10
-
-    // ── 当期 3ヶ月の売上データを取得 ──
-    let allSales: any[] = [];
-    for (let m = 0; m < 3; m++) {
-      const monthSales = await getMonthlySales(year, startMonth + m);
-      allSales = [...allSales, ...monthSales];
-    }
-
-    const staffList = await getStaffList();
-    const staff = staffList.find(st => st.id === staffId);
+    // ターゲットの四半期の開始月と終了月を計算する
+    // Q1: 1月〜3月, Q2: 4月〜6月, Q3: 7月〜9月, Q4: 10月〜12月
+    const startMonthIndex = (targetQuarter - 1) * 3; // 0, 3, 6, 9
+    const startOfQuarter = new Date(targetYear, startMonthIndex, 1);
+    const endOfQuarter = endOfMonth(new Date(targetYear, startMonthIndex + 2, 1));
     
-    // Filter sales to match staff by ID or Name (ignoring spaces) for CSV compatibility
-    const staffSales = allSales.filter(s => {
-      if (s.staff_id === staffId) return true;
-      if (s.staff_id === "unknown" && staff) {
-        const sName = (s.staff_name || "").replace(/\s+/g, "").replace(/[凛凜]/g, "凛");
-        const fName = (staff.name || "").replace(/\s+/g, "").replace(/[凛凜]/g, "凛");
-        const lName = (staff.last_name || "").replace(/\s+/g, "").replace(/[凛凜]/g, "凛");
-        return sName === fName || (sName && (fName.includes(sName) || (lName && sName === lName)));
+    const startStr = format(startOfQuarter, "yyyy-MM-dd");
+    const endStr = format(endOfQuarter, "yyyy-MM-dd");
+
+    const salesCol = collection(db, "sales");
+    const q = query(
+      salesCol,
+      where("staff_id", "==", staffId),
+      where("date", ">=", startStr),
+      where("date", "<=", endStr)
+    );
+    const snapshot = await getDocs(q);
+
+    let total_sales = 0;
+    let visitors = 0;
+    let nominations = 0;
+    let next_bookings = 0;
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      const amount = (data.tech_sales || 0) + (data.product_sales || 0) + (data.nomination_fee || 0) - (data.discount || 0);
+      total_sales += amount;
+      visitors++;
+      
+      if (data.is_nominated || data.nomination_fee > 0) {
+        nominations++;
       }
-      return false;
+      
+      if (data.next_booking_date) {
+        next_bookings++;
+      }
     });
-    const visitCount = staffSales.length || 1;
-    const totalTech = staffSales.reduce((sum, s) => sum + (s.tech_sales || 0), 0);
-    const totalProd = staffSales.reduce((sum, s) => sum + (s.product_sales || 0), 0);
-    const totalRevenue = totalTech + totalProd;
-    const unitPrice = Math.round(totalRevenue / visitCount);
 
-    // ── ① 目標達成率（当期3ヶ月合計の目標vs実績） ──
-    let quarterlyTarget = 0;
-    for (let m = 0; m < 3; m++) {
-      const monthStr = `${year}-${String(startMonth + m).padStart(2, '0')}`;
-      const targets = await getMonthlyStaffTargets(monthStr);
-      quarterlyTarget += targets[staffId] || 0;
-    }
-    // 目標未設定の場合はデフォルト60万/月×3ヶ月
-    if (quarterlyTarget === 0) quarterlyTarget = 1800000;
-    const achievementRate = Math.round((totalRevenue / quarterlyTarget) * 100);
+    const avg_unit_price = visitors > 0 ? Math.round(total_sales / visitors) : 0;
+    const next_booking_rate = visitors > 0 ? Math.round((next_bookings / visitors) * 100) : 0;
 
-    // ── ② 客単価：全スタッフ平均との比率 ──
-    const allVisitCount = allSales.length || 1;
-    const allRevenue = allSales.reduce((sum, s) => sum + (s.tech_sales || 0) + (s.product_sales || 0), 0);
-    const avgUnitPrice = Math.round(allRevenue / allVisitCount);
-    // このスタッフの単価が全体平均の何%か
-    const unitPriceRatio = avgUnitPrice > 0 ? Math.round((unitPrice / avgUnitPrice) * 100) : 100;
+    // 稼働月数の計算
+    let months_present = 3;
+    const totalDaysInPeriod = differenceInDays(endOfQuarter, startOfQuarter) + 1;
 
-    // ── ③ 新規からの再来率（当期内：新規来店→リピートに転換した割合） ──
-    // このスタッフに新規で来た顧客IDを抽出
-    const newCustomerIds = new Set(
-      staffSales
-        .filter(s => s.customer_type === "新規" && s.customer_id)
-        .map(s => s.customer_id)
-    );
-    // 同期間内に全店で「リピ」として来店した顧客IDを抽出
-    const repeatCustomerIdsInPeriod = new Set(
-      allSales
-        .filter(s => s.customer_type === "リピ" && s.customer_id)
-        .map(s => s.customer_id)
-    );
-    // 新規→リピートに転換した顧客数
-    const convertedCount = [...newCustomerIds].filter(id => repeatCustomerIdsInPeriod.has(id)).length;
-    const newRepeatRate = newCustomerIds.size > 0
-      ? Math.round((convertedCount / newCustomerIds.size) * 100)
-      : 0;
-
-    // ── ④ リピーター継続率（前四半期のリピ客が今期も来たか） ──
-    // 前四半期の月を計算
-    const prevQuarterStart = startMonth - 3;
-    const prevYear = prevQuarterStart <= 0 ? year - 1 : year;
-    const adjustedPrevStart = prevQuarterStart <= 0 ? prevQuarterStart + 12 : prevQuarterStart;
-
-    let prevAllSales: any[] = [];
-    for (let m = 0; m < 3; m++) {
-      const monthSales = await getMonthlySales(prevYear, adjustedPrevStart + m);
-      prevAllSales = [...prevAllSales, ...monthSales];
-    }
-    // 前四半期にリピートしていた顧客ID
-    const prevRepeatIds = new Set(
-      prevAllSales
-        .filter(s => s.customer_type === "リピ" && s.customer_id)
-        .map(s => s.customer_id)
-    );
-    // 今期も来店した顧客ID（全スタッフ）
-    const currentCustomerIds = new Set(
-      allSales.map(s => s.customer_id).filter(Boolean)
-    );
-    const continuedCount = [...prevRepeatIds].filter(id => currentCustomerIds.has(id)).length;
-    const repeatContinuationRate = prevRepeatIds.size > 0
-      ? Math.round((continuedCount / prevRepeatIds.size) * 100)
-      : 0;
-
-    // ── お直しペナルティ ──
-    let reworkPenaltyCount = 0;
-    const reworksInPeriod = allSales.filter(s =>
-      s.menu_course?.includes("お直し") || s.discount_reason?.includes("お直し")
-    );
-    for (const rw of reworksInPeriod) {
-      if (!rw.customer_id) continue;
-      const prevVisits = allSales
-        .filter(s => s.customer_id === rw.customer_id && s.date < rw.date)
-        .sort((a, b) => b.date.localeCompare(a.date));
-      if (prevVisits.length > 0 && prevVisits[0].staff_id === staffId) {
-        reworkPenaltyCount++;
+    if (hireDateStr) {
+      const hireDate = parseISO(hireDateStr);
+      if (isAfter(hireDate, endOfQuarter)) {
+        // 対象期間より後に入社
+        months_present = 0;
+      } else if (isAfter(hireDate, startOfQuarter)) {
+        // 対象期間中に入社
+        const daysPresent = differenceInDays(endOfQuarter, hireDate) + 1;
+        months_present = (daysPresent / totalDaysInPeriod) * 3;
       }
     }
 
-    // ── 口コミ集計 ──
-    let totalReviewsCount = 0;
-    let star5ReviewsCount = 0;
-    if (staff) {
-      const staffNameNormal = staff.name.replace(/\s+/g, "");
-      const lastName = staff.last_name || "";
-      const nameKana = (staff.name_kana || "").replace(/\s+/g, "");
-      for (let m = 0; m < 3; m++) {
-        const monthReviews = await getMonthlyReviews(year, startMonth + m);
-        const staffMonthReviews = monthReviews.filter(r => {
-          if (r.staff_name === staff.name) return true;
-          if (r.reply_text) {
-            if (staffNameNormal && r.reply_text.includes(staffNameNormal)) return true;
-            if (nameKana && r.reply_text.includes(nameKana)) return true;
-            if (lastName && r.reply_text.includes(lastName)) return true;
-          }
-          return false;
-        });
-        totalReviewsCount += staffMonthReviews.length;
-        star5ReviewsCount += staffMonthReviews.filter(r => r.rating === 5).length;
+    const monthly_avg_sales = months_present > 0 ? Math.round(total_sales / months_present) : 0;
+    
+    // Target ratio (Assuming staff.monthly_sales_target is passed in or we calculate it later. We will return raw and let the client pass it, but wait! The client can calculate it, or we can fetch the staff here.)
+    // Wait, getStaffAutoMetrics doesn't receive staff target. Let's fetch it.
+    let target = 0;
+    try {
+      const staffRef = doc(db, "staff_profiles", staffId);
+      const staffSnap = await getDoc(staffRef);
+      if (staffSnap.exists()) {
+        target = staffSnap.data().monthly_sales_target || 0;
       }
-    }
+    } catch (e) {}
+
+    const sales_target_ratio = target > 0 ? Math.round((monthly_avg_sales / target) * 100) : 0;
 
     return {
       success: true,
-      metrics: {
-        total_sales: totalRevenue,
-        quarterly_target: quarterlyTarget,
-        achievement_rate: achievementRate,       // 目標達成率(%)
-        unit_price: unitPrice,
-        avg_unit_price: avgUnitPrice,
-        unit_price_ratio: unitPriceRatio,         // 全体平均比(%)
-        new_repeat_rate: newRepeatRate,           // 新規からの再来率(%)
-        repeat_continuation_rate: repeatContinuationRate, // リピーター継続率(%)
-        new_customer_count: newCustomerIds.size,
-        prev_repeat_count: prevRepeatIds.size,
-        rework_count: reworkPenaltyCount,
-        review_replies_count: totalReviewsCount,
-        review_allowance: star5ReviewsCount * 500
+      data: {
+        total_sales_3m: total_sales,
+        visitors_3m: visitors,
+        monthly_sales: monthly_avg_sales,
+        sales_target_ratio,
+        unit_price: avg_unit_price,
+        next_booking_rate,
+        nomination_count: nominations,
+        months_present: Math.round(months_present * 10) / 10,
+        period_start: startStr,
+        period_end: endStr
       }
     };
-  } catch (error: any) {
-    console.error("Error getting evaluation metrics:", error);
-    return { success: false, error: error.message };
+  } catch (error) {
+    console.error("Error fetching staff auto metrics:", error);
+    return { success: false, error: "Failed to fetch metrics" };
   }
 }

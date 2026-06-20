@@ -9,6 +9,10 @@ import RegressionAnalysis from "./RegressionAnalysis";
 import SarimaxForecast from "./SarimaxForecast";
 import RepeatAnalysis from "./RepeatAnalysis";
 import LTVForecast from "./LTVForecast";
+import StaffAnalysis from "./StaffAnalysis";
+import StoreAnalysis from "./StoreAnalysis";
+import ReferralAnalysis from "./ReferralAnalysis";
+import ChannelAnalysis from "./ChannelAnalysis";
 
 export default function AnalyticsPage() {
   const { profile, isSystemOwner } = useAuth();
@@ -33,6 +37,34 @@ export default function AnalyticsPage() {
               >
                 <span className="md:hidden">概要</span>
                 <span className="hidden md:inline">概要 (月次トレンド)</span>
+              </TabsTrigger>
+
+              <TabsTrigger 
+                value="staff" 
+                className="rounded-lg font-bold px-4 py-2.5 md:py-1.5 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all"
+              >
+                スタッフ分析
+              </TabsTrigger>
+
+              <TabsTrigger 
+                value="store" 
+                className="rounded-lg font-bold px-4 py-2.5 md:py-1.5 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all"
+              >
+                店舗比較
+              </TabsTrigger>
+
+              <TabsTrigger 
+                value="referral" 
+                className="rounded-lg font-bold px-4 py-2.5 md:py-1.5 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all"
+              >
+                紹介分析
+              </TabsTrigger>
+
+              <TabsTrigger 
+                value="channel" 
+                className="rounded-lg font-bold px-4 py-2.5 md:py-1.5 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all"
+              >
+                流入分析
               </TabsTrigger>
               
               {isSystemOwner && (
@@ -73,6 +105,22 @@ export default function AnalyticsPage() {
           <TabsContent value="overview" className="mt-6 md:mt-8">
             {/* 既存の高度チャートを再利用 */}
             <AdvancedCharts />
+          </TabsContent>
+
+          <TabsContent value="staff" className="mt-6">
+            <StaffAnalysis />
+          </TabsContent>
+
+          <TabsContent value="store" className="mt-6">
+            <StoreAnalysis />
+          </TabsContent>
+
+          <TabsContent value="referral" className="mt-6">
+            <ReferralAnalysis />
+          </TabsContent>
+
+          <TabsContent value="channel" className="mt-6">
+            <ChannelAnalysis />
           </TabsContent>
           
           {isSystemOwner && (

@@ -245,9 +245,19 @@ export async function bulkSaveShifts(params: {
       where("date", "<=", dateRange.end)
     );
     const existingSnap = await getDocs(qExisting);
+    const keptStaffDates = new Set<string>();
+
     const existingDocsToDelete = existingSnap.docs.filter(d => {
        const data = d.data();
-       return staffIds.includes(data.staff_id) && dates.includes(data.date);
+       if (staffIds.includes(data.staff_id) && dates.includes(data.date)) {
+         const isHoliday = data.type === 'holiday' || data.type === 'paid_leave' || data.type === 'requested_holiday' || data.type === 'requested_paid_leave' || !!data.request_id;
+         if (isHoliday) {
+           keptStaffDates.add(`${data.staff_id}_${data.date}`);
+           return false; // DO NOT DELETE holidays or requests
+         }
+         return true; // DELETE existing work shifts to overwrite
+       }
+       return false;
     });
 
     let currentBatch = writeBatch(db);
@@ -274,6 +284,10 @@ export async function bulkSaveShifts(params: {
       const staffName = staff?.name || "不明";
 
       for (const date of dates) {
+        if (keptStaffDates.has(`${staffId}_${date}`)) {
+          continue; // Skip creating a new shift if we preserved a holiday/request
+        }
+        
         const newDocRef = doc(colRef);
         currentBatch.set(newDocRef, {
           staff_id: staffId,
@@ -432,7 +446,7 @@ export async function getAllHolidayRequests(year: number, month: number): Promis
   }
 }
 
-export async function updateHolidayRequestStatus(id: string, status: "approved" | "rejected") {
+export async function updateHolidayRequestStatus(id: string, status: "approved" | "rejected", optionalShiftId?: string) {
   try {
     const holidayDocRef = doc(db, HOLIDAY_REQUESTS_COLLECTION, id);
     const holidaySnap = await getDoc(holidayDocRef);
@@ -451,8 +465,9 @@ export async function updateHolidayRequestStatus(id: string, status: "approved" 
     });
     
     // 2. Sync with the shift record if shift_id exists
-    if (holidayData.shift_id) {
-      const shiftDocRef = doc(db, SHIFTS_COLLECTION, holidayData.shift_id);
+    const targetShiftId = holidayData.shift_id || optionalShiftId;
+    if (targetShiftId) {
+      const shiftDocRef = doc(db, SHIFTS_COLLECTION, targetShiftId);
       
       if (status === "approved") {
         // Change from 'requested_holiday' to 'holiday', or 'requested_paid_leave' to 'paid_leave'

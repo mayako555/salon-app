@@ -56,6 +56,35 @@ export default function AttendanceSetupPage() {
             ))}
           </div>
 
+          <div className="pt-6 mt-6 border-t border-slate-100">
+            <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+              <Sparkles className="text-purple-500" size={16} />
+              外部サロン（SaaS）用端末
+            </h3>
+            <div className="flex gap-2">
+              <input 
+                id="fcStoreName"
+                type="text" 
+                placeholder="店舗名を入力 (例: 大阪)" 
+                className="flex-1 h-12 px-4 rounded-xl border border-slate-200 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+              />
+              <Button
+                onClick={() => {
+                  const input = document.getElementById("fcStoreName") as HTMLInputElement;
+                  if (input && input.value) {
+                    router.push(`/attendance/kiosk?store=${encodeURIComponent(input.value)}&type=fc`);
+                  }
+                }}
+                className="h-12 px-6 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold"
+              >
+                設定する
+              </Button>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-2">
+              ※加盟店モードでは、シフト判定や丸めを行わず押した時刻をそのまま記録します。
+            </p>
+          </div>
+
           <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 flex items-start gap-4">
             <Sparkles className="text-amber-500 shrink-0" size={20} />
             <div className="space-y-1">

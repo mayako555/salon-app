@@ -18,6 +18,10 @@ export type CompanyTenant = {
   name: string;
   plan: string;
   status: "active" | "inactive";
+  fee?: number;
+  startDate?: string;
+  contractPdfUrl?: string;
+  termsPdfUrl?: string;
   createdAt?: any;
   updatedAt?: any;
 };
