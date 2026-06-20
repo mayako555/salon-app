@@ -4,7 +4,7 @@ import { db } from "@/lib/firebase";
 import { isNationalHoliday, isSalonEvent } from "@/lib/seasonal-events";
 import { fetchHistoricalWeather } from "@/lib/weather";
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
-import { format, subMonths, addMonths, eachDayOfInterval, isWeekend, getDate, getDay, isAfter, isBefore, addDays, subDays, endOfMonth } from "date-fns";
+import { format, subMonths, addMonths, eachDayOfInterval, isWeekend, getDate, getDay, isAfter, isBefore, addDays, subDays, endOfMonth, startOfMonth, startOfYear } from "date-fns";
 
 // Minimal Matrix Math for Multiple Linear Regression
 function invertMatrix(M: number[][]): number[][] {
@@ -1194,3 +1194,285 @@ export async function predictLTVAndRepeaters(params: LTVForecastParams) {
     return { success: false, error: err.message };
   }
 }
+
+// --------------------------------------------------------
+// NEW ANALYTICS FEATURES (STAFF, STORE, REFERRAL, CHANNEL)
+// --------------------------------------------------------
+
+function getPeriodDates(period: string) {
+  const now = new Date();
+  let startDate = startOfMonth(now);
+  let endDate = now;
+
+  if (period === "this_month") {
+    startDate = startOfMonth(now);
+  } else if (period === "last_month") {
+    startDate = startOfMonth(subMonths(now, 1));
+    endDate = endOfMonth(subMonths(now, 1));
+  } else if (period === "last_3_months") {
+    startDate = startOfMonth(subMonths(now, 3));
+  } else if (period === "this_year") {
+    startDate = startOfYear(now);
+  }
+  
+  return {
+    startStr: format(startDate, "yyyy-MM-dd"),
+    endStr: format(endDate, "yyyy-MM-dd")
+  };
+}
+
+export async function getStaffAnalytics(companyId: string, storeId: string | null | undefined, period: string, empType: string = "all") {
+  try {
+    const { startStr, endStr } = getPeriodDates(period);
+    const { adminDb } = await import("@/lib/firebase-admin");
+
+    // Fetch staff
+    let staffQuery = adminDb.collection("staff_profiles").where("companyId", "==", companyId);
+    if (empType !== "all") {
+      staffQuery = staffQuery.where("employment_type", "==", empType);
+    }
+    const staffSnap = await staffQuery.get();
+    const staffMap = new Map();
+    staffSnap.docs.forEach((d: any) => {
+      const data = d.data();
+      staffMap.set(d.id, { 
+        id: d.id, 
+        name: data.name, 
+        type: data.employment_type || "unknown",
+        sales: 0,
+        techSales: 0,
+        productSales: 0,
+        customers: 0,
+        newCustomers: 0,
+        repeatCustomers: 0,
+        nextBookings: 0,
+        workMinutes: 0
+      });
+    });
+
+    // Fetch sales
+    let salesQuery = adminDb.collection("sales")
+      .where("companyId", "==", companyId)
+      .where("date", ">=", startStr)
+      .where("date", "<=", endStr);
+    
+    const salesSnap = await salesQuery.get();
+    salesSnap.docs.forEach((d: any) => {
+      const data = d.data();
+      if (storeId && storeId !== "全店舗" && data.store_name !== storeId) return;
+      const sId = data.staff_id;
+      if (sId && staffMap.has(sId)) {
+        const staff = staffMap.get(sId);
+        staff.sales += (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
+        staff.techSales += (data.tech_sales || 0);
+        staff.productSales += (data.product_sales || 0);
+        staff.customers++;
+        if (data.customer_type === "新規") staff.newCustomers++;
+        else staff.repeatCustomers++;
+        if (data.next_booking_date) staff.nextBookings++;
+      }
+    });
+
+    // Fetch attendance to calculate work hours
+    const attendanceSnap = await adminDb.collection("attendance")
+      .where("date", ">=", startStr)
+      .where("date", "<=", endStr)
+      .get(); // can't composite query on date + companyId if index missing, we filter in memory
+
+    attendanceSnap.docs.forEach((d: any) => {
+      const data = d.data();
+      if (storeId && storeId !== "全店舗" && data.store !== storeId && data.store !== undefined) return;
+      const sId = data.staff_id;
+      if (sId && staffMap.has(sId)) {
+        // Calculate minutes
+        if (data.clock_in && data.clock_out) {
+          const inTime = new Date(data.effective_clock_in || data.clock_in).getTime();
+          const outTime = new Date(data.effective_clock_out || data.clock_out).getTime();
+          let workMs = outTime - inTime;
+          if (data.break_minutes) {
+            workMs -= data.break_minutes * 60000;
+          }
+          if (workMs > 0) {
+            staffMap.get(sId).workMinutes += Math.floor(workMs / 60000);
+          }
+        }
+      }
+    });
+
+    const result = Array.from(staffMap.values()).map(s => {
+      const workHours = s.workMinutes / 60;
+      return {
+        ...s,
+        repeatRate: s.customers > 0 ? (s.repeatCustomers / s.customers) * 100 : 0,
+        nextBookingRate: s.customers > 0 ? (s.nextBookings / s.customers) * 100 : 0,
+        avgSpend: s.customers > 0 ? s.sales / s.customers : 0,
+        retailRatio: s.sales > 0 ? (s.productSales / s.sales) * 100 : 0,
+        timeProductivity: workHours > 0 ? s.sales / workHours : 0,
+        workHours
+      };
+    }).filter(s => s.customers > 0 || s.workMinutes > 0);
+
+    return { success: true, data: result };
+  } catch (error: any) {
+    console.error("Failed to get staff analytics:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getStoreComparisonAnalytics(companyId: string, period: string) {
+  try {
+    const { startStr, endStr } = getPeriodDates(period);
+    const { adminDb } = await import("@/lib/firebase-admin");
+
+    const salesSnap = await adminDb.collection("sales")
+      .where("companyId", "==", companyId)
+      .where("date", ">=", startStr)
+      .where("date", "<=", endStr)
+      .get();
+      
+    const storeMap = new Map();
+    salesSnap.docs.forEach((d: any) => {
+      const data = d.data();
+      const sName = data.store_name || "不明";
+      if (!storeMap.has(sName)) {
+        storeMap.set(sName, { name: sName, sales: 0, customers: 0, newCustomers: 0, repeatCustomers: 0 });
+      }
+      const store = storeMap.get(sName);
+      store.sales += (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
+      store.customers++;
+      if (data.customer_type === "新規") store.newCustomers++;
+      else store.repeatCustomers++;
+    });
+
+    const result = Array.from(storeMap.values()).map(s => ({
+      ...s,
+      avgSpend: s.customers > 0 ? s.sales / s.customers : 0,
+      repeatRate: s.customers > 0 ? (s.repeatCustomers / s.customers) * 100 : 0,
+      newRate: s.customers > 0 ? (s.newCustomers / s.customers) * 100 : 0
+    }));
+
+    return { success: true, data: result };
+  } catch (error: any) {
+    console.error("Failed to get store comparison:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getReferralAnalytics(companyId: string, storeId: string | null | undefined, period: string) {
+  try {
+    const { startStr, endStr } = getPeriodDates(period);
+    const { adminDb } = await import("@/lib/firebase-admin");
+
+    // We look at customers created in this period who have referred_by_id
+    const custSnap = await adminDb.collection("customers")
+      .where("companyId", "==", companyId)
+      .where("first_visit_date", ">=", startStr)
+      .where("first_visit_date", "<=", endStr)
+      .get();
+
+    const referralMap = new Map(); // key: referred_by_id
+    custSnap.docs.forEach((d: any) => {
+      const data = d.data();
+      if (storeId && storeId !== "全店舗" && data.store_name !== storeId) return;
+      if (data.referred_by_id) {
+        if (!referralMap.has(data.referred_by_id)) {
+          referralMap.set(data.referred_by_id, {
+            referrerId: data.referred_by_id,
+            referrerName: "不明",
+            referralCount: 0,
+            referralSales: 0,
+            referredCustomerIds: []
+          });
+        }
+        const ref = referralMap.get(data.referred_by_id);
+        ref.referralCount++;
+        ref.referredCustomerIds.push(d.id);
+      }
+    });
+
+    if (referralMap.size === 0) return { success: true, data: [] };
+
+    // Get referrer names
+    const referrerIds = Array.from(referralMap.keys());
+    // batch fetch if needed, simple approach for now
+    const refCustSnap = await adminDb.collection("customers")
+      .where("companyId", "==", companyId)
+      .get(); // Memory filter
+      
+    refCustSnap.docs.forEach((d: any) => {
+      if (referralMap.has(d.id)) {
+        referralMap.get(d.id).referrerName = d.data().name || "不明";
+      }
+    });
+
+    // Get sales of referred customers
+    const referredIds = new Set<string>();
+    Array.from(referralMap.values()).forEach(v => v.referredCustomerIds.forEach((id: string) => referredIds.add(id)));
+    
+    if (referredIds.size > 0) {
+      const salesSnap = await adminDb.collection("sales")
+        .where("companyId", "==", companyId)
+        .where("date", ">=", startStr)
+        .where("date", "<=", endStr)
+        .get();
+        
+      salesSnap.docs.forEach((d: any) => {
+        const data = d.data();
+        if (data.customer_id && referredIds.has(data.customer_id)) {
+          // Find which referrer this belongs to
+          Array.from(referralMap.values()).forEach(v => {
+            if (v.referredCustomerIds.includes(data.customer_id)) {
+              v.referralSales += (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
+            }
+          });
+        }
+      });
+    }
+
+    const result = Array.from(referralMap.values()).sort((a, b) => b.referralCount - a.referralCount);
+    return { success: true, data: result };
+  } catch (error: any) {
+    console.error("Failed to get referral analytics:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getChannelAnalytics(companyId: string, storeId: string | null | undefined, period: string) {
+  try {
+    const { startStr, endStr } = getPeriodDates(period);
+    const { adminDb } = await import("@/lib/firebase-admin");
+
+    const salesSnap = await adminDb.collection("sales")
+      .where("companyId", "==", companyId)
+      .where("date", ">=", startStr)
+      .where("date", "<=", endStr)
+      .get();
+      
+    const channelMap = new Map();
+    salesSnap.docs.forEach((d: any) => {
+      const data = d.data();
+      if (storeId && storeId !== "全店舗" && data.store_name !== storeId) return;
+      
+      const channel = data.reservation_route || "その他";
+      if (!channelMap.has(channel)) {
+        channelMap.set(channel, { channel, sales: 0, customers: 0, repeatCustomers: 0 });
+      }
+      const ch = channelMap.get(channel);
+      ch.sales += (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
+      ch.customers++;
+      if (data.customer_type !== "新規") ch.repeatCustomers++;
+    });
+
+    const result = Array.from(channelMap.values()).map(ch => ({
+      ...ch,
+      avgSpend: ch.customers > 0 ? ch.sales / ch.customers : 0,
+      repeatRate: ch.customers > 0 ? (ch.repeatCustomers / ch.customers) * 100 : 0
+    })).sort((a, b) => b.customers - a.customers);
+
+    return { success: true, data: result };
+  } catch (error: any) {
+    console.error("Failed to get channel analytics:", error);
+    return { success: false, error: error.message };
+  }
+}
+

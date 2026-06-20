@@ -17,7 +17,8 @@ import {
   Sparkles,
   TrendingUp,
   X,
-  Users
+  Users,
+  Calendar
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -239,11 +240,11 @@ export default function StaffDashboardPage() {
             <div className="text-xl font-black">¥{stats.todaySales.toLocaleString()}</div>
             <div className="text-[10px] text-white/50 font-bold">{stats.todayCount} 件の会計</div>
           </div>
-          <Link href="/staff-portal/sales" className="bg-emerald-500 hover:bg-emerald-600 p-4 rounded-2xl shadow-lg shadow-emerald-900/20 transition-all active:scale-95 flex flex-col justify-between">
-            <ReceiptText size={20} />
+          <Link href="/staff-portal/reservations" className="bg-emerald-500 hover:bg-emerald-600 p-4 rounded-2xl shadow-lg shadow-emerald-900/20 transition-all active:scale-95 flex flex-col justify-between">
+            <Calendar className="mb-2" size={20} />
             <div>
-              <div className="font-bold text-sm">売上入力</div>
-              <div className="text-[10px] opacity-80">本日の方の会計</div>
+              <div className="font-bold text-sm">予約カレンダー</div>
+              <div className="text-[10px] opacity-80">本日のスケジュール確認</div>
             </div>
           </Link>
           <Link href="/staff-portal/customers" className="bg-slate-700 hover:bg-slate-600 p-4 rounded-2xl shadow-lg transition-all active:scale-95">

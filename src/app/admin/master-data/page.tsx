@@ -94,14 +94,51 @@ export default function MasterDataPage() {
     setIsSaving(false);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setEditingItem(prev => ({ ...prev, imageUrl: ev.target?.result as string }));
-    };
-    reader.readAsDataURL(file);
+
+    if (file.type === 'application/pdf') {
+      try {
+        const pdfjsLib = await import('pdfjs-dist');
+        // Setup worker src
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+        const arrayBuffer = await file.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
+        const page = await pdf.getPage(1);
+
+        const targetWidth = 1200;
+        let viewport = page.getViewport({ scale: 1.0 });
+        const scale = targetWidth / viewport.width;
+        viewport = page.getViewport({ scale });
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        if (!context) return;
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        const renderContext = {
+          canvasContext: context,
+          viewport: viewport
+        };
+        await page.render(renderContext).promise;
+
+        const imageUrl = canvas.toDataURL('image/jpeg', 0.9);
+        setEditingItem(prev => ({ ...prev, imageUrl }));
+      } catch (err) {
+        console.error("Failed to parse PDF:", err);
+        alert("PDFの読み込みに失敗しました。別のPDFをお試しいただくか、画像ファイル(JPG/PNG)でアップロードしてください。");
+      }
+    } else {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setEditingItem(prev => ({ ...prev, imageUrl: ev.target?.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -373,7 +410,7 @@ export default function MasterDataPage() {
                       )}
                       <input 
                         type="file" 
-                        accept="image/*" 
+                        accept="image/*, application/pdf" 
                         onChange={handleImageUpload} 
                         className="absolute inset-0 opacity-0 cursor-pointer" 
                       />

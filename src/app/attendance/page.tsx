@@ -703,7 +703,10 @@ export default function AttendancePage() {
                 </Dialog>
                 </>
               )}
-              <AttendanceCSVButton records={attendanceRecords} date={targetDateStr} shifts={shifts} />
+              <AttendanceCSVButton 
+                date={targetDateStr} 
+                isSaaS={profile?.companyId !== "company_default" && profile?.companyId !== undefined} 
+              />
             </div>
         </div>
         <Table>

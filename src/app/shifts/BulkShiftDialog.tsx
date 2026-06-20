@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Dialog, 
   DialogContent, 
@@ -20,9 +20,10 @@ type BulkShiftDialogProps = {
   isOpen: boolean;
   onClose: () => void;
   staffList: StaffProfile[];
+  targetMonth?: Date;
 };
 
-export default function BulkShiftDialog({ isOpen, onClose, staffList }: BulkShiftDialogProps) {
+export default function BulkShiftDialog({ isOpen, onClose, staffList, targetMonth }: BulkShiftDialogProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
@@ -30,6 +31,18 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList }: BulkShif
     start: new Date().toISOString().split("T")[0],
     end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
   });
+
+  useEffect(() => {
+    if (isOpen && targetMonth) {
+      const year = targetMonth.getFullYear();
+      const month = targetMonth.getMonth();
+      
+      const startStr = new Date(year, month, 1).toISOString().split("T")[0];
+      const endStr = new Date(year, month + 1, 0).toISOString().split("T")[0]; // Last day of month
+      
+      setDateRange({ start: startStr, end: endStr });
+    }
+  }, [isOpen, targetMonth]);
   const [type, setType] = useState<ShiftType>("work");
   const { availableStores } = useAuth();
   const defaultStore = availableStores.length > 0 ? availableStores[0] : "メイン店舗";
@@ -38,6 +51,17 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList }: BulkShif
     { start_time: "10:00", end_time: "19:00", store: defaultStore as StoreLocation }
   ]);
   const [activeDaysOfWeek, setActiveDaysOfWeek] = useState<number[]>([1, 2, 3, 4, 5]); // Default Mon-Fri
+
+  useEffect(() => {
+    if (availableStores.length > 0) {
+      setSegments(prev => prev.map(seg => {
+        if (!availableStores.includes(seg.store as string)) {
+          return { ...seg, store: availableStores[0] as StoreLocation };
+        }
+        return seg;
+      }));
+    }
+  }, [availableStores]);
 
   const toggleDayOfWeek = (day: number) => {
     setActiveDaysOfWeek(prev => 
@@ -259,6 +283,7 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList }: BulkShif
                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">開始</span>
                         <Input 
                           type="time" 
+                          step="1800"
                           value={seg.start_time}
                           onChange={(e) => updateSegment(idx, "start_time", e.target.value)}
                           className="h-8 text-sm"
@@ -268,6 +293,7 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList }: BulkShif
                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">終了</span>
                         <Input 
                           type="time" 
+                          step="1800"
                           value={seg.end_time}
                           onChange={(e) => updateSegment(idx, "end_time", e.target.value)}
                           className="h-8 text-sm"

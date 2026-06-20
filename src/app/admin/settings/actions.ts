@@ -112,3 +112,87 @@ export async function saveLineSettings(storeName: string, channelAccessToken: st
     return { success: false, error: error.message };
   }
 }
+
+export async function getCompanySettings(companyId: string) {
+  try {
+    const docRef = doc(db, "companies", companyId);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data();
+    }
+    return { attendanceRule: "simple" };
+  } catch (error) {
+    console.error("Failed to get company settings:", error);
+    return { attendanceRule: "simple" };
+  }
+}
+
+export async function saveCompanyAttendanceRule(companyId: string, rule: "jasminelash" | "simple") {
+  try {
+    const docRef = doc(db, "companies", companyId);
+    await setDoc(docRef, { attendanceRule: rule }, { merge: true });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to save attendance rule:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getKioskSettings(companyId: string) {
+  try {
+    const snap = await getDocs(query(collection(db, "kiosk_settings")));
+    
+    // Fallback if the query is not matching due to index
+    const settings: Record<string, any> = {};
+    snap.docs.forEach(d => {
+      const data = d.data();
+      if (data.companyId === companyId) {
+        settings[data.storeName] = {
+          token: data.token,
+          enabled: data.enabled ?? false
+        };
+      }
+    });
+    return settings;
+  } catch (error) {
+    console.error("Failed to get kiosk settings:", error);
+    return {};
+  }
+}
+
+export async function saveKioskSettings(companyId: string, storeName: string, token: string, enabled: boolean) {
+  try {
+    const q = query(collection(db, "kiosk_settings"));
+    const snap = await getDocs(q);
+    
+    let docId = "";
+    snap.docs.forEach(d => {
+      const data = d.data();
+      if (data.companyId === companyId && data.storeName === storeName) {
+        docId = d.id;
+      }
+    });
+
+    if (docId) {
+      await setDoc(doc(db, "kiosk_settings", docId), {
+        companyId,
+        storeName,
+        token,
+        enabled
+      }, { merge: true });
+    } else {
+      await setDoc(doc(collection(db, "kiosk_settings")), {
+        companyId,
+        storeName,
+        token,
+        enabled
+      });
+    }
+
+    revalidatePath("/admin/settings");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to save kiosk settings:", error);
+    return { success: false, error: error.message };
+  }
+}

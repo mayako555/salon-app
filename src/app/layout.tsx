@@ -15,6 +15,8 @@ export const metadata: Metadata = {
 
 import { AuthProvider } from "@/lib/auth-context";
 import { Toaster } from "sonner";
+import { TrackingProvider } from "@/components/layout/TrackingProvider";
+import { TestPlanFeedbackModal } from "@/components/layout/TestPlanFeedbackModal";
 
 export default function RootLayout({
   children,
@@ -28,7 +30,10 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AuthProvider>
-          <AppLayout>{children}</AppLayout>
+          <TrackingProvider>
+            <AppLayout>{children}</AppLayout>
+            <TestPlanFeedbackModal />
+          </TrackingProvider>
           <Toaster position="top-center" richColors />
         </AuthProvider>
       </body>

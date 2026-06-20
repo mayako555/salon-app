@@ -101,6 +101,32 @@ export default function AdvancedCharts() {
     return Array.from(storeSet).sort();
   }, [chartData]);
   
+  const availableRoutes = useMemo(() => {
+    const routeSet = new Set<string>();
+    chartData.forEach(d => {
+      Object.values(d.stores).forEach((s: any) => {
+        if (s.routes) {
+          Object.keys(s.routes).forEach(r => routeSet.add(r));
+        }
+      });
+    });
+    return Array.from(routeSet).sort();
+  }, [chartData]);
+
+  const routeChartData = useMemo(() => {
+    return chartData.map(d => {
+      const routeVisits: Record<string, number> = {};
+      Object.values(d.stores).forEach((s: any) => {
+        if (s.routes) {
+          Object.entries(s.routes).forEach(([r, vals]: [string, any]) => {
+            routeVisits[r] = (routeVisits[r] || 0) + vals.visits;
+          });
+        }
+      });
+      return { ...d, routeVisits };
+    });
+  }, [chartData]);
+  
   const storeColors = [
     { regular: "#34d399", minimo: "#818cf8" },
     { regular: "#10b981", minimo: "#6366f1" },
@@ -108,6 +134,10 @@ export default function AdvancedCharts() {
     { regular: "#f43f5e", minimo: "#e11d48" },
     { regular: "#fbbf24", minimo: "#f59e0b" },
     { regular: "#38bdf8", minimo: "#0284c7" }
+  ];
+
+  const routeColors = [
+    "#34d399", "#818cf8", "#f43f5e", "#fbbf24", "#38bdf8", "#c084fc", "#f472b6", "#a3e635"
   ];
 
   if (loading) {
@@ -412,6 +442,53 @@ export default function AdvancedCharts() {
                 </div>
               </div>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Reservation Route Breakdown Chart */}
+      <Card className="bg-white border-none shadow-sm md:col-span-2">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <PieChart size={20} className="text-pink-500" />
+            予約経路別 来店客数（過去3年間）
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="w-full mt-4 overflow-x-auto pb-4 custom-scrollbar">
+            <div className="h-[300px]" style={{ minWidth: `${Math.max(routeChartData.length * 60, 600)}px` }}>
+              <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={routeChartData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis 
+                  dataKey="month" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fill: '#94a3b8' }}
+                  tickFormatter={(value) => `${value}人`}
+                />
+                  <Tooltip 
+                    cursor={{ fill: '#f8fafc' }}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
+                    formatter={(value: any) => [`${value?.toLocaleString()}人`, ""]}
+                  />
+                <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '20px' }} />
+                
+                {availableRoutes.map((route, idx) => {
+                  const isLast = idx === availableRoutes.length - 1;
+                  return (
+                    <Bar key={route} name={route} dataKey={`routeVisits.${route}`} stackId="route" fill={routeColors[idx % routeColors.length]} radius={isLast ? [4, 4, 0, 0] : [0,0,0,0]} />
+                  );
+                })}
+              </BarChart>
+            </ResponsiveContainer>
+            </div>
           </div>
         </CardContent>
       </Card>

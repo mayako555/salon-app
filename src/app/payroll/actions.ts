@@ -70,6 +70,7 @@ export type MonthlyStatement = {
     resident_tax_override?: number;
     childcare_support_override?: number;
     already_paid_amount_override?: number; // 支払済振込額 (交通費の一括前払い分などを控除するため)
+    advance_deduction_override?: number; // 立替・購入代金の天引き (税金計算に影響させずに手取りから引く)
     custom_adjustments?: { name: string; amount: number }[];
   };
   details: {

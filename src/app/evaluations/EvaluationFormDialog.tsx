@@ -1,575 +1,541 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Save, Award, User, Star, Calendar, Zap, Target, BarChart3, Heart, MessageSquare, ShieldCheck, Users, Box } from "lucide-react";
-import { StaffEvaluation, EVALUATION_CATEGORIES, RANK_CRITERIA, GRADE_WEIGHTS } from "./constants";
-import { upsertEvaluation, getEvaluationMetrics } from "./actions";
-import { getContractsList } from "@/app/contracts/actions";
+import { StaffProfile } from "@/app/staff/actions";
+import { saveEvaluation, updateEvaluation, getStaffAutoMetrics } from "./actions";
+import { StaffEvaluation, EVALUATION_TEMPLATES, calculateDynamicScore, EVALUATION_CATEGORIES_JP } from "./shared";
+import { Loader2, Award, Calendar, CheckCircle2, Calculator, BarChart3 } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/lib/auth-context";
+import { unfinalizeEvaluation } from "./actions";
+import { logFeatureUsage } from "@/lib/usage-logger";
+import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from "recharts";
 
-// Radar Chart Component (5-axis)
-function RadarChart({ scores }: { scores: StaffEvaluation["category_scores"] }) {
-  const size = 220;
-  const center = size / 2;
-  const radius = 80;
-  
-  const axes = [
-    { label: "技術", key: "technology" },
-    { label: "接客", key: "service" },
-    { label: "売上", key: "sales" },
-    { label: "行動", key: "behavior" },
-    { label: "チーム", key: "brand" },
-  ];
-
-  const getPoint = (index: number, value: number) => {
-    const angle = (Math.PI * 2 * index) / axes.length - Math.PI / 2;
-    const x = center + (radius * (value / 5)) * Math.cos(angle);
-    const y = center + (radius * (value / 5)) * Math.sin(angle);
-    return `${x},${y}`;
-  };
-
-  const points = axes.map((axis, i) => getPoint(i, scores?.[axis.key as keyof typeof scores] || 3)).join(" ");
-  
-  return (
-    <div className="relative w-[220px] h-[220px] mx-auto bg-white rounded-full flex items-center justify-center shadow-inner">
-      <svg width={size} height={size} className="overflow-visible">
-        {[1, 2, 3, 4, 5].map(level => (
-          <polygon
-            key={level}
-            points={axes.map((_, i) => getPoint(i, level)).join(" ")}
-            fill="none"
-            stroke="#f1f5f9"
-            strokeWidth="1"
-          />
-        ))}
-        {axes.map((_, i) => (
-          <line
-            key={i}
-            x1={center}
-            y1={center}
-            x2={center + radius * Math.cos((Math.PI * 2 * i) / axes.length - Math.PI / 2)}
-            y2={center + radius * Math.sin((Math.PI * 2 * i) / axes.length - Math.PI / 2)}
-            stroke="#f1f5f9"
-            strokeWidth="1"
-          />
-        ))}
-        <polygon
-          points={points}
-          fill="rgba(139, 92, 246, 0.25)"
-          stroke="#8b5cf6"
-          strokeWidth="3"
-          className="transition-all duration-500 ease-out"
-        />
-        {axes.map((axis, i) => {
-          const angle = (Math.PI * 2 * i) / axes.length - Math.PI / 2;
-          const x = center + (radius + 25) * Math.cos(angle);
-          const y = center + (radius + 18) * Math.sin(angle);
-          return (
-            <text
-              key={axis.label}
-              x={x}
-              y={y}
-              fontSize="11"
-              fontWeight="900"
-              textAnchor="middle"
-              fill="#475569"
-              className="tracking-tighter"
-            >
-              {axis.label}
-            </text>
-          );
-        })}
-      </svg>
-    </div>
-  );
-}
-
-const INITIAL_DETAILS = {
-  technology: [
-    { id: "tech_accuracy", name: "技術手順の正確さ (ミス・付け漏れなし)", score: 3 },
-    { id: "tech_finish", name: "仕上がりの美しさ (左右差・方向性・再現性)", score: 3 },
-    { id: "tech_hygiene", name: "衛生管理 (器具消毒・施術環境の清潔さ)", score: 3 },
-    { id: "tech_speed", name: "スピード (時間内で正確に仕上げる)", score: 3 },
-  ],
-  service: [
-    { id: "svc_counseling", name: "カウンセリングの丁寧さと正確さ", score: 3 },
-    { id: "svc_attitude", name: "言葉遣い・態度・笑顔", score: 3 },
-    { id: "svc_proposal", name: "お客様の立場に立った提案や説明", score: 3 },
-    { id: "svc_trouble", name: "トラブル時の単独対応力", score: 3 },
-  ],
-  sales: [
-    { id: "sale_total",           name: "売上高（目標達成率）",     score: 3, is_auto: true },
-    { id: "sale_unit",            name: "客単価（全体平均比）",     score: 3, is_auto: true },
-    { id: "sale_new_repeat",      name: "新規からの再来率",         score: 3, is_auto: true },
-    { id: "sale_repeat_continue", name: "リピーター継続率",         score: 3, is_auto: true },
-  ],
-  behavior: [
-    { id: "bhv_attendance", name: "勤怠・時間厳守", score: 3 },
-    { id: "bhv_grooming", name: "身だしなみ・清潔感", score: 3 },
-    { id: "bhv_report", name: "報告・連絡・相談の適切さ", score: 3 },
-    { id: "bhv_improvement", name: "指摘の受け止め方と改善の早さ", score: 3 },
-    { id: "bhv_inventory_use", name: "在庫管理: 使用量の適正化", score: 3 },
-    { id: "bhv_inventory_check", name: "在庫管理: 在庫チェック・補充の正確さ", score: 3 },
-  ],
-  brand: [
-    { id: "team_collab", name: "他スタッフとの協力姿勢", score: 3 },
-    { id: "team_support", name: "フォロー・助け合い", score: 3 },
-    { id: "team_workspace", name: "共有物や作業スペースの扱い", score: 3 },
-    { id: "junior_learning", name: "ジュニア特有: 学習姿勢・研修進捗", score: 3 },
-    { id: "junior_safety", name: "ジュニア特有: モデル施術時の安全管理", score: 3 },
-  ],
+type Props = {
+  isOpen: boolean;
+  onClose: () => void;
+  onRefresh: () => void;
+  staff: StaffProfile;
+  existingEvaluations: StaffEvaluation[];
 };
 
-export default function EvaluationFormDialog({ 
-  isOpen, 
-  onOpenChange, 
-  onSuccess,
-  initialData
-}: { 
-  isOpen: boolean, 
-  onOpenChange: (open: boolean) => void,
-  onSuccess: () => void,
-  initialData?: StaffEvaluation | null
-}) {
-  const [staffList, setStaffList] = useState<{id: string, name: string, grade?: string}[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+export default function EvaluationFormDialog({ isOpen, onClose, onRefresh, staff, existingEvaluations }: Props) {
+  const { user, profile, tenantPlan } = useAuth();
+  const [loading, setLoading] = useState(false);
   
-  const [formData, setFormData] = useState<Partial<StaffEvaluation>>({
-    staff_id: "",
-    staff_name: "",
-    evaluation_date: new Date().toISOString().split('T')[0],
-    target_period: (() => {
-      const now = new Date();
-      const month = now.getMonth();
-      const q = Math.floor(month / 3) + 1;
-      return `${now.getFullYear()}Q${q}`;
-    })(),
-    category_scores: {
-      technology: 3,
-      service: 3,
-      sales: 3,
-      behavior: 3,
-      brand: 3
-    },
-    details: INITIAL_DETAILS,
-    overall_comment: "",
-    overall_rank: "B"
-  });
+  const [autoMetrics, setAutoMetrics] = useState<Record<string, number>>({});
+  const [managerScores, setManagerScores] = useState<Record<string, number>>({});
+  
+  const [targetYear, setTargetYear] = useState<number>(new Date().getFullYear());
+  const [targetQuarter, setTargetQuarter] = useState<number>(Math.floor((new Date().getMonth() + 3) / 3));
+  const [comments, setComments] = useState("");
+  
+  const [fetchingMetrics, setFetchingMetrics] = useState(false);
+  const [periodInfo, setPeriodInfo] = useState({ start: "", end: "", months: 3 });
+
+  const [isUnfinalizeOpen, setIsUnfinalizeOpen] = useState(false);
+  const [unfinalizeReason, setUnfinalizeReason] = useState("");
+  const [unfinalizing, setUnfinalizing] = useState(false);
+
+  // Get previous evaluation to show diff
+  const prevEval = existingEvaluations
+    .sort((a, b) => b.target_year === a.target_year ? b.target_quarter - a.target_quarter : b.target_year - a.target_year)[0];
+
+  const currentEval = existingEvaluations.find(e => e.target_year === targetYear && e.target_quarter === targetQuarter);
 
   useEffect(() => {
-    if (initialData) {
-      setFormData(initialData);
-    } else {
-      setFormData({
-        staff_id: "",
-        staff_name: "",
-        evaluation_date: new Date().toISOString().split('T')[0],
-        target_period: (() => {
-          const now = new Date();
-          const month = now.getMonth();
-          const q = Math.floor(month / 3) + 1;
-          return `${now.getFullYear()}Q${q}`;
-        })(),
-        category_scores: {
-          technology: 3,
-          service: 3,
-          sales: 3,
-          behavior: 3,
-          brand: 3
-        },
-        details: INITIAL_DETAILS,
-        overall_comment: "",
-        overall_rank: "B"
-      });
-    }
-  }, [initialData, isOpen]);
-
-  useEffect(() => {
-    const fetchMetrics = async () => {
-      if (!formData.staff_id || !formData.target_period || !isOpen) return;
-
-      const res = await getEvaluationMetrics(formData.staff_id, formData.target_period);
-      if (res.success && res.metrics) {
-        const m = res.metrics;
-        const nextDetails = { ...formData.details! };
-
-        // スコアリング関数
-        const scoreAchievement = (rate: number) =>
-          rate >= 120 ? 5 : rate >= 100 ? 4 : rate >= 80 ? 3 : rate >= 60 ? 2 : 1;
-        const scoreUnitPriceRatio = (ratio: number) =>
-          ratio >= 130 ? 5 : ratio >= 110 ? 4 : ratio >= 90 ? 3 : ratio >= 70 ? 2 : 1;
-        const scoreNewRepeat = (rate: number) =>
-          rate >= 40 ? 5 : rate >= 30 ? 4 : rate >= 20 ? 3 : rate >= 10 ? 2 : 1;
-        const scoreRepeatContinuation = (rate: number) =>
-          rate >= 80 ? 5 : rate >= 65 ? 4 : rate >= 50 ? 3 : rate >= 35 ? 2 : 1;
-
-        nextDetails.sales = nextDetails.sales.map(item => {
-          if (item.id === "sale_total")
-            return { ...item, score: scoreAchievement(m.achievement_rate), value: m.achievement_rate, label: `達成率 ${m.achievement_rate}%（¥${m.total_sales.toLocaleString()} / 目標¥${m.quarterly_target.toLocaleString()}）` };
-          if (item.id === "sale_unit")
-            return { ...item, score: scoreUnitPriceRatio(m.unit_price_ratio), value: m.unit_price_ratio, label: `¥${m.unit_price.toLocaleString()} （全体平均¥${m.avg_unit_price.toLocaleString()} 比 ${m.unit_price_ratio}%）` };
-          if (item.id === "sale_new_repeat")
-            return { ...item, score: scoreNewRepeat(m.new_repeat_rate), value: m.new_repeat_rate, label: `${m.new_repeat_rate}% （新規${m.new_customer_count}人中 転換）` };
-          if (item.id === "sale_repeat_continue")
-            return { ...item, score: scoreRepeatContinuation(m.repeat_continuation_rate), value: m.repeat_continuation_rate, label: `${m.repeat_continuation_rate}% （前期リピ${m.prev_repeat_count}人中 継続）` };
-          return item;
+    if (isOpen) {
+      if (currentEval) {
+        setManagerScores(currentEval.manager_raw_scores || {});
+        setAutoMetrics(currentEval.auto_metrics || {});
+        setComments(currentEval.comments || "");
+        setFetchingMetrics(false);
+      } else {
+        const template = EVALUATION_TEMPLATES[staff.evaluation_role || "general"];
+        const initManager: Record<string, number> = {};
+        template.managerItems.forEach(item => initManager[item.id] = 3); // Default 3
+        setManagerScores(initManager);
+        setAutoMetrics({});
+        setComments("");
+        
+        setFetchingMetrics(true);
+        getStaffAutoMetrics(staff.id, targetYear, targetQuarter, staff.hire_date).then(res => {
+          if (res.success && res.data) {
+            setAutoMetrics(prev => ({
+              ...prev,
+              monthly_sales: res.data.monthly_sales,
+              sales_target_ratio: res.data.sales_target_ratio,
+              unit_price: res.data.unit_price,
+              next_booking_rate: res.data.next_booking_rate,
+              nomination_count: res.data.nomination_count
+            }));
+            setPeriodInfo({ start: res.data.period_start, end: res.data.period_end, months: res.data.months_present });
+          }
+          setFetchingMetrics(false);
         });
-
-        // 接客・技術の自動スコアも更新
-        nextDetails.service = nextDetails.service.map(item => {
-          if (item.id === "svc_review_reply") return { ...item, score: m.review_replies_count > 5 ? 5 : m.review_replies_count > 0 ? 4 : 3, value: m.review_replies_count };
-          return item;
-        });
-        nextDetails.technology = nextDetails.technology.map(item => {
-          if (item.id === "tech_accuracy") return { ...item, score: m.rework_count === 0 ? 5 : m.rework_count < 2 ? 4 : 2, value: m.rework_count };
-          return item;
-        });
-
-        const salesAvg = Math.round((nextDetails.sales.reduce((sum, i) => sum + i.score, 0) / nextDetails.sales.length) * 10) / 10;
-        const techAvg = Math.round((nextDetails.technology.reduce((sum, i) => sum + i.score, 0) / nextDetails.technology.length) * 10) / 10;
-        const serviceAvg = Math.round((nextDetails.service.reduce((sum, i) => sum + i.score, 0) / nextDetails.service.length) * 10) / 10;
-
-        setFormData(prev => ({
-          ...prev,
-          details: nextDetails,
-          category_scores: {
-            ...prev.category_scores!,
-            sales: salesAvg,
-            technology: techAvg,
-            service: serviceAvg
-          },
-          review_allowance: m.review_allowance
-        } as any));
       }
-    };
-    fetchMetrics();
-  }, [formData.staff_id, formData.target_period, isOpen]);
+    }
+  }, [isOpen, staff, targetYear, targetQuarter, currentEval]);
 
-  useEffect(() => {
-    const fetchStaff = async () => {
-      const contracts = await getContractsList();
-      const uniqueStaff = Array.from(new Set(contracts.map(c => c.staff_id))).map(id => {
-        const c = contracts.find(x => x.staff_id === id);
-        return { id, name: c?.staff_name || "不明", grade: c?.grade };
-      });
-      setStaffList(uniqueStaff);
-    };
-    fetchStaff();
-  }, []);
+  const template = currentEval?.snapshot?.template || EVALUATION_TEMPLATES[staff.evaluation_role || "general"];
+  const { auto_scores, calculated_scores, rank } = calculateDynamicScore(template, autoMetrics, managerScores);
 
-  const handleSubScoreChange = (category: keyof typeof INITIAL_DETAILS, subId: string, val: number) => {
-    const nextDetails = { ...formData.details! };
-    const categoryList = [...nextDetails[category]];
-    const itemIndex = categoryList.findIndex(item => item.id === subId);
+  const handleSubmit = async (status: "draft" | "pending" | "finalized") => {
+    if (!user) {
+      toast.error("ログインしていません");
+      return;
+    }
     
-    if (itemIndex > -1) {
-      categoryList[itemIndex] = { ...categoryList[itemIndex], score: val };
-      nextDetails[category] = categoryList;
-      
-      // Recalculate main category score (average)
-      const avg = Math.round((categoryList.reduce((sum, item) => sum + item.score, 0) / categoryList.length) * 10) / 10;
-      const nextCategoryScores = { ...formData.category_scores!, [category]: avg };
-      
-      // Get current staff's grade weights
-      const staffGrade = staffList.find(s => s.id === formData.staff_id)?.grade || "default";
-      const weights = GRADE_WEIGHTS[staffGrade as keyof typeof GRADE_WEIGHTS] || GRADE_WEIGHTS["default"];
-      
-      // Recalculate Overall Score (Weighted Average)
-      // Overall = Sum(Score * Weight) / 100
-      const weightedSum = (Object.keys(nextCategoryScores) as Array<keyof typeof nextCategoryScores>).reduce((sum, key) => {
-        const score = nextCategoryScores[key] || 0;
-        const weight = weights[key as keyof typeof weights] || 20;
-        return sum + (score * weight);
-      }, 0);
-      const overallScore = weightedSum / 100;
+    setLoading(true);
+    try {
+      const payload = {
+        staff_id: staff.id,
+        evaluator_id: user.uid,
+        target_year: targetYear,
+        target_quarter: targetQuarter,
+        template_id: template.id,
+        auto_metrics: autoMetrics,
+        manager_raw_scores: managerScores,
+        comments,
+        status
+      };
 
-      // Determine Rank
-      let rank: StaffEvaluation["overall_rank"] = "B";
-      if (overallScore >= 4.6) rank = "S";
-      else if (overallScore >= 4.0) rank = "A";
-      else if (overallScore >= 3.0) rank = "B";
-      else if (overallScore >= 2.0) rank = "C";
-      else rank = "D";
+      const res = currentEval 
+        ? await updateEvaluation(currentEval.id, payload)
+        : await saveEvaluation(payload);
 
-      setFormData({ 
-        ...formData, 
-        details: nextDetails, 
-        category_scores: nextCategoryScores,
-        overall_rank: rank 
-      });
+      if (res.success) {
+        toast.success("評価を登録しました");
+        if (profile?.companyId) {
+          logFeatureUsage(profile.companyId, tenantPlan, "evaluation", { action: "save", status });
+        }
+        onRefresh();
+        onClose();
+      } else {
+        toast.error("登録に失敗しました: " + res.error);
+      }
+    } catch (error) {
+      toast.error("エラーが発生しました");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.staff_id) return alert("スタッフを選択してください");
-    
-    setIsSubmitting(true);
-    const res = await upsertEvaluation({
-      ...formData,
-      evaluator_name: "管理者",
-      current_grade_code: staffList.find(s => s.id === formData.staff_id)?.grade || "J1",
-      status: "completed"
+  const handleUnfinalize = async () => {
+    if (!currentEval || !user) return;
+    if (!unfinalizeReason.trim()) {
+      toast.error("解除理由を入力してください");
+      return;
+    }
+
+    setUnfinalizing(true);
+    try {
+      const res = await unfinalizeEvaluation(currentEval.id, unfinalizeReason, user.uid, user.displayName || user.email || "Unknown");
+      if (res.success) {
+        toast.success("評価確定を解除しました");
+        setIsUnfinalizeOpen(false);
+        setUnfinalizeReason("");
+        onRefresh();
+        onClose();
+      } else {
+        toast.error("解除に失敗しました: " + res.error);
+      }
+    } catch (error) {
+      toast.error("エラーが発生しました");
+    } finally {
+      setUnfinalizing(false);
+    }
+  };
+
+  const getDiff = (current: number, prev: number | undefined, unit: string = "") => {
+    if (prev === undefined) return null;
+    const diff = current - prev;
+    if (diff > 0) return <span className="text-emerald-600 text-xs font-bold ml-2">+{diff}{unit}</span>;
+    if (diff < 0) return <span className="text-rose-600 text-xs font-bold ml-2">{diff}{unit}</span>;
+    return <span className="text-slate-400 text-xs ml-2">±0{unit}</span>;
+  };
+
+  // Group manager items by category
+  const managerGroups = template.managerItems.reduce((acc, item) => {
+    if (!acc[item.category]) acc[item.category] = [];
+    acc[item.category].push(item);
+    return acc;
+  }, {} as Record<string, typeof template.managerItems>);
+
+  const getRadarData = () => {
+    const buckets: Record<string, { earned: number; max: number }> = {
+      "技術": { earned: 0, max: 0 },
+      "接客": { earned: 0, max: 0 },
+      "売上": { earned: 0, max: 0 },
+      "集客": { earned: 0, max: 0 },
+      "運営": { earned: 0, max: 0 },
+      "チーム貢献": { earned: 0, max: 0 },
+    };
+
+    template.autoItems.forEach(item => {
+      const s = auto_scores[item.id] || 0;
+      let bucket = "運営";
+      if (item.category === "sales" || item.category === "repeat") bucket = "売上";
+      else if (item.category === "satisfaction") bucket = "接客";
+      else if (item.category === "tech_quality") bucket = "技術";
+      else if (item.category === "marketing") bucket = "集客";
+      
+      buckets[bucket].earned += s;
+      if (item.maxScore > 0) buckets[bucket].max += item.maxScore;
     });
-    
-    if (res.success) {
-      onOpenChange(false);
-      onSuccess();
-    } else {
-      alert("エラー: " + res.error);
-    }
-    setIsSubmitting(false);
+
+    template.managerItems.forEach(item => {
+      const val = managerScores[item.id];
+      if (val === undefined || val === 0) return;
+      
+      let bucket = "運営";
+      if (item.category === "customer_service") bucket = "接客";
+      else if (item.category === "technical") bucket = "技術";
+      else if (item.category === "team_contribution") bucket = "チーム貢献";
+      else if (item.category === "company_contribution" || item.category === "operations") bucket = "運営";
+
+      buckets[bucket].earned += val;
+      buckets[bucket].max += 5;
+    });
+
+    return Object.entries(buckets).map(([subject, { earned, max }]) => ({
+      subject,
+      A: max > 0 ? Math.round((earned / max) * 100) : 0,
+      fullMark: 100
+    }));
   };
+
+  const radarData = getRadarData();
+
+  const isFinalized = currentEval?.status === "finalized";
+  const isOwner = profile?.role === "systemOwner" || profile?.role === "companyOwner";
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[1200px] w-[98vw] max-h-[96vh] overflow-hidden flex flex-col p-0 bg-slate-50 border-none shadow-2xl">
-        <DialogHeader className="p-6 pb-4 bg-white border-b border-slate-100 shrink-0">
-          <div className="flex justify-between items-end">
-            <div className="space-y-0.5">
-              <DialogTitle className="flex items-center gap-3 text-2xl font-black text-slate-900 tracking-tighter">
-                <div className="bg-purple-600 p-2 rounded-xl text-white shadow-lg shadow-purple-200">
-                  <Award size={22} />
-                </div>
-                Performance Review
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-6xl sm:max-w-6xl max-h-[95vh] overflow-y-auto p-0 bg-slate-50">
+        <div className="sticky top-0 bg-white z-10 border-b border-slate-100 p-6 pb-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <DialogTitle className="text-2xl font-black flex items-center gap-2 mb-2">
+                <Award className="text-emerald-500" />
+                スタッフ評価（70/30ルール適用）
               </DialogTitle>
-              <p className="text-slate-400 text-[11px] font-black flex items-center gap-1 ml-1 uppercase tracking-widest">
-                <Target size={12} /> Data-Driven & Brand Excellence Evaluation
-              </p>
+              <DialogDescription>
+                {staff.name} さんの評価を入力します。定量データはシステムで自動計算され（一部手入力）、定性評価は上長が入力します。
+              </DialogDescription>
             </div>
             
-            <div className="flex items-center gap-6">
-              <div className="text-right">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Overall Rank</p>
-                <div className="text-5xl font-black text-purple-600 leading-none">{formData.overall_rank}</div>
+            <div className="flex gap-4">
+              <div>
+                <Label className="text-xs text-slate-500">対象年</Label>
+                <select 
+                  className="block w-24 rounded-md border-slate-200 text-sm mt-1"
+                  value={targetYear}
+                  onChange={e => setTargetYear(Number(e.target.value))}
+                  disabled={isFinalized}
+                >
+                  {[targetYear - 1, targetYear, targetYear + 1].map(y => (
+                    <option key={y} value={y}>{y}年</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label className="text-xs text-slate-500">四半期</Label>
+                <select 
+                  className="block w-24 rounded-md border-slate-200 text-sm mt-1"
+                  value={targetQuarter}
+                  onChange={e => setTargetQuarter(Number(e.target.value))}
+                  disabled={isFinalized}
+                >
+                  <option value={1}>Q1</option>
+                  <option value={2}>Q2</option>
+                  <option value={3}>Q3</option>
+                  <option value={4}>Q4</option>
+                </select>
               </div>
             </div>
           </div>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-y-auto px-6 py-6">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Left Column: Basic Info & Chart (Span 4) */}
-            <div className="lg:col-span-4 space-y-5">
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-5">
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">対象スタッフ</Label>
-                    <Select 
-                      onValueChange={(val) => {
-                        const s = staffList.find(x => x.id === val);
-                        setFormData({ ...formData, staff_id: val, staff_name: s?.name });
-                      }}
-                      value={formData.staff_id}
-                    >
-                      <SelectTrigger className="w-full bg-slate-50 border-none h-10 font-bold text-slate-800 rounded-xl ring-1 ring-slate-200">
-                        <SelectValue placeholder="スタッフを選択" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl border-none shadow-xl">
-                        {staffList.map(s => (
-                          <SelectItem key={s.id} value={s.id} className="font-bold py-2.5">{s.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">評価日</Label>
-                      <Input 
-                        type="date" 
-                        value={formData.evaluation_date}
-                        onChange={(e) => setFormData({ ...formData, evaluation_date: e.target.value })}
-                        className="bg-slate-50 border-none h-9 font-bold text-slate-700 rounded-xl ring-1 ring-slate-200"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">対象期間</Label>
-                      <Select 
-                        onValueChange={(val) => setFormData({ ...formData, target_period: val })}
-                        value={formData.target_period}
-                      >
-                        <SelectTrigger className="w-full bg-slate-50 border-none h-9 font-bold text-slate-700 rounded-xl ring-1 ring-slate-200">
-                          <SelectValue placeholder="期間" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(() => {
-                            const year = new Date().getFullYear();
-                            return [4,3,2,1].map(q => (
-                              <SelectItem key={q} value={`${year}Q${q}`}>{year}年 第{q}四半期</SelectItem>
-                            ))
-                          })()}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="flex items-center gap-2 text-slate-400 font-black text-[10px] uppercase tracking-widest ml-1">
-                      <MessageSquare size={12} className="text-blue-500" /> 面談予定日
-                    </Label>
-                    <Input 
-                      type="date" 
-                      value={formData.interview_date || ""}
-                      onChange={(e) => setFormData({ ...formData, interview_date: e.target.value, interview_status: "pending" })}
-                      className="bg-slate-50 border-none h-9 font-bold text-slate-700 rounded-xl ring-1 ring-slate-200"
-                    />
-                  </div>
-
-                  {/* Calculated Allowance Badge */}
-                  {formData.id === undefined && (Object.keys(formData.category_scores || {}).length > 0) && (
-                    <div className="mt-2 p-3 bg-emerald-50 rounded-2xl border border-emerald-100 animate-in fade-in slide-in-from-top-1">
-                      <div className="flex justify-between items-center">
-                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">自動計算手当</p>
-                        <Badge className="bg-emerald-500 text-white border-none font-black">確定予定</Badge>
-                      </div>
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className="text-xs font-bold text-emerald-700 whitespace-nowrap">口コミ手当:</span>
-                        <div className="relative flex-1">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 font-black text-sm">¥</span>
-                          <Input 
-                            type="number"
-                            value={(formData as any).review_allowance || 0}
-                            onChange={(e) => setFormData({ ...formData, review_allowance: parseInt(e.target.value) || 0 } as any)}
-                            className="pl-7 bg-white border-emerald-200 h-9 rounded-xl font-black text-emerald-700 focus:ring-emerald-500 shadow-sm"
-                          />
-                        </div>
-                        <span className="text-[10px] text-emerald-500 font-bold whitespace-nowrap">(自動計算ベース)</span>
-                      </div>
+          
+          <div className="mt-4 flex gap-6 items-center bg-slate-50 p-4 rounded-xl relative overflow-hidden">
+            <div className="flex-1 flex items-center gap-6 z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center text-2xl font-black text-indigo-600">
+                  {rank}
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-slate-500">総合スコア</div>
+                  <div className="text-3xl font-black">{calculated_scores.total} <span className="text-lg text-slate-400 font-normal">/ 100</span></div>
+                  {prevEval && (
+                    <div className="text-xs text-slate-500 mt-1">
+                      前回: {prevEval.calculated_scores?.total || 0}点 {getDiff(calculated_scores.total, prevEval.calculated_scores?.total)}
                     </div>
                   )}
                 </div>
               </div>
-
-              <div className="bg-white p-2 rounded-[32px] shadow-sm border border-slate-100 flex items-center justify-center aspect-square relative overflow-hidden group">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                <RadarChart scores={formData.category_scores as StaffEvaluation["category_scores"]} />
+              
+              <div className="h-12 w-px bg-slate-200 mx-2"></div>
+              
+              <div>
+                <div className="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1"><Calculator size={14}/> 自動評価（定量）</div>
+                <div className="text-xl font-bold text-emerald-600">{calculated_scores.auto_total} <span className="text-sm font-normal">/ 70</span></div>
               </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">総合コメント / 次回目標</Label>
-                <Textarea 
-                  placeholder="エクセルにある「コメント/次回目標」をここに入力..."
-                  value={formData.overall_comment}
-                  onChange={(e) => setFormData({ ...formData, overall_comment: e.target.value })}
-                  className="min-h-[120px] bg-white border-slate-100 rounded-2xl text-xs p-3 shadow-sm resize-none focus:ring-purple-500"
-                />
+              
+              <div className="text-2xl font-light text-slate-300">+</div>
+              
+              <div>
+                <div className="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1"><Award size={14}/> 上長評価（定性）</div>
+                <div className="text-xl font-bold text-blue-600">{calculated_scores.manager_total} <span className="text-sm font-normal">/ 30</span></div>
               </div>
             </div>
-
-            {/* Right Column: Detailed Tabs (Span 8) */}
-            <div className="lg:col-span-8">
-              <Tabs defaultValue="technology" className="h-full flex flex-col">
-                <TabsList className="bg-white p-1 rounded-2xl border border-slate-100 shadow-sm w-full grid grid-cols-5 h-14 mb-6">
-                  <TabsTrigger value="technology" className="rounded-xl font-black text-[11px] data-[state=active]:bg-purple-600 data-[state=active]:text-white">
-                    <Zap size={13} className="mr-1" />技術
-                  </TabsTrigger>
-                  <TabsTrigger value="service" className="rounded-xl font-black text-[11px] data-[state=active]:bg-purple-600 data-[state=active]:text-white">
-                    <Heart size={13} className="mr-1" />接客
-                  </TabsTrigger>
-                  <TabsTrigger value="sales" className="rounded-xl font-black text-[11px] data-[state=active]:bg-purple-600 data-[state=active]:text-white">
-                    <BarChart3 size={13} className="mr-1" />売上
-                  </TabsTrigger>
-                  <TabsTrigger value="behavior" className="rounded-xl font-black text-[11px] data-[state=active]:bg-purple-600 data-[state=active]:text-white">
-                    <ShieldCheck size={13} className="mr-1" />行動
-                  </TabsTrigger>
-                  <TabsTrigger value="brand" className="rounded-xl font-black text-[11px] data-[state=active]:bg-purple-600 data-[state=active]:text-white">
-                    <Users size={13} className="mr-1" />チーム
-                  </TabsTrigger>
-                </TabsList>
-
-                {(Object.keys(INITIAL_DETAILS) as Array<keyof typeof INITIAL_DETAILS>).map((catKey) => (
-                  <TabsContent key={catKey} value={catKey} className="mt-0 space-y-4 focus-visible:outline-none">
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-8 space-y-8">
-                      <div className="flex justify-between items-center border-b border-slate-50 pb-6">
-                        <div>
-                          <h3 className="text-xl font-black text-slate-800">
-                            {catKey === "technology" ? "技術スキル" : 
-                             catKey === "service" ? "接客スキル" : 
-                             catKey === "behavior" ? "業務態度・在庫管理" : 
-                             catKey === "brand" ? "チームワーク・ジュニア特有" : "売上分析"}
-                          </h3>
-                          <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest">
-                            {catKey} detailed metrics
-                          </p>
-                        </div>
-                        <div className="bg-purple-50 px-4 py-2 rounded-2xl text-center min-w-[80px]">
-                          <p className="text-[9px] font-black text-purple-400 uppercase tracking-tighter">Avg</p>
-                          <p className="text-2xl font-black text-purple-700">{formData.category_scores?.[catKey as keyof StaffEvaluation["category_scores"]]}</p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-6">
-                        {formData.details?.[catKey].map((item) => (
-                          <div key={item.id} className="space-y-3 group">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1 min-w-0 pr-4">
-                                <Label className="text-sm font-black text-slate-700 group-hover:text-purple-600 transition-colors">
-                                  {item.name}
-                                  {item.is_auto && <span className="ml-2 text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-md font-black italic">AUTO</span>}
-                                </Label>
-                                {/* AUTO項目は実値を表示 */}
-                                {item.is_auto && (item as any).label && (
-                                  <p className="text-[11px] text-slate-400 font-bold mt-1 tabular-nums">
-                                    {(item as any).label}
-                                  </p>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {[1, 2, 3, 4, 5].map((lvl) => (
-                                  <button
-                                    key={lvl}
-                                    type="button"
-                                    onClick={() => handleSubScoreChange(catKey, item.id, lvl)}
-                                    className={`w-9 h-9 rounded-xl font-black transition-all text-xs ${
-                                      item.score === lvl
-                                        ? "bg-purple-600 text-white shadow-lg shadow-purple-200 scale-110"
-                                        : "bg-slate-50 text-slate-400 hover:bg-slate-100"
-                                    }`}
-                                  >
-                                    {lvl}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="h-1.5 w-full bg-slate-50 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-gradient-to-r from-purple-200 to-purple-600 transition-all duration-500"
-                                style={{ width: `${(item.score / 5) * 100}%` }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </TabsContent>
-                ))}
-              </Tabs>
+            
+            {/* レーダーチャート表示枠 */}
+            <div className="hidden sm:block absolute right-4 top-0 bottom-0 w-48 opacity-90">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart cx="50%" cy="50%" outerRadius="65%" data={radarData}>
+                  <PolarGrid stroke="#e2e8f0" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 'bold' }} />
+                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                  <Radar
+                    name="スコア"
+                    dataKey="A"
+                    stroke="#059669"
+                    fill="#10b981"
+                    fillOpacity={0.4}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </div>
 
-        <DialogFooter className="p-8 bg-white border-t border-slate-100 shrink-0">
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl font-bold">
-            キャンセル
-          </Button>
-          <Button 
-            onClick={handleSubmit} 
-            disabled={isSubmitting}
-            className="bg-slate-900 hover:bg-slate-800 text-white min-w-[200px] h-12 rounded-2xl shadow-xl shadow-slate-200 font-black text-base gap-2 group transition-all active:scale-95"
-          >
-            {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} className="group-hover:scale-110 transition-transform" />}
-            {isSubmitting ? "保存中..." : "評価を確定して保存"}
-          </Button>
-        </DialogFooter>
+        <div className="p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+            
+            {/* 左側：自動評価セクション (70点) */}
+            <div className="lg:col-span-3 space-y-6">
+              <div className="flex justify-between items-end border-b border-emerald-200 pb-2">
+                <h3 className="text-lg font-black text-emerald-800 flex items-center gap-2">
+                  <Calculator className="text-emerald-500"/>
+                  自動評価セクション <span className="text-sm font-normal text-emerald-600 ml-2">(配点: 70点)</span>
+                </h3>
+                {fetchingMetrics && <div className="text-xs text-emerald-600 flex items-center gap-1"><Loader2 size={12} className="animate-spin"/> 集計中...</div>}
+                {!fetchingMetrics && periodInfo.start && (
+                  <div className="text-xs text-slate-500">
+                    集計期間: {periodInfo.start} 〜 {periodInfo.end} (稼働: {periodInfo.months}ヶ月)
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {template.autoItems.map(item => {
+                  const val = autoMetrics[item.id] || 0;
+                  const score = auto_scores[item.id] || 0;
+                  const prevVal = prevEval?.auto_metrics?.[item.id];
+                  
+                  return (
+                    <div key={item.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-bl-lg border-b border-l border-emerald-100">
+                        最大 {item.maxScore}点
+                      </div>
+                      
+                      <div className="text-xs font-bold text-slate-400 mb-1">{EVALUATION_CATEGORIES_JP[item.category] || item.category}</div>
+                      <Label className="text-sm font-bold block mb-3">{item.label}</Label>
+                      
+                      <div className="flex items-end gap-3 mb-2">
+                        {item.isManualInput ? (
+                          <div className="relative flex-1">
+                            <Input 
+                              type="number"
+                              value={autoMetrics[item.id] || ""}
+                              onChange={e => setAutoMetrics(p => ({...p, [item.id]: Number(e.target.value)}))}
+                              disabled={isFinalized}
+                              className="pr-8 h-10 text-lg font-bold"
+                              placeholder="0"
+                              min="0"
+                              step="0.1"
+                            />
+                            <span className="absolute right-3 top-2.5 text-slate-400 text-sm">{item.unit}</span>
+                          </div>
+                        ) : (
+                          <div className="flex-1 bg-slate-50 border border-slate-100 rounded-md p-2 flex justify-between items-end">
+                            <span className="text-xl font-black text-slate-700">
+                              {item.unit === "円" ? val.toLocaleString() : val}
+                            </span>
+                            <span className="text-sm font-bold text-slate-400">{item.unit}</span>
+                          </div>
+                        )}
+                        
+                        <div className="text-right pb-1">
+                          <div className="text-[10px] text-slate-500 mb-1">獲得スコア</div>
+                          <div className="text-2xl font-black text-emerald-600 flex items-baseline justify-end">
+                            {score} <span className="text-sm font-bold ml-1">点</span>
+                          </div>
+                        </div>
+                      </div>
+                      {prevVal !== undefined && (
+                        <div className="text-xs text-slate-400">
+                          前回: {item.unit === "円" ? prevVal.toLocaleString() : prevVal}{item.unit} {getDiff(val, prevVal, item.unit === "円" ? "" : item.unit)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 右側：上長評価セクション (30点) */}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="flex justify-between items-end border-b border-blue-200 pb-2">
+                <h3 className="text-lg font-black text-blue-800 flex items-center gap-2">
+                  <Award className="text-blue-500"/>
+                  上長評価セクション <span className="text-sm font-normal text-blue-600 ml-2">(配点: 30点)</span>
+                </h3>
+              </div>
+
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-6">
+                {Object.entries(managerGroups).map(([category, items]) => (
+                  <div key={category} className="space-y-4">
+                    <h4 className="text-sm font-black text-slate-700 border-l-4 border-blue-500 pl-2">
+                      {EVALUATION_CATEGORIES_JP[category] || category}
+                    </h4>
+                    
+                    <div className="space-y-4">
+                      {items.map(item => (
+                        <div key={item.id} className="bg-slate-50 p-3 rounded-lg">
+                          <div className="flex justify-between mb-2">
+                            <Label className="text-sm font-bold">{item.label}</Label>
+                            {prevEval && prevEval.manager_raw_scores && prevEval.manager_raw_scores[item.id] && (
+                              <span className="text-xs text-slate-400">前回: {prevEval.manager_raw_scores[item.id]}</span>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            {[1, 2, 3, 4, 5].map(num => (
+                              <button
+                                key={num}
+                                type="button"
+                                disabled={isFinalized}
+                                onClick={() => setManagerScores(p => ({...p, [item.id]: num}))}
+                                className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${
+                                  managerScores[item.id] === num 
+                                    ? "bg-blue-600 text-white shadow-md transform scale-105" 
+                                    : "bg-white text-slate-500 border border-slate-200 hover:border-blue-300 hover:bg-blue-50"
+                                }`}
+                              >
+                                {num}
+                              </button>
+                            ))}
+                            <button
+                                type="button"
+                                disabled={isFinalized}
+                                onClick={() => setManagerScores(p => ({...p, [item.id]: 0}))}
+                                className={`flex-1 max-w-[80px] py-2 text-xs font-bold rounded-md transition-all ${
+                                  managerScores[item.id] === 0 
+                                    ? "bg-slate-600 text-white shadow-md transform scale-105" 
+                                    : "bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200"
+                                }`}
+                              >
+                                対象外
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* コメント入力 */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 mt-6">
+                <Label className="text-sm font-bold mb-2 block">評価コメント・フィードバック</Label>
+                <Textarea 
+                  value={comments}
+                  onChange={e => setComments(e.target.value)}
+                  disabled={isFinalized}
+                  placeholder="スタッフへのフィードバックや評価の理由を入力してください。"
+                  className="min-h-[120px] bg-slate-50"
+                />
+              </div>
+
+            </div>
+          </div>
+          
+          <div className="mt-8 flex justify-end gap-3 sticky bottom-0 bg-white/90 backdrop-blur-md p-4 rounded-xl shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.1)] border border-slate-100 items-center">
+            {isFinalized && (
+              <span className="text-sm font-bold text-rose-600 mr-auto flex items-center gap-2">
+                <CheckCircle2 size={16} /> この評価は確定済みのため編集できません
+              </span>
+            )}
+            
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading} className="w-32">
+              {isFinalized ? "閉じる" : "キャンセル"}
+            </Button>
+            
+            {isFinalized && isOwner && (
+              <Button type="button" variant="destructive" onClick={() => setIsUnfinalizeOpen(true)} disabled={loading} className="shadow-sm">
+                確定を解除する
+              </Button>
+            )}
+            
+            {!isFinalized && (
+              <>
+                <Button type="button" variant="secondary" onClick={() => handleSubmit("draft")} disabled={loading} className="bg-slate-200 hover:bg-slate-300 text-slate-800">
+                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  下書き保存
+                </Button>
+                
+                <Button type="button" onClick={() => handleSubmit("pending")} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white shadow-md">
+                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  承認申請する
+                </Button>
+
+                {isOwner && (
+                  <Button type="button" onClick={() => handleSubmit("finalized")} disabled={loading} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20">
+                    {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                    評価を確定する
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       </DialogContent>
+
+      {/* 確定解除ダイアログ */}
+      <Dialog open={isUnfinalizeOpen} onOpenChange={setIsUnfinalizeOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-rose-600">評価確定の解除</DialogTitle>
+            <DialogDescription>
+              確定済みの評価を編集可能な状態に戻します。監査ログとして解除理由が記録されます。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>解除理由（必須）</Label>
+              <Textarea 
+                value={unfinalizeReason}
+                onChange={e => setUnfinalizeReason(e.target.value)}
+                placeholder="例: 上長と再面談を実施したため、評価内容を修正する。"
+                rows={3}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setIsUnfinalizeOpen(false)} disabled={unfinalizing}>
+              キャンセル
+            </Button>
+            <Button variant="destructive" onClick={handleUnfinalize} disabled={unfinalizing}>
+              {unfinalizing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              解除して下書きに戻す
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

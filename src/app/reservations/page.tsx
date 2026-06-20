@@ -23,33 +23,45 @@ export default function ReservationsPage() {
   const [shifts, setShifts] = useState<ShiftRecord[]>([]);
   const [settings, setSettings] = useState<ReservationSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
 
   const dateStr = format(date, "yyyy-MM-dd");
 
-  const loadData = async () => {
-    setLoading(true);
+  useEffect(() => {
+    const initialLoad = async () => {
+      try {
+        const [staffData, settingsData] = await Promise.all([
+          getStaffList(),
+          getReservationSettings()
+        ]);
+        setStaffList(staffData);
+        setSettings(settingsData);
+      } catch (e) {
+        console.error("Initial load error", e);
+      }
+    };
+    initialLoad();
+  }, []);
+
+  const loadDateData = async () => {
+    setIsFetching(true);
+    if (reservations.length === 0) setLoading(true); // First time load
     try {
-      const [resData, staffData, shiftsData, settingsData] = await Promise.all([
-        getReservations("全店舗", dateStr), // タイムラインには他店舗の予約も出すために一旦全店舗分取得
-        getStaffList(),
-        getShiftsForDate(dateStr),
-        getReservationSettings()
+      const [resData, shiftsData] = await Promise.all([
+        getReservations("全店舗", dateStr),
+        getShiftsForDate(dateStr)
       ]);
       setReservations(resData);
-      setStaffList(staffData);
-      setSettings(settingsData);
-      
-      // Filter shifts for the selected date
-      const dailyShifts = shiftsData;
-      setShifts(dailyShifts);
+      setShifts(shiftsData);
     } catch (e) {
-      console.error(e);
+      console.error("Date data load error", e);
     }
     setLoading(false);
+    setIsFetching(false);
   };
 
   useEffect(() => {
-    loadData();
+    loadDateData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateStr, selectedStore]);
 
@@ -174,8 +186,8 @@ export default function ReservationsPage() {
             <Plus className="w-4 h-4 mr-1" /> 予約追加
           </Button>
           
-          <Button variant="outline" size="sm" onClick={loadData} className="h-8 w-8 p-0" disabled={loading}>
-            <RefreshCw className={`w-4 h-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
+          <Button variant="outline" size="sm" onClick={loadDateData} className="h-8 w-8 p-0" disabled={isFetching}>
+            <RefreshCw className={`w-4 h-4 text-slate-600 ${isFetching ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
@@ -185,24 +197,24 @@ export default function ReservationsPage() {
         {loading || !settings ? (
           <div className="p-20 text-center text-slate-400 font-bold animate-pulse">Loading Timeline...</div>
         ) : (
-          <ReservationTimeline 
-            reservations={reservations} 
-            staffList={staffList.filter(s => {
-              if (selectedStore === "全店舗") {
-                // Return staff if they belong to ANY of the allowed stores, or if they have no salonIds (legacy/admin)
+          <div className={`h-full transition-opacity duration-200 ${isFetching ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+            <ReservationTimeline 
+              reservations={reservations} 
+              staffList={staffList.filter(s => {
+                if (selectedStore === "全店舗") {
+                  if (!s.salonIds || s.salonIds.length === 0) return true;
+                  return s.salonIds.some(st => allowedStores.includes(st));
+                }
                 if (!s.salonIds || s.salonIds.length === 0) return true;
-                return s.salonIds.some(st => allowedStores.includes(st));
-              }
-              // Return staff only if they belong to the specific selected store
-              if (!s.salonIds || s.salonIds.length === 0) return true;
-              return s.salonIds.includes(selectedStore);
-            })} 
-            shifts={shifts}
-            date={dateStr}
-            storeName={selectedStore}
-            settings={settings}
-            onRefresh={loadData}
-          />
+                return s.salonIds.includes(selectedStore);
+              })} 
+              shifts={shifts}
+              date={dateStr}
+              storeName={selectedStore}
+              settings={settings}
+              onRefresh={loadDateData}
+            />
+          </div>
         )}
       </div>
 

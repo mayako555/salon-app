@@ -26,6 +26,8 @@ export type AttendanceRecord = {
   effective_clock_in?: string | null;
   effective_clock_out?: string | null;
   is_effective_manual?: boolean;
+  break_start?: string | null;
+  break_end?: string | null;
   break_minutes: number;
   status: AttendanceStatus;
   store?: string; // Which store they clocked into
@@ -162,7 +164,8 @@ export async function recordClockIn(staffId: string, staffName: string, store?: 
   try {
     const { adminDb } = await import("@/lib/firebase-admin");
     const now = new Date();
-    const dateStr = now.toISOString().split("T")[0];
+    // UTC time converted to JST for calculating the correct "today" string
+    const dateStr = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().split("T")[0];
     
     let effectiveIn = now.toISOString();
     
@@ -222,11 +225,55 @@ export async function recordClockIn(staffId: string, staffName: string, store?: 
   }
 }
 
+export async function recordFcClockIn(staffId: string, staffName: string, store?: string) {
+  try {
+    const { adminDb } = await import("@/lib/firebase-admin");
+    const now = new Date();
+    // UTC time converted to JST for calculating the correct "today" string
+    const dateStr = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().split("T")[0];
+    
+    // For franchise, we simply use the current time
+    let effectiveIn = now.toISOString();
+
+    const payload = {
+      staff_id: staffId,
+      staff_name: staffName,
+      date: dateStr,
+      clock_in: now.toISOString(),
+      clock_out: null, 
+      effective_clock_in: effectiveIn,
+      effective_clock_out: null,
+      break_minutes: 60,
+      status: "normal",
+      store: store || "不明",
+      is_fc: true,
+      created_at: new Date()
+    };
+
+    const docRef = await adminDb.collection(ATTENDANCE_COLLECTION).add(payload);
+    
+    await addAuditLog({
+      table_name: ATTENDANCE_COLLECTION,
+      record_id: docRef.id,
+      action: "INSERT",
+      old_data: null,
+      new_data: payload,
+      actor: staffName
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error recording FC clock in:", error);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function recordClockOut(staffId: string) {
   try {
     const { adminDb } = await import("@/lib/firebase-admin");
     const now = new Date();
-    const dateStr = now.toISOString().split("T")[0];
+    // UTC time converted to JST for calculating the correct "today" string
+    const dateStr = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().split("T")[0];
     
     // Find the active shift (clock_out is null)
     const snapshot = await adminDb.collection(ATTENDANCE_COLLECTION)
@@ -288,6 +335,54 @@ export async function recordClockOut(staffId: string) {
     return { success: true };
   } catch (error: any) {
     console.error("Error recording clock out:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function recordFcClockOut(staffId: string) {
+  try {
+    const { adminDb } = await import("@/lib/firebase-admin");
+    const now = new Date();
+    // UTC time converted to JST for calculating the correct "today" string
+    const dateStr = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().split("T")[0];
+    
+    // Find the active shift (clock_out is null)
+    const snapshot = await adminDb.collection(ATTENDANCE_COLLECTION)
+      .where("staff_id", "==", staffId)
+      .where("date", "==", dateStr)
+      .where("clock_out", "==", null)
+      .get();
+    
+    if (!snapshot.empty) {
+      const docId = snapshot.docs[0].id;
+      
+      const clockOutTime = now.toISOString();
+      let effectiveIn = snapshot.docs[0].data().effective_clock_in || snapshot.docs[0].data().clock_in;
+      
+      // For franchise, effective out is exactly clock out
+      let effectiveOut = clockOutTime;
+
+      const updatePayload = {
+        clock_out: clockOutTime,
+        effective_clock_in: effectiveIn,
+        effective_clock_out: effectiveOut,
+        updated_at: new Date()
+      };
+      
+      await adminDb.collection(ATTENDANCE_COLLECTION).doc(docId).update(updatePayload);
+
+      await addAuditLog({
+        table_name: ATTENDANCE_COLLECTION,
+        record_id: docId,
+        action: "UPDATE",
+        old_data: snapshot.docs[0].data(),
+        new_data: updatePayload,
+        actor: snapshot.docs[0].data().staff_name
+      });
+    }
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error recording FC clock out:", error);
     return { success: false, error: error.message };
   }
 }
@@ -356,7 +451,7 @@ export async function getAllStaffProfiles() {
   }
 }
 
-export async function getKioskStaffList() {
+export async function getKioskStaffList(companyId: string = "company_default") {
   try {
     const { adminDb } = await import("@/lib/firebase-admin");
     const snap = await adminDb.collection("staff_profiles").get();
@@ -378,10 +473,9 @@ export async function getKioskStaffList() {
       };
     });
     
-    // Default fallback to company_default since kiosk has no session context
     const filteredStaff = staffList.filter((s: any) => {
       const sCompanyId = s.companyId || "company_default";
-      return sCompanyId === "company_default";
+      return sCompanyId === companyId;
     });
 
     return filteredStaff.sort((a: any, b: any) => {
@@ -463,5 +557,109 @@ export async function verifyStaffPassword(staffId: string, password: string): Pr
   } catch (error: any) {
     console.error("Error in verifyStaffPassword:", error);
     return { success: false, error: "通信エラーが発生しました" };
+  }
+}
+
+export async function verifyKioskToken(companyId: string, storeId: string, token: string): Promise<boolean> {
+  if (!companyId || !storeId || !token) return false;
+  try {
+    const { adminDb } = await import("@/lib/firebase-admin");
+    const snap = await adminDb.collection("kiosk_settings")
+      .where("companyId", "==", companyId)
+      .where("storeName", "==", storeId)
+      .get();
+
+    if (snap.empty) return false;
+    const data = snap.docs[0].data();
+    return data.token === token && data.enabled === true;
+  } catch (error) {
+    console.error("Token verification failed:", error);
+    return false;
+  }
+}
+
+export async function recordKioskAction(
+  companyId: string,
+  storeId: string,
+  staffId: string,
+  staffName: string,
+  actionType: "IN" | "OUT" | "BREAK_START" | "BREAK_END"
+) {
+  try {
+    const { adminDb } = await import("@/lib/firebase-admin");
+    
+    // Get company rules
+    let rule = "simple";
+    const companyDoc = await adminDb.collection("companies").doc(companyId).get();
+    if (companyDoc.exists) {
+      rule = companyDoc.data()?.attendanceRule || "simple";
+    }
+
+    const now = new Date();
+    // UTC time converted to JST for calculating the correct "today" string
+    const dateStr = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+    // IN / OUT
+    if (actionType === "IN") {
+      if (rule === "jasminelash") {
+        return await recordClockIn(staffId, staffName, storeId);
+      } else {
+        return await recordFcClockIn(staffId, staffName, storeId);
+      }
+    }
+    
+    if (actionType === "OUT") {
+      if (rule === "jasminelash") {
+        return await recordClockOut(staffId);
+      } else {
+        return await recordFcClockOut(staffId);
+      }
+    }
+
+    // BREAK_START / BREAK_END
+    const snapshot = await adminDb.collection(ATTENDANCE_COLLECTION)
+      .where("staff_id", "==", staffId)
+      .where("date", "==", dateStr)
+      .where("clock_out", "==", null)
+      .get();
+      
+    if (snapshot.empty) {
+      return { success: false, error: "出勤していません" };
+    }
+
+    const docId = snapshot.docs[0].id;
+    const currentData = snapshot.docs[0].data();
+    const updatePayload: any = { updated_at: new Date() };
+
+    if (actionType === "BREAK_START") {
+      updatePayload.break_start = now.toISOString();
+      updatePayload.break_end = null;
+    } else if (actionType === "BREAK_END") {
+      updatePayload.break_end = now.toISOString();
+      if (currentData.break_start) {
+        // Calculate break duration in minutes
+        const start = new Date(currentData.break_start).getTime();
+        const end = now.getTime();
+        const diffMins = Math.floor((end - start) / 60000);
+        updatePayload.break_minutes = (currentData.break_minutes || 0) + diffMins;
+      }
+    }
+
+    await adminDb.collection(ATTENDANCE_COLLECTION).doc(docId).update(updatePayload);
+    
+    await addAuditLog({
+      table_name: ATTENDANCE_COLLECTION,
+      record_id: docId,
+      action: "UPDATE",
+      old_data: currentData,
+      new_data: updatePayload,
+      actor: staffName
+    });
+
+    return { success: true };
+
+  } catch (error: any) {
+    console.error("Error in recordKioskAction:", error);
+    return { success: false, error: error.message };
   }
 }

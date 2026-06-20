@@ -40,7 +40,8 @@ export type Customer = {
   
   // 来店きっかけ
   referral_source?: string[]; // 複数選択可
-  referral_name?: string; // 紹介者名
+  referral_name?: string; // 紹介者名 (Text)
+  referred_by_id?: string; // 紹介元顧客ID (System linkage)
   
   // 写真・SNS同意
   photo_permission?: 'yes' | 'no';

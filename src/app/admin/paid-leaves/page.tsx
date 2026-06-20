@@ -11,7 +11,7 @@ import { CalendarDays, Gift, History, Loader2, AlertCircle } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { differenceInMonths, differenceInYears, parseISO } from "date-fns";
+import { differenceInMonths, differenceInYears, parseISO, addMonths, addYears, format } from "date-fns";
 
 export default function PaidLeavesPage() {
   const { isAdmin, isCompanyOwner } = useAuth();
@@ -82,6 +82,41 @@ export default function PaidLeavesPage() {
     if (monthsDiff >= 78) return { days: 20, title: "6.5年以上経過 (20日付与)" };
 
     return null;
+  };
+
+  const getNextGrantSchedule = (staff: StaffProfile) => {
+    if (!staff.hire_date) return null;
+    const hireDate = parseISO(staff.hire_date);
+    const now = new Date();
+    
+    const milestones = [6, 18, 30, 42, 54, 66];
+    
+    for (let i = 0; i < milestones.length; i++) {
+      const grantDate = addMonths(hireDate, milestones[i]);
+      if (grantDate > now) {
+        return format(grantDate, "yyyy年MM月dd日");
+      }
+    }
+    
+    let baseDate = addMonths(hireDate, 6);
+    while (baseDate <= now) {
+      baseDate = addYears(baseDate, 1);
+    }
+    return format(baseDate, "yyyy年MM月dd日");
+  };
+
+  const getExpirationDate = (staffId: string) => {
+    const staffTxs = transactions[staffId];
+    if (!staffTxs || staffTxs.length === 0) return null;
+    
+    const grants = staffTxs.filter(tx => tx.type === 'grant');
+    if (grants.length === 0) return null;
+    
+    grants.sort((a, b) => b.date.localeCompare(a.date));
+    const latestGrantDate = parseISO(grants[0].date);
+    
+    const expiration = addYears(latestGrantDate, 2);
+    return format(expiration, "yyyy年MM月dd日");
   };
 
   const handleGrantSubmit = async (e: React.FormEvent) => {
@@ -191,7 +226,7 @@ export default function PaidLeavesPage() {
                   <TableHead className="font-bold text-slate-600">雇用形態</TableHead>
                   <TableHead className="font-bold text-slate-600">入社日</TableHead>
                   <TableHead className="font-bold text-slate-600 text-center">現在の残日数</TableHead>
-                  <TableHead className="font-bold text-slate-600">自動付与サジェスト</TableHead>
+                  <TableHead className="font-bold text-slate-600">次回付与予定</TableHead>
                   <TableHead className="font-bold text-slate-600 text-right">アクション</TableHead>
                 </TableRow>
               </TableHeader>
@@ -219,15 +254,26 @@ export default function PaidLeavesPage() {
                           {staff.hire_date || <span className="text-slate-400">未設定</span>}
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className="text-lg font-black text-slate-800">{staff.paid_leave_balance || 0}</span>
-                          <span className="text-sm font-bold text-slate-500 ml-1">日</span>
+                          <div>
+                            <span className="text-lg font-black text-slate-800">{staff.paid_leave_balance || 0}</span>
+                            <span className="text-sm font-bold text-slate-500 ml-1">日</span>
+                          </div>
+                          {(staff.paid_leave_balance || 0) > 0 && getExpirationDate(staff.id) && (
+                            <div className="text-[10px] text-slate-400 font-bold mt-1">
+                              有効期限: {getExpirationDate(staff.id)}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           {suggestion ? (
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md w-fit">
-                              <AlertCircle size={14} />
-                              {suggestion.title} 対象
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md w-fit">
+                                <AlertCircle size={14} />
+                                {suggestion.title} 対象
+                              </div>
                             </div>
+                          ) : getNextGrantSchedule(staff) ? (
+                            <span className="text-xs font-bold text-slate-500">{getNextGrantSchedule(staff)}</span>
                           ) : (
                             <span className="text-slate-300">-</span>
                           )}

@@ -25,6 +25,8 @@ export type Reservation = {
   status: ReservationStatus;
   customer_type?: "新規" | "再来" | "モデル" | "不明";
   is_next_booking?: boolean;
+  is_nominated?: boolean;
+  is_line_reminder?: boolean;
   is_caution?: boolean;
   bed_number?: string;
   memo?: string;

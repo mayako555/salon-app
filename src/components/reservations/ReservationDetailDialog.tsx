@@ -109,59 +109,91 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
           )}
         </div>
 
-        <div className="p-4 bg-white border-t border-slate-200 flex flex-col gap-3">
-          {reservation.status !== 'cancelled' && (
-            <div className="flex gap-2 w-full">
-              {reservation.customer_id && (
-                <Link href={`/staff-portal/customers/${reservation.customer_id}/karte/new?reservation_id=${reservation.id}`} className="flex-1">
-                  <Button className="w-full font-bold flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white h-11">
-                    <FileText className="w-4 h-4" /> カルテ記入
-                  </Button>
-                </Link>
-              )}
-              <Link href={`/staff-portal/sales?res_id=${reservation.id}`} className="flex-1">
-                <Button className={cn("w-full font-bold flex items-center gap-2 text-white h-11", reservation.status === 'completed' ? "bg-amber-500 hover:bg-amber-600" : "bg-emerald-600 hover:bg-emerald-700")}>
-                  {reservation.status === 'completed' ? <Search className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
-                  {reservation.status === 'completed' ? "お会計を編集" : "お会計へ進む"}
-                </Button>
-              </Link>
-            </div>
-          )}
+        <div className="p-4 bg-white border-t border-slate-200">
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            {onEdit && reservation.status !== 'completed' && reservation.status !== 'cancelled' ? (
+              <Button variant="outline" className="w-full font-bold bg-slate-50 border-slate-300 hover:bg-slate-100 h-10" onClick={onEdit}>
+                <Edit className="w-4 h-4 mr-1" /> 予約詳細/変更
+              </Button>
+            ) : (
+              <Button variant="outline" className="w-full font-bold bg-slate-50 border-slate-300 text-slate-400 h-10" disabled>
+                <Edit className="w-4 h-4 mr-1" /> 予約詳細/変更
+              </Button>
+            )}
 
-          <div className="flex gap-2 w-full">
-            <div className="flex-1 flex gap-2">
-              {reservation.status !== 'cancelled' && reservation.status !== 'completed' && (
-                <Button 
-                  variant="outline" 
-                  className="flex-1 text-rose-600 border-rose-200 hover:bg-rose-50"
-                  onClick={async () => {
-                    if (confirm('この予約をキャンセルしますか？')) {
-                      const { updateReservationStatus } = await import('@/app/reservations/actions');
-                      await updateReservationStatus(reservation.id, 'cancelled');
-                      onClose();
-                      if (onRefresh) onRefresh();
-                    }
-                  }}
-                >
-                  キャンセル
-                </Button>
-              )}
+            {reservation.status !== 'cancelled' && reservation.status !== 'completed' ? (
               <Button 
-                variant="destructive" 
-                className="flex-1"
+                variant="outline" 
+                className="w-full font-bold text-rose-600 border-rose-200 hover:bg-rose-50 h-10"
                 onClick={async () => {
-                  if (confirm('この予約を完全に削除しますか？この操作は取り消せません。')) {
-                    const { deleteReservation } = await import('@/app/reservations/actions');
-                    await deleteReservation(reservation.id);
+                  if (confirm('この予約をキャンセルしますか？')) {
+                    const { updateReservationStatus } = await import('@/app/reservations/actions');
+                    await updateReservationStatus(reservation.id, 'cancelled');
                     onClose();
                     if (onRefresh) onRefresh();
                   }
                 }}
               >
-                完全削除
+                キャンセル
               </Button>
+            ) : (
+              <Button variant="outline" className="w-full font-bold bg-slate-50 border-slate-300 text-slate-400 h-10" disabled>
+                キャンセル
+              </Button>
+            )}
+
+            {reservation.customer_id ? (
+              <Link href={`/staff-portal/customers/${reservation.customer_id}`} className="w-full">
+                <Button variant="outline" className="w-full font-bold bg-slate-50 border-slate-300 hover:bg-slate-100 h-10">
+                  <UserCircle className="w-4 h-4 mr-1" /> お客様情報
+                </Button>
+              </Link>
+            ) : (
+              <Button variant="outline" className="w-full font-bold bg-slate-50 border-slate-300 text-slate-400 h-10" disabled>
+                <UserCircle className="w-4 h-4 mr-1" /> お客様情報
+              </Button>
+            )}
+
+            {reservation.customer_id ? (
+              <Link href={`/staff-portal/customers/${reservation.customer_id}/karte/new?reservation_id=${reservation.id}`} className="w-full">
+                <Button variant="outline" className="w-full font-bold bg-slate-50 border-slate-300 hover:bg-slate-100 h-10">
+                  <FileText className="w-4 h-4 mr-1" /> カルテ
+                </Button>
+              </Link>
+            ) : (
+              <Button variant="outline" className="w-full font-bold bg-slate-50 border-slate-300 text-slate-400 h-10" disabled>
+                <FileText className="w-4 h-4 mr-1" /> カルテ
+              </Button>
+            )}
+          </div>
+
+          {reservation.status !== 'cancelled' && (
+            <div className="mb-3">
+              <Link href={`/staff-portal/sales?res_id=${reservation.id}`} className="block w-full">
+                <Button className={cn("w-full font-bold flex items-center gap-2 text-white h-11 shadow-sm", reservation.status === 'completed' ? "bg-amber-500 hover:bg-amber-600" : "bg-emerald-600 hover:bg-emerald-700")}>
+                  {reservation.status === 'completed' ? <Search className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
+                  {reservation.status === 'completed' ? "お会計を編集する" : "お会計（レジ）へ進む"}
+                </Button>
+              </Link>
             </div>
-            <Button variant="outline" className="w-24 shrink-0" onClick={onClose}>閉じる</Button>
+          )}
+
+          <div className="flex gap-2 w-full justify-between mt-2 pt-2 border-t border-slate-100">
+            <Button 
+              variant="ghost" 
+              className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs px-2"
+              onClick={async () => {
+                if (confirm('この予約を完全に削除しますか？この操作は取り消せません。')) {
+                  const { deleteReservation } = await import('@/app/reservations/actions');
+                  await deleteReservation(reservation.id);
+                  onClose();
+                  if (onRefresh) onRefresh();
+                }
+              }}
+            >
+              完全削除
+            </Button>
+            <Button variant="ghost" className="w-24 shrink-0 font-bold bg-slate-100" onClick={onClose}>閉じる</Button>
           </div>
         </div>
       </DialogContent>

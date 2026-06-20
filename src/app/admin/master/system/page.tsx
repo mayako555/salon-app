@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Users, Brain, FileText, LayoutDashboard, Calculator, ShieldCheck } from "lucide-react";
+import { Settings, Users, Brain, FileText, LayoutDashboard, Calculator, ShieldCheck, Award, Beaker, Banknote } from "lucide-react";
 
 export default function SystemMasterPage() {
   const { isSystemOwner } = useAuth();
@@ -21,6 +21,9 @@ export default function SystemMasterPage() {
     { title: "AI分析設定", icon: Brain, desc: "SARIMAXのパラメータや回帰分析の重み付け設定", href: "/admin/master/system/ai-settings" },
     { title: "給与・手当ルール", icon: Calculator, desc: "全テナント共通の基本計算ロジック", href: "/admin/master/system/payroll-rules" },
     { title: "契約テンプレート", icon: FileText, desc: "雇用契約書・業務委託契約書の雛形管理", href: "/admin/master/system/contracts" },
+    { title: "請求・入金管理", icon: Banknote, desc: "FC加盟店やテナントへのシステム利用料・ロイヤリティ請求", href: "/admin/master/system/billing" },
+    { title: "評価マスタ設定", icon: Award, desc: "各役職の評価項目と配点の設定", href: "/admin/master/system/evaluations" },
+    { title: "Test/Beta管理", icon: Beaker, desc: "テスト導入企業の利用状況とフィードバック分析", href: "/admin/master/system/test-tenants" },
     { title: "システム全体設定", icon: Settings, desc: "デフォルト値や共通マスタの設定", href: "/admin/master/system/settings" },
   ];
 

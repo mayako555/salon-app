@@ -1,29 +1,35 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getReservationSettings, saveReservationSettings, getLineSettings, saveLineSettings, ReservationSettings, LineSettingsMap } from "./actions";
+import { getReservationSettings, saveReservationSettings, getLineSettings, saveLineSettings, ReservationSettings, LineSettingsMap, getCompanySettings, saveCompanyAttendanceRule, getKioskSettings, saveKioskSettings } from "./actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Save, Settings, MessageCircle, HelpCircle } from "lucide-react";
+import { Save, Settings, MessageCircle, HelpCircle, Clock, LayoutDashboard } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 export default function SystemSettingsPage() {
   const { profile, isAdmin, availableStores } = useAuth();
   const [settings, setSettings] = useState<ReservationSettings | null>(null);
   const [lineSettings, setLineSettings] = useState<LineSettingsMap>({});
+  const [attendanceRule, setAttendanceRule] = useState<"jasminelash" | "simple">("simple");
+  const [kioskSettings, setKioskSettings] = useState<Record<string, { token: string, enabled: boolean }>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     async function load() {
-      const [data, lineData] = await Promise.all([
+      const [data, lineData, compData, kioskData] = await Promise.all([
         getReservationSettings(),
-        getLineSettings()
+        getLineSettings(),
+        getCompanySettings(profile?.companyId || "company_default"),
+        getKioskSettings(profile?.companyId || "company_default")
       ]);
       setSettings(data);
       setLineSettings(lineData);
+      setAttendanceRule(compData.attendanceRule || "simple");
+      setKioskSettings(kioskData || {});
       setLoading(false);
     }
     load();
@@ -60,6 +66,24 @@ export default function SystemSettingsPage() {
     }));
   };
 
+  const handleKioskTokenGenerate = (store: string) => {
+    const randomToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    setKioskSettings(prev => ({
+      ...prev,
+      [store]: { ...prev[store], token: randomToken, enabled: prev[store]?.enabled ?? false }
+    }));
+  };
+
+  const handleKioskToggle = (store: string, enabled: boolean) => {
+    setKioskSettings(prev => {
+      const token = prev[store]?.token || (Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
+      return {
+        ...prev,
+        [store]: { token, enabled }
+      };
+    });
+  };
+
   const handleSave = async () => {
     setSaving(true);
     const res = await saveReservationSettings(settings);
@@ -69,7 +93,15 @@ export default function SystemSettingsPage() {
       return saveLineSettings(store, token);
     });
     
-    await Promise.all(linePromises);
+    // Save Kiosk Settings
+    const kioskPromises = Object.entries(kioskSettings).map(([store, data]) => {
+      return saveKioskSettings(profile?.companyId || "company_default", store, data.token, data.enabled);
+    });
+    
+    // Save Attendance Rule
+    await saveCompanyAttendanceRule(profile?.companyId || "company_default", attendanceRule);
+
+    await Promise.all([...linePromises, ...kioskPromises]);
 
     if (res.success) {
       toast.success("設定を保存しました");
@@ -97,6 +129,49 @@ export default function SystemSettingsPage() {
           {saving ? "保存中..." : "保存する"}
         </Button>
       </div>
+
+      <Card className="border-none shadow-lg shadow-slate-200/50 rounded-3xl overflow-hidden bg-white mb-8">
+        <CardHeader className="bg-amber-50 border-b border-amber-100">
+          <CardTitle className="text-lg font-black text-slate-800 flex items-center gap-2">
+            <Clock className="text-amber-600" /> 勤怠ルール設定（テナント全体）
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            <p className="text-sm font-bold text-slate-500">
+              全店舗共通のタイムカード（打刻）処理ルールを選択します。<br/>
+              ※「Jasminelashルール」は、シフトデータと連携して出退勤時刻を自動補正（30分丸め等）します。<br/>
+              ※「Simpleルール」は、打刻された実時刻をそのまま記録します。
+            </p>
+            <div className="flex gap-4">
+              <label className={`flex-1 border-2 rounded-2xl p-4 cursor-pointer transition-all ${attendanceRule === 'jasminelash' ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-amber-200'}`}>
+                <input 
+                  type="radio" 
+                  name="attendanceRule" 
+                  value="jasminelash" 
+                  checked={attendanceRule === 'jasminelash'}
+                  onChange={(e) => setAttendanceRule(e.target.value as any)}
+                  className="hidden" 
+                />
+                <div className="font-black text-slate-800">Jasminelashルール</div>
+                <div className="text-xs text-slate-500 mt-1">シフト連動・30分丸め自動補正</div>
+              </label>
+              <label className={`flex-1 border-2 rounded-2xl p-4 cursor-pointer transition-all ${attendanceRule === 'simple' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-200'}`}>
+                <input 
+                  type="radio" 
+                  name="attendanceRule" 
+                  value="simple" 
+                  checked={attendanceRule === 'simple'}
+                  onChange={(e) => setAttendanceRule(e.target.value as any)}
+                  className="hidden" 
+                />
+                <div className="font-black text-slate-800">Simpleルール</div>
+                <div className="text-xs text-slate-500 mt-1">実時刻打刻（補正・丸めなし）</div>
+              </label>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="space-y-6">
         {availableStores.filter(store => store !== "共通" && store !== "全店舗").map(store => { const storeSettings = settings.stores[store] || { startHour: 8, endHour: 22, slotDuration: 30 }; return (
@@ -196,6 +271,91 @@ export default function SystemSettingsPage() {
             </CardContent>
           </Card>
         ))}
+
+        <div className="pt-8 pb-4">
+          <h2 className="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2">
+            <LayoutDashboard className="text-indigo-600" /> 外部タイムカード（キオスク端末）
+          </h2>
+          <p className="text-slate-500 font-medium">店舗ごとのタブレット用打刻画面の設定・専用URL発行</p>
+        </div>
+
+        {availableStores.filter(store => store !== "共通" && store !== "全店舗").map((store) => {
+          const kSettings = kioskSettings[store] || { token: "", enabled: false };
+          const companyId = profile?.companyId || "company_default";
+          const kioskUrl = typeof window !== 'undefined' ? `${window.location.origin}/kiosk/attendance?companyId=${companyId}&storeId=${encodeURIComponent(store)}&token=${kSettings.token}` : "";
+
+          return (
+          <Card key={`kiosk-${store}`} className="border-none shadow-lg shadow-slate-200/50 rounded-3xl overflow-hidden bg-white">
+            <CardHeader className="bg-indigo-50 border-b border-indigo-100 flex flex-row items-center justify-between py-4">
+              <CardTitle className="text-lg font-black text-slate-800">{store}店 キオスク端末</CardTitle>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="text-sm font-bold text-slate-600">{kSettings.enabled ? "利用中" : "停止中"}</span>
+                <div className={`w-12 h-6 rounded-full p-1 transition-colors ${kSettings.enabled ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+                  <div className={`bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform ${kSettings.enabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                </div>
+                <input 
+                  type="checkbox" 
+                  className="hidden" 
+                  checked={kSettings.enabled}
+                  onChange={(e) => handleKioskToggle(store, e.target.checked)}
+                />
+              </label>
+            </CardHeader>
+            <CardContent className="p-6">
+              {kSettings.enabled ? (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">専用URL</label>
+                    <div className="flex gap-2">
+                      <Input 
+                        readOnly
+                        value={kioskUrl}
+                        className="h-12 bg-slate-50 border-slate-200 rounded-xl font-bold px-4 text-xs text-slate-500"
+                      />
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          navigator.clipboard.writeText(kioskUrl);
+                          toast.success("URLをコピーしました");
+                        }}
+                        className="h-12 px-6 rounded-xl font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                      >
+                        コピー
+                      </Button>
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        onClick={() => window.open(kioskUrl, "_blank")}
+                        className="h-12 px-6 rounded-xl font-bold text-slate-600 hover:bg-slate-50"
+                      >
+                        開く
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center bg-rose-50 p-4 rounded-xl border border-rose-100">
+                    <div className="text-sm text-rose-700 font-bold">
+                      セキュリティトークンの再発行
+                      <p className="text-[10px] text-rose-500/80 mt-1 font-normal">現在のURLを無効にし、新しいURLを発行します。</p>
+                    </div>
+                    <Button 
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleKioskTokenGenerate(store)}
+                      className="rounded-xl border-rose-200 text-rose-600 hover:bg-rose-100 font-bold"
+                    >
+                      再発行
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4 text-slate-400 font-bold text-sm">
+                  キオスク端末は停止中です。右上のスイッチをONにすると専用URLが発行されます。
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )})}
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { getAllCustomers, Customer } from "@/lib/customers";
 import { StaffProfile } from "@/app/staff/actions";
 import { Button } from "@/components/ui/button";
 import { Search, UserPlus, FileText, CheckCircle, SearchX } from "lucide-react";
+import { getStoreMasterData } from "@/app/sales/actions";
 
 type Props = {
   isOpen: boolean;
@@ -44,6 +45,9 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
   const [isFetchingCustomers, setIsFetchingCustomers] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [hasLoadedCustomers, setHasLoadedCustomers] = useState(false);
+
+  // Routes state
+  const [routes, setRoutes] = useState<string[]>(['直接（電話/LINE/来店）', 'HOT PEPPER Beauty', 'ミニモ', '楽天ビューティ']);
 
   // Form state for autofill
   const [formDataState, setFormDataState] = useState({
@@ -95,7 +99,16 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
         });
       }
     }
-  }, [isOpen, initialData]);
+
+    if (isOpen && storeName) {
+      getStoreMasterData(storeName).then(data => {
+        const routeMaster = data.filter(m => m.itemType === 'reservationRoute' && m.isActive !== false);
+        if (routeMaster.length > 0) {
+          setRoutes(routeMaster.sort((a,b) => (a.sortOrder||999)-(b.sortOrder||999)).map(m => m.name));
+        }
+      }).catch(console.error);
+    }
+  }, [isOpen, initialData, storeName]);
 
   const handleSearchMode = async () => {
     setIsNewCustomer(false);
@@ -180,6 +193,9 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
       memo: formData.get("memo") as string,
       bed_number: recordType === "reservation" ? (formData.get("bed_number") as string) : undefined,
       expected_price: recordType === "reservation" ? Number(formData.get("expected_price")) || 0 : 0,
+      is_nominated: formData.get("is_nomination") === "on",
+      is_next_booking: formData.get("next_booking") === "on",
+      is_line_reminder: formData.get("line_reminder") === "on",
       is_caution: formData.get("is_caution") === "on",
     };
 
@@ -435,10 +451,12 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                 <div>
                   <label className="block mb-1">予約経路</label>
                   <select name="portal" defaultValue={initialData?.portal || "Direct"} className="w-full h-8 px-2 border border-slate-300 rounded bg-white">
-                    <option value="Direct">直接（電話/LINE/来店）</option>
-                    <option value="HPB">HOT PEPPER Beauty</option>
-                    <option value="Minimo">ミニモ</option>
-                    <option value="Rakuten">楽天ビューティ</option>
+                    {routes.map(r => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                    {initialData?.portal && !routes.includes(initialData.portal) && (
+                      <option value={initialData.portal}>{initialData.portal}</option>
+                    )}
                   </select>
                 </div>
                 <div>
@@ -461,9 +479,9 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
 
             {/* フラグ・連携ブロック */}
             {recordType === "reservation" && (
-            <div className="bg-white p-4 border border-slate-200 rounded-lg shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
+             <div className="bg-white p-4 border border-slate-200 rounded-lg shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
                <label className="flex items-center gap-2 cursor-pointer">
-                 <input type="checkbox" name="is_nomination" className="w-4 h-4 rounded border-slate-300" />
+                 <input type="checkbox" name="is_nomination" defaultChecked={initialData?.is_nominated || false} className="w-4 h-4 rounded border-slate-300" />
                  指名予約
                </label>
                <label className="flex items-center gap-2 cursor-pointer text-rose-600">
@@ -471,11 +489,11 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
                  要注意フラグ（アレルギー・クレーム等）
                </label>
                <label className="flex items-center gap-2 cursor-pointer">
-                 <input type="checkbox" name="next_booking" className="w-4 h-4 rounded border-slate-300" defaultChecked />
+                 <input type="checkbox" name="next_booking" defaultChecked={initialData?.is_next_booking || false} className="w-4 h-4 rounded border-slate-300" />
                  次回予約を促す
                </label>
                <label className="flex items-center gap-2 cursor-pointer">
-                 <input type="checkbox" name="line_reminder" className="w-4 h-4 rounded border-slate-300" defaultChecked />
+                 <input type="checkbox" name="line_reminder" defaultChecked={initialData?.is_line_reminder || false} className="w-4 h-4 rounded border-slate-300" />
                  前日LINEリマインドを送信
                </label>
             </div>

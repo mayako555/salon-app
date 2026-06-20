@@ -113,6 +113,14 @@ function SortableStaffItem({
                 <p className="text-[10px] text-slate-400 flex items-center gap-1 min-w-0"><Mail size={10} className="shrink-0" /> <span className="truncate">{staff.email || "メール未設定"}</span></p>
                 <p className="text-[10px] text-slate-400 flex items-center gap-1 shrink-0"><Briefcase size={10} className="shrink-0" /> {staff.role}</p>
               </div>
+              
+              {/* Career Path Badges */}
+              <div className="flex flex-wrap gap-1 mt-2">
+                {staff.j_course && <Badge variant="outline" className="text-[9px] font-bold border-indigo-200 bg-indigo-50 text-indigo-700 h-5 px-1.5">{staff.j_course}</Badge>}
+                {staff.p_course && <Badge variant="outline" className="text-[9px] font-bold border-emerald-200 bg-emerald-50 text-emerald-700 h-5 px-1.5">{staff.p_course}</Badge>}
+                {staff.m_course && <Badge variant="outline" className="text-[9px] font-bold border-amber-200 bg-amber-50 text-amber-700 h-5 px-1.5">{staff.m_course}</Badge>}
+                {staff.e_course && <Badge variant="outline" className="text-[9px] font-bold border-rose-200 bg-rose-50 text-rose-700 h-5 px-1.5">{staff.e_course}</Badge>}
+              </div>
             </div>
           </div>
 
