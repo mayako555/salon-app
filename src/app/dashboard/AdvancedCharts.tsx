@@ -379,8 +379,11 @@ export default function AdvancedCharts() {
                 {/* Store Specific Unit Price & New Customer Info */}
                 <div className="grid grid-cols-2 gap-2">
                   {(() => {
-                    // Calculate averages over the last 3 months with data
-                    const recentMonthsData = [...chartData].reverse().filter(d => d.stores[store]?.totalVisits > 0).slice(0, 3).map(d => d.stores[store]);
+                    // Calculate averages over the last 3 completed months (excluding current month)
+                    const currentMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+                    const recentMonthsData = [...chartData].reverse()
+                      .filter(d => d.stores[store]?.totalVisits > 0 && d.month < currentMonth)
+                      .slice(0, 3).map(d => d.stores[store]);
                     
                     let avgRegular = 0;
                     let avgMinimo = 0;
