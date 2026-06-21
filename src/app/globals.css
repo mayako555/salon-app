@@ -126,5 +126,19 @@
   }
   html {
     @apply font-sans;
+    /* Fix for older browsers where 100vh includes browser chrome */
+    height: 100%;
   }
+  body {
+    min-height: 100%;
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Prevent bottom content cutoff on older OS / browsers */
+.app-shell {
+  height: 100vh;
+  height: 100dvh; /* dynamic viewport height for modern browsers */
+  /* Fallback for older Safari / macOS */
+  min-height: -webkit-fill-available;
 }
