@@ -3,7 +3,7 @@
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { getCurrentUserContext } from "@/lib/auth-server";
-import { AdoptionProgress, defaultAdoptionProgress } from "@/app/setup/actions";
+import { AdoptionProgress, defaultAdoptionProgress } from "@/app/setup/types";
 
 export interface CompanyAdoptionStats {
   id: string;

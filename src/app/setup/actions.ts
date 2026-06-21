@@ -3,28 +3,7 @@
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { getCurrentUserContext } from "@/lib/auth-server";
-
-export interface AdoptionProgress {
-  storeInfo: boolean;
-  businessHours: boolean;
-  menu: boolean;
-  staff: boolean;
-  payroll: boolean;
-  lineSettings: boolean;
-  salesInputStarted: boolean;
-  karteUsageStarted: boolean;
-}
-
-export const defaultAdoptionProgress: AdoptionProgress = {
-  storeInfo: false,
-  businessHours: false,
-  menu: false,
-  staff: false,
-  payroll: false,
-  lineSettings: false,
-  salesInputStarted: false,
-  karteUsageStarted: false,
-};
+import { AdoptionProgress, defaultAdoptionProgress } from "./types";
 
 export async function getCompanySetupStatus() {
   try {
