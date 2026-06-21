@@ -174,7 +174,7 @@ export default function MenuAnalysis() {
                       dataKey="count"
                       position="right"
                       style={{ fontSize: 12, fontWeight: 700, fill: "#475569" }}
-                      formatter={(v: number) => `${v}件`}
+                      formatter={(v: unknown) => `${v}件`}
                     />
                   </Bar>
                 </BarChart>
