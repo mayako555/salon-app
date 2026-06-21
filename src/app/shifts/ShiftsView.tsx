@@ -58,17 +58,19 @@ export default function ShiftsView({
       if (!existing) {
         mergedMap.set(s.staff_id, { ...s });
       } else {
-        // If one is work, prefer work. Merge segments if both are work.
-        if (s.type === 'work') {
-          if (existing.type !== 'work') {
-            existing.type = 'work';
-            existing.segments = s.segments || [];
-          } else {
-            existing.segments = [...(existing.segments || []), ...(s.segments || [])];
-          }
-        } else if (existing.type !== 'work') {
-          // Both are non-work, just keep the first one
+        // Holiday/leave requests always take priority over work shifts
+        const isHolidayType = (type: string) => 
+          type === 'holiday' || type === 'paid_leave' || 
+          type === 'requested_holiday' || type === 'requested_paid_leave';
+        
+        if (isHolidayType(s.type)) {
+          // Incoming is a holiday/leave → always wins
+          mergedMap.set(s.staff_id, { ...s });
+        } else if (s.type === 'work' && !isHolidayType(existing.type)) {
+          // Both are work → merge segments
+          existing.segments = [...(existing.segments || []), ...(s.segments || [])];
         }
+        // If existing is holiday/leave and incoming is work → keep existing (do nothing)
       }
     });
     
@@ -84,16 +86,19 @@ export default function ShiftsView({
     if (staffShifts.length === 0) return undefined;
     if (staffShifts.length === 1) return staffShifts[0];
     
-    // Merge duplicates
+    const isHolidayType = (type: string) => 
+      type === 'holiday' || type === 'paid_leave' || 
+      type === 'requested_holiday' || type === 'requested_paid_leave';
+
+    // Holiday/leave takes priority: return it if any exists
+    const holidayShift = staffShifts.find(s => isHolidayType(s.type));
+    if (holidayShift) return holidayShift;
+
+    // Otherwise merge work segments
     const merged = { ...staffShifts[0] };
     staffShifts.slice(1).forEach(s => {
       if (s.type === 'work') {
-        if (merged.type !== 'work') {
-          merged.type = 'work';
-          merged.segments = s.segments || [];
-        } else {
-          merged.segments = [...(merged.segments || []), ...(s.segments || [])];
-        }
+        merged.segments = [...(merged.segments || []), ...(s.segments || [])];
       }
     });
     return merged;
