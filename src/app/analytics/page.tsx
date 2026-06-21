@@ -13,6 +13,7 @@ import StaffAnalysis from "./StaffAnalysis";
 import StoreAnalysis from "./StoreAnalysis";
 import ReferralAnalysis from "./ReferralAnalysis";
 import ChannelAnalysis from "./ChannelAnalysis";
+import MenuAnalysis from "./MenuAnalysis";
 
 export default function AnalyticsPage() {
   const { profile, isSystemOwner } = useAuth();
@@ -30,7 +31,7 @@ export default function AnalyticsPage() {
 
         <Tabs defaultValue="overview" className="w-full">
           <div className="w-full overflow-x-auto pb-2 -mb-2 no-scrollbar">
-            <TabsList className="inline-flex w-max min-w-full md:grid md:w-full md:grid-cols-5 max-w-5xl h-auto md:h-12 bg-slate-100 p-1 rounded-xl">
+            <TabsList className="inline-flex w-max min-w-full md:grid md:w-full md:grid-cols-6 max-w-5xl h-auto md:h-12 bg-slate-100 p-1 rounded-xl">
               <TabsTrigger 
                 value="overview" 
                 className="rounded-lg font-bold px-4 py-2.5 md:py-1.5 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all"
@@ -65,6 +66,13 @@ export default function AnalyticsPage() {
                 className="rounded-lg font-bold px-4 py-2.5 md:py-1.5 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all"
               >
                 流入分析
+              </TabsTrigger>
+
+              <TabsTrigger 
+                value="menu" 
+                className="rounded-lg font-bold px-4 py-2.5 md:py-1.5 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all"
+              >
+                メニュー分析
               </TabsTrigger>
               
               {isSystemOwner && (
@@ -121,6 +129,10 @@ export default function AnalyticsPage() {
 
           <TabsContent value="channel" className="mt-6">
             <ChannelAnalysis />
+          </TabsContent>
+
+          <TabsContent value="menu" className="mt-6">
+            <MenuAnalysis />
           </TabsContent>
           
           {isSystemOwner && (

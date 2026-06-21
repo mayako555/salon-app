@@ -1476,3 +1476,70 @@ export async function getChannelAnalytics(companyId: string, storeId: string | n
   }
 }
 
+export async function getMenuAnalytics(companyId: string, period: string) {
+  try {
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date = now;
+
+    switch (period) {
+      case "lastMonth": {
+        const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        startDate = d;
+        endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+        break;
+      }
+      case "3months":
+        startDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+        break;
+      case "thisYear":
+        startDate = new Date(now.getFullYear(), 0, 1);
+        break;
+      default: // thisMonth
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+
+    const startStr = format(startDate, "yyyy-MM-dd");
+    const endStr = format(endDate, "yyyy-MM-dd");
+
+    const colRef = collection(db, "reservations");
+    const q = query(
+      colRef,
+      where("date", ">=", startStr),
+      where("date", "<=", endStr)
+    );
+    const snap = await getDocs(q);
+
+    // Count by menu_name, filter by companyId (via store/staff if needed; we trust companyId stored on reservation or filter all)
+    const menuMap = new Map<string, { count: number; revenue: number }>();
+
+    snap.docs.forEach(d => {
+      const data = d.data();
+      // companyId isolation: skip if reservation has explicit companyId mismatch
+      if (data.companyId && data.companyId !== companyId) return;
+      if (data.status === "cancelled") return;
+      if (data.type === "schedule") return;
+
+      const menu = data.menu_name?.trim() || "(メニュー未設定)";
+      const price = data.expected_price || 0;
+
+      if (!menuMap.has(menu)) {
+        menuMap.set(menu, { count: 0, revenue: 0 });
+      }
+      const entry = menuMap.get(menu)!;
+      entry.count += 1;
+      entry.revenue += price;
+    });
+
+    const result = Array.from(menuMap.entries())
+      .map(([menu, stats]) => ({ menu, ...stats }))
+      .sort((a, b) => b.count - a.count);
+
+    return { success: true, data: result };
+  } catch (error: any) {
+    console.error("Failed to get menu analytics:", error);
+    return { success: false, error: error.message, data: [] };
+  }
+}
+
+
