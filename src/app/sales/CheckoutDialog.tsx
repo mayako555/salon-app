@@ -244,20 +244,24 @@ export default function CheckoutDialog({
 
     let newTechPrice = 0;
     let newProductPrice = 0;
+    let newDiscount = 0;
     
     newMenus.forEach(n => {
       const masterItem = storeMasterData.find(m => m.name === n);
       const isProduct = masterItem?.category === '店販' || masterItem?.itemType === 'product';
+      const isDiscount = masterItem?.itemType === 'discount' || masterItem?.category === '割引';
       const defaultPrice = masterItem?.price || 0;
       const p = customPrices[n] !== undefined ? customPrices[n] : defaultPrice;
 
       if (isProduct) newProductPrice += p;
+      else if (isDiscount) newDiscount += p;
       else newTechPrice += p;
     });
     
     setMenuCourse(newMenus.join(' + '));
     setTechSales(newTechPrice);
     setProductSales(newProductPrice);
+    setDiscount(newDiscount);
     handleFeeCalculation(route, newTechPrice + newProductPrice);
   };
 
