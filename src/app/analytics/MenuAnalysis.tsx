@@ -189,9 +189,10 @@ export default function MenuAnalysis() {
                     outerRadius={140}
                     dataKey="count"
                     nameKey="menu"
-                    label={({ name, percent }) =>
-                      `${name.length > 12 ? name.slice(0, 12) + "…" : name} ${(percent * 100).toFixed(0)}%`
-                    }
+                    label={({ name, percent }) => {
+                      const n = name ?? "";
+                      return `${n.length > 12 ? n.slice(0, 12) + "…" : n} ${((percent ?? 0) * 100).toFixed(0)}%`;
+                    }}
                     labelLine={true}
                   >
                     {pieData.map((entry, i) => (
