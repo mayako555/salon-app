@@ -72,8 +72,10 @@ export default function CheckoutDialog({
   const [techSales, setTechSales] = useState(initialData?.tech_sales || 0);
   const [productSales, setProductSales] = useState(initialData?.product_sales || 0);
   const [discount, setDiscount] = useState(initialData?.discount || 0);
-  const [route, setRoute] = useState(initialData?.reservation_route || "電話（HOT PEPPER Beauty）");
+  const [route, setRoute] = useState(initialData?.reservation_route || "");
   const [portalFee, setPortalFee] = useState(initialData?.portal_fee || 0);
+  const [isNominated, setIsNominated] = useState(initialData?.is_nominated || false);
+  const [nextBookingNominated, setNextBookingNominated] = useState(initialData?.next_booking_nominated ?? false);
 
   // Staff list state
   const [dbStaffList, setDbStaffList] = useState<StaffProfile[]>([]);
@@ -111,8 +113,10 @@ export default function CheckoutDialog({
       setTechSales(initialData?.tech_sales || 0);
       setProductSales(initialData?.product_sales || 0);
       setDiscount(initialData?.discount || 0);
-      setRoute(initialData?.reservation_route || "電話（HOT PEPPER Beauty）");
+      setRoute(initialData?.reservation_route || "");
       setPortalFee(initialData?.portal_fee || 0);
+      setIsNominated(initialData?.is_nominated || false);
+      setNextBookingNominated(initialData?.next_booking_nominated ?? false);
       setNextBookingDate(initialData?.next_booking_date || "");
       setNextBookingStaffName(initialData?.next_booking_staff_name || "");
       setNoNextBooking(!initialData?.next_booking_date);
@@ -420,7 +424,16 @@ export default function CheckoutDialog({
     };
 
     storeMasterData.filter(i => i.isActive !== false && i.itemType !== 'store' && i.itemType !== 'reservationRoute' && i.itemType !== 'paymentMethod').forEach(item => {
-      const cat = item.category || "その他";
+      const cat = (() => {
+        const raw = item.category || "その他";
+        if (item.itemType === 'coupon' && !['新規クーポン', '再来クーポン', 'メッセージクーポン'].includes(raw)) {
+          const r = (item.restrictions || "").trim();
+          if (r === '再来' || r.includes('2回') || r.includes('3回') || r.includes('再来')) return '再来クーポン';
+          if (r === '新規') return '新規クーポン';
+          if (r === '全員') return '再来クーポン';
+        }
+        return raw;
+      })();
       const mTab = item.majorCategory || '施術';
       
       if (!mapping[mTab]) {
@@ -457,10 +470,23 @@ export default function CheckoutDialog({
     }
   }, [majorTab, dynamicMapping, tab]);
 
+  // ビビビ祭等のカテゴリを restrictions に基づいて既存カテゴリにマージする
+  const normalizeCategory = (item: SalesMasterItem): string => {
+    const cat = item.category || "その他";
+    // "まつエク・ビビビ祭" など、標準カテゴリ外のクーポン系カテゴリを restrictions で振り分け
+    if (item.itemType === 'coupon' && !['新規クーポン', '再来クーポン', 'メッセージクーポン'].includes(cat)) {
+      const r = (item.restrictions || "").trim();
+      if (r === '再来' || r.includes('2回') || r.includes('3回') || r.includes('再来')) return '再来クーポン';
+      if (r === '新規') return '新規クーポン';
+      if (r === '全員') return '再来クーポン'; // 全員対象は再来クーポンタブへ
+    }
+    return cat;
+  };
+
   const filteredMaster = storeMasterData.filter(item => {
     if (item.isActive === false) return false;
     
-    const cat = item.category || "その他";
+    const cat = normalizeCategory(item);
     
     // Tab filter
     if (tab && cat !== tab) return false;
@@ -479,9 +505,9 @@ export default function CheckoutDialog({
 
   // 予約経路マスタの取得（マスタ未登録の場合は初期リストを使用）
   const routeMaster = storeMasterData.filter(m => m.itemType === 'reservationRoute');
-  const defaultRoutes = ['電話（自社）', '電話（HOT PEPPER Beauty）', '直接来店', 'ミニモ', '次回予約', 'スレッズ', '公式LINE', '自社サイト', 'Instagram'];
-  const routes = routeMaster.length > 0 ? routeMaster.map(m => m.name) : defaultRoutes;
-  const allRoutes = [...new Set([route, ...routes].filter(Boolean))];
+  const defaultRoutes = ['', '電話（自社）', '電話（HOT PEPPER Beauty）', '直接来店', 'ミニモ', '次回予約', 'スレッズ', '公式LINE', '自社サイト', 'Instagram'];
+  const routes = routeMaster.length > 0 ? ['', ...routeMaster.map(m => m.name)] : defaultRoutes;
+  const allRoutes = [...new Set([route, ...routes].filter(r => r !== undefined))];
 
   // 支払い方法マスタの取得
   const paymentMaster = storeMasterData.filter(m => m.itemType === 'paymentMethod');
@@ -744,13 +770,13 @@ export default function CheckoutDialog({
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-slate-700 mb-1">予約経路</label>
                   <select 
-                    required 
                     name="reservation_route" 
                     value={route} 
                     onChange={(e) => { const r = e.target.value; setRoute(r); handleFeeCalculation(r, techSales + productSales); }} 
                     className="w-full h-9 px-3 border border-slate-300 rounded-md text-sm bg-white"
                   >
-                    {allRoutes.map(r => <option key={r} value={r}>{r}</option>)}
+                    <option value="">-- 選択してください --</option>
+                    {routes.filter(r => r !== "").map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
                 <div className="col-span-2">
@@ -798,6 +824,18 @@ export default function CheckoutDialog({
                       {autoSuggestedStaff && (
                         <p className="text-[10px] text-emerald-600 font-bold mt-1">※担当休日のため、近い等級のスタッフを自動選択しました</p>
                       )}
+                    </div>
+                    <div className="col-span-2 flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          name="next_booking_nominated"
+                          checked={nextBookingNominated}
+                          onChange={(e) => setNextBookingNominated(e.target.checked)}
+                          className="w-4 h-4 rounded text-blue-600"
+                        />
+                        <span className="text-xs font-bold text-blue-900">次回指名あり</span>
+                      </label>
                     </div>
                     <div className="col-span-2 space-y-2 mt-2">
                       <label className="flex items-center gap-2 cursor-pointer">
