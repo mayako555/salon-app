@@ -200,7 +200,7 @@ export default function MenuAnalysis() {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number, name: string) => [`${value}件`, name]}
+                    formatter={(value: unknown, name: unknown) => [`${value}件`, String(name)]}
                   />
                 </PieChart>
               </ResponsiveContainer>
