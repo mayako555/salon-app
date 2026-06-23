@@ -206,7 +206,14 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
                       )}
                     </span>
                     <div className="flex items-center gap-3">
-                      <span className="font-bold text-emerald-600">¥{a.amount.toLocaleString()}</span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="font-bold text-emerald-600">¥{a.amount.toLocaleString()}</span>
+                        {a.target_details?.was_capped && (
+                          <span className="text-[9px] text-rose-500 font-bold bg-rose-50 px-1 py-0.5 rounded border border-rose-100">
+                            上限適用前: ¥{a.target_details.original_requested_amount?.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
                       <button 
                         type="button"
                         onClick={() => handleDeleteAllowance(a.id)}

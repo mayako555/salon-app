@@ -30,14 +30,41 @@ export async function submitTransportRequest(data: {
   details: string
 }) {
   try {
+    // Get staff contract to find transport limit
+    let transportLimit = 15000; // Default limit
+    try {
+      const contractsSnapshot = await getDocs(query(collection(db, "staff_contracts"), where("staff_id", "==", data.staff_id)));
+      let latestContract: any = null;
+      contractsSnapshot.forEach(doc => {
+         const cData = doc.data();
+         if (!cData.deleted && (!latestContract || cData.valid_from > latestContract.valid_from)) {
+            latestContract = cData;
+         }
+      });
+      if (latestContract && latestContract.transport_fee_limit !== undefined) {
+         transportLimit = Number(latestContract.transport_fee_limit);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch contract for transport limit:", err);
+    }
+
+    const cappedAmount = Math.min(data.amount, transportLimit);
+    const targetDetails = { 
+      context: data.details, 
+      is_request: true, 
+      status: "pending",
+      original_requested_amount: data.amount,
+      was_capped: data.amount > transportLimit
+    };
+
     const colRef = collection(db, ALLOWANCES_COLLECTION);
     const payload = {
       staff_id: data.staff_id,
       staff_name: data.staff_name,
       target_month: data.target_month,
       type: "transport",
-      amount: data.amount,
-      target_details: { context: data.details, is_request: true, status: "pending" },
+      amount: cappedAmount,
+      target_details: targetDetails,
       created_at: serverTimestamp()
     };
 
