@@ -107,7 +107,7 @@ export default function NominationDetailDialog({
                             if (matched.length > 0) {
                               return matched.join(", ");
                             }
-                            return <span className="text-slate-400 font-normal">（メニュー記載なし）</span>;
+                            return <span className="text-slate-500 font-normal">オプション指名料</span>;
                           })()}
                         </div>
                       </td>
