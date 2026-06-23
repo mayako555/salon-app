@@ -61,6 +61,7 @@ export default function CreateStatementDialog({
   const [workedHours, setWorkedHours] = useState("");
   const [hourlyWage, setHourlyWage] = useState("");
   const [workLocation, setWorkLocation] = useState("");
+  const [note, setNote] = useState("");
 
   const [contractType, setContractType] = useState<string>("");
   const [contractData, setContractData] = useState<any>(null);
@@ -96,6 +97,7 @@ export default function CreateStatementDialog({
       setWorkedHours("");
       setHourlyWage("");
       setWorkLocation("");
+      setNote("");
       setContractWarning(null);
       setContractData(null);
       setTechSales("");
@@ -168,6 +170,7 @@ export default function CreateStatementDialog({
           setWorkedHours("");
           setHourlyWage("");
           setWorkLocation("");
+          setNote("");
           setContractData(null);
           setContractWarning("該当スタッフの契約情報が登録されていません。");
         }
@@ -295,6 +298,7 @@ export default function CreateStatementDialog({
         total_deductions: totalDeductions,
         final_paid_amount: finalPaidAmount,
         work_location: workLocation,
+        note: note,
         details: {
           base_tech_salary: type === "reward" ? numBase : 0,
           base_product_salary: 0,
@@ -347,6 +351,7 @@ export default function CreateStatementDialog({
         setWorkedDays("");
         setWorkedHours("");
         setWorkLocation("");
+        setNote("");
         if (onSuccess) onSuccess();
       } else {
         toast.error(`作成エラー: ${res.error}`);
@@ -721,6 +726,21 @@ export default function CreateStatementDialog({
               </div>
             </div>
           )}
+
+          {/* Memo / Notes */}
+          <div className="space-y-3 animate-in slide-in-from-top-3 duration-200">
+            <h3 className="text-xs font-bold text-slate-700 flex items-center gap-1 border-b pb-1.5">
+              <span className="w-1.5 h-3.5 bg-slate-500 rounded-sm"></span> 自由記載メモ (明細書下部に表示)
+            </h3>
+            <div className="space-y-1">
+              <textarea 
+                value={note} 
+                onChange={(e) => setNote(e.target.value)}
+                className="w-full h-20 text-xs rounded-lg p-3 font-medium border border-slate-200 resize-none"
+                placeholder="特記事項や計算の補足などがあれば入力してください..."
+              />
+            </div>
+          </div>
 
           {/* Live Calculation Output Card */}
           <div className="p-4 rounded-xl border bg-slate-900 text-white space-y-3 shadow-lg shadow-slate-100">

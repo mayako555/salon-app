@@ -351,9 +351,13 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
               </div>
             </div>
 
-            {/* Footer Rules */}
-            <div className="mt-4 border-2 border-black p-2 text-xs">
-               <p>※インセンティブ計算に関する備考項目。当月の変動歩合や評価に基づく特別手当が基本支給に含まれています。</p>
+            {/* Footer Rules / Memo */}
+            <div className="mt-4 border-2 border-black p-2 text-xs whitespace-pre-wrap min-h-[3rem]">
+               {stmt.note ? (
+                 <p>{stmt.note}</p>
+               ) : (
+                 <p>※インセンティブ計算に関する備考項目。当月の変動歩合や評価に基づく特別手当が基本支給に含まれています。</p>
+               )}
             </div>
             
           </div>

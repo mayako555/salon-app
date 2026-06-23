@@ -59,6 +59,7 @@ export type MonthlyStatement = {
   final_paid_amount: number;
   status: "draft" | "closed";
   work_location?: string;
+  note?: string;
   adjustments?: {
     tech_cashless_sales_override?: number;
     retail_cashless_sales_override?: number;
@@ -702,6 +703,7 @@ export async function createManualStatement(data: {
   total_deductions: number;
   final_paid_amount: number;
   work_location?: string;
+  note?: string;
   details: MonthlyStatement["details"];
 }) {
   try {
@@ -1031,6 +1033,7 @@ export async function updateManualStatement(id: string, data: {
   total_deductions: number;
   final_paid_amount: number;
   work_location?: string;
+  note?: string;
   status?: "draft" | "closed";
   adjustments?: MonthlyStatement["adjustments"];
   details: MonthlyStatement["details"];
@@ -1051,6 +1054,7 @@ export async function updateManualStatement(id: string, data: {
       total_deductions: data.total_deductions,
       final_paid_amount: data.final_paid_amount,
       work_location: data.work_location ?? "",
+      note: data.note ?? "",
       details: data.details,
       updated_at: serverTimestamp()
     };

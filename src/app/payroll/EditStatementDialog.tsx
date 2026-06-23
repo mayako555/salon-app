@@ -58,6 +58,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const [workedHours, setWorkedHours] = useState(stmt.details.metrics?.worked_hours?.toString() || "0");
   const [hourlyWage, setHourlyWage] = useState(stmt.details.hourly_wage?.toString() || "0");
   const [workLocation, setWorkLocation] = useState(stmt.work_location || "");
+  const [note, setNote] = useState(stmt.note || "");
   const [contractType, setContractType] = useState<string>("");
 
   const [productSalesRecords, setProductSalesRecords] = useState<SalesRecord[]>([]);
@@ -185,6 +186,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
         total_deductions: totalDeductions,
         final_paid_amount: finalPaidAmount,
         work_location: workLocation,
+        note: note,
         status: status,
         adjustments: {
           ...stmt.adjustments,
@@ -607,6 +609,21 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                   placeholder="例: 5000"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Memo / Notes */}
+          <div className="space-y-3 animate-in slide-in-from-top-3 duration-200">
+            <h3 className="text-xs font-bold text-slate-700 flex items-center gap-1 border-b pb-1.5">
+              <span className="w-1.5 h-3.5 bg-slate-500 rounded-sm"></span> 自由記載メモ (明細書下部に表示)
+            </h3>
+            <div className="space-y-1">
+              <textarea 
+                value={note} 
+                onChange={(e) => setNote(e.target.value)}
+                className="w-full h-20 text-xs rounded-lg p-3 font-medium border border-slate-200 resize-none"
+                placeholder="特記事項や計算の補足などがあれば入力してください..."
+              />
             </div>
           </div>
 
