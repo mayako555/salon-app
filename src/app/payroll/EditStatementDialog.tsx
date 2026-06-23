@@ -73,6 +73,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const [workLocation, setWorkLocation] = useState(stmt.work_location || "");
   const [note, setNote] = useState(stmt.note || "");
   const [contractType, setContractType] = useState<string>("");
+  const [contractData, setContractData] = useState<any>(null);
 
   const [productSalesRecords, setProductSalesRecords] = useState<SalesRecord[]>([]);
   const [showProductSales, setShowProductSales] = useState(false);
@@ -100,10 +101,11 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
           }
 
           // Fetch contract type
-          const contractsSnap = await getDocs(query(collection(db, "contracts"), where("staff_id", "==", stmt.staff_id)));
+          const contractsSnap = await getDocs(query(collection(db, "staff_contracts"), where("staff_id", "==", stmt.staff_id)));
           if (!contractsSnap.empty) {
-            const contractData = contractsSnap.docs[0].data();
-            setContractType(contractData.contract_type || "");
+            const contractDataDb = contractsSnap.docs[0].data();
+            setContractType(contractDataDb.contract_type || "");
+            setContractData(contractDataDb);
           }
         } catch (err) {
           console.error("Error fetching staff wage or contract:", err);
@@ -152,7 +154,10 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   // Calculations
   const numTech = Number(techSalary) || 0;
   const numProduct = Number(productSalary) || 0;
-  const numBase = numTech + numProduct;
+  const monthlyBaseSalary = (contractType === "monthly" || contractType === "tier_monthly")
+    ? (contractData?.monthly_base_salary ?? (stmt.base_amount - (stmt.details.base_tech_salary || 0) - (stmt.details.base_product_salary || 0)))
+    : 0;
+  const numBase = monthlyBaseSalary + numTech + numProduct;
   const numTransport = Number(transportAllowance) || 0;
   const numNomination = Number(nominationAllowance) || 0;
   const numReview = Number(reviewAllowance) || 0;
@@ -301,7 +306,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
             <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 shadow-sm space-y-3">
               <div className="flex items-center justify-between border-b border-blue-100/60 pb-2">
                 <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-blue-600 animate-pulse" />
+                  <Clock className="w-4 h-4 text-blue-600" />
                   時給計算アシスタント（パート・時給制スタッフ用）
                 </h4>
                 <span className="text-[9px] font-black text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
@@ -343,6 +348,40 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
             </div>
           )}
 
+          {/* 基本情報（正社員・固定給用） */}
+          {stmt.type === "salary" && (contractType === "monthly" || contractType === "tier_monthly") && (
+            <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-emerald-100/60 pb-2">
+                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-emerald-600" />
+                  基本契約情報（正社員・固定給）
+                </h4>
+                <span className="text-[9px] font-black text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  Fixed Salary Contract
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-500 block">ベース基本給 (固定)</span>
+                  <div className="h-9 flex items-center justify-start px-3 bg-white border border-slate-200 rounded-lg text-xs font-extrabold text-slate-700 tabular-nums">
+                    ¥{monthlyBaseSalary.toLocaleString()}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-500 block">固定手当 合計</span>
+                  <div className="h-9 flex items-center justify-start px-3 bg-white border border-slate-200 rounded-lg text-xs font-extrabold text-slate-700 tabular-nums">
+                    ¥{((contractData?.business_allowance || 0) + (contractData?.attendance_allowance || 0)).toLocaleString()}
+                  </div>
+                  {((contractData?.business_allowance || 0) > 0 || (contractData?.attendance_allowance || 0) > 0) && (
+                    <span className="text-[9px] text-slate-400 block mt-0.5">
+                      (業務手当: ¥{(contractData?.business_allowance || 0).toLocaleString()} / 皆勤手当: ¥{(contractData?.attendance_allowance || 0).toLocaleString()})
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Earnings Grid */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-slate-700 border-b pb-1.5 flex items-center justify-between gap-1">
@@ -356,7 +395,13 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 block">技術歩合 / 基本給ベース (円)</label>
+                <label className="text-[10px] font-bold text-slate-500 block">
+                  {stmt.type === "reward" 
+                    ? "技術歩合報酬ベース (円)" 
+                    : (contractType === "monthly" || contractType === "tier_monthly") 
+                      ? "基本給 (円)" 
+                      : "基本給 (時給ベース) (円)"}
+                </label>
                 <Input 
                   type="number" 
                   value={techSalary} 

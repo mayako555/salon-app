@@ -164,9 +164,9 @@ export default function CreateStatementDialog({
     }
   };
 
-  // Load defaults when staff, year, or month changes
+  // Load defaults when staff, year, or month changes (only when dialog is open)
   useEffect(() => {
-    if (!staffId) {
+    if (!isOpen || !staffId) {
       setContractWarning(null);
       return;
     }
@@ -271,7 +271,7 @@ export default function CreateStatementDialog({
     }
     
     loadDefaults();
-  }, [staffId, targetYear, targetMonth]);
+  }, [isOpen, staffId, targetYear, targetMonth]);
 
   // Dynamic client-side tax auto-calculation
   useEffect(() => {
@@ -693,7 +693,13 @@ export default function CreateStatementDialog({
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 block">基本給 / 歩合報酬ベース (円)</label>
+                <label className="text-[10px] font-bold text-slate-500 block">
+                  {type === "reward" 
+                    ? "技術歩合報酬ベース (円)" 
+                    : (contractType === "monthly" || contractType === "tier_monthly") 
+                      ? "基本給 (円)" 
+                      : "基本給 (時給ベース) (円)"}
+                </label>
                 <Input 
                   type="number" 
                   placeholder="例: 280000"

@@ -211,7 +211,7 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
                 <p>支給日: {paymentDate}</p>
                 <p className="font-bold border-b border-black w-48 mb-2 pb-1">{stmt.target_month.replace("-", "年")}月分 給与・報酬</p>
                 <div className="flex justify-between items-baseline pr-4">
-                  <span>当サロン</span>
+                  <span>{stmt.work_location ? stmt.work_location.split("・")[0] : "Jasmine Lash"}</span>
                 </div>
                 <p className="font-bold text-lg">{stmt.staff_name} 様</p>
               </div>

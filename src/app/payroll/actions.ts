@@ -345,7 +345,8 @@ export async function generateStatements(year: number, month: number) {
       const baseHourlySalary = Math.floor(totalHours * (contract.hourly_wage || 0));
       finalWorkedHours = totalHours;
 
-      const allowanceTotal = transportAllowanceDb + nominationAllowanceDb + reviewAllowanceDb + blogAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
+      const transportFee = preservedAdjusts?.transport_fee_override ?? transportAllowanceDb;
+      const allowanceTotal = transportFee + nominationAllowanceDb + reviewAllowanceDb + blogAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
       const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
 
       const intermediatePaidAmount = baseHourlySalary + allowanceTotal + customAdjustTotal;
@@ -368,7 +369,7 @@ export async function generateStatements(year: number, month: number) {
           base_tech_salary: 0,
           base_product_salary: 0,
           nomination_reward: nominationAllowanceDb,
-          transport_fee: preservedAdjusts?.transport_fee_override ?? transportAllowanceDb,
+          transport_fee: transportFee,
           cashless_deduction: 0,
           tax_addition: taxAddition,
           review_allowance: reviewAllowanceDb,
@@ -433,15 +434,15 @@ export async function generateStatements(year: number, month: number) {
       
       const baseMonthlySalary = contract.monthly_base_salary || 0;
       const totalCommission = techCommission + productCommission + nominationReward;
-      const allowanceTotal = transportAllowanceDb + nominationAllowanceDb + reviewAllowanceDb + blogAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
+      const transportFee = preservedAdjusts?.transport_fee_override ?? (transportAllowanceDb > 0 ? transportAllowanceDb : 17950);
+      const allowanceTotal = transportFee + nominationAllowanceDb + reviewAllowanceDb + blogAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
       const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
 
       const base_amount = baseMonthlySalary + totalCommission;
-      const transportFee = preservedAdjusts?.transport_fee_override ?? 17950; 
 
       const taxes = calculatePayrollTaxes({
         baseSalary: base_amount,
-        allowances: allowanceTotal + customAdjustTotal,
+        allowances: allowanceTotal - transportFee + customAdjustTotal,
         transportFee: transportFee,
         dependentsCount: 0
       });
@@ -455,7 +456,7 @@ export async function generateStatements(year: number, month: number) {
       const childcare = preservedAdjusts?.childcare_support_override ?? (taxes.childcareSupport || 0);
 
       const totalDeductions = health + pension + employment + incomeTax + residentTax + childcare;
-      const final_paid = base_amount + allowanceTotal + transportFee + customAdjustTotal - totalDeductions;
+      const final_paid = base_amount + allowanceTotal + customAdjustTotal - totalDeductions;
 
       const statementPayload = {
         staff_id: contract.staff_id,
@@ -512,7 +513,8 @@ export async function generateStatements(year: number, month: number) {
       }
       
       const nominationReward = nominationCount * contract.nomination_fee;
-      const allowanceTotal = transportAllowanceDb + nominationAllowanceDb + reviewAllowanceDb + blogAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
+      const transportFee = preservedAdjusts?.transport_fee_override ?? (transportAllowanceDb > 0 ? transportAllowanceDb : 17950);
+      const allowanceTotal = transportFee + nominationAllowanceDb + reviewAllowanceDb + blogAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
       const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
 
       const intermediatePaidAmount = baseMonthlySalary + incentive + nominationReward + allowanceTotal + customAdjustTotal;
@@ -534,7 +536,7 @@ export async function generateStatements(year: number, month: number) {
           base_tech_salary: incentive,
           base_product_salary: 0,
           nomination_reward: nominationReward,
-          transport_fee: preservedAdjusts?.transport_fee_override ?? transportAllowanceDb,
+          transport_fee: transportFee,
           cashless_deduction: 0,
           tax_addition: 0,
           review_allowance: reviewAllowanceDb,
@@ -571,16 +573,26 @@ export async function generateStatements(year: number, month: number) {
     const nominationReward = nominationCount * contract.nomination_fee;
     let baseAmount = baseTechSalary + baseProductSalary + nominationReward;
 
-    const allowanceTotal = transportAllowanceDb + nominationAllowanceDb + reviewAllowanceDb + blogAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
-    const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
+    const transportFee = preservedAdjusts?.transport_fee_override ?? transportAllowanceDb;
+    
+    // 課税対象手当 (before_tax)
+    const beforeTaxAllowances = nominationAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
+    
+    // 非課税・立替精算手当 (after_tax)
+    const afterTaxAllowances = transportFee + reviewAllowanceDb + blogAllowanceDb;
+    
+    const allowanceTotal = beforeTaxAllowances + afterTaxAllowances;
+    const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc: number, curr: any) => acc + curr.amount, 0);
 
-    let intermediatePaidAmount = baseAmount + allowanceTotal + customAdjustTotal;
+    const taxableSubtotal = baseAmount + beforeTaxAllowances;
+    
     let taxAddition = 0;
     if (!contract.deduction_consumption_tax) {
-       taxAddition = Math.floor(intermediatePaidAmount * 0.1); 
+       taxAddition = Math.floor(taxableSubtotal * 0.1); 
     }
 
-    const finalPaidAmount = intermediatePaidAmount + taxAddition;
+    // 最終支払額 ＝ (課税対象額 ＋ 消費税) ＋ 非課税手当 ＋ 個別調整
+    const finalPaidAmount = taxableSubtotal + taxAddition + afterTaxAllowances + customAdjustTotal;
 
     const statementPayload = {
       staff_id: contract.staff_id,
@@ -598,7 +610,7 @@ export async function generateStatements(year: number, month: number) {
         base_tech_salary: baseTechSalary,
         base_product_salary: baseProductSalary,
         nomination_reward: nominationReward,
-        transport_fee: preservedAdjusts?.transport_fee_override ?? transportAllowanceDb,
+        transport_fee: transportFee,
         cashless_deduction: techCashlessFee + productCashlessFee,
         tax_addition: taxAddition,
         social_insurance: undefined,
@@ -918,7 +930,7 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
       const productCommission = calculateProductCommission(staffSales, contract, 0);
       
       base_amount = (contract.monthly_base_salary || 0) + techCommission + productCommission;
-      transportAllowance = 17950; // Standard transport fee for monthly contracts
+      transportAllowance = transportAllowanceDb > 0 ? transportAllowanceDb : 17950; // Standard transport fee for monthly contracts if not entered in DB
 
       const totalAllowancesTmp = transportAllowance + nominationAllowance + reviewAllowance + blogAllowance + executiveAllowance;
       const taxes = calculatePayrollTaxes({
@@ -954,7 +966,7 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
       }
       
       base_amount = baseMonthlySalary + incentive;
-      transportAllowance = 17950; // Standard transport fee
+      transportAllowance = transportAllowanceDb > 0 ? transportAllowanceDb : 17950; // Standard transport fee if not entered in DB
 
       const totalAllowancesTmp = transportAllowance + nominationAllowance + reviewAllowance + blogAllowance + executiveAllowance;
       const taxes = calculatePayrollTaxes({
