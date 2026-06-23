@@ -58,6 +58,7 @@ export type SalesRecord = {
   source: SalesSource;
   source_reservation_id?: string; // Links back to the original reservation
   next_booking_date?: string; // 次回予約日
+  treatment_excluded?: boolean; // 除外トリートメントフラグ
   next_booking_time?: string; // 次回予約時間
   next_booking_staff_name?: string; // 次回予約担当者
   next_booking_nominated?: boolean; // 次回予約指名

@@ -15,7 +15,9 @@ import AuthGuard from "@/components/AuthGuard";
 import { AllowanceTaskStatus, getMonthlyAllowanceTasks, unmarkAllowanceChecked } from "./actions";
 import { UserCheck } from "lucide-react";
 
-export default function AllowancesPage() {
+import { Suspense } from "react";
+
+function AllowancesPageContent() {
   const searchParams = useSearchParams();
   const monthParam = searchParams.get("month");
   
@@ -274,5 +276,13 @@ export default function AllowancesPage() {
       )}
     </div>
     </AuthGuard>
+  );
+}
+
+export default function AllowancesPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-slate-500 text-xs">読み込み中...</div>}>
+      <AllowancesPageContent />
+    </Suspense>
   );
 }

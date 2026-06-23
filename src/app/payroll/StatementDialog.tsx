@@ -282,11 +282,15 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
                        <span>{stmt.details.blog_allowance.toLocaleString()}</span>
                      </div>
                    )}
-                   {/* @ts-ignore */}
-                   {stmt.details.executive_allowance > 0 && (
-                     <div className="flex justify-between text-xs">
-                       <span>役職・その他手当</span>
-                       {/* @ts-ignore */}
+                    {/* @ts-ignore */}
+                    {stmt.details.executive_allowance > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span>役職・その他手当</span>
+                        {/* @ts-ignore */}
+                        <span>{stmt.details.executive_allowance.toLocaleString()}</span>
+                      </div>
+                    )}
+
                    {/* Legacy fallback / Unallocated Allowances */}
                    {(() => {
                      const allocated = 
@@ -316,6 +320,7 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
                      <div className="flex justify-between text-xs"><span>消費税加算額</span><span>{stmt.details.tax_addition.toLocaleString()}</span></div>
                    )}
                 </div>
+              </div>
 
               {/* Col 3: Deductions */}
               <div className="border-x-2 border-b-2 border-black relative">

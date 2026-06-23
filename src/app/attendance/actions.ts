@@ -185,7 +185,7 @@ export async function recordClockIn(staffId: string, staffName: string, store?: 
         
         const shiftStarts = segmentsToUse.map((s: any) => s.start_time).sort();
         const scheduledStart = shiftStarts[0];
-        const schedIn = new Date(`${dateStr}T${scheduledStart}:00`);
+        const schedIn = new Date(`${dateStr}T${scheduledStart}:00+09:00`);
         
         if (now < schedIn) {
           effectiveIn = schedIn.toISOString();
@@ -306,7 +306,7 @@ export async function recordClockOut(staffId: string) {
           
           const shiftEnds = segmentsToUse.map((s: any) => s.end_time).sort();
           const scheduledEnd = shiftEnds[shiftEnds.length - 1];
-          const schedOut = new Date(`${dateStr}T${scheduledEnd}:00`);
+          const schedOut = new Date(`${dateStr}T${scheduledEnd}:00+09:00`);
           
           if (now > schedOut) {
             effectiveOut = schedOut.toISOString();

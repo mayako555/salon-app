@@ -81,6 +81,9 @@ export type MonthlyStatement = {
     transport_fee: number;
     cashless_deduction: number;
     tax_addition: number; 
+    review_allowance?: number;
+    blog_allowance?: number;
+    executive_allowance?: number;
     social_insurance?: {
       employment: number;
       health: number;

@@ -10,6 +10,7 @@ import {
   deleteDoc,
   doc,
   setDoc,
+  updateDoc,
   writeBatch,
   serverTimestamp 
 } from "firebase/firestore";
@@ -214,11 +215,11 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
       // ★5口コミを抽出（返信テキストやスタッフ名でマッチング）
       const staffReviews = monthlyReviews.filter(r => {
         if (r.rating !== 5) return false;
-        if (normalizeStaffName(r.staff_name) === staffNameNormal) return true;
+        if (r.staff_name && normalizeStaffName(r.staff_name) === staffNameNormal) return true;
         // fallback to checking reply_text for staff name or katakana
         if (r.reply_text) {
           const kanji = staffNameNormal;
-          const kana = normalizeStaffName(staff.name_kana);
+          const kana = staff.name_kana ? normalizeStaffName(staff.name_kana) : "";
           if (kanji && r.reply_text.includes(kanji)) return true;
           if (kana && r.reply_text.includes(kana)) return true;
           if (staff.last_name && r.reply_text.includes(staff.last_name)) return true;
