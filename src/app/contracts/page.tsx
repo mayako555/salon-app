@@ -29,9 +29,14 @@ export default function ContractsPage() {
 
   const loadContracts = async () => {
     setIsLoading(true);
-    const data = await getContractsList();
-    setContracts(data);
-    setIsLoading(false);
+    try {
+      const data = await getContractsList();
+      setContracts(data);
+    } catch (err) {
+      console.error("Failed to load contracts:", err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleOpenAdd = () => {

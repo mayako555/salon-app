@@ -42,13 +42,14 @@ export async function getContractsList(): Promise<StaffContract[]> {
       .map((doc: any) => {
         const data = doc.data();
         // Convert dates/timestamps to serializable types or remove them if not needed
-        return {
+        const contract = {
           ...data,
           id: doc.id,
           staff_name: staffMap.get(data.staff_id) || "不明",
-          created_at: data.created_at?.toDate?.()?.toISOString() || null,
-          updated_at: data.updated_at?.toDate?.()?.toISOString() || null,
-        } as StaffContract;
+          created_at: data.created_at?.toDate?.()?.getTime() || data.created_at || null,
+          updated_at: data.updated_at?.toDate?.()?.getTime() || data.updated_at || null,
+        };
+        return JSON.parse(JSON.stringify(contract)) as StaffContract;
       });
   } catch (error: any) {
     console.error("Error fetching contracts from Firestore:", error);
