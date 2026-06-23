@@ -95,8 +95,20 @@ export default function NominationDetailDialog({
                       </td>
                       <td className="px-4 py-3 font-bold text-slate-800">{sale.customer_name}</td>
                       <td className="px-4 py-3">
-                        <div className="max-w-[200px] truncate text-xs text-slate-600" title={sale.menu_course}>
-                          {sale.menu_course}
+                        <div className="text-xs text-slate-700 font-bold leading-relaxed max-w-[300px]">
+                          {(() => {
+                            const keywords = ["指名"];
+                            const menuParts = (sale.menu_course || "").split(",");
+                            const optionParts = (sale.options || "").split(",");
+                            const matched = [...menuParts, ...optionParts]
+                              .map(p => p.trim())
+                              .filter(p => keywords.some(k => p.toUpperCase().includes(k)));
+                            
+                            if (matched.length > 0) {
+                              return matched.join(", ");
+                            }
+                            return <span className="text-slate-400 font-normal">（メニュー記載なし）</span>;
+                          })()}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right font-black text-blue-600">
