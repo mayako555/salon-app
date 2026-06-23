@@ -716,7 +716,7 @@ export async function importHotPepperCsv(formData: FormData) {
       };
 
       let techSales = 0, prodSales = 0, discount = 0, hpbPoints = 0, nominationFee = 0;
-      let menuCourses: string[] = [], discountReasons: string[] = [];
+      let menuCourses: string[] = [], discountReasons: string[] = [], optionsList: string[] = [];
 
       groupRows.forEach(row => {
         const category = String(row["区分"] || "");
@@ -733,7 +733,12 @@ export async function importHotPepperCsv(formData: FormData) {
         else if (menu.includes("指名料")) nominationFee += val;
         else techSales += val;
 
-        if (menu && !menuCourses.includes(menu) && !menu.includes("割引") && !menu.includes("指名料")) menuCourses.push(menu);
+        if (menu && String(row["カテゴリ"] || "").includes("オプション")) {
+          if (!optionsList.includes(menu)) optionsList.push(menu);
+        } else if (menu && !menuCourses.includes(menu) && !menu.includes("割引") && !menu.includes("指名料") && !category.includes("店販")) {
+          menuCourses.push(menu);
+        }
+        
         hpbPoints += isCancel ? -Math.abs(parseMoney(row["ポイント使用"])) : Math.abs(parseMoney(row["ポイント使用"]));
       });
 
@@ -759,6 +764,7 @@ export async function importHotPepperCsv(formData: FormData) {
         customer_name: customerName,
         customer_type: groupRows.some(r => (r["新規再来"] || "").includes("新規")) ? "新規" : "リピ",
         menu_course: menuCourses.slice(0, 3).join(", "),
+        options: optionsList.join(", "),
         tech_sales: techSales,
         product_sales: prodSales,
         is_nominated: nominationFee !== 0,
