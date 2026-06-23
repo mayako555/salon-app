@@ -23,7 +23,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     pathname.startsWith("/staff-portal") || 
     pathname.startsWith("/customers/intake") || 
     pathname.startsWith("/entry") || 
-    pathname.startsWith("/attendance/kiosk") ||
+    pathname.startsWith("/kiosk/attendance") ||
     pathname.startsWith("/staff/login") ||
     pathname.startsWith("/link-line")
   ) {

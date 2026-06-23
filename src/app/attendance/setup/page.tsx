@@ -12,7 +12,7 @@ export default function AttendanceSetupPage() {
   const router = useRouter();
 
   const handleSelectStore = (store: string) => {
-    router.push(`/attendance/kiosk?store=${encodeURIComponent(store)}`);
+    router.push(`/kiosk/attendance?store=${encodeURIComponent(store)}`);
   };
 
   return (
@@ -72,7 +72,7 @@ export default function AttendanceSetupPage() {
                 onClick={() => {
                   const input = document.getElementById("fcStoreName") as HTMLInputElement;
                   if (input && input.value) {
-                    router.push(`/attendance/kiosk?store=${encodeURIComponent(input.value)}&type=fc`);
+                    router.push(`/kiosk/attendance?store=${encodeURIComponent(input.value)}&type=fc`);
                   }
                 }}
                 className="h-12 px-6 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold"
