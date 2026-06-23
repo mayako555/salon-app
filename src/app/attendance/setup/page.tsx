@@ -12,7 +12,7 @@ export default function AttendanceSetupPage() {
   const router = useRouter();
   const { availableStores, loading } = useAuth();
 
-  const storesToUse = availableStores && availableStores.length > 0 ? availableStores : ["神戸", "元町", "六甲"];
+  const storesToUse = availableStores;
 
   const handleSelectStore = (store: string) => {
     router.push(`/kiosk/attendance?store=${encodeURIComponent(store)}`);

@@ -104,7 +104,7 @@ export default function CreateStatementDialog({
     let totalProd = 0;
     let totalProdCashless = 0;
 
-    const stores = availableStores && availableStores.length > 0 ? availableStores : ["神戸", "元町", "六甲"];
+    const stores = availableStores;
     stores.forEach(s => {
       const data = updated[s] || { techSales: "", techCashless: "", productSales: "", productCashless: "" };
       totalTech += Number(data.techSales) || 0;
@@ -610,7 +610,7 @@ export default function CreateStatementDialog({
               </div>
               
               <div className="space-y-3">
-                {(availableStores && availableStores.length > 0 ? availableStores : ["神戸", "元町", "六甲"]).map(store => {
+                {availableStores.map(store => {
                   const data = storeSales[store] || { techSales: "", techCashless: "", productSales: "", productCashless: "" };
                   return (
                     <div key={store} className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm space-y-2">
