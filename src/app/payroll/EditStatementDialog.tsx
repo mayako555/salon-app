@@ -273,10 +273,37 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
       </DialogTrigger>
       <DialogContent className="sm:max-w-3xl w-full max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-800">
-            <Calculator className="text-blue-500 w-5 h-5 animate-pulse" />
-            給与・報酬明細の編集
-          </DialogTitle>
+          <div className="flex items-center justify-between mt-4">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-800">
+              <Calculator className="text-blue-500 w-5 h-5 animate-pulse" />
+              給与・報酬明細の編集
+            </DialogTitle>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={async () => {
+                const toastId = toast.loading("最新のデータを取得中...");
+                const [year, month] = stmt.target_month.split('-');
+                const { getStaffPayrollDefaultValues } = await import('./actions');
+                const res = await getStaffPayrollDefaultValues(stmt.staff_id, Number(year), Number(month));
+                if (res.success && res.data) {
+                  const d = res.data as any;
+                  setTransportAllowance((d.transportAllowance || 0).toString());
+                  setNominationAllowance((d.nominationAllowance || 0).toString());
+                  setReviewAllowance((d.reviewAllowance || 0).toString());
+                  setBlogAllowance((d.blogAllowance || 0).toString());
+                  setExecutiveAllowance((d.executiveAllowance || 0).toString());
+                  toast.success("最新の売上・手当データで数値を上書きしました", { id: toastId });
+                } else {
+                  toast.error("データの取得に失敗しました", { id: toastId });
+                }
+              }}
+              className="h-8 text-xs font-bold bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+            >
+              <Loader2 className="w-3 h-3 mr-1" />
+              最新の売上・手当を取得
+            </Button>
+          </div>
           <DialogDescription className="text-slate-500 text-xs">
             対象スタッフ：{stmt.staff_name} 様 ({stmt.target_month.replace("-", "年")}月度 / {stmt.type === "salary" ? "正社員・パート給与" : "業務委託報酬"})
           </DialogDescription>

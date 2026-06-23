@@ -16,12 +16,12 @@ export default function AttendanceSetupPage() {
   const storesToUse = availableStores;
 
   const handleSelectStore = async (store: string) => {
-    if (!profile?.companyId) {
+    if (!profile) {
       alert("ログインセッションが無効です。一度ログインし直してください。");
       return;
     }
     try {
-      const companyId = profile.companyId;
+      const companyId = profile.companyId || "company_default";
       const settings = await getKioskSettings(companyId);
       const storeConfig = settings[store];
       
