@@ -69,9 +69,9 @@ export async function getMonthlyAllowances(year: number, month: number): Promise
   try {
     const colRef = collection(db, ALLOWANCES_COLLECTION);
     const q = query(colRef, where("target_month", "==", targetPrefix));
-    require('fs').appendFileSync('scratch/allowance_log.txt', "Fetching allowances...\n");
+    
     const snapshot = await getDocs(q);
-    require('fs').appendFileSync('scratch/allowance_log.txt', "Allowances fetched: ", snapshot.docs.length);
+    
     
     const records = snapshot.docs.map(doc => {
       const data = doc.data();
@@ -112,14 +112,14 @@ export type AllowanceTaskStatus = {
 };
 
 export async function getMonthlyAllowanceTasks(year: number, month: number): Promise<AllowanceTaskStatus[]> {
-  require('fs').appendFileSync('scratch/allowance_log.txt', "getMonthlyAllowanceTasks called\n", year, month);
+  
   const targetPrefix = `${year}-${String(month).padStart(2, '0')}`;
   
   try {
     // 1. 全在籍スタッフ取得
-    require('fs').appendFileSync('scratch/allowance_log.txt', "Fetching staff list...\n");
+    
     const staffList = await getStaffList();
-    require('fs').appendFileSync('scratch/allowance_log.txt', "Staff list fetched: ", staffList.length);
+    
     
     // 2. その月の全手当取得
     const colRef = collection(db, ALLOWANCES_COLLECTION);
@@ -141,14 +141,14 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
     const checkedStaffIds = new Set(checksSnapshot.docs.map(d => d.data().staff_id));
 
     // 4. その月の全売上取得（指名数カウント用）
-    require('fs').appendFileSync('scratch/allowance_log.txt', "Fetching monthly sales...\n");
+    
     const monthlySales = await getMonthlySales(year, month);
-    require('fs').appendFileSync('scratch/allowance_log.txt', "Monthly sales fetched: ", monthlySales.length);
+    
 
     // 5. その月の全口コミ取得（★5自動カウント用）
-    require('fs').appendFileSync('scratch/allowance_log.txt', "Fetching monthly reviews...\n");
+    
     const monthlyReviews = await getMonthlyReviews(year, month);
-    require('fs').appendFileSync('scratch/allowance_log.txt', "Monthly reviews fetched: ", monthlyReviews.length);
+    
 
     // 6. スタッフごとに集計
     const tasks: AllowanceTaskStatus[] = staffList.map(staff => {
@@ -213,7 +213,7 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
       };
     });
 
-    require('fs').appendFileSync('scratch/allowance_log.txt', 'Returning tasks...\n'); return tasks;
+     return tasks;
   } catch (error) {
     console.error("Error fetching allowance tasks:", error);
     return [];
