@@ -9,6 +9,7 @@ import { Plus, Calculator, Calendar, User, ShieldAlert, BadgeCheck, Clock } from
 import { createManualStatement, getStaffPayrollDefaultValues } from "./actions";
 import { toast } from "sonner";
 import { calculatePayrollTaxes } from "@/lib/tax-calculator";
+import { useAuth } from "@/lib/auth-context";
 
 type StaffProfileSimple = {
   id: string;
@@ -63,6 +64,14 @@ export default function CreateStatementDialog({
   const [workLocation, setWorkLocation] = useState("");
   const [note, setNote] = useState("");
 
+  const { availableStores } = useAuth();
+  const [storeSales, setStoreSales] = useState<Record<string, {
+    techSales: string;
+    techCashless: string;
+    productSales: string;
+    productCashless: string;
+  }>>({});
+
   const [contractType, setContractType] = useState<string>("");
   const [contractData, setContractData] = useState<any>(null);
 
@@ -71,6 +80,51 @@ export default function CreateStatementDialog({
   const [productSales, setProductSales] = useState("");
   const [techCashless, setTechCashless] = useState("");
   const [productCashless, setProductCashless] = useState("");
+
+  const updateStoreSales = (storeName: string, field: string, value: string) => {
+    const current = storeSales[storeName] || {
+      techSales: "",
+      techCashless: "",
+      productSales: "",
+      productCashless: ""
+    };
+    const updatedStoreData = {
+      ...current,
+      [field]: value
+    };
+    const updated = {
+      ...storeSales,
+      [storeName]: updatedStoreData
+    };
+    setStoreSales(updated);
+
+    // Calculate totals
+    let totalTech = 0;
+    let totalTechCashless = 0;
+    let totalProd = 0;
+    let totalProdCashless = 0;
+
+    const stores = availableStores && availableStores.length > 0 ? availableStores : ["神戸", "元町", "六甲"];
+    stores.forEach(s => {
+      const data = updated[s] || { techSales: "", techCashless: "", productSales: "", productCashless: "" };
+      totalTech += Number(data.techSales) || 0;
+      totalTechCashless += Number(data.techCashless) || 0;
+      totalProd += Number(data.productSales) || 0;
+      totalProdCashless += Number(data.productCashless) || 0;
+    });
+
+    setTechSales(totalTech > 0 ? totalTech.toString() : "");
+    setTechCashless(totalTechCashless > 0 ? totalTechCashless.toString() : "");
+    setProductSales(totalProd > 0 ? totalProd.toString() : "");
+    setProductCashless(totalProdCashless > 0 ? totalProdCashless.toString() : "");
+
+    recalculateReward(
+      totalTech > 0 ? totalTech.toString() : "",
+      totalProd > 0 ? totalProd.toString() : "",
+      totalTechCashless > 0 ? totalTechCashless.toString() : "",
+      totalProdCashless > 0 ? totalProdCashless.toString() : ""
+    );
+  };
 
   // Contract Warning Banner State
   const [contractWarning, setContractWarning] = useState<string | null>(null);
@@ -104,6 +158,7 @@ export default function CreateStatementDialog({
       setProductSales("");
       setTechCashless("");
       setProductCashless("");
+      setStoreSales({});
     } else if (initialStaffId) {
       setStaffId(initialStaffId);
     }
@@ -149,6 +204,42 @@ export default function CreateStatementDialog({
           setWorkedHours(d.workedHours.toString());
           setHourlyWage(d.hourly_wage ? d.hourly_wage.toString() : "0");
           setWorkLocation(d.work_location || "");
+
+          // Prefill store-by-store sales
+          if (d.storeSalesBreakdown) {
+            const formatted: any = {};
+            Object.entries(d.storeSalesBreakdown).forEach(([store, sVal]: [string, any]) => {
+              formatted[store] = {
+                techSales: sVal.techSales > 0 ? sVal.techSales.toString() : "",
+                techCashless: sVal.techCashless > 0 ? sVal.techCashless.toString() : "",
+                productSales: sVal.productSales > 0 ? sVal.productSales.toString() : "",
+                productCashless: sVal.productCashless > 0 ? sVal.productCashless.toString() : ""
+              };
+            });
+            setStoreSales(formatted);
+
+            let totalTech = 0;
+            let totalTechCashless = 0;
+            let totalProd = 0;
+            let totalProdCashless = 0;
+            Object.values(d.storeSalesBreakdown).forEach((sVal: any) => {
+              totalTech += sVal.techSales || 0;
+              totalTechCashless += sVal.techCashless || 0;
+              totalProd += sVal.productSales || 0;
+              totalProdCashless += sVal.productCashless || 0;
+            });
+            setTechSales(totalTech > 0 ? totalTech.toString() : "");
+            setTechCashless(totalTechCashless > 0 ? totalTechCashless.toString() : "");
+            setProductSales(totalProd > 0 ? totalProd.toString() : "");
+            setProductCashless(totalProdCashless > 0 ? totalProdCashless.toString() : "");
+          } else {
+            setStoreSales({});
+            setTechSales("");
+            setProductSales("");
+            setTechCashless("");
+            setProductCashless("");
+          }
+
           toast.success("スタッフの当月実績と契約データから初期値を自動入力しました（編集可能です）");
         } else if (res.error) {
           // Gracefully reset forms so they can key in manually from scratch
@@ -507,36 +598,84 @@ export default function CreateStatementDialog({
 
           {/* 業務委託 計算アシスタント */}
           {type === "reward" && contractData && (
-            <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 shadow-sm space-y-3">
+            <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 shadow-sm space-y-4">
               <div className="flex items-center justify-between border-b border-emerald-100/60 pb-2">
                 <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <Calculator className="w-4 h-4 text-emerald-600 animate-pulse" />
-                  業務委託・歩合計算アシスタント
+                  業務委託・歩合計算アシスタント（店舗別入力）
                 </h4>
                 <span className="text-[9px] font-black text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                   Commission Auto-Calc
                 </span>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-500 block">技術売上 (総額)</label>
-                  <Input type="number" value={techSales} onChange={(e) => { setTechSales(e.target.value); recalculateReward(e.target.value, productSales, techCashless, productCashless); }} className="h-9 text-xs rounded-lg font-bold border-slate-200 bg-white" placeholder="例: 500000" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-500 block">うちキャッシュレス</label>
-                  <Input type="number" value={techCashless} onChange={(e) => { setTechCashless(e.target.value); recalculateReward(techSales, productSales, e.target.value, productCashless); }} className="h-9 text-xs rounded-lg font-bold border-slate-200 bg-white" placeholder="0" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-500 block">商品売上 (総額)</label>
-                  <Input type="number" value={productSales} onChange={(e) => { setProductSales(e.target.value); recalculateReward(techSales, e.target.value, techCashless, productCashless); }} className="h-9 text-xs rounded-lg font-bold border-slate-200 bg-white" placeholder="例: 20000" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-500 block">うちキャッシュレス</label>
-                  <Input type="number" value={productCashless} onChange={(e) => { setProductCashless(e.target.value); recalculateReward(techSales, productSales, techCashless, e.target.value); }} className="h-9 text-xs rounded-lg font-bold border-slate-200 bg-white" placeholder="0" />
+              
+              <div className="space-y-3">
+                {(availableStores && availableStores.length > 0 ? availableStores : ["神戸", "元町", "六甲"]).map(store => {
+                  const data = storeSales[store] || { techSales: "", techCashless: "", productSales: "", productCashless: "" };
+                  return (
+                    <div key={store} className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm space-y-2">
+                      <div className="text-[11px] font-black text-slate-700 border-b border-slate-50 pb-1 flex items-center gap-1">
+                        <span className="w-1.5 h-3 bg-emerald-500 rounded-full"></span>
+                        {store}店
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-slate-400 block">技術売上 (総額)</label>
+                          <Input 
+                            type="number" 
+                            value={data.techSales} 
+                            onChange={(e) => updateStoreSales(store, "techSales", e.target.value)} 
+                            className="h-8 text-xs rounded font-bold border-slate-200" 
+                            placeholder="例: 100000" 
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-slate-400 block">うちキャッシュレス</label>
+                          <Input 
+                            type="number" 
+                            value={data.techCashless} 
+                            onChange={(e) => updateStoreSales(store, "techCashless", e.target.value)} 
+                            className="h-8 text-xs rounded font-bold border-slate-200" 
+                            placeholder="0" 
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-slate-400 block">商品売上 (総額)</label>
+                          <Input 
+                            type="number" 
+                            value={data.productSales} 
+                            onChange={(e) => updateStoreSales(store, "productSales", e.target.value)} 
+                            className="h-8 text-xs rounded font-bold border-slate-200" 
+                            placeholder="例: 5000" 
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-slate-400 block">うちキャッシュレス</label>
+                          <Input 
+                            type="number" 
+                            value={data.productCashless} 
+                            onChange={(e) => updateStoreSales(store, "productCashless", e.target.value)} 
+                            className="h-8 text-xs rounded font-bold border-slate-200" 
+                            placeholder="0" 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 合計表示 */}
+              <div className="bg-slate-900 text-white p-3 rounded-lg flex flex-col md:flex-row md:items-center justify-between text-xs font-bold shadow-sm gap-2">
+                <div>合計売上（自動集計結果）:</div>
+                <div className="flex flex-wrap gap-4 text-slate-300">
+                  <span>技術: <strong className="text-emerald-400">¥{(Number(techSales) || 0).toLocaleString()}</strong> (内キャッシュレス: ¥{(Number(techCashless) || 0).toLocaleString()})</span>
+                  <span>商品: <strong className="text-emerald-400">¥{(Number(productSales) || 0).toLocaleString()}</strong> (内キャッシュレス: ¥{(Number(productCashless) || 0).toLocaleString()})</span>
                 </div>
               </div>
+
               <p className="text-[10px] text-slate-400 font-semibold italic">
-                ※ 売上を入力すると、契約情報（技術歩合 {contractData.tech_sales_ratio}% / 商品歩合 {contractData.product_sales_ratio}% / 手数料 {contractData.deduction_cashless_ratio}%）に基づき「歩合報酬ベース」が自動計算されます。
+                ※ 各店舗の売上を入力すると、自動的に合算され、契約情報（技術歩合 {contractData.tech_sales_ratio}% / 商品歩合 {contractData.product_sales_ratio}% / 手数料 {contractData.deduction_cashless_ratio}%）に基づき「歩合報酬ベース」が自動計算されます。
               </p>
             </div>
           )}

@@ -767,6 +767,27 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
     const storesWorked = Array.from(storesWorkedSet).filter(Boolean);
     const storeLocation = storesWorked.length > 0 ? storesWorked.join("・") : "";
 
+    const storeSalesBreakdown: Record<string, {
+      techSales: number;
+      techCashless: number;
+      productSales: number;
+      productCashless: number;
+    }> = {};
+
+    for (const sale of staffSales) {
+      const storeName = sale.store_name || "不明";
+      if (!storeSalesBreakdown[storeName]) {
+        storeSalesBreakdown[storeName] = { techSales: 0, techCashless: 0, productSales: 0, productCashless: 0 };
+      }
+      const netTechSales = Math.max(0, sale.tech_sales - (sale.discount || 0));
+      storeSalesBreakdown[storeName].techSales += netTechSales;
+      storeSalesBreakdown[storeName].productSales += sale.product_sales;
+      if (sale.payment_method !== "現金" && sale.payment_method !== "不明") {
+        storeSalesBreakdown[storeName].techCashless += netTechSales;
+        storeSalesBreakdown[storeName].productCashless += sale.product_sales;
+      }
+    }
+
     // Calculate worked days & hours
     const workedDays = staffAttendances.length;
     let workedHours = 0;
@@ -994,7 +1015,8 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
         workedDays: finalWorkedDays,
         workedHours: finalWorkedHours,
         hourly_wage: finalHourlyWage,
-        work_location: storeLocation
+        work_location: storeLocation,
+        storeSalesBreakdown
       }
     };
   } catch (error: any) {
