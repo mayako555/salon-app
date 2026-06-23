@@ -287,26 +287,35 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
                      <div className="flex justify-between text-xs">
                        <span>役職・その他手当</span>
                        {/* @ts-ignore */}
-                       <span>{stmt.details.executive_allowance.toLocaleString()}</span>
-                     </div>
-                   )}
-
-                   {/* Legacy fallback - if it's an old statement that only has total_allowances but no detailed fields */}
-                   {stmt.total_allowances > 0 && 
-                    !stmt.details.transport_fee && 
-                    !stmt.details.nomination_reward && 
-                    // @ts-ignore
-                    !stmt.details.review_allowance && 
-                    // @ts-ignore
-                    !stmt.details.executive_allowance && (
-                     <div className="flex justify-between text-xs"><span>各種手当</span><span>{stmt.total_allowances.toLocaleString()}</span></div>
-                   )}
+                   {/* Legacy fallback / Unallocated Allowances */}
+                   {(() => {
+                     const allocated = 
+                       (stmt.details.transport_fee || 0) + 
+                       (stmt.details.nomination_reward || 0) + 
+                       // @ts-ignore
+                       (stmt.details.review_allowance || 0) + 
+                       // @ts-ignore
+                       (stmt.details.blog_allowance || 0) + 
+                       // @ts-ignore
+                       (stmt.details.executive_allowance || 0);
+                     
+                     const unallocated = stmt.total_allowances - allocated;
+                     
+                     if (unallocated > 0) {
+                       return (
+                         <div className="flex justify-between text-xs">
+                           <span>各種手当（内訳未登録分・その他）</span>
+                           <span>{unallocated.toLocaleString()}</span>
+                         </div>
+                       );
+                     }
+                     return null;
+                   })()}
 
                    {stmt.details.tax_addition > 0 && (
                      <div className="flex justify-between text-xs"><span>消費税加算額</span><span>{stmt.details.tax_addition.toLocaleString()}</span></div>
                    )}
                 </div>
-              </div>
 
               {/* Col 3: Deductions */}
               <div className="border-x-2 border-b-2 border-black relative">

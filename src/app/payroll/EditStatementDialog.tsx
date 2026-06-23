@@ -38,8 +38,21 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const [reviewAllowance, setReviewAllowance] = useState((stmt.details.review_allowance || 0).toString());
   // @ts-ignore
   const [blogAllowance, setBlogAllowance] = useState((stmt.details.blog_allowance || 0).toString());
+  
+  const allocated = 
+    (stmt.details.transport_fee || 0) + 
+    (stmt.details.nomination_reward || 0) + 
+    // @ts-ignore
+    (stmt.details.review_allowance || 0) + 
+    // @ts-ignore
+    (stmt.details.blog_allowance || 0) + 
+    // @ts-ignore
+    (stmt.details.executive_allowance || 0);
+  const unallocated = (stmt.total_allowances || 0) - allocated;
+  const initialExecutive = (stmt.details.executive_allowance || 0) + (unallocated > 0 ? unallocated : 0);
+
   // @ts-ignore
-  const [executiveAllowance, setExecutiveAllowance] = useState((stmt.details.executive_allowance || 0).toString());
+  const [executiveAllowance, setExecutiveAllowance] = useState(initialExecutive.toString());
   const [taxAddition, setTaxAddition] = useState((stmt.details.tax_addition || 0).toString());
 
   // Deductions State (Salary only)
