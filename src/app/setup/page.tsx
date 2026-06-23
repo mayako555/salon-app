@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
-import { getCompanySetupStatus, updateAdoptionProgress, AdoptionProgress } from "./actions";
+import { getCompanySetupStatus, updateAdoptionProgress } from "./actions";
+import { AdoptionProgress } from "./types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CheckCircle2, Circle, ArrowRight, ArrowLeft, Home, Store, Clock, BookOpen, Users, Calculator } from "lucide-react";
