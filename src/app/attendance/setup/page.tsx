@@ -6,10 +6,13 @@ import { Card } from "@/components/ui/card";
 import { MapPin, ArrowRight, Monitor, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 
-const STORES = ["神戸", "元町", "六甲"];
+import { useAuth } from "@/lib/auth-context";
 
 export default function AttendanceSetupPage() {
   const router = useRouter();
+  const { availableStores, loading } = useAuth();
+
+  const storesToUse = availableStores && availableStores.length > 0 ? availableStores : ["神戸", "元町", "六甲"];
 
   const handleSelectStore = (store: string) => {
     router.push(`/kiosk/attendance?store=${encodeURIComponent(store)}`);
@@ -33,27 +36,31 @@ export default function AttendanceSetupPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-4">
-            {STORES.map((store, index) => (
-              <motion.div
-                key={store}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <Button
-                  onClick={() => handleSelectStore(store)}
-                  className="w-full h-24 rounded-3xl bg-slate-50 hover:bg-slate-100 border-2 border-slate-100 hover:border-slate-900 transition-all group flex items-center justify-between px-8"
+            {loading ? (
+              <div className="text-center py-12 text-slate-400 font-bold animate-pulse text-sm">店舗情報を取得中...</div>
+            ) : (
+              storesToUse.map((store, index) => (
+                <motion.div
+                  key={store}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-900 shadow-sm border border-slate-100">
-                      <MapPin size={24} />
+                  <Button
+                    onClick={() => handleSelectStore(store)}
+                    className="w-full h-24 rounded-3xl bg-slate-50 hover:bg-slate-100 border-2 border-slate-100 hover:border-slate-900 transition-all group flex items-center justify-between px-8"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-900 shadow-sm border border-slate-100">
+                        <MapPin size={24} />
+                      </div>
+                      <span className="text-2xl font-black text-slate-800">{store}店</span>
                     </div>
-                    <span className="text-2xl font-black text-slate-800">{store}店</span>
-                  </div>
-                  <ArrowRight className="text-slate-300 group-hover:text-slate-900 transition-colors" />
-                </Button>
-              </motion.div>
-            ))}
+                    <ArrowRight className="text-slate-300 group-hover:text-slate-900 transition-colors" />
+                  </Button>
+                </motion.div>
+              ))
+            )}
           </div>
 
           <div className="pt-6 mt-6 border-t border-slate-100">
