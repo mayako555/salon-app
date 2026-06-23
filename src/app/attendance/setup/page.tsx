@@ -7,15 +7,33 @@ import { MapPin, ArrowRight, Monitor, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { useAuth } from "@/lib/auth-context";
+import { getKioskSettings } from "@/app/admin/settings/actions";
 
 export default function AttendanceSetupPage() {
   const router = useRouter();
-  const { availableStores, loading } = useAuth();
+  const { availableStores, profile, loading } = useAuth();
 
   const storesToUse = availableStores;
 
-  const handleSelectStore = (store: string) => {
-    router.push(`/kiosk/attendance?store=${encodeURIComponent(store)}`);
+  const handleSelectStore = async (store: string) => {
+    if (!profile?.companyId) {
+      alert("ログインセッションが無効です。一度ログインし直してください。");
+      return;
+    }
+    try {
+      const companyId = profile.companyId;
+      const settings = await getKioskSettings(companyId);
+      const storeConfig = settings[store];
+      
+      if (storeConfig && storeConfig.token) {
+        router.push(`/kiosk/attendance?companyId=${companyId}&storeId=${encodeURIComponent(store)}&token=${storeConfig.token}`);
+      } else {
+        alert(`${store}店の打刻端末設定（トークン）が登録されていません。\n管理画面の「設定」＞「店舗用タイムカード設定」で対象店舗を有効化してください。`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("端末設定の取得中にエラーが発生しました。");
+    }
   };
 
   return (
@@ -79,7 +97,7 @@ export default function AttendanceSetupPage() {
                 onClick={() => {
                   const input = document.getElementById("fcStoreName") as HTMLInputElement;
                   if (input && input.value) {
-                    router.push(`/kiosk/attendance?store=${encodeURIComponent(input.value)}&type=fc`);
+                    handleSelectStore(input.value);
                   }
                 }}
                 className="h-12 px-6 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold"
