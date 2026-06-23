@@ -11,9 +11,10 @@ type AllowanceTaskDialogProps = {
   onClose: () => void;
   onSuccess: () => void;
   onOpenDetail?: () => void;
+  onOpenTreatmentDetail?: () => void;
 };
 
-export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, onOpenDetail }: AllowanceTaskDialogProps) {
+export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, onOpenDetail, onOpenTreatmentDetail }: AllowanceTaskDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
@@ -39,11 +40,18 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
   // Other one-off allowances (SNS, Blog, Treatment)
   const [blogCount, setBlogCount] = useState("");
   const [snsCount, setSnsCount] = useState("");
-  const [treatmentCount, setTreatmentCount] = useState("");
+  const hasRegisteredTreatment = task.allowances.some(a => a.type === "treatment");
+  const [treatmentCount, setTreatmentCount] = useState(hasRegisteredTreatment ? "" : (task.treatment_count_auto || "").toString());
   
   const [blogStore, setBlogStore] = useState("六甲");
   const [snsStore, setSnsStore] = useState("六甲");
-  const [treatmentStore, setTreatmentStore] = useState("六甲");
+
+  let defaultTreatmentStore = "六甲";
+  if (!hasRegisteredTreatment && task.treatment_store_breakdown && Object.keys(task.treatment_store_breakdown).length > 0) {
+    const stores = Object.keys(task.treatment_store_breakdown);
+    defaultTreatmentStore = stores.reduce((a, b) => task.treatment_store_breakdown![a] > task.treatment_store_breakdown![b] ? a : b);
+  }
+  const [treatmentStore, setTreatmentStore] = useState(defaultTreatmentStore);
 
   const calculateAmount = (type: AllowanceType, countStr: string) => {
     const count = parseInt(countStr || "0", 10);
@@ -374,7 +382,14 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
                     <HelpCircle size={16} className="text-amber-500" />
                     トリートメント手当
                   </label>
-                  <p className="text-xs text-slate-500 mt-0.5">10件達成で 5,000円支給</p>
+                  <div className="flex items-center justify-between mt-0.5 pr-2">
+                    <p className="text-xs text-slate-500">10件達成で 5,000円支給</p>
+                    {onOpenTreatmentDetail && task.treatment_count_auto > 0 && (
+                      <button type="button" onClick={onOpenTreatmentDetail} className="text-[10px] text-blue-500 hover:text-blue-700 underline">
+                        明細を確認 ({task.treatment_count_auto}件)
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <select value={treatmentStore} onChange={e => setTreatmentStore(e.target.value)} className="h-10 px-2 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-emerald-500/20">

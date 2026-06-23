@@ -109,6 +109,9 @@ export type AllowanceTaskStatus = {
   review_count_auto: number;
   nomination_store_breakdown?: Record<string, number>;
   review_store_breakdown?: Record<string, number>;
+  treatments: SalesRecord[];
+  treatment_count_auto: number;
+  treatment_store_breakdown?: Record<string, number>;
 };
 
 export async function getMonthlyAllowanceTasks(year: number, month: number): Promise<AllowanceTaskStatus[]> {
@@ -197,6 +200,20 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
         reviewStoreBreakdown[store] = (reviewStoreBreakdown[store] || 0) + 1;
       });
 
+      // トリートメントデータを抽出
+      const staffTreatments = monthlySales.filter(s => {
+        const saleStaffNameNormal = (s.staff_name || "").replace(/\s+/g, "");
+        if (saleStaffNameNormal !== staffNameNormal) return false;
+        return s.menu_course && s.menu_course.includes("トリートメント");
+      });
+
+      // Group treatments by store
+      const treatmentStoreBreakdown: Record<string, number> = {};
+      staffTreatments.forEach(s => {
+        const store = s.store_name || "不明";
+        treatmentStoreBreakdown[store] = (treatmentStoreBreakdown[store] || 0) + 1;
+      });
+
       return {
         staff_id: staff.id,
         staff_name: staff.name,
@@ -209,7 +226,10 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
         nomination_fee_unit: staff.nomination_fee || 300,
         review_count_auto: staffReviews.length,
         nomination_store_breakdown: nominationStoreBreakdown,
-        review_store_breakdown: reviewStoreBreakdown
+        review_store_breakdown: reviewStoreBreakdown,
+        treatments: staffTreatments,
+        treatment_count_auto: staffTreatments.length,
+        treatment_store_breakdown: treatmentStoreBreakdown
       };
     });
 

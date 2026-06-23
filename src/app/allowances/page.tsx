@@ -10,6 +10,7 @@ import { Plus, Download, ChevronLeft, ChevronRight, MessageSquare, Edit3, Megaph
 import { format } from "date-fns";
 import AllowanceTaskDialog from "./AllowanceTaskDialog";
 import NominationDetailDialog from "./NominationDetailDialog";
+import TreatmentDetailDialog from "./TreatmentDetailDialog";
 import AuthGuard from "@/components/AuthGuard";
 import { AllowanceTaskStatus, getMonthlyAllowanceTasks, unmarkAllowanceChecked } from "./actions";
 import { UserCheck } from "lucide-react";
@@ -30,6 +31,7 @@ export default function AllowancesPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [selectedTask, setSelectedTask] = useState<AllowanceTaskStatus | null>(null);
   const [detailStaff, setDetailStaff] = useState<AllowanceTaskStatus | null>(null);
+  const [detailTreatmentStaff, setDetailTreatmentStaff] = useState<AllowanceTaskStatus | null>(null);
 
   const loadTasks = async () => {
     try {
@@ -247,6 +249,7 @@ export default function AllowancesPage() {
             loadTasks();
           }}
           onOpenDetail={() => setDetailStaff(selectedTask)} 
+          onOpenTreatmentDetail={() => setDetailTreatmentStaff(selectedTask)} 
         />
       )}
 
@@ -257,6 +260,16 @@ export default function AllowancesPage() {
           nominations={detailStaff.nominations}
           isOpen={true}
           onClose={() => setDetailStaff(null)}
+        />
+      )}
+
+      {detailTreatmentStaff && (
+        <TreatmentDetailDialog
+          staffName={detailTreatmentStaff.staff_name}
+          month={`${year}年${month}月`}
+          treatments={detailTreatmentStaff.treatments}
+          isOpen={true}
+          onClose={() => setDetailTreatmentStaff(null)}
         />
       )}
     </div>
