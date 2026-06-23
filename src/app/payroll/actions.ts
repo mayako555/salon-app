@@ -22,6 +22,19 @@ import { getMonthlyShifts, ShiftRecord } from "@/app/shifts/actions";
 import { addAuditLog } from "@/app/audit/actions";
 import { calculatePayrollTaxes } from "@/lib/tax-calculator";
 
+function normalizeStaffName(name: string) {
+  if (!name) return "";
+  return name.replace(/[\s　]+/g, "")
+    .replace(/凜/g, "凛")
+    .replace(/邊/g, "辺")
+    .replace(/齊|齋/g, "斉")
+    .replace(/澤/g, "沢")
+    .replace(/濱/g, "浜")
+    .replace(/嶋/g, "島")
+    .replace(/﨑|嵜/g, "崎")
+    .replace(/髙/g, "高");
+}
+
 // Helper function to extract contracts active in a specific month, keeping only the latest one per staff member
 function getActiveContractsForMonth(contracts: any[], year: number, month: number) {
   const startOfMonthStr = `${year}-${String(month).padStart(2, "0")}-01`;
@@ -244,9 +257,10 @@ export async function generateStatements(year: number, month: number) {
 
   // 4. Calculate for each contract
   for (const contract of activeContracts) {
-    const staffSales = sales.filter((s: any) => s.staff_name === contract.staff_name);
-    const staffAllowances = allowances.filter((a: any) => a.staff_name === contract.staff_name);
-    const staffAttendances = attendances.filter((a: AttendanceRecord) => a.staff_name === contract.staff_name);
+    const staffNameNormal = normalizeStaffName(contract.staff_name);
+    const staffSales = sales.filter((s: any) => s.staff_name && normalizeStaffName(s.staff_name) === staffNameNormal);
+    const staffAllowances = allowances.filter((a: any) => a.staff_name && normalizeStaffName(a.staff_name) === staffNameNormal);
+    const staffAttendances = attendances.filter((a: AttendanceRecord) => a.staff_name && normalizeStaffName(a.staff_name) === staffNameNormal);
     const staffPaidLeaves = shifts.filter((s: ShiftRecord) => s.staff_id === contract.staff_id && s.type === "paid_leave").length;
 
     const storesWorkedSet = new Set<string>();
@@ -754,9 +768,10 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
     const allowances = await getMonthlyAllowances(year, month);
     const attendances = await getMonthlyAttendance(year, month);
     
-    const staffSales = sales.filter((s: any) => s.staff_name === contract.staff_name);
-    const staffAllowances = allowances.filter((a: any) => a.staff_name === contract.staff_name);
-    const staffAttendances = attendances.filter((a: any) => a.staff_name === contract.staff_name);
+    const staffNameNormal = normalizeStaffName(contract.staff_name);
+    const staffSales = sales.filter((s: any) => s.staff_name && normalizeStaffName(s.staff_name) === staffNameNormal);
+    const staffAllowances = allowances.filter((a: any) => a.staff_name && normalizeStaffName(a.staff_name) === staffNameNormal);
+    const staffAttendances = attendances.filter((a: any) => a.staff_name && normalizeStaffName(a.staff_name) === staffNameNormal);
 
     const storesWorkedSet = new Set<string>();
     staffAttendances.forEach((att: any) => {
