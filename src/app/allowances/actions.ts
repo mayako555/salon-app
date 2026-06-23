@@ -231,7 +231,14 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
       const staffTreatments = monthlySales.filter(s => {
         const saleStaffNameNormal = (s.staff_name || "").replace(/\s+/g, "");
         if (saleStaffNameNormal !== staffNameNormal) return false;
-        return s.menu_course && s.menu_course.includes("トリートメント");
+        
+        const menuStr = (s.menu_course || "").toUpperCase();
+        const optionStr = (s.options || "").toUpperCase();
+        
+        const menuMatch = menuStr.includes("トリートメント") || menuStr.includes("TR");
+        const optionsMatch = optionStr.includes("トリートメント") || optionStr.includes("TR");
+        
+        return menuMatch || optionsMatch;
       });
 
       // Group treatments by store
