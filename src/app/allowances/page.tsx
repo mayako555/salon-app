@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { getMonthlyAllowances, AllowanceType, AllowanceRecord } from "./actions";
 import { getStaffList } from "@/app/staff/actions";
 import { Button } from "@/components/ui/button";
@@ -14,13 +14,9 @@ import AuthGuard from "@/components/AuthGuard";
 import { AllowanceTaskStatus, getMonthlyAllowanceTasks, unmarkAllowanceChecked } from "./actions";
 import { UserCheck } from "lucide-react";
 
-export default function AllowancesPage({
-  searchParams
-}: {
-  searchParams: Promise<{ month?: string }>
-}) {
-  const params = use(searchParams);
-  const monthParam = params.month;
+export default function AllowancesPage() {
+  const searchParams = useSearchParams();
+  const monthParam = searchParams.get("month");
   
   const targetDate = monthParam ? new Date(monthParam) : new Date();
   const year = targetDate.getFullYear();
