@@ -43,6 +43,8 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
   const hasRegisteredTreatment = task.allowances.some(a => a.type === "treatment");
   const [treatmentCount, setTreatmentCount] = useState(hasRegisteredTreatment ? "" : (task.treatment_count_auto || "").toString());
   
+  const [transportAmount, setTransportAmount] = useState("");
+  
   const [blogStore, setBlogStore] = useState("六甲");
   const [snsStore, setSnsStore] = useState("六甲");
 
@@ -112,6 +114,9 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
       const tAmount = calculateAmount("treatment", treatmentCount);
       if (tAmount > 0) allowances.push({ type: "treatment" as AllowanceType, amount: tAmount, store_name: treatmentStore, target_details: { count: parseInt(treatmentCount) } });
 
+      const trAmount = parseInt(transportAmount || "0", 10);
+      if (trAmount > 0) allowances.push({ type: "transport" as AllowanceType, amount: trAmount, store_name: "全店共通", target_details: { context: "管理画面から追加" } });
+
       const res = await saveStaffAllowanceTask({
         staff_id: task.staff_id,
         staff_name: task.staff_name,
@@ -163,7 +168,7 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
     }
   };
 
-  const hasAnyInput = STORES.some(s => reviewStoreCounts[s] || nominationStoreCounts[s]) || blogCount || snsCount || treatmentCount;
+  const hasAnyInput = STORES.some(s => reviewStoreCounts[s] || nominationStoreCounts[s]) || blogCount || snsCount || treatmentCount || transportAmount;
 
   if (!isOpen) return null;
 
@@ -407,6 +412,23 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
                 </div>
                 <div className="w-20 text-right font-bold text-emerald-600">
                   ¥{calculateAmount("treatment", treatmentCount).toLocaleString()}
+                </div>
+              </div>
+
+              {/* Transport */}
+              <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-lg p-3">
+                <div className="flex-1">
+                  <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                    <span className="text-slate-500">🚆</span>
+                    交通費（通勤手当）
+                  </label>
+                  <p className="text-xs text-slate-500 mt-0.5">※管理画面から直接入力する場合</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <input type="number" min="0" value={transportAmount} onChange={e => setTransportAmount(e.target.value)} placeholder="0" className="w-28 h-10 px-2 pl-8 border border-slate-300 rounded-md text-right font-bold text-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+                    <span className="absolute left-3 top-2.5 text-sm font-bold text-slate-400">¥</span>
+                  </div>
                 </div>
               </div>
             </div>
