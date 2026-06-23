@@ -96,7 +96,10 @@ export default function NominationDetailDialog({
                       <td className="px-4 py-3 font-bold text-slate-800">{sale.customer_name}</td>
                       <td className="px-4 py-3">
                         <div className="text-xs text-slate-700 font-bold leading-relaxed max-w-[300px]">
-                          {sale.options ? sale.options : <span className="text-slate-400 font-normal">（オプション記載なし）</span>}
+                          {sale.options 
+                            ? sale.options 
+                            : (sale.nomination_fee > 0 ? "◎指名料" : <span className="text-slate-400 font-normal">（オプション記載なし）</span>)
+                          }
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right font-black text-blue-600">
