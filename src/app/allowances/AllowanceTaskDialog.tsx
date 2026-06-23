@@ -10,9 +10,10 @@ type AllowanceTaskDialogProps = {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  onOpenDetail?: () => void;
 };
 
-export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }: AllowanceTaskDialogProps) {
+export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, onOpenDetail }: AllowanceTaskDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
@@ -252,7 +253,14 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess }
                         <span className="text-emerald-500 font-black text-sm">★</span>
                         <span>指名手当 (指名数)</span>
                       </div>
-                      <span className="text-[10px] text-slate-400 font-normal mt-0.5 block">1件 {task.nomination_fee_unit || 300}円</span>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className="text-[10px] text-slate-400 font-normal block">1件 {task.nomination_fee_unit || 300}円</span>
+                        {onOpenDetail && (
+                          <button type="button" onClick={onOpenDetail} className="text-[10px] text-blue-500 hover:text-blue-700 underline flex items-center gap-0.5">
+                            明細を確認 ({task.nomination_count}件)
+                          </button>
+                        )}
+                      </div>
                     </th>
                   </tr>
                 </thead>

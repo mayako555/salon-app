@@ -245,7 +245,8 @@ export default function AllowancesPage() {
           onSuccess={() => {
             setSelectedTask(null);
             loadTasks();
-          }} 
+          }}
+          onOpenDetail={() => setDetailStaff(selectedTask)} 
         />
       )}
 
