@@ -229,14 +229,16 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
 
       // トリートメントデータを抽出
       const staffTreatments = monthlySales.filter(s => {
+        if (s.treatment_excluded) return false;
+
         const saleStaffNameNormal = (s.staff_name || "").replace(/\s+/g, "");
         if (saleStaffNameNormal !== staffNameNormal) return false;
         
         const menuStr = (s.menu_course || "").toUpperCase();
         const optionStr = (s.options || "").toUpperCase();
         
-        const menuMatch = menuStr.includes("トリートメント") || menuStr.includes("TR");
-        const optionsMatch = optionStr.includes("トリートメント") || optionStr.includes("TR");
+        const menuMatch = menuStr.includes("トリートメント") || menuStr.includes("TR") || menuStr.includes("スペシャルケア");
+        const optionsMatch = optionStr.includes("トリートメント") || optionStr.includes("TR") || optionStr.includes("スペシャルケア");
         
         return menuMatch || optionsMatch;
       });
@@ -440,5 +442,16 @@ export async function deleteAllowance(id: string) {
   } catch (error: any) {
     console.error("Error deleting allowance:", error);
     return { success: false, error: error.message || "エラーが発生しました。" };
+  }
+}
+
+export async function toggleTreatmentExclusion(saleId: string, exclude: boolean) {
+  try {
+    const saleRef = doc(db, "sales", saleId);
+    await updateDoc(saleRef, { treatment_excluded: exclude });
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error toggling treatment exclusion:", err);
+    return { success: false, error: err.message };
   }
 }

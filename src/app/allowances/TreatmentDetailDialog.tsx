@@ -1,9 +1,11 @@
 "use client";
 
-import { X, HelpCircle, Calendar, Info } from "lucide-react";
+import { useState } from "react";
+import { X, HelpCircle, Calendar, Info, Ban } from "lucide-react";
 import { SalesRecord } from "@/app/sales/actions";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
+import { toggleTreatmentExclusion } from "./actions";
 
 type TreatmentDetailDialogProps = {
   staffName: string;
@@ -16,10 +18,22 @@ type TreatmentDetailDialogProps = {
 export default function TreatmentDetailDialog({ 
   staffName, 
   month, 
-  treatments, 
+  treatments: initialTreatments, 
   isOpen, 
   onClose 
 }: TreatmentDetailDialogProps) {
+  const [treatments, setTreatments] = useState(initialTreatments);
+
+  const handleExclude = async (saleId: string) => {
+    if (!confirm("このトリートメントを手当の集計から除外しますか？\\n※手当の再計算には一度画面をリロードするか、再度確認ボタンを押し直してください。")) return;
+    const res = await toggleTreatmentExclusion(saleId, true);
+    if (res.success) {
+      setTreatments(prev => prev.filter(t => t.id !== saleId));
+    } else {
+      alert("エラーが発生しました: " + res.error);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -76,6 +90,7 @@ export default function TreatmentDetailDialog({
                     <th className="px-4 py-3">顧客名</th>
                     <th className="px-4 py-3">メニュー</th>
                     <th className="px-4 py-3">経路</th>
+                    <th className="px-4 py-3 text-right">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -100,6 +115,14 @@ export default function TreatmentDetailDialog({
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
                           {sale.reservation_route}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button 
+                          onClick={() => handleExclude(sale.id)}
+                          className="text-[10px] font-bold text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded-md transition-colors border border-rose-100"
+                        >
+                          除外
+                        </button>
                       </td>
                     </tr>
                   ))}
