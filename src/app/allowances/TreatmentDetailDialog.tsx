@@ -107,15 +107,21 @@ export default function TreatmentDetailDialog({
                       </td>
                       <td className="px-4 py-3 font-bold text-slate-800">{sale.customer_name}</td>
                       <td className="px-4 py-3">
-                        <div className="text-xs text-slate-700 font-medium leading-relaxed max-w-[400px]">
-                          {sale.menu_course}
+                        <div className="text-xs text-slate-700 font-bold leading-relaxed max-w-[400px]">
+                          {(() => {
+                            const keywords = ["トリートメント", "TR", "スペシャルケア"];
+                            const menuParts = (sale.menu_course || "").split(",");
+                            const optionParts = (sale.options || "").split(",");
+                            const matched = [...menuParts, ...optionParts]
+                              .map(p => p.trim())
+                              .filter(p => keywords.some(k => p.toUpperCase().includes(k)));
+                            
+                            if (matched.length > 0) {
+                              return matched.join(", ");
+                            }
+                            return sale.menu_course;
+                          })()}
                         </div>
-                        {sale.options && (
-                          <div className="mt-1.5 text-[10px] text-slate-500 bg-slate-50 p-1.5 rounded-md border border-slate-100 max-w-[400px]">
-                            <span className="font-bold mr-1">OP:</span>
-                            {sale.options}
-                          </div>
-                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
