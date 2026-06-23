@@ -141,6 +141,19 @@ export type AllowanceTaskStatus = {
   treatment_store_breakdown?: Record<string, number>;
 };
 
+function normalizeStaffName(name: string) {
+  if (!name) return "";
+  return name.replace(/[\s　]+/g, "")
+    .replace(/凜/g, "凛")
+    .replace(/邊/g, "辺")
+    .replace(/齊|齋/g, "斉")
+    .replace(/澤/g, "沢")
+    .replace(/濱/g, "浜")
+    .replace(/嶋/g, "島")
+    .replace(/﨑|嵜/g, "崎")
+    .replace(/髙/g, "高");
+}
+
 export async function getMonthlyAllowanceTasks(year: number, month: number): Promise<AllowanceTaskStatus[]> {
   
   const targetPrefix = `${year}-${String(month).padStart(2, '0')}`;
@@ -192,20 +205,20 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
       });
 
       // 指名データを抽出（名前でマッチング）
-      const staffNameNormal = staff.name.replace(/\s+/g, "");
+      const staffNameNormal = normalizeStaffName(staff.name);
       const staffNominations = monthlySales.filter(s => {
-        const saleStaffNameNormal = (s.staff_name || "").replace(/\s+/g, "");
+        const saleStaffNameNormal = normalizeStaffName(s.staff_name);
         return saleStaffNameNormal === staffNameNormal && s.is_nominated;
       });
 
       // ★5口コミを抽出（返信テキストやスタッフ名でマッチング）
       const staffReviews = monthlyReviews.filter(r => {
         if (r.rating !== 5) return false;
-        if (r.staff_name === staff.name) return true;
+        if (normalizeStaffName(r.staff_name) === staffNameNormal) return true;
         // fallback to checking reply_text for staff name or katakana
         if (r.reply_text) {
           const kanji = staffNameNormal;
-          const kana = (staff.name_kana || "").replace(/\s+/g, "");
+          const kana = normalizeStaffName(staff.name_kana);
           if (kanji && r.reply_text.includes(kanji)) return true;
           if (kana && r.reply_text.includes(kana)) return true;
           if (staff.last_name && r.reply_text.includes(staff.last_name)) return true;
@@ -231,7 +244,7 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
       const staffTreatments = monthlySales.filter(s => {
         if (s.treatment_excluded) return false;
 
-        const saleStaffNameNormal = (s.staff_name || "").replace(/\s+/g, "");
+        const saleStaffNameNormal = normalizeStaffName(s.staff_name);
         if (saleStaffNameNormal !== staffNameNormal) return false;
         
         const menuStr = (s.menu_course || "").toUpperCase();
