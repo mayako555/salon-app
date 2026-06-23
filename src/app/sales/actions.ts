@@ -60,6 +60,7 @@ export type SalesRecord = {
   next_booking_date?: string; // 次回予約日
   next_booking_time?: string; // 次回予約時間
   next_booking_staff_name?: string; // 次回予約担当者
+  next_booking_nominated?: boolean; // 次回予約指名
   next_booking_line_reminder?: boolean; // 2日前のリマインダー送付
   customer_id?: string;
   is_minimo?: boolean;
