@@ -73,7 +73,7 @@ export async function getTradeAreaStats() {
       const store = data.store_name || (data as any).main_store;
       
       // Filter permissions
-      if (!isInHouse) {
+      if (!isTenantAdmin) {
         if (!ctx.salonIds?.includes(store) && store !== ctx.salonIds?.[0]) {
           return;
         }
@@ -99,7 +99,7 @@ export async function getTradeAreaStats() {
       const data = doc.data();
       const store = data.store_name || (data as any).main_store;
       
-      if (!isInHouse) {
+      if (!isTenantAdmin) {
         if (!ctx.salonIds?.includes(store) && store !== ctx.salonIds?.[0]) {
           return;
         }
