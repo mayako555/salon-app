@@ -93,7 +93,7 @@ export async function getMonthlyAttendance(year: number, month: number): Promise
 }
 
 async function autoFixMissingClockOuts(records: AttendanceRecord[], adminDb: any): Promise<AttendanceRecord[]> {
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = new Date(new Date().getTime() + 9 * 60 * 60 * 1000).toISOString().split("T")[0];
   const needsFix = records.filter(r => !r.clock_out && r.date < todayStr);
   
   if (needsFix.length === 0) return records;
@@ -390,7 +390,7 @@ export async function recordFcClockOut(staffId: string) {
 export async function handleQRScan(staffId: string, store?: string) {
   try {
     const now = new Date();
-    const dateStr = now.toISOString().split("T")[0];
+    const dateStr = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().split("T")[0];
     const colRef = collection(db, ATTENDANCE_COLLECTION);
     
     const staffDoc = await getDocs(query(collection(db, "staff_profiles"), where("__name__", "==", staffId)));
