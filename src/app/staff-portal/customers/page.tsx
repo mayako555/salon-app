@@ -56,7 +56,7 @@ export default function StaffCustomersPage() {
       const store = c.store_name || (c as any).main_store;
       
       // If store is completely undefined and they are a franchise, they shouldn't see it
-      if (!isInHouse && (!store || !allowedStores.includes(store))) {
+      if (!isTenantAdmin && (!store || !allowedStores.includes(store))) {
         return false;
       }
 
