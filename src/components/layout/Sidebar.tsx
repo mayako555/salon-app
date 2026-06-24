@@ -57,16 +57,16 @@ const managementCategories = [
     title: "分析・経理",
     items: [
       { name: "高度分析", href: "/analytics", icon: Sparkles, role: "admin" }, // All admins can see the page, but tabs are restricted inside
-      { name: "経費・収支管理", href: "/admin/expenses", icon: Wallet, role: "companyOwner" },
-      { name: "給与・報酬計算", href: "/payroll", icon: Calculator, role: "companyOwner" },
+      { name: "経費・収支管理", href: "/admin/expenses", icon: Wallet, role: "admin" },
+      { name: "給与・報酬計算", href: "/payroll", icon: Calculator, role: "admin" },
     ]
   },
   {
     title: "勤怠・シフト",
     items: [
       { name: "シフト管理", href: "/shifts", icon: CalendarDays, role: "manager" },
-      { name: "勤怠管理", href: "/attendance", icon: Clock, role: "companyOwner" },
-      { name: "店舗用タイムカード", href: "/attendance/setup", icon: Clock, role: "companyOwner" },
+      { name: "勤怠管理", href: "/attendance", icon: Clock, role: "admin" },
+      { name: "店舗用タイムカード", href: "/attendance/setup", icon: Clock, role: "admin" },
       { name: "有給管理", href: "/admin/paid-leaves", icon: CalendarDays, role: "admin" },
     ]
   },
@@ -75,20 +75,20 @@ const managementCategories = [
     items: [
       { name: "採用管理", href: "/admin/recruitment", icon: Briefcase, role: "admin" },
       { name: "スタッフ管理", href: "/staff", icon: Users, role: "admin" },
-      { name: "スタッフ評価", href: "/evaluations", icon: Award, role: "companyOwner" },
-      { name: "新人教育", href: "/training", icon: GraduationCap, role: "companyOwner" },
+      { name: "スタッフ評価", href: "/evaluations", icon: Award, role: "admin" },
+      { name: "新人教育", href: "/training", icon: GraduationCap, role: "admin" },
     ]
   },
   {
     title: "マスタ・データ管理",
     items: [
-      { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste, role: "companyOwner" },
-      { name: "口コミ一括取込", href: "/admin/reviews/import", icon: ClipboardPaste, role: "companyOwner" },
+      { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste, role: "admin" },
+      { name: "口コミ一括取込", href: "/admin/reviews/import", icon: ClipboardPaste, role: "admin" },
       { name: "店舗運用マスタ", href: "/admin/master/operations", icon: Database, role: "admin" },
       { name: "システム管理マスタ", href: "/admin/master/system", icon: Settings, role: "systemOwner" },
       { name: "在庫管理", href: "/inventory", icon: Package, role: "manager" },
-      { name: "雇用・業務委託契約", href: "/contracts", icon: FileText, role: "companyOwner" },
-      { name: "手当管理", href: "/allowances", icon: Gift, role: "companyOwner" },
+      { name: "雇用・業務委託契約", href: "/contracts", icon: FileText, role: "admin" },
+      { name: "手当管理", href: "/allowances", icon: Gift, role: "admin" },
       { name: "FC契約・請求管理", href: "/admin/settings/subscription", icon: Building2, role: "companyOwner" },
       { name: "システム設定", href: "/admin/settings", icon: Settings, role: "systemOwner" },
       { name: "監査ログ", href: "/audit", icon: Settings, role: "systemOwner" },

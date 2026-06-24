@@ -9,6 +9,7 @@ import StatementDialog from "./StatementDialog";
 import EditStatementDialog from "./EditStatementDialog";
 import CreateStatementDialog from "./CreateStatementDialog";
 import DeleteStatementButton from "./DeleteStatementButton";
+import TransferToggleButton from "./TransferToggleButton";
 import StatusToggleButton from "./StatusToggleButton";
 import { getStaffList } from "../staff/actions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -142,6 +143,7 @@ export default async function PayrollPage({
                   <TableHead className="text-right text-emerald-600">消費税加算</TableHead>
                   <TableHead className="text-right">差引支給額 / 最終請求額</TableHead>
                   <TableHead className="text-center w-28">状態</TableHead>
+                  <TableHead className="text-center w-28">振込</TableHead>
                   <TableHead className="text-right w-36">アクション</TableHead>
                 </TableRow>
               </TableHeader>
@@ -186,6 +188,14 @@ export default async function PayrollPage({
                         }`} />
                         {stmt.status === "closed" ? "確定済み" : "一時保存"}
                       </span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <TransferToggleButton 
+                        id={stmt.id} 
+                        status={stmt.status} 
+                        isTransferred={!!stmt.is_transferred} 
+                        staffName={stmt.staff_name} 
+                      />
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end items-center gap-1.5">

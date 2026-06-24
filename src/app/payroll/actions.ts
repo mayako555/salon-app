@@ -71,6 +71,7 @@ export type MonthlyStatement = {
   total_deductions: number;
   final_paid_amount: number;
   status: "draft" | "closed";
+  is_transferred?: boolean;
   work_location?: string;
   note?: string;
   adjustments?: {
@@ -140,6 +141,20 @@ export async function getMonthlyStatements(year: number, month: number, staffId?
   } catch (error) {
     console.error("Error fetching monthly statements:", error);
     return [];
+  }
+}
+
+export async function toggleTransferStatus(id: string, currentStatus: boolean): Promise<{success: boolean, error?: string}> {
+  try {
+    const docRef = doc(db, STATEMENTS_COLLECTION, id);
+    await updateDoc(docRef, {
+      is_transferred: !currentStatus,
+      updated_at: serverTimestamp()
+    });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error toggling transfer status:", error);
+    return { success: false, error: error.message };
   }
 }
 

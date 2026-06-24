@@ -456,7 +456,13 @@ export async function getKioskStaffList(companyId: string) {
 
   try {
     const { adminDb } = await import("@/lib/firebase-admin");
+    const now = new Date();
+    const dateStr = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const attendanceSnap = await adminDb.collection("attendance").where("date", "==", dateStr).get();
+    const todayRecords = attendanceSnap.docs.map((doc: any) => doc.data());
+
     const snap = await adminDb.collection("staff_profiles").get();
+
     const staffList = snap.docs.map((doc: any) => {
       const data = doc.data();
       const serializedData: any = {};
@@ -469,13 +475,31 @@ export async function getKioskStaffList(companyId: string) {
           serializedData[key] = value;
         }
       }
+
+      const staffRecords = todayRecords.filter((r: any) => r.staff_id === doc.id);
+      const activeRecord = staffRecords.find((r: any) => !r.clock_out);
+      const hasClockedInToday = staffRecords.length > 0;
+      
+      let today_status = "none";
+      if (activeRecord) {
+        today_status = "working";
+      } else if (hasClockedInToday) {
+        today_status = "finished";
+      }
+
       return {
         id: doc.id,
-        ...serializedData
+        ...serializedData,
+        today_status
       };
     });
     
-    const filteredStaff = staffList.filter((s: any) => s.companyId === companyId);
+    const filteredStaff = staffList.filter((s: any) => 
+      s.companyId === companyId && 
+      s.status !== "resigned" && 
+      s.employment_status !== "resigned" && 
+      s.employment_status !== "retired"
+    );
 
     return filteredStaff.sort((a: any, b: any) => {
       const aIsRetired = a.employment_status === "retired";

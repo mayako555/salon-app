@@ -113,7 +113,7 @@ export default function StaffPayrollPage() {
             </h2>
           </div>
 
-          <div className="p-0">
+          <div className="p-4 sm:p-6">
             {isLoading ? (
               <div className="py-20 text-center text-slate-400">読み込み中...</div>
             ) : !isAvailable ? (
@@ -139,42 +139,26 @@ export default function StaffPayrollPage() {
                 </div>
               </div>
             ) : (
-              <Table>
-                <TableHeader className="bg-slate-50/50">
-                  <TableRow>
-                    <TableHead>種別</TableHead>
-                    <TableHead className="text-right">総支給額 (税込)</TableHead>
-                    <TableHead className="text-center">ステータス</TableHead>
-                    <TableHead className="text-right">詳細</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {statements.map((stmt) => (
-                    <TableRow key={stmt.id} className="hover:bg-slate-50/50 transition-colors">
-                      <TableCell>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          stmt.type === "salary" ? "bg-blue-100 text-blue-800" : "bg-emerald-100 text-emerald-800"
-                        }`}>
-                          {stmt.type === "salary" ? "給与" : "業務委託報酬"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-lg text-slate-800">
-                        ¥{(stmt.base_amount + stmt.total_allowances + (stmt.details.tax_addition || 0)).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className={`text-xs px-2 py-1 rounded-md font-bold ${
-                          stmt.status === "closed" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
-                        }`}>
-                          {stmt.status === "closed" ? "確定済み" : "計算中"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <StatementDialog stmt={stmt} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="space-y-4">
+                {statements.map((stmt) => (
+                  <div key={stmt.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 border border-slate-200 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                        <Banknote size={20} />
+                      </div>
+                      <div>
+                        <h3 className="font-black text-slate-800 text-lg">
+                          {year}年{month}月分 {stmt.type === "salary" ? "給与" : "業務委託報酬"}
+                        </h3>
+                        <p className="text-sm text-slate-500 font-medium mt-0.5">支払明細書</p>
+                      </div>
+                    </div>
+                    <div>
+                      <StatementDialog stmt={stmt} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>

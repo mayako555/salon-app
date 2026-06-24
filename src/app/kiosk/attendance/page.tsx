@@ -18,7 +18,7 @@ function KioskApp() {
   const [initializing, setInitializing] = useState(true);
   const [message, setMessage] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const [selectedStaff, setSelectedStaff] = useState<{id: string, name: string} | null>(null);
+  const [selectedStaff, setSelectedStaff] = useState<any | null>(null);
   const [staffList, setStaffList] = useState<any[]>([]);
 
   useEffect(() => {
@@ -64,7 +64,10 @@ function KioskApp() {
       setMessage(`【エラー】${res.error}`);
     }
     
+    const list = await getKioskStaffList(companyId);
+
     setTimeout(() => {
+      setStaffList(list);
       setLoading(false);
       setSelectedStaff(null);
       setTimeout(() => setMessage(""), 5000);
@@ -135,12 +138,22 @@ function KioskApp() {
               <button
                 key={staff.id}
                 onClick={() => setSelectedStaff(staff)}
-                className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-200 ${
+                className={`relative flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-200 ${
                   selectedStaff?.id === staff.id 
                   ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-black shadow-md transform scale-105' 
                   : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:bg-slate-50 font-bold'
                 }`}
               >
+                {staff.today_status === "working" && (
+                  <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse shadow-md">
+                    出勤中
+                  </div>
+                )}
+                {staff.today_status === "finished" && (
+                  <div className="absolute -top-2 -right-2 bg-slate-400 text-white text-[10px] px-2 py-0.5 rounded-full font-black shadow-md">
+                    退勤済
+                  </div>
+                )}
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 text-lg ${selectedStaff?.id === staff.id ? 'bg-indigo-200' : 'bg-slate-100'}`}>
                   {staff.name.charAt(0)}
                 </div>
@@ -165,37 +178,21 @@ function KioskApp() {
             <div className="grid grid-cols-2 gap-4">
               <Button 
                 onClick={() => handleAction("IN", "出勤")} 
-                disabled={loading || !selectedStaff}
-                className="h-24 rounded-2xl flex flex-col gap-1 bg-gradient-to-br from-emerald-500 to-emerald-400 hover:from-emerald-600 hover:to-emerald-500 text-white shadow-lg disabled:opacity-40 transition-all text-2xl font-black"
+                disabled={loading || !selectedStaff || selectedStaff.today_status === "working"}
+                className="h-32 rounded-2xl flex flex-col gap-2 bg-gradient-to-br from-emerald-500 to-emerald-400 hover:from-emerald-600 hover:to-emerald-500 text-white shadow-xl disabled:opacity-40 transition-all text-3xl font-black"
               >
-                <LogIn size={24} className="opacity-50" /> 出勤
+                <LogIn size={32} className="opacity-50" /> 出勤
               </Button>
 
               <Button 
                 onClick={() => handleAction("OUT", "退勤")} 
-                disabled={loading || !selectedStaff}
-                className="h-24 rounded-2xl flex flex-col gap-1 bg-gradient-to-br from-slate-700 to-slate-600 hover:from-slate-800 hover:to-slate-700 text-white shadow-lg disabled:opacity-40 transition-all text-2xl font-black"
+                disabled={loading || !selectedStaff || selectedStaff.today_status !== "working"}
+                className="h-32 rounded-2xl flex flex-col gap-2 bg-gradient-to-br from-slate-700 to-slate-600 hover:from-slate-800 hover:to-slate-700 text-white shadow-xl disabled:opacity-40 transition-all text-3xl font-black"
               >
-                <LogOut size={24} className="opacity-50" /> 退勤
+                <LogOut size={32} className="opacity-50" /> 退勤
               </Button>
 
-              <Button 
-                onClick={() => handleAction("BREAK_START", "休憩開始")} 
-                disabled={loading || !selectedStaff}
-                variant="outline"
-                className="h-20 rounded-2xl flex flex-col gap-1 border-2 border-amber-200 text-amber-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300 shadow-sm disabled:opacity-40 transition-all text-lg font-black"
-              >
-                <Coffee size={20} className="opacity-50" /> 休憩開始
-              </Button>
 
-              <Button 
-                onClick={() => handleAction("BREAK_END", "休憩終了")} 
-                disabled={loading || !selectedStaff}
-                variant="outline"
-                className="h-20 rounded-2xl flex flex-col gap-1 border-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 shadow-sm disabled:opacity-40 transition-all text-lg font-black"
-              >
-                <Briefcase size={20} className="opacity-50" /> 休憩終了
-              </Button>
             </div>
           </div>
         </div>

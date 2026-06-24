@@ -43,7 +43,8 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
     router.push("/staff/login");
   };
 
-  const isAdminOrManager = profile?.role === "admin" || profile?.role === "manager";
+  const isManagerOrAbove = profile?.role === "manager" || profile?.role === "admin" || profile?.role === "companyOwner" || profile?.role === "systemOwner";
+  const isCompanyOwnerOrAbove = profile?.role === "companyOwner" || profile?.role === "systemOwner";
   const canViewTimecard = profile?.role === "systemOwner" || profile?.role === "companyOwner" || profile?.role === "admin";
   const isTenantAdmin = profile?.role === "systemOwner" || profile?.role === "admin" || profile?.role === "companyOwner";
   const allowedStores = isTenantAdmin ? availableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : availableStores);
@@ -54,11 +55,14 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
     { name: "顧客管理", href: "/staff-portal/customers", icon: Users },
     { name: "売上管理・レジ締め", href: "/sales", icon: Lock },
     { name: "シフト確認", href: "/staff-portal/shifts", icon: Calendar },
-    ...(isAdminOrManager ? [
+    ...(isManagerOrAbove ? [
       { name: "ダッシュボード", href: "/dashboard", icon: LayoutDashboard },
       { name: "スタッフ管理", href: "/staff", icon: Users },
       { name: "メニュー・商品設定", href: "/admin/master/operations", icon: Database },
       { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste },
+    ] : []),
+    ...(isCompanyOwnerOrAbove ? [
+      { name: "給与・報酬計算", href: "/payroll", icon: Calculator },
     ] : []),
     ...(canViewTimecard ? [
       { name: "タイムカード", href: "/attendance", icon: Clock },
@@ -139,7 +143,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{profile?.role || "staff"}</p>
             </div>
           </div>
-          {isAdminOrManager && (
+          {isManagerOrAbove && (
             <Link href="/dashboard" className="mb-2 block">
               <Button 
                 variant="outline" 
@@ -183,7 +187,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
               {allowedStores[0] || "メイン店舗"}
             </span>
           )}
-          {isAdminOrManager && (
+          {isManagerOrAbove && (
             <Link href="/dashboard" className="text-blue-400">
               <Settings size={18} />
             </Link>

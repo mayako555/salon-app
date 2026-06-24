@@ -92,7 +92,7 @@ export default function StaffDashboardPage() {
       
       // Filter today's shifts and sort by staff sort_order
       const tShifts = mShifts
-        .filter((s: any) => s.date === today && s.type === 'work' && (localIsInHouse || s.segments?.some((seg: any) => localAvailableStores.some((ls: string) => ls.includes(seg.store) || seg.store.includes(ls.replace("店", ""))))))
+        .filter((s: any) => s.date === today && s.type === 'work' && (localIsTenantAdmin || s.segments?.some((seg: any) => localAvailableStores.some((ls: string) => ls.includes(seg.store) || seg.store.includes(ls.replace("店", ""))))))
         .sort((a, b) => {
           const staffA = sList.find(s => s.id === a.staff_id);
           const staffB = sList.find(s => s.id === b.staff_id);
@@ -102,7 +102,7 @@ export default function StaffDashboardPage() {
       setStaffListData(sList);
       
       // Filter sales by available stores
-      const storeSales = localIsInHouse ? sales : sales.filter(s => localAvailableStores.includes(s.store_name));
+      const storeSales = localIsTenantAdmin ? sales : sales.filter(s => localAvailableStores.includes(s.store_name));
       const todaySalesData = storeSales.filter(s => s.date === today);
       const total = todaySalesData.reduce((acc, s) => acc + (s.tech_sales || 0) + (s.product_sales || 0) - (s.discount || 0), 0);
       
@@ -136,7 +136,7 @@ export default function StaffDashboardPage() {
       // Sort by created_at desc and take top 5
       // If store_name is not available on customer, we might lose them if we strictly filter.
       // Assuming store_name is set for new customers from now on. For existing, we can only do our best.
-      const storeCustomers = localIsInHouse ? customers : customers.filter(c => !c.store_name || localAvailableStores.includes(c.store_name));
+      const storeCustomers = localIsTenantAdmin ? customers : customers.filter(c => !c.store_name || localAvailableStores.includes(c.store_name));
       const sorted = [...storeCustomers].sort((a, b) => {
         const dateA = a.created_at?.toDate?.() || new Date(0);
         const dateB = b.created_at?.toDate?.() || new Date(0);
@@ -516,7 +516,7 @@ export default function StaffDashboardPage() {
           </div>
           
           <div className="grid grid-cols-1 gap-3">
-            {contextAvailableStores.filter(store => isInHouse || allowedStores.includes(store)).map(store => {
+            {contextAvailableStores.filter(store => isTenantAdmin || allowedStores.includes(store)).map(store => {
               const staffAtStore = todayShifts.filter(s => 
                 s.segments?.some((seg: any) => store.includes(seg.store) || seg.store.includes(store.replace("店", "")))
               );

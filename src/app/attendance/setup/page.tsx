@@ -7,7 +7,7 @@ import { MapPin, ArrowRight, Monitor, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { useAuth } from "@/lib/auth-context";
-import { getKioskSettings } from "@/app/admin/settings/actions";
+import { getKioskSettings, saveKioskSettings } from "@/app/admin/settings/actions";
 
 export default function AttendanceSetupPage() {
   const router = useRouter();
@@ -35,7 +35,10 @@ export default function AttendanceSetupPage() {
       if (storeConfig && storeConfig.token) {
         router.push(`/kiosk/attendance?companyId=${companyId}&storeId=${encodeURIComponent(store)}&token=${storeConfig.token}`);
       } else {
-        alert(`${store}店の打刻端末設定（トークン）が登録されていません。\n管理画面の「設定」＞「店舗用タイムカード設定」で対象店舗を有効化してください。`);
+        // Automatically generate a token and save it since it's missing
+        const newToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        await saveKioskSettings(companyId, store, newToken, true);
+        router.push(`/kiosk/attendance?companyId=${companyId}&storeId=${encodeURIComponent(store)}&token=${newToken}`);
       }
     } catch (err) {
       console.error(err);

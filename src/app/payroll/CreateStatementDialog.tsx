@@ -80,6 +80,8 @@ export default function CreateStatementDialog({
   const [productSales, setProductSales] = useState("");
   const [techCashless, setTechCashless] = useState("");
   const [productCashless, setProductCashless] = useState("");
+  const [techCommission, setTechCommission] = useState(0);
+  const [productCommission, setProductCommission] = useState(0);
 
   const updateStoreSales = (storeName: string, field: string, value: string) => {
     const current = storeSales[storeName] || {
@@ -159,6 +161,8 @@ export default function CreateStatementDialog({
       setTechCashless("");
       setProductCashless("");
       setStoreSales({});
+      setTechCommission(0);
+      setProductCommission(0);
     } else if (initialStaffId) {
       setStaffId(initialStaffId);
     }
@@ -372,6 +376,8 @@ export default function CreateStatementDialog({
     const commProd = Math.max(0, prodSalesNum - prodTax - prodCashlessFee);
     const baseProd = Math.floor(commProd * (prodRatio / 100));
 
+    setTechCommission(baseTech);
+    setProductCommission(baseProd);
     setBaseAmount((baseTech + baseProd).toString());
   };
 
@@ -399,8 +405,8 @@ export default function CreateStatementDialog({
         work_location: workLocation,
         note: note,
         details: {
-          base_tech_salary: type === "reward" ? numBase : 0,
-          base_product_salary: 0,
+          base_tech_salary: type === "reward" ? techCommission : 0,
+          base_product_salary: type === "reward" ? productCommission : 0,
           nomination_reward: numNomination,
           transport_fee: numTransport,
           review_allowance: numReview,
@@ -682,7 +688,17 @@ export default function CreateStatementDialog({
                 </div>
               </div>
 
-              <p className="text-[10px] text-slate-400 font-semibold italic">
+              {type === "reward" && contractData && (
+                <div className="bg-emerald-50 text-emerald-800 p-3 rounded-lg flex flex-col md:flex-row md:items-center justify-between text-xs font-bold shadow-sm border border-emerald-100 mt-2">
+                  <div>自動計算の歩合詳細:</div>
+                  <div className="flex flex-wrap gap-4">
+                    <span>技術歩合: <strong>¥{techCommission.toLocaleString()}</strong> ({contractData.tech_sales_ratio || 0}%)</span>
+                    <span>商品売上手当: <strong>¥{productCommission.toLocaleString()}</strong> ({contractData.product_sales_ratio || 0}%)</span>
+                  </div>
+                </div>
+              )}
+
+              <p className="text-[10px] text-slate-400 font-semibold italic mt-2">
                 ※ 各店舗の売上を入力すると、自動的に合算され、契約情報（技術歩合 {contractData.tech_sales_ratio}% / 商品歩合 {contractData.product_sales_ratio}% / 手数料 {contractData.deduction_cashless_ratio}%）に基づき「歩合報酬ベース」が自動計算されます。
               </p>
             </div>
