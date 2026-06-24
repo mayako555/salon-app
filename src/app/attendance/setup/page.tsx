@@ -16,12 +16,19 @@ export default function AttendanceSetupPage() {
   const storesToUse = availableStores;
 
   const handleSelectStore = async (store: string) => {
-    if (!profile) {
-      alert("ログインセッションが無効です。一度ログインし直してください。");
+    if (!profile || (!profile.companyId && profile.role !== "systemOwner")) {
+      alert("ログインセッションが無効、または会社情報が未設定です。一度ログインし直してください。");
       return;
     }
     try {
-      const companyId = profile.companyId || "company_default";
+      // systemOwner might not have companyId, they should explicitly set it or we handle it somehow.
+      // But for setup, a systemOwner needs to setup for a specific company. Let's assume they must have it or we prompt.
+      // For now, if systemOwner doesn't have it, we shouldn't fallback to default.
+      const companyId = profile.companyId;
+      if (!companyId) {
+        alert("システム管理者は会社IDを指定して操作してください。");
+        return;
+      }
       const settings = await getKioskSettings(companyId);
       const storeConfig = settings[store];
       

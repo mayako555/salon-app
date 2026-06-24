@@ -50,6 +50,10 @@ export async function getReservations(store: string, dateStr: string): Promise<R
     // For simplicity, fetch by date, filter by store in memory to avoid needing composite indexes.
     const snapshot = await getDocs(q);
     
+    const { getCurrentUserContext } = await import("@/lib/auth-server");
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) throw new Error("会社IDが指定されていません");
+
     let results = snapshot.docs.map(d => {
       const data = d.data();
       return {
@@ -57,8 +61,10 @@ export async function getReservations(store: string, dateStr: string): Promise<R
         ...data,
         created_at: data.created_at?.toMillis?.() || data.created_at,
         updated_at: data.updated_at?.toMillis?.() || data.updated_at
-      } as Reservation;
+      } as Reservation & { companyId?: string };
     });
+
+    results = results.filter(r => r.companyId === ctx.companyId);
 
     // Populate same_day_cancel_count
     const customerIds = Array.from(new Set(results.map(r => r.customer_id).filter(Boolean))) as string[];
@@ -115,10 +121,15 @@ export async function getReservations(store: string, dateStr: string): Promise<R
 
 export async function addReservation(data: Omit<Reservation, "id" | "created_at" | "updated_at">) {
   try {
+    const { getCurrentUserContext } = await import("@/lib/auth-server");
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) throw new Error("会社IDが指定されていません");
+
     const colRef = collection(db, RESERVATIONS_COLLECTION);
     
     // Remove undefined values
     const cleanData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined));
+    cleanData.companyId = ctx.companyId;
 
     const newDoc = await addDoc(colRef, {
       ...cleanData,
@@ -291,6 +302,19 @@ export async function getReservationById(id: string): Promise<Reservation | null
     if (!snap.exists()) return null;
     
     const data = snap.data();
+    
+    const { getCurrentUserContext } = await import("@/lib/auth-server");
+    const ctx = await getCurrentUserContext();
+    if (ctx.role !== "systemOwner") {
+      if (!ctx.companyId || data.companyId !== ctx.companyId) {
+        return null;
+      }
+    } else {
+      if (ctx.companyId && data.companyId !== ctx.companyId) {
+        return null;
+      }
+    }
+
     return {
       id: snap.id,
       ...data,

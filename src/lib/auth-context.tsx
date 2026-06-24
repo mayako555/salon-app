@@ -89,9 +89,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             
             // Fetch tenant plan
             let currentPlan = "Standard";
-            const companyIdToUse = data.companyId || "company_default";
+            const companyIdToUse = data.companyId;
+
+            if (!companyIdToUse && data.role !== "systemOwner") {
+              console.error("会社情報が未設定です");
+              setProfile(null);
+              setLoading(false);
+              return;
+            }
             
-            if (companyIdToUse !== "company_default") {
+            if (companyIdToUse) {
               try {
                 const companyDoc = await getDoc(doc(db, "companies", companyIdToUse));
                 if (companyDoc.exists()) {
@@ -111,11 +118,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const storeSnap = await getDocs(storeQ);
               const stores = storeSnap.docs
                 .map(d => d.data())
-                .filter(d => (d.companyId || "company_default") === companyIdToUse && d.isActive !== false)
+                .filter(d => d.companyId === companyIdToUse && d.isActive !== false)
                 .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
                 .map(d => d.name);
                 
-              const finalStores = stores.length > 0 ? stores : ["メイン店舗"]; // Fallback
+              const finalStores = stores.length > 0 ? stores : []; 
               setAvailableStores(finalStores);
 
               const savedStore = localStorage.getItem("selected_store");
@@ -128,27 +135,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
             } catch (err) {
               console.error("Error fetching stores:", err);
-              const defaultStores = ["メイン店舗"];
-              setAvailableStores(defaultStores);
-              setSelectedStore(defaultStores[0]);
+              setAvailableStores([]);
             }
           } else {
             // No profile found, but user is authenticated via Auth. Give them default systemOwner access.
-            const defaultStores = ["メイン店舗"];
             const fallbackName = firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : "管理者");
             setProfile({
               id: "admin_" + firebaseUser.uid,
               name: fallbackName,
               role: "systemOwner",
-              companyId: "company_default",
+              companyId: undefined,
               employment_status: "active",
               is_active: true,
               is_trainee: false,
               employment_type: "employee",
               max_holiday_requests: 3
             } as any);
-            setAvailableStores(defaultStores);
-            setSelectedStore(defaultStores[0]);
+            setAvailableStores([]);
           }
         } catch (error) {
           console.error("Error fetching staff profile:", error);
@@ -169,7 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profile,
     loading,
     isAdmin: profile?.role === "admin" || profile?.role === "systemOwner" || profile?.role === "companyOwner",
-    isSystemOwner: profile?.role === "systemOwner" || (profile?.role === "admin" && (!profile?.companyId || profile?.companyId === "company_default")),
+    isSystemOwner: profile?.role === "systemOwner",
     isManager: profile?.role === "manager" || profile?.role === "storeManager" || profile?.role === "admin" || profile?.role === "systemOwner" || profile?.role === "companyOwner",
     isStaff: true,
     isCompanyOwner: profile?.role === "companyOwner",

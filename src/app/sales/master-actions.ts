@@ -40,13 +40,11 @@ export async function getMasterItems(store?: string): Promise<SalesMasterItem[]>
     }) as (SalesMasterItem & { companyId?: string })[];
 
     // --- SaaS Security: Enforce companyId isolation ---
-    // For older records without companyId, we treat them as company_default
-    if (ctx.role !== "admin" && ctx.role !== "systemOwner") {
-      items = items.filter(item => {
-        const itemCompanyId = item.companyId || "company_default";
-        return itemCompanyId === ctx.companyId;
-      });
+    if (!ctx.companyId) {
+      throw new Error("会社IDが指定されていません");
     }
+
+    items = items.filter(item => item.companyId === ctx.companyId);
 
     if (store && store !== "all") {
       items = items.filter(item => item.store === store || item.store === "共通");
@@ -69,6 +67,9 @@ export async function getMasterItems(store?: string): Promise<SalesMasterItem[]>
 export async function upsertMasterItem(data: Partial<SalesMasterItem>) {
   try {
     const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) {
+      throw new Error("会社IDが指定されていません");
+    }
     const colRef = collection(db, MASTER_COLLECTION);
     
     const payload = {

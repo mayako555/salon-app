@@ -17,7 +17,7 @@ export default function StoreAnalysis() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const res = await getStoreComparisonAnalytics(profile?.companyId || "company_default", period);
+      const res = await getStoreComparisonAnalytics(profile?.companyId!, period);
       if (res.success) {
         setData(res.data || []);
       }

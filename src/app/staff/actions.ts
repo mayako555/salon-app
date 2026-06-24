@@ -96,14 +96,11 @@ export async function getStaffList(): Promise<StaffProfile[]> {
       }];
     }
 
-    // Filter by companyId in memory to gracefully handle legacy records without companyId
-    let filteredStaff = staff;
-    if (ctx.role !== "systemOwner" && ctx.role !== "admin") {
-      filteredStaff = staff.filter(s => {
-        const sCompanyId = s.companyId || "company_default";
-        return sCompanyId === (ctx.companyId || "company_default");
-      });
+    if (!ctx.companyId) {
+      throw new Error("会社IDが指定されていません");
     }
+
+    const filteredStaff = staff.filter(s => s.companyId === ctx.companyId);
 
     if (filteredStaff.length === 0) {
       return [{
@@ -207,9 +204,13 @@ export async function addStaff(formData: FormData) {
       // but they won't be able to log in until an Auth account is manually created.
     }
 
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) throw new Error("会社IDが指定されていません");
+
     // 2. Save Staff Profile to Firestore
     const colRef = collection(db, STAFF_COLLECTION);
     const staffData = {
+      companyId: ctx.companyId,
       uid: uid || null,
       name,
       last_name: lastName,

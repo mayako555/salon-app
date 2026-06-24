@@ -287,10 +287,15 @@ export default function CreateStatementDialog({
 
     const baseVal = Number(baseAmount) || 0;
     const transportVal = Number(transportAllowance) || 0;
+    const fixedAllowances = (contractType === "monthly" || contractType === "tier_monthly")
+      ? ((contractData?.business_allowance || 0) + (contractData?.attendance_allowance || 0))
+      : 0;
+
     const otherAllowances = (Number(nominationAllowance) || 0) + 
                             (Number(reviewAllowance) || 0) + 
                             (Number(blogAllowance) || 0) + 
-                            (Number(executiveAllowance) || 0);
+                            (Number(executiveAllowance) || 0) + 
+                            fixedAllowances;
 
     if (baseVal <= 0) return; // Don't calculate if no base pay is set yet
 
@@ -315,7 +320,10 @@ export default function CreateStatementDialog({
   const numReview = Number(reviewAllowance) || 0;
   const numBlog = Number(blogAllowance) || 0;
   const numExecutive = Number(executiveAllowance) || 0;
-  const numAllowance = numTransport + numNomination + numReview + numBlog + numExecutive;
+  const fixedAllowances = (contractType === "monthly" || contractType === "tier_monthly")
+    ? ((contractData?.business_allowance || 0) + (contractData?.attendance_allowance || 0))
+    : 0;
+  const numAllowance = numTransport + numNomination + numReview + numBlog + numExecutive + fixedAllowances;
 
   const numTaxAdd = Number(taxAddition) || 0;
 

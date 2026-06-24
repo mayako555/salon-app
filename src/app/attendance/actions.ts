@@ -451,7 +451,9 @@ export async function getAllStaffProfiles() {
   }
 }
 
-export async function getKioskStaffList(companyId: string = "company_default") {
+export async function getKioskStaffList(companyId: string) {
+  if (!companyId) throw new Error("会社IDが指定されていません");
+
   try {
     const { adminDb } = await import("@/lib/firebase-admin");
     const snap = await adminDb.collection("staff_profiles").get();
@@ -473,10 +475,7 @@ export async function getKioskStaffList(companyId: string = "company_default") {
       };
     });
     
-    const filteredStaff = staffList.filter((s: any) => {
-      const sCompanyId = s.companyId || "company_default";
-      return sCompanyId === companyId;
-    });
+    const filteredStaff = staffList.filter((s: any) => s.companyId === companyId);
 
     return filteredStaff.sort((a: any, b: any) => {
       const aIsRetired = a.employment_status === "retired";

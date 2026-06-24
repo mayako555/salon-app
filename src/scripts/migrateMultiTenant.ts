@@ -48,7 +48,10 @@ const COLLECTIONS = [
   "rules",
   "expenses",
   "stores",
-  "audit_logs"
+  "audit_logs",
+  "staff_contracts",
+  "kiosk_settings",
+  "system_settings"
 ];
 
 const DEFAULT_COMPANY_ID = "company_default";

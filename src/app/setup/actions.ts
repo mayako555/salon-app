@@ -46,8 +46,8 @@ export async function getCompanySetupStatus() {
 export async function updateAdoptionProgress(field: keyof AdoptionProgress, value: boolean) {
   try {
     const ctx = await getCurrentUserContext();
-    if (!ctx.companyId || ctx.companyId === "company_default") {
-       return { success: false, error: "Cannot update default company" };
+    if (!ctx.companyId) {
+       return { success: false, error: "会社IDが指定されていません" };
     }
 
     const companyRef = doc(db, "companies", ctx.companyId);
@@ -67,7 +67,7 @@ export async function updateAdoptionProgress(field: keyof AdoptionProgress, valu
 export async function recordFirstTimeUsage(field: 'firstLoginAt' | 'firstReservationAt' | 'firstKarteAt' | 'firstSalesAt' | 'firstLineSentAt') {
   try {
     const ctx = await getCurrentUserContext();
-    if (!ctx.companyId || ctx.companyId === "company_default") {
+    if (!ctx.companyId) {
        return { success: false };
     }
 
@@ -107,7 +107,7 @@ export async function recordFirstTimeUsage(field: 'firstLoginAt' | 'firstReserva
 export async function recordLogin() {
   try {
     const ctx = await getCurrentUserContext();
-    if (!ctx.companyId || ctx.companyId === "company_default") {
+    if (!ctx.companyId) {
        return { success: false };
     }
 

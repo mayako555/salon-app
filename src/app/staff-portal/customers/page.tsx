@@ -47,8 +47,8 @@ export default function StaffCustomersPage() {
     load();
   }, []);
 
-  const isInHouse = !profile?.companyId || profile?.companyId === "company_default" || profile?.role === "systemOwner";
-  const allowedStores = isInHouse ? availableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : availableStores);
+  const isTenantAdmin = profile?.role === "systemOwner" || profile?.role === "admin" || profile?.role === "companyOwner";
+  const allowedStores = isTenantAdmin ? availableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : availableStores);
 
   const filtered = customers
     .filter(c => {

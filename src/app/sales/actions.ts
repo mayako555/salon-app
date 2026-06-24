@@ -168,10 +168,8 @@ export async function getSaleByReservationId(resId: string): Promise<SalesRecord
     const doc = snap.docs[0];
     const data = { id: doc.id, ...doc.data() } as SalesRecord;
     
-    if (ctx.role !== "systemOwner") {
-      const sCompanyId = data.companyId || "company_default";
-      if (sCompanyId !== (ctx.companyId || "company_default")) return null;
-    }
+    if (!ctx.companyId) return null;
+    if (data.companyId !== ctx.companyId) return null;
     
     return data;
   } catch (error) {
@@ -218,13 +216,10 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
     }) as SalesRecord[];
 
     let filteredSales = sales;
-    if (ctx.role !== "systemOwner") {
-      filteredSales = sales.filter(s => {
-        // Fallback: If no companyId in record, assume it's company_default
-        const sCompanyId = s.companyId || "company_default";
-        return sCompanyId === (ctx.companyId || "company_default");
-      });
+    if (!ctx.companyId) {
+      throw new Error("会社IDが指定されていません");
     }
+    filteredSales = sales.filter(s => s.companyId === ctx.companyId);
 
     const { getStaffList } = await import("../staff/actions");
     const staffList = await getStaffList();

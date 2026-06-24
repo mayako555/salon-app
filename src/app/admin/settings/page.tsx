@@ -23,8 +23,8 @@ export default function SystemSettingsPage() {
       const [data, lineData, compData, kioskData] = await Promise.all([
         getReservationSettings(),
         getLineSettings(),
-        getCompanySettings(profile?.companyId || "company_default"),
-        getKioskSettings(profile?.companyId || "company_default")
+        getCompanySettings(profile?.companyId!),
+        getKioskSettings(profile?.companyId!)
       ]);
       setSettings(data);
       setLineSettings(lineData);
@@ -95,11 +95,11 @@ export default function SystemSettingsPage() {
     
     // Save Kiosk Settings
     const kioskPromises = Object.entries(kioskSettings).map(([store, data]) => {
-      return saveKioskSettings(profile?.companyId || "company_default", store, data.token, data.enabled);
+      return saveKioskSettings(profile?.companyId!, store, data.token, data.enabled);
     });
     
     // Save Attendance Rule
-    await saveCompanyAttendanceRule(profile?.companyId || "company_default", attendanceRule);
+    await saveCompanyAttendanceRule(profile?.companyId!, attendanceRule);
 
     await Promise.all([...linePromises, ...kioskPromises]);
 
@@ -281,7 +281,7 @@ export default function SystemSettingsPage() {
 
         {availableStores.filter(store => store !== "共通" && store !== "全店舗").map((store) => {
           const kSettings = kioskSettings[store] || { token: "", enabled: false };
-          const companyId = profile?.companyId || "company_default";
+          const companyId = profile?.companyId!;
           const kioskUrl = typeof window !== 'undefined' ? `${window.location.origin}/kiosk/attendance?companyId=${companyId}&storeId=${encodeURIComponent(store)}&token=${kSettings.token}` : "";
 
           return (

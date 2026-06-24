@@ -51,7 +51,7 @@ export default function MenuAnalysis() {
   const fetchData = async () => {
     setLoading(true);
     const res = await getMenuAnalytics(
-      profile?.companyId || "company_default",
+      profile?.companyId!,
       period
     );
     if (res.success) setData(res.data || []);

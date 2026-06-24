@@ -112,10 +112,8 @@ export async function getDashboardStats() {
     });
 
     // Use user's salonIds if available, otherwise fallback to all targets
-    const isInHouse = !ctx.companyId || ctx.companyId === "company_default" || ctx.role === "systemOwner";
-    
-    // In-house can see all store targets. Franchise users see their salonIds (or all their company stores if salonIds is empty)
-    const availableStores = isInHouse 
+    const isTenantAdmin = ctx.role === "systemOwner" || ctx.role === "admin" || ctx.role === "companyOwner";
+    const availableStores = isTenantAdmin 
       ? storeTargets.map(t => t.store_name.endsWith("店") ? t.store_name.slice(0, -1) : t.store_name) 
       : (ctx.salonIds && ctx.salonIds.length > 0 
           ? ctx.salonIds.map(s => s.endsWith("店") ? s.slice(0, -1) : s) 

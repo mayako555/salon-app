@@ -146,7 +146,8 @@ export async function getKioskSettings(companyId: string) {
     const settings: Record<string, any> = {};
     snap.docs.forEach(d => {
       const data = d.data();
-      if (data.companyId === companyId) {
+      const docCompanyId = data.companyId;
+      if (docCompanyId === companyId) {
         settings[data.storeName] = {
           token: data.token,
           enabled: data.enabled ?? false
@@ -168,7 +169,8 @@ export async function saveKioskSettings(companyId: string, storeName: string, to
     let docId = "";
     snap.docs.forEach(d => {
       const data = d.data();
-      if (data.companyId === companyId && data.storeName === storeName) {
+      const docCompanyId = data.companyId;
+      if (docCompanyId === companyId && data.storeName === storeName) {
         docId = d.id;
       }
     });

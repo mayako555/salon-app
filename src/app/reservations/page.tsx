@@ -77,8 +77,8 @@ export default function ReservationsPage() {
 
   const currentStoreReservations = reservations.filter(r => selectedStore === "全店舗" || r.store_name === selectedStore);
 
-  const isInHouse = !profile?.companyId || profile?.companyId === "company_default" || profile?.role === "systemOwner";
-  const allowedStores = isInHouse ? availableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : availableStores);
+  const isTenantAdmin = profile?.role === "systemOwner" || profile?.role === "admin" || profile?.role === "companyOwner";
+  const allowedStores = isTenantAdmin ? availableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : availableStores);
 
   return (
     <div className="flex flex-col h-screen bg-slate-100 overflow-hidden text-xs">
@@ -127,7 +127,7 @@ export default function ReservationsPage() {
             {allowedStores.map(s => (
               <option key={s} value={s}>{s}</option>
             ))}
-            {isInHouse && <option value="全店舗">全店舗</option>}
+            {isTenantAdmin && <option value="全店舗">全店舗</option>}
           </select>
         </div>
 

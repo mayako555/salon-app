@@ -6,7 +6,7 @@ export type UserRole = "systemOwner" | "companyOwner" | "manager" | "storeManage
 export interface UserContext {
   uid: string;
   role: UserRole;
-  companyId: string;
+  companyId?: string;
   salonIds: string[];
 }
 
@@ -36,24 +36,25 @@ export async function getCurrentUserContext(): Promise<UserContext> {
     }
     
     if (!snapshot || snapshot.empty) {
-      // Create a default systemOwner context if they have an Auth account but no staff profile
-      return {
-        uid,
-        role: "systemOwner",
-        companyId: "company_default",
-        salonIds: [],
-      };
+      throw new Error("ユーザープロフィールが見つかりません (Profile not found)");
     }
 
     const userData = snapshot.docs[0]?.data();
     if (!userData) {
       throw new Error("ユーザーデータが空です (Empty User Data)");
     }
+
+    const role = (userData?.role as UserRole) || "staff";
+    const companyId = userData?.companyId;
+
+    if (!companyId && role !== "systemOwner") {
+      throw new Error("会社情報が未設定です (Company ID missing)");
+    }
     
     return {
       uid,
-      role: (userData?.role as UserRole) || "staff",
-      companyId: userData?.companyId || "company_default", // 後方互換のためデフォルト値を設定
+      role,
+      companyId,
       salonIds: userData?.salonIds || [],
     };
   } catch (error: any) {

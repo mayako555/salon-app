@@ -17,6 +17,7 @@ import { getCurrentUserContext } from "./auth-server";
 
 export type Customer = {
   id: string;
+  companyId?: string;
   customer_no?: string; // お客様No.
   first_visit_date?: string; // 初来店日
   name: string; // Full name (e.g. "藤 衣")
@@ -87,20 +88,9 @@ export async function getAllCustomers(): Promise<Customer[]> {
       };
     }) as Customer[];
 
-    if (ctx.role !== "systemOwner") {
-      const isInHouse = !ctx.companyId || ctx.companyId === "company_default";
-      const allowedStores = isInHouse ? [] : (ctx.salonIds || []);
-      
-      return customers.filter(c => {
-        const store = c.store_name || (c as any).main_store;
-        if (isInHouse) return true; // Give headquarters access to all legacy customers or we can restrict it.
-        // For franchise, they MUST only see customers linked to their stores
-        if (!store || !allowedStores.includes(store)) return false;
-        return true;
-      });
-    }
-
-    return customers;
+    if (!ctx.companyId) throw new Error("会社IDが指定されていません");
+    
+    return customers.filter(c => c.companyId === ctx.companyId);
   } catch (error) {
     console.error("Error fetching customers:", error);
     return [];
@@ -127,6 +117,9 @@ export async function getCustomerById(id: string): Promise<Customer | null> {
 
 export async function addCustomer(data: Omit<Customer, 'id' | 'created_at' | 'updated_at'>) {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) throw new Error("会社IDが指定されていません");
+
     const colRef = collection(db, CUSTOMERS_COLLECTION);
     
     // Filter out undefined values
@@ -136,6 +129,7 @@ export async function addCustomer(data: Omit<Customer, 'id' | 'created_at' | 'up
 
     const docRef = await addDoc(colRef, {
       ...cleanData,
+      companyId: ctx.companyId,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp(),
     });

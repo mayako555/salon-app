@@ -52,8 +52,8 @@ export default function StaffDashboardPage() {
   const [isSending, setIsSending] = useState(false);
 
   // Derived auth state
-  const isInHouse = !profile?.companyId || profile?.companyId === "company_default" || profile?.role === "systemOwner";
-  const allowedStores = isInHouse ? contextAvailableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : contextAvailableStores);
+  const isTenantAdmin = profile?.role === "systemOwner" || profile?.role === "admin" || profile?.role === "companyOwner";
+  const allowedStores = isTenantAdmin ? contextAvailableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : contextAvailableStores);
   const canViewRestrictedStats = profile?.role === "systemOwner" || profile?.role === "companyOwner" || profile?.role === "admin";
 
   // My Dashboard State
@@ -80,10 +80,10 @@ export default function StaffDashboardPage() {
       
       // Inside useEffect, we can use the same logic or just use the derived vars if they are stable.
       // But since they depend on profile and contextAvailableStores which are deps of useEffect (indirectly or directly), it's safe.
-      const localIsInHouse = !profile?.companyId || profile?.companyId === "company_default" || profile?.role === "systemOwner";
-      const localAvailableStores = localIsInHouse ? contextAvailableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : contextAvailableStores);
+      const localIsTenantAdmin = profile?.role === "systemOwner" || profile?.role === "admin" || profile?.role === "companyOwner";
+      const localAvailableStores = localIsTenantAdmin ? contextAvailableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : contextAvailableStores);
 
-      const storeTasks = localIsInHouse ? tRecords : tRecords.filter(t => {
+      const storeTasks = localIsTenantAdmin ? tRecords : tRecords.filter(t => {
         const staff = sList.find(s => s.id === t.staff_id);
         if (!staff || !staff.salonIds) return true; // Show unassigned tasks to everyone just in case
         return staff.salonIds.some((st: string) => localAvailableStores.includes(st));

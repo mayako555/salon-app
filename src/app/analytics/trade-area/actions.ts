@@ -54,7 +54,8 @@ function standardizeChannel(source: string): string {
 export async function getTradeAreaStats() {
   try {
     const ctx = await getCurrentUserContext();
-    const isInHouse = !ctx.companyId || ctx.companyId === "company_default" || ctx.role === "systemOwner";
+    const isTenantAdmin = ctx.role === "systemOwner" || ctx.role === "admin" || ctx.role === "companyOwner";
+    const allowedStores = isTenantAdmin ? [] : (ctx.salonIds || []);
     
     // Fetch Customers
     const customersCol = collection(db, "customers");

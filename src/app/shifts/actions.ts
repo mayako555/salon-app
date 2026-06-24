@@ -66,16 +66,12 @@ export async function getMonthlyShifts(year: number, month: number): Promise<Shi
       };
     }) as ShiftRecord[];
     
-    // In-memory filter by companyId
-    if (ctx.role !== "systemOwner") {
-      const allowedCompany = ctx.companyId || "company_default";
-      const staffList = await getStaffList(); // Already filtered by companyId
-      const allowedStaffIds = new Set(staffList.map(s => s.id));
-      
-      return shifts.filter(s => allowedStaffIds.has(s.staff_id));
-    }
+    if (!ctx.companyId) throw new Error("会社IDが指定されていません");
+
+    const staffList = await getStaffList(); // Already strictly filtered by companyId
+    const allowedStaffIds = new Set(staffList.map(s => s.id));
     
-    return shifts;
+    return shifts.filter(s => allowedStaffIds.has(s.staff_id));
   } catch (error) {
     console.error("Error fetching monthly shifts:", error);
     return [];
@@ -99,13 +95,11 @@ export async function getShiftsForDate(dateStr: string): Promise<ShiftRecord[]> 
       };
     }) as ShiftRecord[];
 
-    if (ctx.role !== "systemOwner") {
-      const staffList = await getStaffList();
-      const allowedStaffIds = new Set(staffList.map(s => s.id));
-      return shifts.filter(s => allowedStaffIds.has(s.staff_id));
-    }
-
-    return shifts;
+    if (!ctx.companyId) throw new Error("会社IDが指定されていません");
+    
+    const staffList = await getStaffList();
+    const allowedStaffIds = new Set(staffList.map(s => s.id));
+    return shifts.filter(s => allowedStaffIds.has(s.staff_id));
   } catch (error) {
     console.error("Error fetching shifts for date:", error);
     return [];
@@ -433,13 +427,12 @@ export async function getAllHolidayRequests(year: number, month: number): Promis
         ...data,
         created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null)
       };
-    }) as HolidayRequest[];    if (ctx.role !== "systemOwner") {
-      const staffList = await getStaffList();
-      const allowedStaffIds = new Set(staffList.map(s => s.id));
-      return requests.filter(r => allowedStaffIds.has(r.staff_id));
-    }
-
-    return requests;
+    }) as HolidayRequest[];
+    if (!ctx.companyId) throw new Error("会社IDが指定されていません");
+    
+    const staffList = await getStaffList();
+    const allowedStaffIds = new Set(staffList.map(s => s.id));
+    return requests.filter(r => allowedStaffIds.has(r.staff_id));
   } catch (error) {
     console.error("Error fetching all holiday requests:", error);
     return [];

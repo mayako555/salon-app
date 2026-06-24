@@ -45,8 +45,8 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
 
   const isAdminOrManager = profile?.role === "admin" || profile?.role === "manager";
   const canViewTimecard = profile?.role === "systemOwner" || profile?.role === "companyOwner" || profile?.role === "admin";
-  const isInHouse = !profile?.companyId || profile?.companyId === "company_default" || profile?.role === "systemOwner";
-  const allowedStores = isInHouse ? availableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : availableStores);
+  const isTenantAdmin = profile?.role === "systemOwner" || profile?.role === "admin" || profile?.role === "companyOwner";
+  const allowedStores = isTenantAdmin ? availableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : availableStores);
 
   const navItems = [
     { name: "ホーム", href: "/staff-portal", icon: LayoutDashboard },

@@ -18,7 +18,7 @@ export default function StaffAnalysis() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const res = await getStaffAnalytics(profile?.companyId || "company_default", undefined, period, empType);
+      const res = await getStaffAnalytics(profile?.companyId!, undefined, period, empType);
       if (res.success) {
         setData(res.data || []);
       }

@@ -17,7 +17,7 @@ export default function ChannelAnalysis() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const res = await getChannelAnalytics(profile?.companyId || "company_default", undefined, period);
+      const res = await getChannelAnalytics(profile?.companyId!, undefined, period);
       if (res.success) {
         setData(res.data || []);
       }

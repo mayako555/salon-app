@@ -17,7 +17,7 @@ export default function ReferralAnalysis() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const res = await getReferralAnalytics(profile?.companyId || "company_default", undefined, period);
+      const res = await getReferralAnalytics(profile?.companyId!, undefined, period);
       if (res.success) {
         setData(res.data || []);
       }
