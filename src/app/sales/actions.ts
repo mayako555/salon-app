@@ -675,8 +675,10 @@ export async function importHotPepperCsv(formData: FormData) {
 
     const colRef = collection(db, SALES_COLLECTION);
     
-    // Step 2: Fetch existing records to prevent duplicates
+    // Step 2: Fetch existing records to prevent duplicates and find manual records to merge
     const existingKeys = new Set<string>();
+    const existingManualRecords: Record<string, any> = {};
+
     if (minDate !== "9999-99-99" && maxDate !== "0000-00-00") {
       const q = query(colRef, 
         where("date", ">=", minDate), 
@@ -689,6 +691,11 @@ export async function importHotPepperCsv(formData: FormData) {
           // Generate a deduplication key
           const key = `${d.customer_name}_${d.date}_${d.time}`;
           existingKeys.add(key);
+        } else {
+          // Manual record: Key by date and clean customer name
+          const cleanName = String(d.customer_name || "").replace(/\s+/g, "");
+          const manualKey = `${d.date}_${cleanName}`;
+          existingManualRecords[manualKey] = { id: doc.id, ref: doc.ref, ...d };
         }
       });
     }
@@ -696,6 +703,7 @@ export async function importHotPepperCsv(formData: FormData) {
     const batch = writeBatch(db);
     let importCount = 0;
     let skipCount = 0;
+    let mergedCount = 0;
 
     // Step 3: Process each group
     Object.values(groups).forEach(groupRows => {
@@ -750,6 +758,25 @@ export async function importHotPepperCsv(formData: FormData) {
         return; // Skip this duplicate record
       }
 
+      // Merge with existing manual record if found
+      const cleanCustomerName = customerName.replace(/\s+/g, "");
+      const manualMatchKey = `${dateFormatted}_${cleanCustomerName}`;
+      const manualMatch = existingManualRecords[manualMatchKey];
+
+      let paymentMethod = "未入力";
+      let paymentStatus = "unpaid";
+      let note = "";
+
+      if (manualMatch) {
+        paymentMethod = manualMatch.payment_method || "未入力";
+        paymentStatus = manualMatch.payment_status || "unpaid";
+        note = manualMatch.note || "";
+        // Remove the old manual record to avoid duplicates
+        batch.delete(manualMatch.ref);
+        delete existingManualRecords[manualMatchKey];
+        mergedCount++;
+      }
+
       const docRef = doc(colRef);
       batch.set(docRef, {
         staff_id: "unknown",
@@ -769,6 +796,9 @@ export async function importHotPepperCsv(formData: FormData) {
         discount_reason: discountReasons.join(", ") || "CSV一括読込",
         hpb_points: hpbPoints,
         reservation_route: "ホットペッパー",
+        payment_method: paymentMethod,
+        payment_status: paymentStatus,
+        note: note,
         status: "draft",
         source: "hotpepper" as SalesSource,
         created_at: serverTimestamp()
@@ -778,7 +808,7 @@ export async function importHotPepperCsv(formData: FormData) {
 
     await batch.commit();
     revalidatePath("/staff-portal/sales");
-    return { success: true, count: importCount, skipped: skipCount };
+    return { success: true, count: importCount, skipped: skipCount, merged: mergedCount };
   } catch (error: any) {
     console.error("Error importing CSV:", error);
     return { success: false, error: error.message };

@@ -513,10 +513,10 @@ export default function CheckoutDialog({
   const routes = routeMaster.length > 0 ? ['', ...routeMaster.map(m => m.name)] : defaultRoutes;
   const allRoutes = [...new Set([route, ...routes].filter(r => r !== undefined))];
 
-  // 支払い方法マスタの取得
   const paymentMaster = storeMasterData.filter(m => m.itemType === 'paymentMethod');
   const defaultPayments = ['現金', 'クレジットカード', 'PayPay', '楽天Pay', 'ミニモ事前決済', 'その他'];
-  const paymentMethods = paymentMaster.length > 0 ? paymentMaster.map(m => m.name) : defaultPayments;
+  const basePaymentMethods = paymentMaster.length > 0 ? paymentMaster.map(m => m.name) : defaultPayments;
+  const paymentMethods = ['未入力', ...basePaymentMethods.filter(p => p !== '未入力')];
 
   return (
     <>

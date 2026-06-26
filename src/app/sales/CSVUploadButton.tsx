@@ -25,7 +25,7 @@ export default function CSVUploadButton() {
       const result = await importHotPepperCsv(formData);
       
       if (result.success) {
-        alert(`CSVの取り込みに成功しました。\n${result.count}件の売上データを登録しました。`);
+        alert(`CSVの取り込みに成功しました。\n${result.count}件の売上データを登録しました。\n（うち ${result.merged || 0} 件は手打ちデータと統合・上書きされました）`);
         // Force refresh to show new data
         window.location.reload();
       } else {

@@ -222,21 +222,23 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
               </div>
             </div>
 
-            {/* 4 Column Layout */}
-            <div className="grid grid-cols-4 gap-2 border-t-2 border-black">
+            {/* Dynamic Column Layout based on Staff Type */}
+            <div className={`grid ${stmt.type === "salary" ? "grid-cols-4" : "grid-cols-3"} gap-2 border-t-2 border-black`}>
               
-              {/* Col 1: Attendance */}
-              <div className="border-x-2 border-b-2 border-black">
-                <div className="text-center font-bold border-b-2 border-black py-1">勤怠</div>
-                <div className="p-2 space-y-2 h-[260px]">
-                   <div className="flex justify-between text-xs"><span>出勤日数</span><span>{workedDays} 日</span></div>
-                   <div className="flex justify-between text-xs"><span>欠勤日数</span><span>0 日</span></div>
-                   <div className="flex justify-between text-xs"><span>公休日数</span><span>{publicHolidays} 日</span></div>
-                   <div className="flex justify-between text-xs"><span>有給使用回数</span><span>{paidLeaves} 日</span></div>
-                   <div className="flex justify-between text-xs mt-4"><span>労働時間</span><span>{stmt.details.metrics?.worked_hours || 0} 時間</span></div>
-                   <div className="flex justify-between text-xs mt-4"><span>扶養人数</span><span>0 人</span></div>
+              {/* Col 1: Attendance (Employees only) */}
+              {stmt.type === "salary" && (
+                <div className="border-x-2 border-b-2 border-black">
+                  <div className="text-center font-bold border-b-2 border-black py-1">勤怠</div>
+                  <div className="p-2 space-y-2 h-[260px]">
+                     <div className="flex justify-between text-xs"><span>出勤日数</span><span>{workedDays} 日</span></div>
+                     <div className="flex justify-between text-xs"><span>欠勤日数</span><span>0 日</span></div>
+                     <div className="flex justify-between text-xs"><span>公休日数</span><span>{publicHolidays} 日</span></div>
+                     <div className="flex justify-between text-xs"><span>有給使用回数</span><span>{paidLeaves} 日</span></div>
+                     <div className="flex justify-between text-xs mt-4"><span>労働時間</span><span>{stmt.details.metrics?.worked_hours || 0} 時間</span></div>
+                     <div className="flex justify-between text-xs mt-4"><span>扶養人数</span><span>0 人</span></div>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Col 2: Payments */}
               <div className="border-x-2 border-b-2 border-black relative">
@@ -326,13 +328,21 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
               <div className="border-x-2 border-b-2 border-black relative">
                 <div className="text-center font-bold border-b-2 border-black py-1">控除</div>
                 <div className="p-2 space-y-2 h-[260px]">
-                   <div className="flex justify-between text-xs"><span>雇用保険料</span><span>{stmt.details.social_insurance?.employment.toLocaleString() || "--"}</span></div>
-                   <div className="flex justify-between text-xs"><span>所得税</span><span>{stmt.details.social_insurance?.income_tax.toLocaleString() || "--"}</span></div>
-                   <div className="flex justify-between text-xs"><span>住民税</span><span>{stmt.details.social_insurance?.resident_tax.toLocaleString() || "--"}</span></div>
-                   <div className="flex justify-between text-xs mt-4"><span>健康保険料</span><span>{stmt.details.social_insurance?.health.toLocaleString() || "--"}</span></div>
-                   <div className="flex justify-between text-xs"><span>厚生年金保険</span><span>{stmt.details.social_insurance?.pension.toLocaleString() || "--"}</span></div>
-                   {(stmt.details.social_insurance?.childcare ?? 0) > 0 && (
-                     <div className="flex justify-between text-xs"><span>子ども・子育て支援金</span><span>{stmt.details.social_insurance?.childcare?.toLocaleString()}</span></div>
+                   {stmt.type === "salary" ? (
+                     <>
+                       <div className="flex justify-between text-xs"><span>雇用保険料</span><span>{stmt.details.social_insurance?.employment.toLocaleString() || "--"}</span></div>
+                       <div className="flex justify-between text-xs"><span>所得税</span><span>{stmt.details.social_insurance?.income_tax.toLocaleString() || "--"}</span></div>
+                       <div className="flex justify-between text-xs"><span>住民税</span><span>{stmt.details.social_insurance?.resident_tax.toLocaleString() || "--"}</span></div>
+                       <div className="flex justify-between text-xs mt-4"><span>健康保険料</span><span>{stmt.details.social_insurance?.health.toLocaleString() || "--"}</span></div>
+                       <div className="flex justify-between text-xs"><span>厚生年金保険</span><span>{stmt.details.social_insurance?.pension.toLocaleString() || "--"}</span></div>
+                       {(stmt.details.social_insurance?.childcare ?? 0) > 0 && (
+                         <div className="flex justify-between text-xs"><span>子ども・子育て支援金</span><span>{stmt.details.social_insurance?.childcare?.toLocaleString()}</span></div>
+                       )}
+                     </>
+                   ) : (
+                     <>
+                       <div className="flex justify-between text-xs"><span>所得税（源泉徴収）</span><span>{stmt.details.social_insurance?.income_tax?.toLocaleString() || "0"}</span></div>
+                     </>
                    )}
                 </div>
                 <div className="absolute bottom-0 w-full flex justify-between font-bold border-t-2 border-black p-2">
@@ -344,8 +354,17 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
               <div className="border-x-2 border-b-2 border-black flex flex-col">
                 <div className="text-center font-bold border-b-2 border-black py-1">その他</div>
                 <div className="p-2 space-y-2 border-b-2 border-black pb-4">
-                   <div className="flex justify-between text-xs"><span>年末調整還付</span><span></span></div>
-                   <div className="flex justify-between text-xs"><span>年末調整徴収</span><span></span></div>
+                   {stmt.type === "salary" ? (
+                     <>
+                       <div className="flex justify-between text-xs"><span>年末調整還付</span><span></span></div>
+                       <div className="flex justify-between text-xs"><span>年末調整徴収</span><span></span></div>
+                     </>
+                   ) : (
+                     <>
+                       <div className="flex justify-between text-xs text-transparent"><span>-</span><span></span></div>
+                       <div className="flex justify-between text-xs text-transparent"><span>-</span><span></span></div>
+                     </>
+                   )}
                    <div className="flex justify-between text-xs font-bold mt-2 pt-2 border-t border-black"><span>合計</span><span>0</span></div>
                 </div>
                 
