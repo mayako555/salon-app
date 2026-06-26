@@ -629,6 +629,9 @@ export async function importHotPepperCsv(formData: FormData) {
     const file = formData.get("csv_file") as File;
     const storeName = formData.get("store_name") as string || "不明店舗";
     
+    const ctx = await getCurrentUserContext();
+    const companyId = ctx.companyId;
+
     if (!file) return { success: false, error: "ファイルが選択されていません。" };
 
     const arrayBuffer = await file.arrayBuffer();
@@ -661,8 +664,19 @@ export async function importHotPepperCsv(formData: FormData) {
     rows.forEach(row => {
       const accountingId = row["会計ID"] || row["予約ID"] || "";
       const customerName = String(row["お客様名"] || row["顧客名"] || row["顧客氏名"] || row["customer"] || "不明").trim();
-      const rawDate = String(row["会計日"] || row["来店日"] || "");
-      const rawTime = String(row["会計時間"] || row["来店時間"] || "");
+      let rawDate = String(row["会計日"] || row["来店日"] || "");
+      let rawTime = String(row["会計時間"] || row["来店時間"] || "");
+      
+      if (!rawDate) {
+        const dateTime = String(row["来店日時"] || row["予約日時"] || row["日時"] || "");
+        if (dateTime.includes(" ")) {
+          const parts = dateTime.split(" ");
+          rawDate = parts[0];
+          rawTime = parts[1];
+        } else if (dateTime) {
+          rawDate = dateTime;
+        }
+      }
       
       const groupId = accountingId || `${customerName}_${rawDate}_${rawTime}`;
       if (!groups[groupId]) groups[groupId] = [];
@@ -710,9 +724,21 @@ export async function importHotPepperCsv(formData: FormData) {
       const firstRow = groupRows[0];
       const rawStaffName = groupRows.find(r => r["スタッフ"] || r["担当スタッフ"] || r["スタッフ名"])?.["スタッフ"] || "フリー";
       const staffName = String(rawStaffName).replace(/\s+/g, "");
-      const rawDate = String(firstRow["会計日"] || firstRow["来店日"] || "");
-      const rawTime = String(firstRow["会計時間"] || "");
-      const customerName = String(firstRow["お客様名"] || firstRow["顧客名"] || "HotPepper経由").trim();
+      let rawDate = String(firstRow["会計日"] || firstRow["来店日"] || "");
+      let rawTime = String(firstRow["会計時間"] || firstRow["来店時間"] || "");
+      
+      if (!rawDate) {
+        const dateTime = String(firstRow["来店日時"] || firstRow["予約日時"] || firstRow["日時"] || "");
+        if (dateTime.includes(" ")) {
+          const parts = dateTime.split(" ");
+          rawDate = parts[0];
+          rawTime = parts[1];
+        } else if (dateTime) {
+          rawDate = dateTime;
+        }
+      }
+      
+      const customerName = String(firstRow["お客様名"] || firstRow["顧客名"] || firstRow["顧客氏名"] || "HotPepper経由").trim();
       
       const parseMoney = (val: any) => {
         if (val === undefined || val === null) return 0;
@@ -779,6 +805,7 @@ export async function importHotPepperCsv(formData: FormData) {
 
       const docRef = doc(colRef);
       batch.set(docRef, {
+        companyId: companyId || "company_default",
         staff_id: "unknown",
         staff_name: staffName,
         store_name: storeName,

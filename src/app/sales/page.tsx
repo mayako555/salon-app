@@ -29,7 +29,7 @@ export default function SalesPage({
   searchParams: Promise<{ month?: string }>
 }) {
   const params = use(searchParams);
-  const { profile, loading: authLoading, availableStores } = useAuth();
+  const { profile, loading: authLoading, availableStores, isAdmin } = useAuth();
   const targetDateStr = params.month || format(new Date(), "yyyy-MM");
   const [yearNum, monthNum] = targetDateStr.split("-").map(Number);
   const year = yearNum;
@@ -176,7 +176,7 @@ export default function SalesPage({
   };
 
   const cashSales = sales.filter(s => s.payment_method === '現金');
-  const cashlessSales = sales.filter(s => s.payment_method !== '現金' && s.payment_method !== '不明');
+  const cashlessSales = sales.filter(s => s.payment_method !== '現金' && s.payment_method !== '不明' && s.payment_method !== '未入力');
 
   const totalTechSales = sales.reduce((sum, s) => sum + s.tech_sales, 0);
   const totalProductSales = sales.reduce((sum, s) => sum + s.product_sales, 0);
@@ -311,7 +311,7 @@ export default function SalesPage({
                   initialTime={checkoutInitialTime}
                   initialData={editingSale}
                 />
-                {profile?.role === 'admin' && (
+                {isAdmin && (
                   <>
                     <CSVUploadButton />
                     <Button variant="outline" size="sm" onClick={handleClearImports} className="text-rose-600 border-rose-200 hover:bg-rose-50 h-10 px-3">
@@ -578,7 +578,7 @@ export default function SalesPage({
                 
                 <div className="flex gap-4 items-center">
                   
-                  {profile?.role === 'admin' && filteredSales.length > 0 && (selectedStaffs.size > 0 || selectedStores.size > 0 || searchQuery) && (
+                  {isAdmin && filteredSales.length > 0 && (selectedStaffs.size > 0 || selectedStores.size > 0 || searchQuery) && (
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -720,18 +720,18 @@ export default function SalesPage({
                                 "px-2 py-0.5 rounded-full text-[10px] font-black",
                                 sale.payment_method === '現金' 
                                   ? 'bg-slate-100 text-slate-700' 
-                                  : sale.payment_method === '不明'
+                                  : (sale.payment_method === '不明' || sale.payment_method === '未入力')
                                     ? 'bg-amber-50 text-amber-600 border border-amber-100'
                                     : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
                               )}>
-                                {sale.payment_method || "不明"}
+                                {sale.payment_method || "未入力"}
                               </span>
                             </TableCell>
                             <TableCell className="text-right font-bold text-slate-800 bg-slate-50">
                               ¥{Math.max(0, saleTotal).toLocaleString()}
                             </TableCell>
                             <TableCell>
-                              {profile?.role === 'admin' && (
+                              {isAdmin && (
                                 <div className="flex gap-1 justify-end">
                                   <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-emerald-600" onClick={() => handleEditClick(sale)}>
                                     <Search size={14} />
@@ -769,7 +769,7 @@ export default function SalesPage({
             >
               選択をクリア
             </Button>
-            {profile?.role === 'admin' && (
+            {isAdmin && (
               <Button 
                 variant="destructive" 
                 size="sm" 
