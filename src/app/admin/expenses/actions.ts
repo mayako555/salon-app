@@ -18,6 +18,8 @@ import {
 import { revalidatePath } from "next/cache";
 import { getAdvancedAnalytics } from "@/app/dashboard/actions";
 import { addAuditLog } from "@/app/audit/actions";
+import * as Papa from "papaparse";
+import * as crypto from "crypto";
 
 export type ExpenseRecord = {
   id?: string;
@@ -600,21 +602,43 @@ export async function parseYayoiPdfAction(base64File: string, mimeType: string) 
 
     const cleanBase64 = base64File.includes(",") ? base64File.split(",")[1] : base64File;
 
+    if (mimeType === "text/csv" || mimeType === "text/plain" || mimeType === "text/rtf") {
+      const buffer = Buffer.from(cleanBase64, 'base64');
+      const jschardet = await import('jschardet');
+      const iconv = await import('iconv-lite');
+      const detected = jschardet.detect(buffer);
+      // jschardet can sometimes return null for short/ambiguous Shift_JIS strings.
+      // If the buffer looks like a CSV and has Shift_JIS byte patterns or is undetected, default to Shift_JIS.
+      let encoding = 'utf8';
+      if (detected.encoding === 'Shift_JIS' || detected.encoding === 'windows-1252' || detected.encoding?.includes('ISO') || !detected.encoding) {
+        encoding = 'Shift_JIS';
+      }
+      
+      const decodedText = iconv.decode(buffer, encoding);
+      // If it decoded as Shift_JIS but looks completely garbled (lots of replacement characters), fallback to utf8
+      if (decodedText.includes('') && encoding === 'Shift_JIS' && !decodedText.includes('弥生')) {
+          return parseYayoiTextAction(iconv.decode(buffer, 'utf8'));
+      }
+      
+      return parseYayoiTextAction(decodedText);
+    }
+
     const prompt = `
 あなたは優秀な美容サロン専門の税理士・会計コンサルタントです。
-添付されたファイルは、弥生会計の「取引帳」「取引履歴」または「総勘定元帳」のPDF、CSVテキスト、またはスクリーンショット画像です。
+添付されたファイルは、弥生会計の「取引帳」「取引履歴」、または銀行口座のWeb明細（CSV、テキスト、画像など）です。
 この画像または書類に記載されているすべての取引行を正確に抽出し、以下のルールに従って解析してJSON形式の配列で返してください。
 
 【解析・重複検出・振替分類ルール】
-1. 各行の取引日、借方勘定科目、貸方勘定科目、金額、摘要を正確に抽出してください。
-2. 売上の二重計上防止チェック:
-   - 勘定科目が「売上」「売掛金」「雑収入」となっている行、または摘要に「ＰＡＹＰＡＹ」「PayPay」「ﾘｸﾙｰﾄ ﾍﾟｲﾒﾝﾄ」「リクルート」「ﾒﾙﾍﾟｲ」「メルペイ」「Square」「スクエア」「Stripe」「ストライプ」「カード」などの文字が含まれ、分類が「売上」となっている行は、日報売上（サロンアプリ側）と重複しているため、 is_duplicate_sales を true にし、日本のサロンオーナー向けに分かりやすい具体的な警告・仕訳アドバイス理由（reason）を添えてください。
-3. 財務・税務支出（キャッシュフロー計算用）のチェック:
-   - 借方勘定科目が「借入金」「長期借入金」「短期借入金」「法人税等」「所得税」「住民税」「消費税」の場合は、 classification を "財務・税務" にしてください。
-4. 口座間振替・資金移動（経費ではない取引）のチェック:
-   - 上記の「財務・税務」以外で、借方と貸方の両方が資産口座（例：「普通預金」⇔「普通預金」、「普通預金」⇔「現金」、「クレジットカード」の返済）となっている取引、または摘要に「パソコン振替」「セブンATM出金」「カード (302)」「通帳 (709)」などの資金移動を示す文言がある場合は、経費ではなく資金の移動に過ぎないため、 is_transfer を true にしてください。それ以外（消耗品費、水道光熱費、通信費、広告宣伝費、地代家賃、税理士報酬、給料賃金、支払手数料など）は is_transfer を false にし、 classification を "経費" にしてください。
-5. 金額はカンマを除いた数値型（number）で出力してください。
-6. 取引データが存在しない場合は、必ず空のJSON配列 \`[]\` だけを出力してください。挨拶や説明などの文章は一切不要です。
+1. 各行の取引日、金額、摘要（お取り扱い内容）を正確に抽出してください。銀行明細の場合、「お引出し」「出金」の金額を支出として扱い、「お預入れ」「入金」の金額を収入として扱います。
+2. 勘定科目の推測: 銀行明細などで勘定科目が不明な場合は、摘要（お取り扱い内容）から推測して 'category' に最も適切な勘定科目（消耗品費、通信費、広告宣伝費、旅費交通費、地代家賃など）を設定してください。推測が難しい場合は摘要の一部をそのまま使うか「不明」としてください。
+3. 売上の二重計上防止チェック:
+   - 勘定科目が「売上」となっている行、または「お預入れ」等で摘要に「ＰＡＹＰＡＹ」「PayPay」「ﾘｸﾙｰﾄ ﾍﾟｲﾒﾝﾄ」「リクルート」「ﾒﾙﾍﾟｲ」「メルペイ」「Square」「スクエア」「Stripe」「ストライプ」「カード」「ホットペッパー」などの売上入金を示す文字が含まれる場合は、日報売上（サロンアプリ側）と重複しているため、分類を「売上」とし、 'is_duplicate_sales' を true にしてください。具体的な警告・仕訳アドバイス理由（reason）を添えてください。
+4. 財務・税務支出（キャッシュフロー計算用）のチェック:
+   - 借方勘定科目または摘要が「借入金」「長期借入金」「短期借入金」「法人税等」「所得税」「住民税」「消費税」の場合は、 'classification' を "財務・税務" にしてください。
+5. 口座間振替・資金移動（経費ではない取引）のチェック:
+   - 上記の「財務・税務」以外で、借方と貸方の両方が資産口座となっている取引、または摘要に「パソコン振替」「セブンATM出金」「カード (302)」「通帳 (709)」などの資金移動を示す文言がある場合は、経費ではなく資金の移動に過ぎないため、 'is_transfer' を true にし、 'classification' を "振替" にしてください。それ以外の出金（消耗品費、水道光熱費など）は 'is_transfer' を false にし、 'classification' を "経費" にしてください。
+6. 金額はカンマを除いた数値型（number）で出力してください。
+7. 取引データが存在しない場合は、必ず空のJSON配列 \`[]\` だけを出力してください。挨拶や説明などの文章は一切不要です。
 
 【期待するJSON構造】
 [
@@ -635,7 +659,7 @@ export async function parseYayoiPdfAction(base64File: string, mimeType: string) 
 
     console.log(`[Yayoi Parser] Sending file to Gemini (MIME: ${mimeType})...`);
     
-    const modelIds = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-flash-latest"];
+    const modelIds = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"];
     let lastError = null;
     let jsonResultText = null;
 
@@ -726,24 +750,34 @@ export async function parseYayoiPdfAction(base64File: string, mimeType: string) 
   }
 }
 
-export async function parseYayoiTextAction(textContent: string) {
+function hashStr(str: string) {
+  return crypto.createHash("md5").update(str).digest("hex");
+}
+
+export async function parseYayoiTextAction(textContent: string, columnMapping?: { date: string | number; amount: string | number; desc: string | number }) {
+  const startTime = Date.now();
+  let stats = { total: 0, ai: 0, rule: 0, excluded: 0, expense: 0, timeMs: 0 };
+
   try {
-    // 1. If it looks like Yayoi CSV (lines starting with "2000" or similar), parse it locally!
     const lines = textContent.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-    const isCsv = lines.some(l => l.startsWith('"2000"') || l.includes('","'));
-
-    if (isCsv) {
-      console.log(`[Yayoi Parser] Detected CSV format. Parsing locally...`);
-      const parsedData = [];
+    const isYayoi = lines.some(l => l.startsWith('"2000"') || l.includes('弥生'));
+    
+    const parsed = Papa.parse(textContent, { skipEmptyLines: true, header: false });
+    const data = parsed.data as any[][];
+    if (data.length === 0) return { success: false, error: "データが空です" };
+    
+    const hasHeader = isNaN(Number(data[0][0]?.replace(/,/g, ''))) && data.length > 1;
+    const startIndex = hasHeader ? 1 : 0;
+    
+    let results: any[] = [];
+    
+    if (isYayoi) {
+      console.log("[Parser] Detected Yayoi CSV. Skipping AI.");
       let no = 1;
-      
-      for (const line of lines) {
-        if (!line.includes('","')) continue;
-        
-        // Simple CSV parser for standard yayoi row
-        const row = line.split('","').map(c => c.replace(/^"|"$/g, ''));
+      for (let i = startIndex; i < data.length; i++) {
+        const row = data[i];
         if (row.length < 17) continue;
-
+        
         const date = row[3] ? row[3].replace(/\//g, "-") : "";
         const debitAccount = row[4] || "";
         const creditAccount = row[10] || "";
@@ -752,197 +786,206 @@ export async function parseYayoiTextAction(textContent: string) {
         const description = row[16] || "";
 
         if (!date || amount === 0) continue;
+        stats.total++;
+
+        const exclusions = ["売上", "売掛金", "普通預金", "事業主貸", "事業主借", "現金"]; 
+        if (exclusions.includes(debitAccount)) {
+          stats.excluded++;
+          continue; 
+        }
 
         let classification = "経費";
-        let is_duplicate_sales = false;
-        let is_transfer = false;
-        let reason = "";
+        let category = debitAccount;
 
-        const assetAccounts = ["普通預金", "現金", "クレジットカード", "借入金", "売掛金"];
-        
-        // Check Transfer
-        const isDebitAsset = assetAccounts.includes(debitAccount);
-        const isCreditAsset = assetAccounts.includes(creditAccount);
-        
-        const transferKeywords = ["振替", "ATM出金", "カード (302)", "通帳 (709)", "カード　(770)", "カード　(320)", "カード　(767)", "セブンATM", "ご返済", "借入金返済", "パソコン振替"];
-        const hasTransferKeyword = transferKeywords.some(k => description.includes(k));
+        const debtAccounts = ["借入金", "長期借入金", "短期借入金"];
+        const taxAccounts = ["租税公課", "法人税等", "所得税", "住民税", "消費税"];
+        const salaryAccounts = ["給料手当", "法定福利費", "福利厚生費"];
+        const rentAccounts = ["地代家賃"];
 
-        // 特例: 未払金でも税理士法人など経費扱いにしたいもの
-        let isTaxAccountant = false;
-        if (debitAccount === "未払金" && (description.includes("ｾﾞｲﾘｼ") || description.includes("税理士"))) {
-          isTaxAccountant = true;
-        }
-
-        // 財務・税務チェック (Taxes & Debts)
-        const financialAccounts = ["借入金", "長期借入金", "短期借入金", "法人税等", "法人税", "所得税", "住民税", "消費税"];
-        const isFinancialOrTax = financialAccounts.includes(debitAccount) || financialAccounts.some(acc => description.includes(acc));
-
-        if (isFinancialOrTax) {
+        if (debtAccounts.includes(category)) {
+          category = "借入金・返済";
           classification = "財務・税務";
-        } else if (!isTaxAccountant && ((isDebitAsset && isCreditAsset) || hasTransferKeyword || debitAccount === "未払金")) {
-          is_transfer = true;
-          classification = "振替";
-          reason = "口座間・資金移動と判定されました";
+        } else if (taxAccounts.includes(category)) {
+          category = "税金";
+          classification = "財務・税務";
+        } else if (salaryAccounts.includes(category)) {
+          category = "人件費";
+        } else if (rentAccounts.includes(category)) {
+          category = "固定費";
         }
+        
+        stats.rule++;
+        stats.expense++;
 
-        // Check Sales
-        const salesAccounts = ["売上", "受取利息", "雑収入", "売掛金"];
-        if (!is_transfer && (salesAccounts.includes(creditAccount) || salesAccounts.includes(debitAccount))) {
-          classification = "売上";
-        }
-
-        // Check Duplicate Sales
-        if (classification === "売上") {
-          const salesKeywords = ["ＰＡＹＰＡＹ", "PayPay", "ﾘｸﾙｰﾄ", "リクルート", "ﾒﾙﾍﾟｲ", "メルペイ", "Square", "スクエア", "Stripe", "ストライプ", "カード"];
-          const hasSalesKeyword = salesKeywords.some(k => description.includes(k) || creditAccount.includes(k) || debitAccount.includes(k));
-          
-          if (hasSalesKeyword || creditAccount === "売掛金" || creditAccount === "売上") {
-            is_duplicate_sales = true;
-            reason = "日報の売上と重複する決済・入金記録です";
-          }
-        }
-
-        let category = classification === "売上" ? creditAccount : debitAccount;
-        if (isTaxAccountant) category = "税理士・弁護士報酬";
-
-        parsedData.push({
-          no: no++,
-          date,
-          classification,
-          category: category === "普通預金" ? creditAccount : category,
-          description,
-          payment_method: "",
-          amount,
-          is_duplicate_sales,
-          is_transfer,
-          reason
+        results.push({
+          no: no++, date, classification, category, description,
+          payment_method: "", amount, is_duplicate_sales: false, is_transfer: false,
+          reason: "弥生自動マッピング"
         });
       }
+      stats.timeMs = Date.now() - startTime;
+      return { success: true, dataStr: JSON.stringify(results), stats };
+    }
 
-      if (parsedData.length > 0) {
-        return { success: true, dataStr: JSON.stringify(parsedData) };
+    console.log("[Parser] Detected Generic CSV.");
+    
+    let dateCol = -1, amountCol = -1, descCol = -1;
+    
+    if (columnMapping) {
+      dateCol = Number(columnMapping.date);
+      amountCol = Number(columnMapping.amount);
+      descCol = Number(columnMapping.desc);
+    } else {
+      const firstRow = data[0];
+      for (let i = 0; i < firstRow.length; i++) {
+        const val = String(firstRow[i]);
+        if (val.includes("日付") || val.includes("利用日") || /^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}/.test(val)) {
+           if (dateCol === -1) dateCol = i;
+        }
+        if (val.includes("出金") || val.includes("引出") || val.includes("支払") || val.includes("金額")) {
+           amountCol = i;
+        }
+        if (val.includes("摘要") || val.includes("内容") || val.includes("利用店")) {
+           descCol = i;
+        }
+      }
+      
+      if (dateCol === -1 || amountCol === -1 || descCol === -1) {
+         if (data.length > 1) {
+           const row = data[1];
+           for (let i = 0; i < row.length; i++) {
+             const val = String(row[i]);
+             if (/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}/.test(val) && dateCol === -1) dateCol = i;
+             const num = Number(val.replace(/,/g, ''));
+             if (!isNaN(num) && num > 0 && amountCol === -1) amountCol = i;
+             if (val.length > 3 && isNaN(num) && descCol === -1) descCol = i;
+           }
+         }
       }
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is not configured in environment variables.");
+    if (dateCol === -1 || amountCol === -1 || descCol === -1) {
+       return { 
+         success: false, 
+         requireColumnSelection: true, 
+         headers: data[0],
+         previewRows: data.slice(1, 4)
+       };
     }
 
-    const prompt = `
-あなたは優秀な美容サロン専門の税理士・会計コンサルタントです。
-提供されたテキストは、弥生会計などの「取引帳」「取引履歴」または「総勘定元帳」のデータです。
-このテキストに記載されているすべての取引行を正確に抽出し、以下のルールに従って解析してJSON形式の配列で返してください。
+    let no = 1;
+    const aiQueue: any[] = [];
+    const salesKeywords = ["paypay", "リクルート", "stripe", "square", "airpay", "stores", "楽天ペイ", "ホットペッパー"];
+    const transferKeywords = ["atm", "振替", "移動", "引落", "振込", "カード ("];
 
-【解析・重複検出・振替分類ルール】
-1. 各行の取引日、借方勘定科目、貸方勘定科目、金額、摘要を正確に抽出してください。
-2. 売上の二重計上防止チェック:
-   - 勘定科目が「売上」「売掛金」「雑収入」となっている行、または摘要に「ＰＡＹＰＡＹ」「PayPay」「ﾘｸﾙｰﾄ ﾍﾟｲﾒﾝﾄ」「リクルート」「ﾒﾙﾍﾟｲ」「メルペイ」「Square」「スクエア」「Stripe」「ストライプ」「カード」などの文字が含まれ、分類が「売上」となっている行は、日報売上（サロンアプリ側）と重複しているため、 is_duplicate_sales を true にし、日本のサロンオーナー向けに分かりやすい具体的な警告・仕訳アドバイス理由（reason）を添えてください。
-3. 財務・税務支出（キャッシュフロー計算用）のチェック:
-   - 借方勘定科目が「借入金」「長期借入金」「短期借入金」「法人税等」「所得税」「住民税」「消費税」の場合は、 classification を "財務・税務" にしてください。
-4. 口座間振替・資金移動（経費ではない取引）のチェック:
-   - 上記の「財務・税務」以外で、借方と貸方の両方が資産口座（例：「普通預金」⇔「普通預金」、「普通預金」⇔「現金」、「クレジットカード」の返済）となっている取引、または摘要に「パソコン振替」「セブンATM出金」「カード (302)」「通帳 (709)」などの資金移動を示す文言がある場合は、経費ではなく資金の移動に過ぎないため、 is_transfer を true にしてください。それ以外（消耗品費、水道光熱費、通信費、広告宣伝費、地代家賃、税理士報酬、給料賃金、支払手数料など）は is_transfer を false にし、 classification を "経費" にしてください。
-5. 金額はカンマを除いた数値型（number）で出力してください。
-6. 取引データが存在しない場合は、必ず空のJSON配列 \`[]\` だけを出力してください。挨拶や説明などの文章は一切不要です。
+    for (let i = startIndex; i < data.length; i++) {
+      const row = data[i];
+      if (!row[dateCol] || !row[amountCol]) continue;
+      
+      const date = row[dateCol].replace(/\//g, "-");
+      const amount = parseInt(String(row[amountCol]).replace(/,/g, ''), 10) || 0;
+      const desc = row[descCol] || "";
+      
+      if (amount === 0) continue; 
+      stats.total++;
+      
+      const descLower = desc.toLowerCase();
+      const isSales = salesKeywords.some(k => descLower.includes(k));
+      const isTransfer = transferKeywords.some(k => descLower.includes(k));
 
-【期待するJSON構造】
-[
-  {
-    "no": 1,
-    "date": "YYYY-MM-DD",
-    "classification": "売上" | "経費" | "振替",
-    "category": "勘定科目名",
-    "description": "摘要欄の内容",
-    "payment_method": "取引手段の内容",
-    "amount": 金額（数値）,
-    "is_duplicate_sales": true | false,
-    "is_transfer": true | false,
-    "reason": "重複や振替の警告理由、または空欄"
-  }
-]
-`;
-
-    console.log(`[Yayoi Parser] Sending text data to Gemini...`);
-    
-    const modelIds = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-flash-latest"];
-    let lastError = null;
-    let jsonResultText = null;
-
-    for (const modelId of modelIds) {
-      try {
-        console.log(`[Yayoi Parser] Attempting text parse with model: ${modelId}`);
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: prompt
-                    },
-                    {
-                      text: "以下は解析対象のテキストデータです:\n\n" + textContent
-                    }
-                  ]
-                }
-              ]
-            }),
-            signal: AbortSignal.timeout(90000)
-          }
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          lastError = errorData.error?.message || response.status;
-          continue;
-        }
-
-        const json = await response.json();
-        jsonResultText = json.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (jsonResultText) break;
-      } catch (err: any) {
-        lastError = err.message;
+      if (isSales) {
+        stats.rule++;
+        stats.excluded++;
+        results.push({ no: no++, date, classification: "売上", category: "売上", description: desc, payment_method: "", amount, is_duplicate_sales: true, is_transfer: false, reason: "ルール：売上重複除外" });
         continue;
       }
-    }
 
-    if (!jsonResultText) {
-      return { 
-        success: false, 
-        error: `テキストの読み取りに失敗しました（エラー: ${lastError || "レスポンス空" }）。` 
-      };
-    }
-
-    try {
-      const jsonMatch = jsonResultText.match(/\[[\s\S]*\]/);
-      const jsonStr = jsonMatch ? jsonMatch[0] : jsonResultText;
-      let parsedData = JSON.parse(jsonStr);
-      
-      if (!Array.isArray(parsedData)) {
-        parsedData = [parsedData];
+      if (isTransfer) {
+        stats.rule++;
+        stats.excluded++;
+        results.push({ no: no++, date, classification: "振替", category: "振替", description: desc, payment_method: "", amount, is_duplicate_sales: false, is_transfer: true, reason: "ルール：資金移動除外" });
+        continue;
       }
-      
-      // Keep only flat objects to prevent Next.js rendering issues
-      const validTransactions = parsedData.flat(5).filter((item: any) => 
-        item && typeof item === 'object' && !Array.isArray(item)
-      );
 
-      // Return as string to avoid Next.js Server Action array depth limits
-      return { success: true, dataStr: JSON.stringify(validTransactions) };
-    } catch (parseErr: any) {
-      return {
-        success: false,
-        error: `AIの出力解析に失敗しました。データが多すぎるため途中で処理が途切れた可能性があります（長文テキストや元帳まるごと等の場合）。数ヶ月ごとに分割して貼り付けるか、弥生会計から「CSV形式」でエクスポートしたテキストを貼り付けると確実に一瞬で読み込めます。`
-      };
+      // Check Cache
+      const hash = hashStr(desc);
+      try {
+        const snap = await getDoc(doc(db, "ai_expense_rules", hash));
+        if (snap.exists()) {
+          const cached = snap.data();
+          stats.rule++;
+          stats.expense++;
+          results.push({ no: no++, date, classification: cached.classification, category: cached.category, description: desc, payment_method: "", amount, is_duplicate_sales: false, is_transfer: false, reason: "キャッシュ：自動適用" });
+          continue;
+        }
+      } catch (e) { console.error("Cache error", e); }
+
+      aiQueue.push({ index: i, no: no++, date, amount, desc, hash });
     }
-  } catch (error: any) {
-    console.error("parseYayoiTextAction Error:", error);
-    return { success: false, error: error.message };
+
+    if (aiQueue.length > 0) {
+      console.log(`[Parser] Extracted ${aiQueue.length} items for AI processing`);
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
+
+      const prompt = `
+あなたは優秀な美容サロン専門の税理士・会計コンサルタントです。
+以下のJSON配列データ（未分類の経費行）の 'category' を推測して設定してください。
+分類は '消耗品費', '通信費', '広告宣伝費', '旅費交通費', '地代家賃' 等の適切な科目です。推測不可な場合は '不明' としてください。
+出力は元の配列と同じ長さのJSON配列のみを返してください。
+
+データ:
+${JSON.stringify(aiQueue.map(q => ({ desc: q.desc, amount: q.amount })))}
+
+出力形式:
+[ { "category": "勘定科目名" }, ... ]
+`;
+
+      const modelIds = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"];
+      let aiResultText = null;
+      let lastError = null;
+
+      for (const modelId of modelIds) {
+        try {
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }), signal: AbortSignal.timeout(90000)
+          });
+          if (!response.ok) { lastError = (await response.json()).error?.message; continue; }
+          const json = await response.json();
+          aiResultText = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (aiResultText) break;
+        } catch (err: any) { lastError = err.message; continue; }
+      }
+
+      if (!aiResultText) throw new Error(`AI解析エラー: ${lastError}`);
+
+      const jsonMatch = aiResultText.match(/\[[\s\S]*\]/);
+      const jsonStr = jsonMatch ? jsonMatch[0] : aiResultText;
+      let aiParsed = JSON.parse(jsonStr);
+      if (!Array.isArray(aiParsed)) aiParsed = [aiParsed];
+
+      for (let i = 0; i < aiQueue.length; i++) {
+        const q = aiQueue[i];
+        const aiRes = aiParsed[i] || { category: "不明" };
+        stats.ai++;
+        stats.expense++;
+        
+        results.push({ no: q.no, date: q.date, classification: "経費", category: aiRes.category, description: q.desc, payment_method: "", amount: q.amount, is_duplicate_sales: false, is_transfer: false, reason: "AI推測" });
+        
+        // Save to cache
+        try {
+          await setDoc(doc(db, "ai_expense_rules", q.hash), {
+            description: q.desc, classification: "経費", category: aiRes.category, updated_at: serverTimestamp()
+          });
+        } catch (e) { console.error("Cache save error", e); }
+      }
+    }
+
+    stats.timeMs = Date.now() - startTime;
+    return { success: true, dataStr: JSON.stringify(results), stats };
+  } catch (e: any) {
+    return { success: false, error: e.message };
   }
 }
 

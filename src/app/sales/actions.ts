@@ -66,6 +66,8 @@ export type SalesRecord = {
   customer_id?: string;
   is_minimo?: boolean;
   treatment_minutes?: number; // 稼働率計算用
+  merge_status?: "CSV_ONLY" | "MERGED_PRIMARY" | "MANUAL_ONLY" | "MERGED_SOURCE" | "DELETED";
+  merged_into_id?: string;
   companyId?: string; // Tenant isolation
   created_at: any; // Firestore Timestamp
 };
@@ -219,7 +221,12 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
     if (!ctx.companyId) {
       throw new Error("会社IDが指定されていません");
     }
-    filteredSales = sales.filter(s => s.companyId === ctx.companyId);
+    
+    // Filter strictly to HotPepper-based truth records for 1-yen accuracy, per user request
+    filteredSales = sales.filter(s => 
+      s.companyId === ctx.companyId && 
+      (s.merge_status === "CSV_ONLY" || s.merge_status === "MERGED_PRIMARY")
+    );
 
     const { getStaffList } = await import("../staff/actions");
     const staffList = await getStaffList();
@@ -359,7 +366,96 @@ export async function addCheckout(formData: FormData) {
     };
 
     const colRef = collection(db, SALES_COLLECTION);
-    const docRef = await addDoc(colRef, payload);
+    let docRef: any;
+
+    // Fetch existing unmerged CSV records for this date
+    const qFuzzy = query(colRef, where("date", "==", date), where("source", "==", "hotpepper"));
+    const fuzzySnap = await getDocs(qFuzzy);
+    const existingCsvRecords = fuzzySnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }))
+      .filter((d: any) => d.merge_status !== "DELETED" && d.merge_status !== "MERGED_PRIMARY");
+
+    let hpMatch = null;
+    const payloadTotal = payload.tech_sales + payload.product_sales + payload.nomination_fee - payload.discount;
+    const pStaff = String(payload.staff_name || "").replace(/\s+/g, "");
+    
+    // Priority 1: Exact Reservation ID match
+    if (sourceReservationId) {
+      hpMatch = existingCsvRecords.find((d: any) => d.source_reservation_id === sourceReservationId);
+    }
+    
+    // Priority 2: Date + Staff + Time (+/- 15 mins) + Amount
+    if (!hpMatch) {
+      const timeToMins = (t: string) => {
+         if(!t || !t.includes(":")) return 0;
+         const [h, m] = t.split(":").map(Number);
+         return h * 60 + m;
+      };
+      const pMins = timeToMins(payload.time);
+      
+      const possibleMatches = existingCsvRecords.filter((d: any) => {
+         const dTotal = (d.tech_sales || 0) + (d.product_sales || 0) + (d.nomination_fee || 0) - (d.discount || 0);
+         const dStaff = String(d.staff_name || "").replace(/\s+/g, "");
+         const isSameStaff = dStaff === pStaff || dStaff === "フリー" || pStaff === "フリー";
+         const dMins = timeToMins(d.time);
+         const timeDiff = Math.abs(pMins - dMins);
+         
+         return dTotal === payloadTotal && isSameStaff && timeDiff <= 15;
+      });
+      if (possibleMatches.length === 1) {
+          hpMatch = possibleMatches[0];
+      }
+    }
+    
+    // Priority 3: Date + Staff + Amount + Name (Normalized)
+    if (!hpMatch) {
+      const cleanPName = payload.customer_name.replace(/\s+/g, "");
+      const possibleMatches = existingCsvRecords.filter((d: any) => {
+         const dTotal = (d.tech_sales || 0) + (d.product_sales || 0) + (d.nomination_fee || 0) - (d.discount || 0);
+         const dStaff = String(d.staff_name || "").replace(/\s+/g, "");
+         const isSameStaff = dStaff === pStaff || dStaff === "フリー" || pStaff === "フリー";
+         const cleanDName = String(d.customer_name || "").replace(/\s+/g, "");
+         
+         return dTotal === payloadTotal && isSameStaff && cleanDName === cleanPName;
+      });
+      if (possibleMatches.length === 1) {
+          hpMatch = possibleMatches[0];
+      }
+    }
+
+    if (hpMatch) {
+      const hpData = hpMatch as any;
+      // We found a CSV record. 
+      // 1. Save the new manual record as MERGED_SOURCE
+      // 2. Update the existing CSV record as MERGED_PRIMARY and append manual data
+      
+      docRef = await addDoc(colRef, {
+        ...payload,
+        merge_status: "MERGED_SOURCE",
+        merged_into_id: hpData.id
+      });
+      
+      const mergedPayload = {
+        customer_type: payload.customer_type,
+        customer_id: payload.customer_id,
+        options: payload.options || hpData.options,
+        payment_method: payload.payment_method,
+        payment_status: "paid",
+        reservation_route: hpData.reservation_route || payload.reservation_route,
+        hpb_points: (hpData.hpb_points !== 0) ? hpData.hpb_points : payload.hpb_points,
+        menu_course: hpData.menu_course || payload.menu_course,
+        next_booking_date: payload.next_booking_date,
+        next_booking_time: payload.next_booking_time,
+        merge_status: "MERGED_PRIMARY",
+        updated_at: serverTimestamp()
+      };
+      
+      await updateDoc(hpData.ref, mergedPayload);
+    } else {
+      docRef = await addDoc(colRef, {
+        ...payload,
+        merge_status: "MANUAL_ONLY"
+      });
+    }
     
     // Automatically update reservation status if linked
     if (sourceReservationId) {
@@ -690,8 +786,8 @@ export async function importHotPepperCsv(formData: FormData) {
     const colRef = collection(db, SALES_COLLECTION);
     
     // Step 2: Fetch existing records to prevent duplicates and find manual records to merge
-    const existingKeys = new Set<string>();
-    const existingManualRecords: Record<string, any> = {};
+    const existingCsvRecords: any[] = [];
+    const unmergedManualRecords: any[] = [];
 
     if (minDate !== "9999-99-99" && maxDate !== "0000-00-00") {
       const q = query(colRef, 
@@ -701,15 +797,13 @@ export async function importHotPepperCsv(formData: FormData) {
       const snapshot = await getDocs(q);
       snapshot.forEach(doc => {
         const d = doc.data();
+        // Ignore DELETED and MERGED_SOURCE records
+        if (d.merge_status === "DELETED" || d.merge_status === "MERGED_SOURCE") return;
+
         if (d.source === "hotpepper") {
-          // Generate a deduplication key
-          const key = `${d.customer_name}_${d.date}_${d.time}`;
-          existingKeys.add(key);
+          existingCsvRecords.push({ id: doc.id, ...d });
         } else {
-          // Manual record: Key by date and clean customer name
-          const cleanName = String(d.customer_name || "").replace(/\s+/g, "");
-          const manualKey = `${d.date}_${cleanName}`;
-          existingManualRecords[manualKey] = { id: doc.id, ref: doc.ref, ...d };
+          unmergedManualRecords.push({ id: doc.id, ref: doc.ref, ...d });
         }
       });
     }
@@ -738,7 +832,16 @@ export async function importHotPepperCsv(formData: FormData) {
         }
       }
       
-      const customerName = String(firstRow["お客様名"] || firstRow["顧客名"] || firstRow["顧客氏名"] || "HotPepper経由").trim();
+      const customerName = String(
+        firstRow["お客様名"] || 
+        firstRow["顧客名"] || 
+        firstRow["顧客氏名"] || 
+        firstRow["来店者名"] || 
+        firstRow["予約者名"] || 
+        firstRow["氏名"] ||
+        firstRow["カナ氏名"] ||
+        "HotPepper経由"
+      ).trim();
       
       const parseMoney = (val: any) => {
         if (val === undefined || val === null) return 0;
@@ -777,33 +880,93 @@ export async function importHotPepperCsv(formData: FormData) {
       const dateFormatted = formatDate(rawDate);
       let timeFormatted = rawTime.includes(":") ? rawTime : `${rawTime.padStart(4, '0').substring(0, 2)}:${rawTime.padStart(4, '0').substring(2, 4)}`;
 
-      // Deduplication check
-      const dupKey = `${customerName}_${dateFormatted}_${timeFormatted}`;
-      if (existingKeys.has(dupKey)) {
+      const csvTotal = techSales + prodSales + nominationFee - discount;
+      
+      // Deduplication check: Is this CSV record already imported?
+      // Match by date, time, staff, and total amount, or name.
+      const isAlreadyImported = existingCsvRecords.some(r => {
+         const rTotal = (r.tech_sales || 0) + (r.product_sales || 0) + (r.nomination_fee || 0) - (r.discount || 0);
+         return r.date === dateFormatted && 
+                r.time === timeFormatted && 
+                rTotal === csvTotal && 
+                (r.customer_name === customerName || r.staff_name === staffName);
+      });
+
+      if (isAlreadyImported) {
         skipCount++;
-        return; // Skip this duplicate record
+        return; // Skip this duplicate CSV record
       }
 
-      // Merge with existing manual record if found
-      const cleanCustomerName = customerName.replace(/\s+/g, "");
-      const manualMatchKey = `${dateFormatted}_${cleanCustomerName}`;
-      const manualMatch = existingManualRecords[manualMatchKey];
+      // Find matching manual record to merge
+      let manualMatch = null;
+      
+      // Priority 1: Exact Reservation ID match (if we had it in CSV, but usually it's in the row)
+      const accountingId = firstRow["会計ID"] || firstRow["予約ID"] || "";
+      if (accountingId) {
+         manualMatch = unmergedManualRecords.find(m => m.source_reservation_id === accountingId);
+      }
+      
+      // Priority 2: Date + Staff + Time (+/- 15 mins) + Amount
+      if (!manualMatch) {
+         const timeToMins = (t: string) => {
+            if(!t || !t.includes(":")) return 0;
+            const [h, m] = t.split(":").map(Number);
+            return h * 60 + m;
+         };
+         const csvMins = timeToMins(timeFormatted);
+         
+         const possibleMatches = unmergedManualRecords.filter(m => {
+            const mTotal = (m.tech_sales || 0) + (m.product_sales || 0) + (m.nomination_fee || 0) - (m.discount || 0);
+            const isSameStaff = m.staff_name === staffName || m.staff_name === "フリー" || staffName === "フリー";
+            const mMins = timeToMins(m.time);
+            const timeDiff = Math.abs(csvMins - mMins);
+            
+            return m.date === dateFormatted && mTotal === csvTotal && isSameStaff && timeDiff <= 15;
+         });
+         if (possibleMatches.length === 1) {
+             manualMatch = possibleMatches[0];
+         }
+      }
+      
+      // Priority 3: Date + Staff + Amount + Name (Normalized)
+      if (!manualMatch) {
+         const cleanCustomerName = customerName.replace(/\s+/g, "");
+         const possibleMatches = unmergedManualRecords.filter(m => {
+            const mTotal = (m.tech_sales || 0) + (m.product_sales || 0) + (m.nomination_fee || 0) - (m.discount || 0);
+            const isSameStaff = m.staff_name === staffName || m.staff_name === "フリー" || staffName === "フリー";
+            const cleanMName = String(m.customer_name || "").replace(/\s+/g, "");
+            
+            return m.date === dateFormatted && mTotal === csvTotal && isSameStaff && cleanMName === cleanCustomerName;
+         });
+         if (possibleMatches.length === 1) {
+             manualMatch = possibleMatches[0];
+         }
+      }
 
       let paymentMethod = "未入力";
       let paymentStatus = "unpaid";
       let note = "";
+      const docRef = doc(colRef);
 
       if (manualMatch) {
         paymentMethod = manualMatch.payment_method || "未入力";
         paymentStatus = manualMatch.payment_status || "unpaid";
         note = manualMatch.note || "";
-        // Remove the old manual record to avoid duplicates
-        batch.delete(manualMatch.ref);
-        delete existingManualRecords[manualMatchKey];
+        
+        // Mark manual record as MERGED_SOURCE instead of deleting
+        batch.update(manualMatch.ref, {
+           merge_status: "MERGED_SOURCE",
+           merged_into_id: docRef.id,
+           updated_at: serverTimestamp()
+        });
+        
+        // Remove from unmerged list so it's not merged again
+        const idx = unmergedManualRecords.findIndex(m => m.id === manualMatch.id);
+        if (idx !== -1) unmergedManualRecords.splice(idx, 1);
+        
         mergedCount++;
       }
 
-      const docRef = doc(colRef);
       batch.set(docRef, {
         companyId: companyId || "company_default",
         staff_id: "unknown",
@@ -827,6 +990,7 @@ export async function importHotPepperCsv(formData: FormData) {
         payment_status: paymentStatus,
         note: note,
         status: "draft",
+        merge_status: manualMatch ? "MERGED_PRIMARY" : "CSV_ONLY",
         source: "hotpepper" as SalesSource,
         created_at: serverTimestamp()
       });

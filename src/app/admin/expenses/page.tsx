@@ -168,7 +168,14 @@ export default function AdminExpensesDashboard() {
   const [isParsingPdf, setIsParsingPdf] = useState(false);
   const [parsedTransactions, setParsedTransactions] = useState<any[]>([]);
   const [importError, setImportError] = useState<string | null>(null);
+
   const [pasteText, setPasteText] = useState("");
+  const [requireColumnMapping, setRequireColumnMapping] = useState(false);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvPreviewRows, setCsvPreviewRows] = useState<any[][]>([]);
+  const [colMapping, setColMapping] = useState({ date: "", amount: "", desc: "" });
+  const [importStats, setImportStats] = useState<any>(null);
+
 
   // New Expense Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -314,7 +321,7 @@ export default function AdminExpensesDashboard() {
     }
   };
 
-  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -326,6 +333,8 @@ export default function AdminExpensesDashboard() {
     setIsParsingPdf(true);
     setImportError(null);
     setParsedTransactions([]);
+    setRequireColumnMapping(false);
+    setImportStats(null);
 
     try {
       const reader = new FileReader();
@@ -337,7 +346,14 @@ export default function AdminExpensesDashboard() {
           if (!mime && file.name.endsWith(".csv")) mime = "text/csv";
           if (!mime && file.name.endsWith(".rtf")) mime = "text/rtf";
           if (mime === "application/rtf") mime = "text/rtf";
+          
+          if (mime === "text/csv" || mime === "text/plain" || mime === "text/rtf") {
+            // We intentionally do not decode text on the client-side to prevent mojibake.
+            // The server will handle decoding with iconv-lite.
+          }
+
           const res = await parseYayoiPdfAction(base64Data, mime || "application/pdf");
+          
           if (res.success && res.dataStr) {
             const parsedArray = JSON.parse(res.dataStr);
             if (parsedArray.length === 0) {
@@ -345,8 +361,14 @@ export default function AdminExpensesDashboard() {
               toast.error("データが0件です");
             } else {
               setParsedTransactions(parsedArray);
-              toast.success("取引履歴をAIで解析しました！");
+              setImportStats(res.stats || null);
+              toast.success("取引履歴を高速解析しました！");
             }
+          } else if (res.requireColumnSelection) {
+            setRequireColumnMapping(true);
+            setCsvHeaders(res.headers || []);
+            setCsvPreviewRows(res.previewRows || []);
+            toast.error("CSVの列が自動判定できませんでした。列を選択してください。");
           } else {
             setImportError(res.error || "取引履歴の解析に失敗しました");
             toast.error("解析エラーが発生しました");
@@ -372,15 +394,19 @@ export default function AdminExpensesDashboard() {
     }
   };
 
-  const handlePasteTextUpload = async () => {
+  const handlePasteTextUpload = async (columnMappingParams?: any) => {
     if (!pasteText.trim()) return;
 
     setIsParsingPdf(true);
     setImportError(null);
-    setParsedTransactions([]);
+    if (!columnMappingParams) {
+      setParsedTransactions([]);
+      setRequireColumnMapping(false);
+      setImportStats(null);
+    }
 
     try {
-      const res = await parseYayoiTextAction(pasteText);
+      const res = await parseYayoiTextAction(pasteText, columnMappingParams);
       if (res.success && res.dataStr) {
         const parsedArray = JSON.parse(res.dataStr);
         if (parsedArray.length === 0) {
@@ -388,8 +414,15 @@ export default function AdminExpensesDashboard() {
           toast.error("データが0件です");
         } else {
           setParsedTransactions(parsedArray);
-          toast.success("テキストから取引履歴をAIで解析しました！");
+          setImportStats(res.stats || null);
+          setRequireColumnMapping(false);
+          toast.success("テキストから取引履歴を高速解析しました！");
         }
+      } else if (res.requireColumnSelection) {
+        setRequireColumnMapping(true);
+        setCsvHeaders(res.headers || []);
+        setCsvPreviewRows(res.previewRows || []);
+        toast.error("CSVの列が自動判定できませんでした。列を選択してください。");
       } else {
         setImportError(res.error || "取引履歴の解析に失敗しました");
         toast.error("解析エラーが発生しました");
@@ -567,7 +600,7 @@ export default function AdminExpensesDashboard() {
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 rounded-xl px-4 gap-2 text-xs"
             >
               <Brain size={14} className="text-amber-300" />
-              弥生取引帳PDF・画像インポート
+              CSV・画像から経費を取込 (AI)
             </Button>
 
             <Button 
@@ -576,7 +609,7 @@ export default function AdminExpensesDashboard() {
               className="bg-slate-900 hover:bg-slate-800 text-white font-bold h-10 rounded-xl px-4 gap-2 text-xs"
             >
               <Download size={14} />
-              弥生会計インポートCSV
+              弥生会計へエクスポート (CSV)
             </Button>
           </div>
         </div>
@@ -1120,6 +1153,62 @@ export default function AdminExpensesDashboard() {
                   </div>
                 )}
 
+                                {/* Column Selection UI */}
+                {requireColumnMapping && (
+                  <div className="flex flex-col gap-4 border border-rose-200 rounded-xl p-6 bg-rose-50/50">
+                    <div>
+                      <h4 className="text-rose-800 font-bold text-sm">列の自動判定に失敗しました</h4>
+                      <p className="text-xs text-rose-600 mt-1">
+                        特殊なCSVフォーマットのため、どの列が日付・金額・摘要か判断できませんでした。以下から列を選択してください。
+                      </p>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500">日付の列</label>
+                        <select 
+                          value={colMapping.date} 
+                          onChange={e => setColMapping({...colMapping, date: e.target.value})}
+                          className="w-full text-xs p-2 border border-slate-200 rounded-lg"
+                        >
+                          <option value="">選択してください</option>
+                          {csvHeaders.map((h, i) => <option key={i} value={i}>{h || `列 ${i+1}`}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500">金額（出金）の列</label>
+                        <select 
+                          value={colMapping.amount} 
+                          onChange={e => setColMapping({...colMapping, amount: e.target.value})}
+                          className="w-full text-xs p-2 border border-slate-200 rounded-lg"
+                        >
+                          <option value="">選択してください</option>
+                          {csvHeaders.map((h, i) => <option key={i} value={i}>{h || `列 ${i+1}`}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500">摘要の列</label>
+                        <select 
+                          value={colMapping.desc} 
+                          onChange={e => setColMapping({...colMapping, desc: e.target.value})}
+                          className="w-full text-xs p-2 border border-slate-200 rounded-lg"
+                        >
+                          <option value="">選択してください</option>
+                          {csvHeaders.map((h, i) => <option key={i} value={i}>{h || `列 ${i+1}`}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <Button
+                      onClick={() => handlePasteTextUpload(colMapping)}
+                      disabled={colMapping.date === "" || colMapping.amount === "" || colMapping.desc === ""}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 mt-2"
+                    >
+                      この列設定で解析を実行
+                    </Button>
+                  </div>
+                )}
+
                 {/* Parsing Status */}
                 {isParsingPdf && (
                   <div className="flex flex-col items-center justify-center py-16 text-center gap-4 bg-slate-50 rounded-xl border border-slate-100 p-8 animate-pulse">
@@ -1149,9 +1238,24 @@ export default function AdminExpensesDashboard() {
                   </div>
                 )}
 
-                {/* Parsed Transactions List */}
+                                {/* Parsed Transactions List */}
                 {parsedTransactions.length > 0 && (
                   <div className="space-y-4">
+                    
+                    {importStats && (
+                      <div className="bg-slate-800 text-slate-200 p-4 rounded-xl text-xs font-mono mb-4">
+                        <h4 className="text-emerald-400 font-bold mb-2 pb-2 border-b border-slate-700">🚀 ハイブリッド解析レポート</h4>
+                        <div className="grid grid-cols-2 gap-y-2 gap-x-4">
+                          <div><span className="text-slate-400">総読み込み行数:</span> {importStats.total}件</div>
+                          <div><span className="text-slate-400">ルール処理・キャッシュ:</span> <span className="text-emerald-300 font-bold">{importStats.rule}件</span></div>
+                          <div><span className="text-slate-400">AIが推測した未知の行:</span> <span className="text-amber-300 font-bold">{importStats.ai}件</span></div>
+                          <div><span className="text-slate-400">重複・対象外の除外:</span> {importStats.excluded}件</div>
+                          <div><span className="text-slate-400">経費として反映可能:</span> {importStats.expense}件</div>
+                          <div><span className="text-slate-400">処理時間:</span> {importStats.timeMs}ms</div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex justify-between items-center bg-emerald-50 border border-emerald-100 p-3 rounded-xl">
                       <div>
                         <span className="text-[10px] font-bold text-emerald-800 block">🎉 取引抽出が完了しました！</span>
