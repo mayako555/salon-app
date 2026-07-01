@@ -7,7 +7,7 @@ import { ja } from "date-fns/locale";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { User, Clock, Plus, Info, Scissors, ShoppingBag, Tag } from "lucide-react";
-import CheckoutDialog from "./CheckoutDialog";
+import PaymentEditDialog from "./PaymentEditDialog";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -93,33 +93,35 @@ export default function DailyScheduleView({
                       className="flex-1 min-w-[120px] relative border-r border-slate-100 last:border-r-0 h-16 group/cell"
                     >
                       {sale ? (
-                        <div 
-                          onClick={() => onEditClick(sale)}
-                          className={cn(
-                            "absolute inset-1 rounded-xl p-2 shadow-sm border transition-all cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-95 z-10",
-                            sale.status === 'closed' 
-                              ? "bg-slate-100 border-slate-200 text-slate-500" 
-                              : "bg-amber-50 border-amber-200 text-amber-900"
-                          )}
-                        >
-                          <div className="flex flex-col h-full justify-between">
-                            <div className="flex justify-between items-start">
-                              <span className="text-[10px] font-black truncate max-w-[80%] leading-tight">
-                                {sale.customer_name} 様
-                              </span>
-                              {sale.customer_type === '新規' && <span className="text-[8px] bg-blue-500 text-white px-1 rounded-sm font-bold">新</span>}
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-[11px] font-black tabular-nums">
-                                ¥{(sale.tech_sales + sale.product_sales + (sale.nomination_fee || 0) - (sale.discount || 0)).toLocaleString()}
-                              </span>
-                              <div className="flex gap-0.5">
-                                {sale.tech_sales > 0 && <Scissors size={10} className="text-blue-400" />}
-                                {sale.product_sales > 0 && <ShoppingBag size={10} className="text-emerald-400" />}
+                        <PaymentEditDialog 
+                          initialData={sale}
+                          trigger={
+                            <div className={cn(
+                              "absolute inset-1 rounded-xl p-2 shadow-sm border transition-all cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-95 z-10",
+                              sale.status === 'closed' 
+                                ? "bg-slate-100 border-slate-200 text-slate-500" 
+                                : "bg-amber-50 border-amber-200 text-amber-900"
+                            )}>
+                              <div className="flex flex-col h-full justify-between">
+                                <div className="flex justify-between items-start">
+                                  <span className="text-[10px] font-black truncate max-w-[80%] leading-tight">
+                                    {sale.customer_name} 様
+                                  </span>
+                                  {sale.customer_type === '新規' && <span className="text-[8px] bg-blue-500 text-white px-1 rounded-sm font-bold">新</span>}
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] font-black tabular-nums">
+                                    ¥{(sale.tech_sales + sale.product_sales + (sale.nomination_fee || 0) - (sale.discount || 0)).toLocaleString()}
+                                  </span>
+                                  <div className="flex gap-0.5">
+                                    {sale.tech_sales > 0 && <Scissors size={10} className="text-blue-400" />}
+                                    {sale.product_sales > 0 && <ShoppingBag size={10} className="text-emerald-400" />}
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </div>
+                          }
+                        />
                       ) : (
                         <div className="absolute inset-0 w-full h-full bg-transparent flex items-center justify-center transition-opacity" />
                       )}

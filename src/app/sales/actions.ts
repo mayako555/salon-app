@@ -51,6 +51,8 @@ export type SalesRecord = {
   hpb_points: number; 
   reservation_route: string;
   payment_method: string;
+  payment_status?: string;
+  note?: string;
   hair_material: string;
   options: string;
   cancel_fee: number;
@@ -222,10 +224,11 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
       throw new Error("会社IDが指定されていません");
     }
     
-    // Filter strictly to HotPepper-based truth records for 1-yen accuracy, per user request
+    // Strict CSV-driven: only hotpepper source records are used for aggregation.
     filteredSales = sales.filter(s => 
       s.companyId === ctx.companyId && 
-      (s.merge_status === "CSV_ONLY" || s.merge_status === "MERGED_PRIMARY")
+      s.source === "hotpepper" &&
+      s.merge_status !== "DELETED"
     );
 
     const { getStaffList } = await import("../staff/actions");
@@ -247,476 +250,41 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
   }
 }
 
-import { sendBookingConfirmation } from "@/lib/line";
-import { getCustomerById } from "@/lib/customers";
-
-export async function addCheckout(formData: FormData) {
+export async function updatePaymentInfo(id: string, paymentMethod: string, paymentStatus: string, note: string) {
   try {
-    const staffId = formData.get("staff_id") as string;
-    const staffName = formData.get("staff_name") as string;
-    const storeName = formData.get("store_name") as string;
-    const date = formData.get("date") as string;
-    const time = formData.get("time") as string || "00:00";
-    
-    // Name handling
-    const lastName = formData.get("last_name") as string || "";
-    const firstName = formData.get("first_name") as string || "";
-    const lastNameKana = formData.get("last_name_kana") as string || "";
-    const firstNameKana = formData.get("first_name_kana") as string || "";
-    
-    const customerName = (lastName + " " + firstName).trim() || "名無し";
-    const customerNameKana = (lastNameKana + " " + firstNameKana).trim() || "";
-    
-    let customerId = formData.get("customer_id") as string || null;
-    const customerType = formData.get("customer_type") as "新規" | "リピ" | "不明";
-    
-    // Auto-create customer if ID is missing and we have a name
-    if (!customerId && (lastName || firstName)) {
-      const newCustomerRes = await addCustomer({
-        name: customerName,
-        last_name: lastName,
-        first_name: firstName,
-        name_kana: customerNameKana,
-        last_name_kana: lastNameKana,
-        first_name_kana: firstNameKana,
-        phone: "",
-        gender: "female", // Default
-        allergies: [],
-        has_allergy: false,
-        notes: "会計時に自動登録されました"
-      });
-      if (newCustomerRes.success) {
-        customerId = newCustomerRes.id || null;
-      }
-    }
-
-    const menuCourse = formData.get("menu_course") as string || "";
-    const options = formData.get("options") as string || "";
-    const techSales = parseInt(formData.get("tech_sales") as string || "0", 10);
-    const prodSales = parseInt(formData.get("product_sales") as string || "0", 10);
-    const isNominated = formData.get("is_nominated") === "true";
-    const nominationFee = parseInt(formData.get("nomination_fee") as string || "0", 10);
-    const discount = parseInt(formData.get("discount") as string || "0", 10);
-    const discountReason = formData.get("discount_reason") as string || "";
-    const portalFee = parseInt(formData.get("portal_fee") as string || "0", 10);
-    const hpbPoints = parseInt(formData.get("hpb_points") as string || "0", 10);
-    const cancelFee = parseInt(formData.get("cancel_fee") as string || "0", 10);
-    const paymentMethod = formData.get("payment_method") as string || "現金";
-    const reservationRoute = formData.get("reservation_route") as string || "その他";
-    const hairMaterial = formData.get("hair_material") as string || "";
-    
-    // Next Booking Fields
-    const nextBookingDate = formData.get("next_booking_date") as string || "";
-    const nextBookingTime = formData.get("next_booking_time") as string || "";
-    const nextBookingLineReminder = formData.get("next_booking_line_reminder") === "true";
-    const nextBookingStaffName = formData.get("next_booking_staff_name") as string || staffName;
-    const isMinimo = formData.get("is_minimo") === "true" || reservationRoute.includes("ミニモ");
-    const treatmentMinutes = parseInt(formData.get("treatment_minutes") as string || "60", 10);
-    const sourceReservationId = formData.get("source_reservation_id") as string || "";
-
-    if (!staffName || !date) {
-      return { success: false, error: "必須項目が入力されていません。" };
-    }
-
-    if (sourceReservationId) {
-      const q = query(collection(db, SALES_COLLECTION), where("source_reservation_id", "==", sourceReservationId), limit(1));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        return { success: false, error: "この予約はすでに会計済みです（二重会計エラー）。" };
-      }
-    }
-
-    const payload = {
-      staff_id: staffId || "staff-" + staffName,
-      staff_name: staffName,
-      store_name: storeName,
-      date,
-      time,
-      customer_name: customerName,
-      last_name: lastName,
-      first_name: firstName,
-      last_name_kana: lastNameKana,
-      first_name_kana: firstNameKana,
-      customer_id: customerId,
-      customer_type: customerType,
-      menu_course: menuCourse,
-      tech_sales: techSales,
-      product_sales: prodSales,
-      is_nominated: isNominated,
-      nomination_fee: nominationFee,
-      discount: discount,
-      discount_reason: discountReason,
-      portal_fee: portalFee,
-      hpb_points: hpbPoints,
-      reservation_route: reservationRoute,
-      payment_method: paymentMethod,
-      hair_material: hairMaterial,
-      options: options,
-      cancel_fee: cancelFee,
-      next_booking_date: nextBookingDate,
-      next_booking_time: nextBookingTime,
-      next_booking_staff_name: nextBookingStaffName,
-      next_booking_line_reminder: nextBookingLineReminder,
-      is_minimo: isMinimo,
-      treatment_minutes: treatmentMinutes,
-      status: "draft",
-      source: "checkout" as SalesSource,
-      source_reservation_id: sourceReservationId || null,
-      created_at: serverTimestamp()
-    };
-
-    const colRef = collection(db, SALES_COLLECTION);
-    let docRef: any;
-
-    // Fetch existing unmerged CSV records for this date
-    const qFuzzy = query(colRef, where("date", "==", date), where("source", "==", "hotpepper"));
-    const fuzzySnap = await getDocs(qFuzzy);
-    const existingCsvRecords = fuzzySnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }))
-      .filter((d: any) => d.merge_status !== "DELETED" && d.merge_status !== "MERGED_PRIMARY");
-
-    let hpMatch = null;
-    const payloadTotal = payload.tech_sales + payload.product_sales + payload.nomination_fee - payload.discount;
-    const pStaff = String(payload.staff_name || "").replace(/\s+/g, "");
-    
-    // Priority 1: Exact Reservation ID match
-    if (sourceReservationId) {
-      hpMatch = existingCsvRecords.find((d: any) => d.source_reservation_id === sourceReservationId);
-    }
-    
-    // Priority 2: Date + Staff + Time (+/- 15 mins) + Amount
-    if (!hpMatch) {
-      const timeToMins = (t: string) => {
-         if(!t || !t.includes(":")) return 0;
-         const [h, m] = t.split(":").map(Number);
-         return h * 60 + m;
-      };
-      const pMins = timeToMins(payload.time);
-      
-      const possibleMatches = existingCsvRecords.filter((d: any) => {
-         const dTotal = (d.tech_sales || 0) + (d.product_sales || 0) + (d.nomination_fee || 0) - (d.discount || 0);
-         const dStaff = String(d.staff_name || "").replace(/\s+/g, "");
-         const isSameStaff = dStaff === pStaff || dStaff === "フリー" || pStaff === "フリー";
-         const dMins = timeToMins(d.time);
-         const timeDiff = Math.abs(pMins - dMins);
-         
-         return dTotal === payloadTotal && isSameStaff && timeDiff <= 15;
-      });
-      if (possibleMatches.length === 1) {
-          hpMatch = possibleMatches[0];
-      }
-    }
-    
-    // Priority 3: Date + Staff + Amount + Name (Normalized)
-    if (!hpMatch) {
-      const cleanPName = payload.customer_name.replace(/\s+/g, "");
-      const possibleMatches = existingCsvRecords.filter((d: any) => {
-         const dTotal = (d.tech_sales || 0) + (d.product_sales || 0) + (d.nomination_fee || 0) - (d.discount || 0);
-         const dStaff = String(d.staff_name || "").replace(/\s+/g, "");
-         const isSameStaff = dStaff === pStaff || dStaff === "フリー" || pStaff === "フリー";
-         const cleanDName = String(d.customer_name || "").replace(/\s+/g, "");
-         
-         return dTotal === payloadTotal && isSameStaff && cleanDName === cleanPName;
-      });
-      if (possibleMatches.length === 1) {
-          hpMatch = possibleMatches[0];
-      }
-    }
-
-    if (hpMatch) {
-      const hpData = hpMatch as any;
-      // We found a CSV record. 
-      // 1. Save the new manual record as MERGED_SOURCE
-      // 2. Update the existing CSV record as MERGED_PRIMARY and append manual data
-      
-      docRef = await addDoc(colRef, {
-        ...payload,
-        merge_status: "MERGED_SOURCE",
-        merged_into_id: hpData.id
-      });
-      
-      const mergedPayload = {
-        customer_type: payload.customer_type,
-        customer_id: payload.customer_id,
-        options: payload.options || hpData.options,
-        payment_method: payload.payment_method,
-        payment_status: "paid",
-        reservation_route: hpData.reservation_route || payload.reservation_route,
-        hpb_points: (hpData.hpb_points !== 0) ? hpData.hpb_points : payload.hpb_points,
-        menu_course: hpData.menu_course || payload.menu_course,
-        next_booking_date: payload.next_booking_date,
-        next_booking_time: payload.next_booking_time,
-        merge_status: "MERGED_PRIMARY",
-        updated_at: serverTimestamp()
-      };
-      
-      await updateDoc(hpData.ref, mergedPayload);
-    } else {
-      docRef = await addDoc(colRef, {
-        ...payload,
-        merge_status: "MANUAL_ONLY"
-      });
-    }
-    
-    // Automatically update reservation status if linked
-    if (sourceReservationId) {
-      const { updateReservationStatus } = await import('@/app/reservations/actions');
-      await updateReservationStatus(sourceReservationId, 'completed');
-      
-      // If customer was newly created or linked, make sure reservation is updated with customer ID
-      if (customerId) {
-        await updateDoc(doc(db, 'reservations', sourceReservationId), {
-          customer_id: customerId,
-          updated_at: serverTimestamp()
-        });
-      }
-    }
-
-    // --- Create Auto Reservation for Next Booking ---
-    if (nextBookingDate && nextBookingTime) {
-      try {
-        const h = parseInt(nextBookingTime.split(":")[0] || "0", 10);
-        const m = parseInt(nextBookingTime.split(":")[1] || "0", 10);
-        const endTotalMins = h * 60 + m + treatmentMinutes;
-        const endHour = Math.floor(endTotalMins / 60);
-        const endMin = endTotalMins % 60;
-        const endTime = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
-
-        const { addReservation } = await import("@/app/reservations/actions");
-        const resData = await addReservation({
-          store_name: storeName,
-          staff_id: "staff-" + nextBookingStaffName,
-          staff_name: nextBookingStaffName,
-          type: "reservation",
-          customer_id: customerId || undefined,
-          customer_name: customerName || undefined,
-          customer_kana: lastNameKana ? `${lastNameKana} ${firstNameKana}`.trim() : undefined,
-          date: nextBookingDate,
-          start_time: nextBookingTime,
-          end_time: endTime,
-          menu_name: menuCourse || "次回予約",
-          status: "booked",
-          is_next_booking: true,
-          expected_price: techSales + prodSales - discount,
-        });
-        
-        if (resData.success && resData.id) {
-          await updateDoc(docRef, { next_reservation_id: resData.id });
-        }
-      } catch (e) {
-        console.error("Failed to auto-create next reservation:", e);
-      }
-    }
-
-    // --- Inventory Sync ---
-    await syncInventoryFromSale({ id: docRef.id, ...payload }, "deduct");
-
-    await addAuditLog({
-      table_name: SALES_COLLECTION,
-      record_id: docRef.id,
-      action: "INSERT",
-      old_data: null,
-      new_data: { staffName, date, total: techSales + prodSales },
-      actor: "POS端末"
-    });
-
-    revalidatePath("/staff-portal");
-    revalidatePath("/staff-portal/sales");
-    revalidatePath("/payroll");
-    revalidatePath("/audit");
-    return { success: true, id: docRef.id };
-  } catch (error: any) {
-    console.error("Error adding checkout to Firestore:", error);
-    return { success: false, error: error.message };
-  }
-}
-
-export async function updateCheckout(id: string, formData: FormData) {
-  try {
-    const staffId = formData.get("staff_id") as string;
-    const staffName = formData.get("staff_name") as string;
-    const storeName = formData.get("store_name") as string;
-    const date = formData.get("date") as string;
-    const time = formData.get("time") as string || "00:00";
-    
-    // Name handling
-    const lastName = formData.get("last_name") as string || "";
-    const firstName = formData.get("first_name") as string || "";
-    const lastNameKana = formData.get("last_name_kana") as string || "";
-    const firstNameKana = formData.get("first_name_kana") as string || "";
-    
-    const customerName = (lastName + " " + firstName).trim() || "名無し";
-    const customerNameKana = (lastNameKana + " " + firstNameKana).trim() || "";
-    
-    let customerId = formData.get("customer_id") as string || null;
-    const customerType = formData.get("customer_type") as "新規" | "リピ" | "不明";
-    
-    // Auto-create customer if ID is missing and we have a name
-    if (!customerId && (lastName || firstName)) {
-      const newCustomerRes = await addCustomer({
-        name: customerName,
-        last_name: lastName,
-        first_name: firstName,
-        name_kana: customerNameKana,
-        last_name_kana: lastNameKana,
-        first_name_kana: firstNameKana,
-        phone: "",
-        gender: "female",
-        allergies: [],
-        has_allergy: false,
-        notes: "会計更新時に自動登録されました"
-      });
-      if (newCustomerRes.success) {
-        customerId = newCustomerRes.id || null;
-      }
-    }
-
-    const menuCourse = formData.get("menu_course") as string || "";
-    const options = formData.get("options") as string || "";
-    const techSales = parseInt(formData.get("tech_sales") as string || "0", 10);
-    const prodSales = parseInt(formData.get("product_sales") as string || "0", 10);
-    const isNominated = formData.get("is_nominated") === "true";
-    const nominationFee = parseInt(formData.get("nomination_fee") as string || "0", 10);
-    const discount = parseInt(formData.get("discount") as string || "0", 10);
-    const discountReason = formData.get("discount_reason") as string || "";
-    const portalFee = parseInt(formData.get("portal_fee") as string || "0", 10);
-    const hpbPoints = parseInt(formData.get("hpb_points") as string || "0", 10);
-    const cancelFee = parseInt(formData.get("cancel_fee") as string || "0", 10);
-    const paymentMethod = formData.get("payment_method") as string || "現金";
-    const reservationRoute = formData.get("reservation_route") as string || "その他";
-    const hairMaterial = formData.get("hair_material") as string || "";
-    
-    const nextBookingDate = formData.get("next_booking_date") as string || "";
-    const nextBookingTime = formData.get("next_booking_time") as string || "";
-    const nextBookingLineReminder = formData.get("next_booking_line_reminder") === "true";
-    const nextBookingStaffName = formData.get("next_booking_staff_name") as string || staffName;
-    const isMinimo = formData.get("is_minimo") === "true" || reservationRoute.includes("ミニモ");
-    const treatmentMinutes = parseInt(formData.get("treatment_minutes") as string || "60", 10);
-
-    if (!staffName || !date) {
-      return { success: false, error: "必須項目が入力されていません。" };
-    }
-
-    const payload = Object.fromEntries(
-      Object.entries({
-        staff_id: staffId || "staff-" + staffName,
-        staff_name: staffName,
-        store_name: storeName,
-        date,
-        time,
-        customer_name: customerName,
-        last_name: lastName,
-        first_name: firstName,
-        last_name_kana: lastNameKana,
-        first_name_kana: firstNameKana,
-        customer_id: customerId || null,
-        customer_type: customerType,
-        menu_course: menuCourse,
-        tech_sales: techSales,
-        product_sales: prodSales,
-        is_nominated: isNominated,
-        nomination_fee: nominationFee,
-        discount: discount,
-        discount_reason: discountReason,
-        portal_fee: portalFee,
-        hpb_points: hpbPoints,
-        reservation_route: reservationRoute,
-        payment_method: paymentMethod,
-        hair_material: hairMaterial,
-        options: options,
-        cancel_fee: cancelFee,
-        next_booking_date: nextBookingDate,
-        next_booking_time: nextBookingTime,
-        next_booking_staff_name: nextBookingStaffName,
-        next_booking_line_reminder: nextBookingLineReminder,
-        is_minimo: isMinimo,
-        treatment_minutes: treatmentMinutes,
-        updated_at: serverTimestamp()
-      }).filter(([_, v]) => v !== undefined)
-    );
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) throw new Error("認証エラー");
 
     const docRef = doc(db, SALES_COLLECTION, id);
-    const oldDoc = await getDoc(docRef);
-    const oldData = oldDoc.exists() ? oldDoc.data() : null;
-    
-    await updateDoc(docRef, payload);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) throw new Error("データが見つかりません");
+    const data = snap.data();
+    if (data.companyId !== ctx.companyId) throw new Error("権限がありません");
 
-    if (oldData?.source_reservation_id && customerId) {
-      // Ensure the source reservation is linked to this customer
-      await updateDoc(doc(db, 'reservations', oldData.source_reservation_id), {
-        customer_id: customerId,
-        updated_at: serverTimestamp()
-      });
-    }
+    await updateDoc(docRef, {
+      payment_method: paymentMethod,
+      payment_status: paymentStatus,
+      note: note,
+      updated_at: serverTimestamp()
+    });
 
-    // --- Auto Create/Update Reservation for Next Booking ---
-    if (nextBookingDate && nextBookingTime) {
-      try {
-        const h = parseInt(nextBookingTime.split(":")[0] || "0", 10);
-        const m = parseInt(nextBookingTime.split(":")[1] || "0", 10);
-        const endTotalMins = h * 60 + m + treatmentMinutes;
-        const endHour = Math.floor(endTotalMins / 60);
-        const endMin = endTotalMins % 60;
-        const endTime = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
+    await addAuditLog({
+      action: "UPDATE",
+      table_name: SALES_COLLECTION,
+      record_id: id,
+      old_data: { payment_method: data.payment_method, payment_status: data.payment_status, note: data.note },
+      new_data: { payment_method: paymentMethod, payment_status: paymentStatus, note: note },
+      actor: ctx.uid || "unknown",
+    });
 
-        const { addReservation, updateReservationTime, getReservationById } = await import("@/app/reservations/actions");
-        
-        let existingResId = oldData?.next_reservation_id;
-        let shouldCreate = !existingResId;
-
-        if (existingResId) {
-          // Verify it still exists
-          const existingRes = await getReservationById(existingResId);
-          if (existingRes) {
-            // Update time and date
-            const resRef = doc(db, "reservations", existingResId);
-            await updateDoc(resRef, {
-              date: nextBookingDate,
-              start_time: nextBookingTime,
-              end_time: endTime,
-              staff_name: nextBookingStaffName,
-              staff_id: "staff-" + nextBookingStaffName,
-              menu_name: menuCourse || "次回予約",
-              expected_price: techSales + prodSales - discount,
-              updated_at: serverTimestamp()
-            });
-            shouldCreate = false;
-          } else {
-            shouldCreate = true;
-          }
-        }
-
-        if (shouldCreate) {
-          const resData = await addReservation({
-            store_name: storeName,
-            staff_id: "staff-" + nextBookingStaffName,
-            staff_name: nextBookingStaffName,
-            type: "reservation",
-            customer_id: customerId || undefined,
-            customer_name: customerName || undefined,
-            customer_kana: lastNameKana ? `${lastNameKana} ${firstNameKana}`.trim() : undefined,
-            date: nextBookingDate,
-            start_time: nextBookingTime,
-            end_time: endTime,
-            menu_name: menuCourse || "次回予約",
-            status: "booked",
-            is_next_booking: true,
-            expected_price: techSales + prodSales - discount,
-          });
-          
-          if (resData.success && resData.id) {
-            await updateDoc(docRef, { next_reservation_id: resData.id });
-          }
-        }
-      } catch (e) {
-        console.error("Failed to auto-update next reservation:", e);
-      }
-    }
-
+    revalidatePath("/sales");
     revalidatePath("/staff-portal/sales");
+    revalidatePath("/dashboard");
+    revalidatePath("/admin/sales/debug");
     return { success: true };
-  } catch (error: any) {
-    console.error("Error updating checkout in Firestore:", error);
-    return { success: false, error: error.message };
+  } catch (err: any) {
+    console.error(err);
+    throw new Error(err.message || "更新に失敗しました");
   }
 }
 
@@ -785,33 +353,25 @@ export async function importHotPepperCsv(formData: FormData) {
 
     const colRef = collection(db, SALES_COLLECTION);
     
-    // Step 2: Fetch existing records to prevent duplicates and find manual records to merge
+    // Step 2: Fetch existing records to prevent duplicates
     const existingCsvRecords: any[] = [];
-    const unmergedManualRecords: any[] = [];
 
     if (minDate !== "9999-99-99" && maxDate !== "0000-00-00") {
       const q = query(colRef, 
         where("date", ">=", minDate), 
-        where("date", "<=", maxDate)
+        where("date", "<=", maxDate),
+        where("source", "==", "hotpepper")
       );
       const snapshot = await getDocs(q);
       snapshot.forEach(doc => {
         const d = doc.data();
-        // Ignore DELETED and MERGED_SOURCE records
-        if (d.merge_status === "DELETED" || d.merge_status === "MERGED_SOURCE") return;
-
-        if (d.source === "hotpepper") {
-          existingCsvRecords.push({ id: doc.id, ...d });
-        } else {
-          unmergedManualRecords.push({ id: doc.id, ref: doc.ref, ...d });
-        }
+        existingCsvRecords.push({ id: doc.id, ...d });
       });
     }
 
     const batch = writeBatch(db);
     let importCount = 0;
     let skipCount = 0;
-    let mergedCount = 0;
 
     // Step 3: Process each group
     Object.values(groups).forEach(groupRows => {
@@ -882,8 +442,7 @@ export async function importHotPepperCsv(formData: FormData) {
 
       const csvTotal = techSales + prodSales + nominationFee - discount;
       
-      // Deduplication check: Is this CSV record already imported?
-      // Match by date, time, staff, and total amount, or name.
+      // Strict architecture: We only check if THIS EXACT CSV RECORD was already imported.
       const isAlreadyImported = existingCsvRecords.some(r => {
          const rTotal = (r.tech_sales || 0) + (r.product_sales || 0) + (r.nomination_fee || 0) - (r.discount || 0);
          return r.date === dateFormatted && 
@@ -897,75 +456,7 @@ export async function importHotPepperCsv(formData: FormData) {
         return; // Skip this duplicate CSV record
       }
 
-      // Find matching manual record to merge
-      let manualMatch = null;
-      
-      // Priority 1: Exact Reservation ID match (if we had it in CSV, but usually it's in the row)
-      const accountingId = firstRow["会計ID"] || firstRow["予約ID"] || "";
-      if (accountingId) {
-         manualMatch = unmergedManualRecords.find(m => m.source_reservation_id === accountingId);
-      }
-      
-      // Priority 2: Date + Staff + Time (+/- 15 mins) + Amount
-      if (!manualMatch) {
-         const timeToMins = (t: string) => {
-            if(!t || !t.includes(":")) return 0;
-            const [h, m] = t.split(":").map(Number);
-            return h * 60 + m;
-         };
-         const csvMins = timeToMins(timeFormatted);
-         
-         const possibleMatches = unmergedManualRecords.filter(m => {
-            const mTotal = (m.tech_sales || 0) + (m.product_sales || 0) + (m.nomination_fee || 0) - (m.discount || 0);
-            const isSameStaff = m.staff_name === staffName || m.staff_name === "フリー" || staffName === "フリー";
-            const mMins = timeToMins(m.time);
-            const timeDiff = Math.abs(csvMins - mMins);
-            
-            return m.date === dateFormatted && mTotal === csvTotal && isSameStaff && timeDiff <= 15;
-         });
-         if (possibleMatches.length === 1) {
-             manualMatch = possibleMatches[0];
-         }
-      }
-      
-      // Priority 3: Date + Staff + Amount + Name (Normalized)
-      if (!manualMatch) {
-         const cleanCustomerName = customerName.replace(/\s+/g, "");
-         const possibleMatches = unmergedManualRecords.filter(m => {
-            const mTotal = (m.tech_sales || 0) + (m.product_sales || 0) + (m.nomination_fee || 0) - (m.discount || 0);
-            const isSameStaff = m.staff_name === staffName || m.staff_name === "フリー" || staffName === "フリー";
-            const cleanMName = String(m.customer_name || "").replace(/\s+/g, "");
-            
-            return m.date === dateFormatted && mTotal === csvTotal && isSameStaff && cleanMName === cleanCustomerName;
-         });
-         if (possibleMatches.length === 1) {
-             manualMatch = possibleMatches[0];
-         }
-      }
-
-      let paymentMethod = "未入力";
-      let paymentStatus = "unpaid";
-      let note = "";
       const docRef = doc(colRef);
-
-      if (manualMatch) {
-        paymentMethod = manualMatch.payment_method || "未入力";
-        paymentStatus = manualMatch.payment_status || "unpaid";
-        note = manualMatch.note || "";
-        
-        // Mark manual record as MERGED_SOURCE instead of deleting
-        batch.update(manualMatch.ref, {
-           merge_status: "MERGED_SOURCE",
-           merged_into_id: docRef.id,
-           updated_at: serverTimestamp()
-        });
-        
-        // Remove from unmerged list so it's not merged again
-        const idx = unmergedManualRecords.findIndex(m => m.id === manualMatch.id);
-        if (idx !== -1) unmergedManualRecords.splice(idx, 1);
-        
-        mergedCount++;
-      }
 
       batch.set(docRef, {
         companyId: companyId || "company_default",
@@ -986,12 +477,13 @@ export async function importHotPepperCsv(formData: FormData) {
         discount_reason: discountReasons.join(", ") || "CSV一括読込",
         hpb_points: hpbPoints,
         reservation_route: "ホットペッパー",
-        payment_method: paymentMethod,
-        payment_status: paymentStatus,
-        note: note,
-        status: "draft",
-        merge_status: manualMatch ? "MERGED_PRIMARY" : "CSV_ONLY",
+        payment_method: "未入力",
+        payment_status: "unpaid",
+        hair_material: "",
+        note: "",
+        status: "closed",
         source: "hotpepper" as SalesSource,
+        merge_status: "CSV_ONLY",
         created_at: serverTimestamp()
       });
       importCount++;
@@ -999,7 +491,7 @@ export async function importHotPepperCsv(formData: FormData) {
 
     await batch.commit();
     revalidatePath("/staff-portal/sales");
-    return { success: true, count: importCount, skipped: skipCount, merged: mergedCount };
+    return { success: true, count: importCount, skipped: skipCount, merged: 0 };
   } catch (error: any) {
     console.error("Error importing CSV:", error);
     return { success: false, error: error.message };

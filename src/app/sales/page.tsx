@@ -11,7 +11,7 @@ import Link from "next/link";
 import { format, isSameMonth } from "date-fns";
 import { ja } from "date-fns/locale";
 import CSVUploadButton from "./CSVUploadButton";
-import CheckoutDialog from "./CheckoutDialog";
+import PaymentEditDialog from "./PaymentEditDialog";
 import DailyCloseDialog from "./DailyCloseDialog";
 import SalesExportCSVButton from "./SalesExportCSVButton";
 import DailyScheduleView from "./DailyScheduleView";
@@ -303,14 +303,13 @@ export default function SalesPage({
                   {isScheduleView ? <Search size={16} /> : <Calendar size={16} />}
                   {isScheduleView ? "リスト表示" : "スケジュール表示"}
                 </Button>
-                <CheckoutDialog 
-                  staffList={staffNames} 
-                  isOpenControlled={isCheckoutOpen}
-                  onOpenChangeControlled={setIsCheckoutOpen}
-                  defaultStaffName={checkoutInitialStaff}
-                  initialTime={checkoutInitialTime}
-                  initialData={editingSale}
-                />
+                {editingSale && (
+                  <PaymentEditDialog 
+                    isOpenControlled={isCheckoutOpen}
+                    onOpenChangeControlled={setIsCheckoutOpen}
+                    initialData={editingSale}
+                  />
+                )}
                 {isAdmin && (
                   <>
                     <CSVUploadButton />
@@ -733,7 +732,7 @@ export default function SalesPage({
                             <TableCell>
                               {isAdmin && (
                                 <div className="flex gap-1 justify-end">
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-emerald-600" onClick={() => handleEditClick(sale)}>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-50" onClick={() => handleEditClick(sale)}>
                                     <Search size={14} />
                                   </Button>
                                   <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-500" onClick={() => handleDeleteSale(sale.id)}>

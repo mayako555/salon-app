@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getMonthlySales, SalesRecord } from "@/app/sales/actions";
 import { getReservationById, Reservation, updateReservationStatus } from "@/app/reservations/actions";
-import CheckoutDialog from "@/app/sales/CheckoutDialog";
+import PaymentEditDialog from "@/app/sales/PaymentEditDialog";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 import { ReceiptText, CheckCircle2, UserCircle, Users, Lock, Database, Search } from "lucide-react";
@@ -147,20 +147,15 @@ export default function StaffPortalSalesPage() {
       </div>
 
       {autoCheckoutRes && (
-        <CheckoutDialog 
-          defaultStaffName={profile?.name || ""} 
-          defaultStoreName="メイン店舗" 
-          staffList={staffNames}
+        <PaymentEditDialog 
           initialData={mapReservationToSalesRecord(autoCheckoutRes)}
           isOpenControlled={true}
           onSuccess={async () => {
-             // Explicitly navigate to reservations schedule
              window.location.replace('/staff-portal/reservations');
           }}
           onOpenChangeControlled={(open) => {
             if (!open) {
               setAutoCheckoutRes(null);
-              // Remove query param from URL without reload
               window.history.replaceState({}, '', window.location.pathname);
             }
           }}
@@ -168,20 +163,15 @@ export default function StaffPortalSalesPage() {
       )}
 
       {autoEditSale && (
-        <CheckoutDialog 
-          staffList={staffNames}
-          defaultStoreName={autoEditSale.store_name}
+        <PaymentEditDialog 
           initialData={autoEditSale}
           isOpenControlled={true}
-          readOnly={autoEditSale.status === 'closed'}
           onSuccess={async () => {
-             // Explicitly navigate to reservations schedule
              window.location.replace('/staff-portal/reservations');
           }}
           onOpenChangeControlled={(open) => {
             if (!open) {
               setAutoEditSale(null);
-              // Remove query param from URL without reload
               window.history.replaceState({}, '', window.location.pathname);
             }
           }}
@@ -228,14 +218,11 @@ export default function StaffPortalSalesPage() {
                         <span className="font-bold text-slate-800 text-sm">¥{(sale.tech_sales + sale.product_sales - (sale.discount || 0)).toLocaleString()}</span>
                       </div>
                       
-                      <CheckoutDialog 
+                      <PaymentEditDialog 
                         initialData={sale}
-                        staffList={staffNames}
-                        defaultStoreName={sale.store_name}
-                        readOnly={sale.status === 'closed'}
                         trigger={
                           <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-emerald-600 transition-colors">
-                            {sale.status === 'closed' ? <Search size={16} /> : <Database size={16} />}
+                            <Search size={16} />
                           </button>
                         }
                       />
@@ -286,14 +273,11 @@ export default function StaffPortalSalesPage() {
                 </div>
                 <div className="flex items-center gap-3 text-right">
                   <span className="font-bold text-slate-700 text-sm">¥{(sale.tech_sales + sale.product_sales - (sale.discount || 0)).toLocaleString()}</span>
-                  <CheckoutDialog 
+                  <PaymentEditDialog 
                     initialData={sale}
-                    staffList={staffNames}
-                    defaultStoreName={sale.store_name}
-                    readOnly={sale.status === 'closed'}
                     trigger={
                       <button className="p-2 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-emerald-600 transition-colors">
-                        {sale.status === 'closed' ? <Search size={16} /> : <Database size={16} />}
+                        <Search size={16} />
                       </button>
                     }
                   />
