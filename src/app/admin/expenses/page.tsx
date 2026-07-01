@@ -361,16 +361,16 @@ export default function AdminExpensesDashboard() {
               toast.error("データが0件です");
             } else {
               setParsedTransactions(parsedArray);
-              setImportStats(res.stats || null);
+              setImportStats((res as any).stats || null);
               toast.success("取引履歴を高速解析しました！");
             }
-          } else if (res.requireColumnSelection) {
+          } else if ((res as any).requireColumnSelection) {
             setRequireColumnMapping(true);
-            setCsvHeaders(res.headers || []);
-            setCsvPreviewRows(res.previewRows || []);
+            setCsvHeaders((res as any).headers || []);
+            setCsvPreviewRows((res as any).previewRows || []);
             toast.error("CSVの列が自動判定できませんでした。列を選択してください。");
           } else {
-            setImportError(res.error || "取引履歴の解析に失敗しました");
+            setImportError((res as any).error || "取引履歴の解析に失敗しました");
             toast.error("解析エラーが発生しました");
           }
         } catch (err: any) {
