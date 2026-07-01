@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/firebase";
 import { getCurrentUserContext } from "@/lib/auth-server";
-import { SALES_COLLECTION, SalesRecord } from "@/app/sales/actions";
+import { SalesRecord } from "@/app/sales/actions";
 
 export async function getDebugSales(year: number, month: number): Promise<SalesRecord[]> {
   try {
@@ -14,7 +14,7 @@ export async function getDebugSales(year: number, month: number): Promise<SalesR
 
     const { adminDb } = await import("@/lib/firebase-admin");
     const snapshot = await adminDb
-      .collection(SALES_COLLECTION)
+      .collection("sales")
       .where("companyId", "==", ctx.companyId)
       .where("date", ">=", startDate)
       .where("date", "<=", endDate)
