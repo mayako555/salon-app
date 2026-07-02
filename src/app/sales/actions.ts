@@ -359,13 +359,14 @@ export async function importHotPepperCsv(formData: FormData) {
     if (minDate !== "9999-99-99" && maxDate !== "0000-00-00") {
       const q = query(colRef, 
         where("date", ">=", minDate), 
-        where("date", "<=", maxDate),
-        where("source", "==", "hotpepper")
+        where("date", "<=", maxDate)
       );
       const snapshot = await getDocs(q);
       snapshot.forEach(doc => {
         const d = doc.data();
-        existingCsvRecords.push({ id: doc.id, ...d });
+        if (d.source === "hotpepper" && d.companyId === companyId) {
+          existingCsvRecords.push({ id: doc.id, ...d });
+        }
       });
     }
 
