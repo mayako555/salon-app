@@ -34,6 +34,9 @@ export type Reservation = {
   same_day_cancel_count?: number; // Optional flag to show on calendar
   customer_notes?: string;
   customer_allergies?: string[];
+  source?: "manual" | "hotpepper" | "csv_estimated"; // 予約の発生元
+  source_sales_id?: string; // 生成元となった売上データのID
+  is_confirmed?: boolean; // 推定予約を手動で確定したかどうかのフラグ
   created_at: any;
   updated_at: any;
 };

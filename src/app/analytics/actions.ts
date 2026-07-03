@@ -889,7 +889,7 @@ export async function getRepeatAnalysis(params: RepeatAnalysisParams) {
     const staffStats: Record<string, Stats> = {};
     const menuStats: Record<string, Stats> = {};
 
-    const getRouteStat = (stats: Stats, route: string) => {
+      const getRouteStat = (stats: Stats, route: string) => {
       if (!stats.routes[route]) {
         stats.routes[route] = { newTotal: 0, newReturned: 0, repeatTotal: 0, repeatReturned: 0 };
       }
@@ -903,23 +903,33 @@ export async function getRepeatAnalysis(params: RepeatAnalysisParams) {
       for (let i = 0; i < visits.length; i++) {
         const v = visits[i];
         const staff = v.staff_name;
-        const menu = v.menu_name;
+        const menus = v.menu_name.split(",").map(m => m.trim()).filter(Boolean);
         const route = v.route;
 
         if (!staffStats[staff]) staffStats[staff] = { routes: {} };
-        if (!menuStats[menu]) menuStats[menu] = { routes: {} };
-
         const staffRoute = getRouteStat(staffStats[staff], route);
-        const menuRoute = getRouteStat(menuStats[menu], route);
+        
+        menus.forEach(menu => {
+          if (!menuStats[menu]) menuStats[menu] = { routes: {} };
+          const menuRoute = getRouteStat(menuStats[menu], route);
+          const returned = (i < visits.length - 1); // 次の来店があるか
 
-        const returned = (i < visits.length - 1); // 次の来店があるか
+          if (v.customer_type === "新規") {
+            menuRoute.newTotal++;
+            if (returned) menuRoute.newReturned++;
+          } else {
+            menuRoute.repeatTotal++;
+            if (returned) menuRoute.repeatReturned++;
+          }
+        });
 
+        const returned = (i < visits.length - 1);
         if (v.customer_type === "新規") {
-          staffRoute.newTotal++; menuRoute.newTotal++;
-          if (returned) { staffRoute.newReturned++; menuRoute.newReturned++; }
+          staffRoute.newTotal++;
+          if (returned) staffRoute.newReturned++;
         } else {
-          staffRoute.repeatTotal++; menuRoute.repeatTotal++;
-          if (returned) { staffRoute.repeatReturned++; menuRoute.repeatReturned++; }
+          staffRoute.repeatTotal++;
+          if (returned) staffRoute.repeatReturned++;
         }
       }
     });
@@ -1520,15 +1530,20 @@ export async function getMenuAnalytics(companyId: string, period: string) {
       if (data.status === "cancelled") return;
       if (data.type === "schedule") return;
 
-      const menu = data.menu_name?.trim() || "(メニュー未設定)";
-      const price = data.expected_price || 0;
+      const rawMenu = data.menu_name?.trim() || "(メニュー未設定)";
+      let menus = rawMenu.split(",").map((m: string) => m.trim()).filter(Boolean);
+      if (menus.length === 0) menus = ["(メニュー未設定)"];
+      
+      const pricePerMenu = data.expected_price ? data.expected_price / menus.length : 0;
 
-      if (!menuMap.has(menu)) {
-        menuMap.set(menu, { count: 0, revenue: 0 });
-      }
-      const entry = menuMap.get(menu)!;
-      entry.count += 1;
-      entry.revenue += price;
+      menus.forEach((menu: string) => {
+        if (!menuMap.has(menu)) {
+          menuMap.set(menu, { count: 0, revenue: 0 });
+        }
+        const entry = menuMap.get(menu)!;
+        entry.count += 1;
+        entry.revenue += pricePerMenu;
+      });
     });
 
     const result = Array.from(menuMap.entries())

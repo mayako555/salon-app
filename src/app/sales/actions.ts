@@ -302,6 +302,28 @@ export async function importHotPepperCsv(formData: FormData) {
     const decoder = new TextDecoder("shift-jis");
     const text = decoder.decode(arrayBuffer);
     
+    // Fetch master items to calculate duration
+    const { getMasterItems } = await import("./master-actions");
+    const masterItems = await getMasterItems("all");
+    
+    // Helper to parse duration string (e.g. "90分", "1.5h", "1時間30分") to minutes
+    const parseDurationToMinutes = (durationStr: string | undefined): number => {
+      if (!durationStr) return 60;
+      let totalMinutes = 0;
+      const hoursMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*(?:時間|h)/i);
+      const minutesMatch = durationStr.match(/(\d+)\s*分/);
+      
+      if (hoursMatch) totalMinutes += parseFloat(hoursMatch[1]) * 60;
+      if (minutesMatch) totalMinutes += parseInt(minutesMatch[1], 10);
+      
+      if (totalMinutes === 0) {
+        const justNumber = parseInt(durationStr, 10);
+        if (!isNaN(justNumber)) return justNumber;
+        return 60; // Default
+      }
+      return totalMinutes;
+    };
+    
     const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, dynamicTyping: true });
     const rows = parsed.data as any[];
 
@@ -353,8 +375,8 @@ export async function importHotPepperCsv(formData: FormData) {
 
     const colRef = collection(db, SALES_COLLECTION);
     
-    // Step 2: Fetch existing records to prevent duplicates
     const existingCsvRecords: any[] = [];
+    const existingReservations: any[] = [];
 
     if (minDate !== "9999-99-99" && maxDate !== "0000-00-00") {
       const q = query(colRef, 
@@ -366,6 +388,18 @@ export async function importHotPepperCsv(formData: FormData) {
         const d = doc.data();
         if (d.source === "hotpepper" && d.companyId === companyId) {
           existingCsvRecords.push({ id: doc.id, ...d });
+        }
+      });
+      
+      const resQ = query(collection(db, "reservations"), 
+        where("date", ">=", minDate), 
+        where("date", "<=", maxDate)
+      );
+      const resSnapshot = await getDocs(resQ);
+      resSnapshot.forEach(doc => {
+        const d = doc.data();
+        if (d.companyId === companyId || !d.companyId) {
+          existingReservations.push({ id: doc.id, ...d });
         }
       });
     }
@@ -401,6 +435,10 @@ export async function importHotPepperCsv(formData: FormData) {
         firstRow["予約者名"] || 
         firstRow["氏名"] ||
         firstRow["カナ氏名"] ||
+        firstRow["お客様（カナ）"] ||
+        firstRow["お客様(カナ)"] ||
+        firstRow["お客様名（カナ）"] ||
+        firstRow["お客様名(カナ)"] ||
         "HotPepper経由"
       ).trim();
       
@@ -487,6 +525,71 @@ export async function importHotPepperCsv(formData: FormData) {
         merge_status: "CSV_ONLY",
         created_at: serverTimestamp()
       });
+
+      // --- 予約自動生成 (CSV推定予約) ---
+      // バッチ処理等を見据えた推定予約の重複チェック
+      const isResAlreadyImported = existingReservations.some(r => {
+        if (r.source_sales_id && r.source_sales_id === docRef.id) return true;
+        return r.companyId === (companyId || "company_default") &&
+               r.store_name === storeName &&
+               r.staff_name === staffName &&
+               r.customer_name === customerName &&
+               r.date === dateFormatted &&
+               r.end_time === timeFormatted &&
+               (r.expected_price || 0) === csvTotal;
+      });
+
+      if (!isResAlreadyImported) {
+        const resDocRef = doc(collection(db, "reservations"));
+        
+        // 所要時間の計算（複数メニュー時は合計する。セットメニューの場合はマスタのセット時間が適用される）
+        let durationMinutes = 0;
+        let matchedAny = false;
+        if (menuCourses.length > 0) {
+          for (const menu of menuCourses) {
+            const matchedItem = masterItems.find(mi => mi.name === menu || mi.hpbName === menu);
+            if (matchedItem && matchedItem.duration) {
+              durationMinutes += parseDurationToMinutes(matchedItem.duration);
+              matchedAny = true;
+            }
+          }
+        }
+        if (!matchedAny || durationMinutes === 0) {
+          durationMinutes = 60;
+        }
+
+        // Calculate start time
+        const [endH, endM] = timeFormatted.split(":").map(Number);
+        let totalM = (endH || 0) * 60 + (endM || 0) - durationMinutes;
+        if (totalM < 0) totalM += 24 * 60;
+        const startH = Math.floor(totalM / 60);
+        const startM = totalM % 60;
+        const startTimeFormatted = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
+
+        batch.set(resDocRef, {
+          companyId: companyId || "company_default",
+          store_name: storeName,
+          staff_id: "unknown",
+          staff_name: staffName,
+          type: "reservation",
+          customer_name: customerName,
+          date: dateFormatted,
+          start_time: startTimeFormatted,
+          end_time: timeFormatted,
+          menu_name: menuCourses.slice(0, 3).join(", "),
+          portal: "HPB",
+          status: "completed",
+          customer_type: groupRows.some(r => (r["新規再来"] || "").includes("新規")) ? "新規" : "再来",
+          source: "csv_estimated",
+          source_sales_id: docRef.id,
+          is_confirmed: false,
+          expected_price: csvTotal,
+          created_at: serverTimestamp(),
+          updated_at: serverTimestamp(),
+        });
+      }
+      // ---------------------------------
+
       importCount++;
     });
 

@@ -6,7 +6,7 @@ import { addReservation, updateReservation, Reservation } from "@/app/reservatio
 import { getAllCustomers, Customer } from "@/lib/customers";
 import { StaffProfile } from "@/app/staff/actions";
 import { Button } from "@/components/ui/button";
-import { Search, UserPlus, FileText, CheckCircle, SearchX } from "lucide-react";
+import { Search, UserPlus, FileText, CheckCircle, SearchX, AlertCircle } from "lucide-react";
 import { getStoreMasterData } from "@/app/sales/actions";
 
 type Props = {
@@ -199,6 +199,10 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
       is_caution: formData.get("is_caution") === "on",
     };
 
+    if (initialData?.source === "csv_estimated" && formData.get("confirm_csv") === "true") {
+      (data as any).is_confirmed = true;
+    }
+
     const res = initialData?.id 
       ? await updateReservation(initialData.id, data)
       : await addReservation(data);
@@ -237,9 +241,19 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col max-h-[85vh]">
+        <form id="reservation-form" onSubmit={handleSubmit} className="flex flex-col max-h-[85vh]">
           <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs font-bold text-slate-700">
             
+            {initialData?.source === "csv_estimated" && !initialData?.is_confirmed && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg flex items-start gap-2 shadow-sm mb-2">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-black text-sm mb-1">CSVからの推定予約です</p>
+                  <p className="font-medium text-xs opacity-90">実際の開始・終了時間に合わせて修正し、下部の「時間修正・確定する」ボタンを押してください。</p>
+                </div>
+              </div>
+            )}
+
             {/* 顧客情報ブロック (予約時のみ) */}
             {recordType === "reservation" && (
             <div className="bg-white border border-slate-300 shadow-sm mb-5">
@@ -503,9 +517,45 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
 
           <div className="bg-white border-t border-slate-200 p-4 flex flex-col sm:flex-row items-center justify-between shrink-0 gap-3 sm:gap-0">
             <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-32 font-bold order-2 sm:order-1">キャンセル</Button>
-            <Button type="submit" disabled={loading} className="w-full sm:w-48 bg-blue-600 hover:bg-blue-700 font-bold text-white order-1 sm:order-2">
-              {loading ? "保存中..." : (initialData?.id ? "更新する" : "予約を確定する")}
-            </Button>
+            
+            <div className="w-full sm:w-auto flex gap-2 order-1 sm:order-2">
+              {initialData?.source === "csv_estimated" && !initialData?.is_confirmed && (
+                <Button 
+                  type="submit" 
+                  disabled={loading} 
+                  className="bg-amber-500 hover:bg-amber-600 font-bold text-white shadow-sm"
+                  onClick={() => {
+                    const form = document.getElementById('reservation-form') as HTMLFormElement;
+                    if (form) {
+                      let hidden = form.querySelector('input[name="confirm_csv"]');
+                      if (!hidden) {
+                        hidden = document.createElement('input');
+                        hidden.setAttribute('type', 'hidden');
+                        hidden.setAttribute('name', 'confirm_csv');
+                        form.appendChild(hidden);
+                      }
+                      (hidden as HTMLInputElement).value = 'true';
+                    }
+                  }}
+                >
+                  時間修正・確定する
+                </Button>
+              )}
+              <Button 
+                type="submit" 
+                disabled={loading} 
+                className="w-full sm:w-48 bg-blue-600 hover:bg-blue-700 font-bold text-white"
+                onClick={() => {
+                  const form = document.getElementById('reservation-form') as HTMLFormElement;
+                  if (form) {
+                    const hidden = form.querySelector('input[name="confirm_csv"]');
+                    if (hidden) hidden.remove();
+                  }
+                }}
+              >
+                {loading ? "保存中..." : (initialData?.id ? "更新する" : "予約を確定する")}
+              </Button>
+            </div>
           </div>
         </form>
       </DialogContent>

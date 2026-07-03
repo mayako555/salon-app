@@ -310,14 +310,12 @@ export default function SalesPage({
                     initialData={editingSale}
                   />
                 )}
+                <CSVUploadButton />
                 {isAdmin && (
-                  <>
-                    <CSVUploadButton />
-                    <Button variant="outline" size="sm" onClick={handleClearImports} className="text-rose-600 border-rose-200 hover:bg-rose-50 h-10 px-3">
-                      <Trash2 size={16} className="mr-1" />
-                      CSVクリア
-                    </Button>
-                  </>
+                  <Button variant="outline" size="sm" onClick={handleClearImports} className="text-rose-600 border-rose-200 hover:bg-rose-50 h-10 px-3">
+                    <Trash2 size={16} className="mr-1" />
+                    CSVクリア
+                  </Button>
                 )}
                 <Link href="/staff-portal/sales/master">
                   <Button variant="outline" size="icon" className="h-10 w-10 border-slate-200">
@@ -715,31 +713,38 @@ export default function SalesPage({
                               {sale.hpb_points > 0 ? `¥${sale.hpb_points.toLocaleString()}` : "-"}
                             </TableCell>
                             <TableCell className="text-center">
-                              <span className={cn(
-                                "px-2 py-0.5 rounded-full text-[10px] font-black",
-                                sale.payment_method === '現金' 
-                                  ? 'bg-slate-100 text-slate-700' 
-                                  : (sale.payment_method === '不明' || sale.payment_method === '未入力')
-                                    ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                              {sale.payment_method === '未入力' || sale.payment_method === '不明' || !sale.payment_method ? (
+                                <button 
+                                  onClick={() => handleEditClick(sale)}
+                                  className="px-2 py-1 rounded-md text-[10px] font-black bg-rose-100 text-rose-700 border border-rose-300 shadow-sm animate-pulse hover:bg-rose-200 transition-colors cursor-pointer"
+                                >
+                                  入力してください
+                                </button>
+                              ) : (
+                                <span className={cn(
+                                  "px-2 py-0.5 rounded-full text-[10px] font-black",
+                                  sale.payment_method === '現金' 
+                                    ? 'bg-slate-100 text-slate-700' 
                                     : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                              )}>
-                                {sale.payment_method || "未入力"}
-                              </span>
+                                )}>
+                                  {sale.payment_method}
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell className="text-right font-bold text-slate-800 bg-slate-50">
                               ¥{Math.max(0, saleTotal).toLocaleString()}
                             </TableCell>
                             <TableCell>
-                              {isAdmin && (
-                                <div className="flex gap-1 justify-end">
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-50" onClick={() => handleEditClick(sale)}>
-                                    <Search size={14} />
-                                  </Button>
+                              <div className="flex gap-1 justify-end">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-50" onClick={() => handleEditClick(sale)}>
+                                  <Search size={14} />
+                                </Button>
+                                {isAdmin && (
                                   <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-500" onClick={() => handleDeleteSale(sale.id)}>
                                     <Trash2 size={14} />
                                   </Button>
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         );

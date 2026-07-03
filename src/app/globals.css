@@ -140,5 +140,14 @@
   height: 100vh;
   height: 100dvh; /* dynamic viewport height for modern browsers */
   /* Fallback for older Safari / macOS */
-  min-height: -webkit-fill-available;
+}
+
+.striped-bg-amber {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(251, 191, 36, 0.1) 10px,
+    rgba(251, 191, 36, 0.1) 20px
+  );
 }

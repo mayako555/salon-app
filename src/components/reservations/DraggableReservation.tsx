@@ -23,6 +23,11 @@ function getColorClasses(res: Reservation) {
   if (res.type === "schedule") return "bg-slate-300/80 border-slate-300/80 text-slate-600 shadow-none !rounded-none";
 
   if (res.status === 'cancelled') return "bg-slate-100 border-slate-200 text-slate-400 opacity-50 line-through";
+  
+  if (res.source === "csv_estimated" && !res.is_confirmed) {
+    return "bg-amber-50 border-dashed border-2 border-amber-400 text-amber-800 opacity-90 striped-bg-amber";
+  }
+
   if (res.status === 'completed') return "bg-slate-200 border-slate-300 text-slate-500 opacity-70"; // 会計後はグレー
   
   if (res.is_caution) return "bg-rose-100 border-rose-300 text-rose-800";
@@ -180,6 +185,9 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
             <span className="px-0.5 rounded flex items-center gap-0.5 border border-black/5 bg-white/60">
               {getMenuIcon(res.menu_name || "")} {res.portal}
             </span>
+            {res.source === "csv_estimated" && !res.is_confirmed && (
+              <span className="bg-amber-500 text-white px-1 py-0.5 rounded shadow-sm">CSV推定</span>
+            )}
             {res.customer_type && (
               <span className={`px-0.5 rounded text-white ${res.customer_type === '新規' ? 'bg-blue-500' : res.customer_type === '再来' ? 'bg-green-500' : 'bg-slate-500'}`}>
                 {res.customer_type.charAt(0)}
@@ -196,10 +204,22 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
           </div>
         )}
         <span className="text-[10px] font-black truncate leading-tight pointer-events-none tracking-tight">
-          {res.type === 'schedule' ? res.menu_name : (res.customer_name?.trim() ? res.customer_name : res.customer_kana)}
+          {res.type === 'schedule' 
+            ? res.menu_name 
+            : (
+              <>
+                {res.customer_name?.trim() ? res.customer_name : (res.customer_kana || "名前なし")}
+                {res.source === "csv_estimated" && res.customer_type && (
+                  <span className="font-normal text-[9px] ml-1">({res.customer_type})</span>
+                )}
+              </>
+            )
+          }
         </span>
         {res.type !== 'schedule' && (
-          <span className="text-[8px] truncate opacity-80 leading-tight mt-px pointer-events-none">{res.menu_name}</span>
+          <span className="text-[8px] truncate opacity-80 leading-tight mt-px pointer-events-none">
+            {res.menu_name}
+          </span>
         )}
         
         {!isCompleted && (
