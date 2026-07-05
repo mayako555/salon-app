@@ -25,6 +25,56 @@ import { addCustomer } from "@/lib/customers";
 import { syncInventoryFromSale } from "../inventory/inventory-actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
 
+export async function mapReservationToSalesRecord(res: any): Promise<SalesRecord> {
+  let treatmentMinutes = 60;
+  if (res.start_time && res.end_time) {
+    const [h1, m1] = res.start_time.split(":").map(Number);
+    const [h2, m2] = res.end_time.split(":").map(Number);
+    treatmentMinutes = (h2 * 60 + m2) - (h1 * 60 + m1);
+  }
+
+  const cName = (res.customer_name && res.customer_name !== "-") ? res.customer_name : (res.customer_kana && res.customer_kana !== "-" ? res.customer_kana : "予定");
+  const nameParts = cName !== "予定" ? cName.split(/[\s　]+/) : ["予定", ""];
+  
+  const kanaStr = res.customer_kana && res.customer_kana !== "-" ? res.customer_kana : (cName !== "予定" ? cName : "");
+  const kanaParts = kanaStr.split(/[\s　]+/);
+
+  return {
+    id: "new",
+    staff_id: res.staff_id,
+    staff_name: res.staff_name,
+    store_name: res.store_name,
+    date: res.date,
+    time: res.start_time,
+    customer_id: res.customer_id,
+    customer_name: cName,
+    last_name: nameParts[0] || "",
+    first_name: nameParts[1] || "",
+    last_name_kana: kanaParts[0] || "",
+    first_name_kana: kanaParts[1] || "",
+    customer_type: "不明",
+    menu_course: res.menu_name || "",
+    tech_sales: res.expected_price || 0,
+    product_sales: 0,
+    is_nominated: false,
+    nomination_fee: 0,
+    discount: 0,
+    discount_reason: "",
+    portal_fee: 0,
+    reservation_route: res.portal === "HPB" ? "HOT PEPPER Beauty" : (res.portal || "Direct"),
+    status: "draft",
+    payment_method: "cash",
+    hpb_points: 0,
+    source: "checkout",
+    source_reservation_id: res.id,
+    hair_material: "",
+    options: "",
+    cancel_fee: 0,
+    treatment_minutes: treatmentMinutes,
+    created_at: Date.now()
+  };
+}
+
 export type SalesSource = "checkout" | "hotpepper" | "manual";
 
 export type SalesRecord = {
@@ -250,6 +300,53 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
   }
 }
 
+export async function checkoutReservation(reservationId: string, salesData: Partial<SalesRecord>) {
+  try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) throw new Error("認証エラー");
+
+    // Check if sales record already exists for this reservation
+    const q = query(
+      collection(db, SALES_COLLECTION),
+      where("source_reservation_id", "==", reservationId),
+      limit(1)
+    );
+    const snap = await getDocs(q);
+    
+    let saleId = "";
+    if (!snap.empty) {
+      saleId = snap.docs[0].id;
+      const docRef = doc(db, SALES_COLLECTION, saleId);
+      await updateDoc(docRef, {
+        ...salesData,
+        updated_at: serverTimestamp()
+      });
+    } else {
+      const { id, ...dataToCreate } = salesData;
+      const docRef = await addDoc(collection(db, SALES_COLLECTION), {
+        ...dataToCreate,
+        source_reservation_id: reservationId,
+        companyId: ctx.companyId,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
+      });
+      saleId = docRef.id;
+    }
+
+    // Also update reservation status
+    const { updateReservationStatus } = await import("@/app/reservations/actions");
+    await updateReservationStatus(reservationId, "completed");
+
+    revalidatePath("/sales");
+    revalidatePath("/staff-portal/sales");
+    revalidatePath("/staff-portal/reservations");
+    return { success: true, id: saleId };
+  } catch (err: any) {
+    console.error(err);
+    throw new Error(err.message || "会計処理に失敗しました");
+  }
+}
+
 export async function updatePaymentInfo(id: string, paymentMethod: string, paymentStatus: string, note: string) {
   try {
     const ctx = await getCurrentUserContext();
@@ -267,6 +364,12 @@ export async function updatePaymentInfo(id: string, paymentMethod: string, payme
       note: note,
       updated_at: serverTimestamp()
     });
+
+    // Mark the source reservation as completed if it exists
+    if (data.source_reservation_id) {
+      const { updateReservationStatus } = await import("@/app/reservations/actions");
+      await updateReservationStatus(data.source_reservation_id, "completed");
+    }
 
     await addAuditLog({
       action: "UPDATE",

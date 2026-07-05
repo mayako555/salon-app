@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { X, CreditCard } from "lucide-react";
-import { updatePaymentInfo, SalesRecord } from "./actions";
+import { updatePaymentInfo, checkoutReservation, SalesRecord } from "./actions";
 import { getMasterItems } from "./master-actions";
 
 export default function PaymentEditDialog({ 
@@ -49,7 +49,19 @@ export default function PaymentEditDialog({
 
     setIsSubmitting(true);
     try {
-      const res = await updatePaymentInfo(initialData.id, paymentMethod, paymentStatus, note);
+      let res;
+      if (initialData.id === "new" && initialData.source_reservation_id) {
+        // If it's a new checkout from a reservation, use checkoutReservation
+        res = await checkoutReservation(initialData.source_reservation_id, {
+          ...initialData,
+          payment_method: paymentMethod,
+          payment_status: paymentStatus,
+          note: note,
+          status: "closed"
+        });
+      } else {
+        res = await updatePaymentInfo(initialData.id, paymentMethod, paymentStatus, note);
+      }
       if (res.success) {
         if (onSuccess) {
           await onSuccess();

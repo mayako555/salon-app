@@ -211,8 +211,9 @@ export default function ReservationsPage() {
               shifts={shifts}
               date={dateStr}
               storeName={selectedStore}
-              settings={settings}
+              settings={settings || undefined}
               onRefresh={loadDateData}
+              onOptimisticUpdate={(updated) => setReservations(prev => prev.map(r => r.id === updated.id ? updated : r))}
             />
           </div>
         )}

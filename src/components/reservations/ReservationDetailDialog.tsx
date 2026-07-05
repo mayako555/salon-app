@@ -2,8 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Reservation, updateReservation } from "@/app/reservations/actions";
+import { deleteReservation, Reservation, updateReservationStatus } from "@/app/reservations/actions";
+
+import { getSaleByReservationId, mapReservationToSalesRecord, SalesRecord } from "@/app/sales/actions";
+import { updateReservation } from "@/app/reservations/actions";
 import { getStaffList, StaffProfile } from "@/app/staff/actions";
+import { getMasterItems } from "@/app/sales/master-actions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserCircle, Calendar, Clock, MapPin, Tag, MessageSquare, CreditCard, Edit, Search, FileText } from "lucide-react";
 import Link from "next/link";
@@ -17,17 +21,165 @@ type Props = {
   onClose: () => void;
   onEdit?: () => void;
   onRefresh?: () => void;
+  onNextBooking?: (res: Reservation) => void;
+  onOptimisticUpdate?: (res: Reservation) => void;
 };
 
-export default function ReservationDetailDialog({ reservation, isOpen, onClose, onEdit, onRefresh }: Props) {
+export default function ReservationDetailDialog({ reservation, isOpen, onClose, onEdit, onRefresh, onNextBooking, onOptimisticUpdate }: Props) {
   const [staffs, setStaffs] = useState<StaffProfile[]>([]);
   const [updatingStaff, setUpdatingStaff] = useState(false);
+  
+  const [checkoutData, setCheckoutData] = useState<SalesRecord | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<string[]>(["未入力", "現金", "クレジットカード", "PayPay", "楽天Pay", "ミニモ事前決済", "スマート支払い", "その他"]);
+  const [paymentMethod, setPaymentMethod] = useState("未入力");
+  const [isFetchingCheckout, setIsFetchingCheckout] = useState(false);
+
+  const [hasNextBooking, setHasNextBooking] = useState(false);
+  const [nextBookingDate, setNextBookingDate] = useState("");
+  const [nextBookingTime, setNextBookingTime] = useState("10:00");
+  const [nextBookingStaff, setNextBookingStaff] = useState(reservation.staff_name || "");
+  const [remind2Days, setRemind2Days] = useState(true);
+  const [sendLine, setSendLine] = useState(false);
+
+  const [showLinePreview, setShowLinePreview] = useState(false);
+  const [previewLineText, setPreviewLineText] = useState("");
+  const [pendingCheckout, setPendingCheckout] = useState(false);
+
+  const executeCheckout = async () => {
+    setIsFetchingCheckout(true);
+    try {
+      let salesData;
+      if (reservation.status === "completed") {
+        const existing = await getSaleByReservationId(reservation.id);
+        if (existing) {
+          salesData = { ...existing, payment_method: paymentMethod };
+        } else {
+          salesData = { ...(await mapReservationToSalesRecord(reservation)), payment_method: paymentMethod };
+        }
+      } else {
+        salesData = { ...(await mapReservationToSalesRecord(reservation)), payment_method: paymentMethod };
+      }
+      
+      const { checkoutReservation, updatePaymentInfo } = await import("@/app/sales/actions");
+      
+      let accountingId = salesData.id;
+      if (salesData.id && salesData.id !== "new") {
+        await updatePaymentInfo(salesData.id, paymentMethod, salesData.payment_status || "paid", salesData.note || "");
+      } else {
+        const res = await checkoutReservation(reservation.id, {
+          ...salesData,
+          payment_method: paymentMethod,
+          payment_status: "paid",
+          status: "closed"
+        });
+        accountingId = res.id;
+      }
+
+      // Handle next booking creation
+      if (hasNextBooking && nextBookingDate && nextBookingTime && reservation.customer_id) {
+        const { addReservation } = await import("@/app/reservations/actions");
+        let treatmentMinutes = 60;
+        if (reservation.start_time && reservation.end_time) {
+          const [h1, m1] = reservation.start_time.split(":").map(Number);
+          const [h2, m2] = reservation.end_time.split(":").map(Number);
+          treatmentMinutes = (h2 * 60 + m2) - (h1 * 60 + m1);
+        }
+        const [nh, nm] = nextBookingTime.split(":").map(Number);
+        const endMins = nh * 60 + nm + treatmentMinutes;
+        const endTime = `${Math.floor(endMins / 60).toString().padStart(2, '0')}:${(endMins % 60).toString().padStart(2, '0')}`;
+
+        await addReservation({
+          store_name: reservation.store_name,
+          staff_id: "manual",
+          staff_name: nextBookingStaff,
+          type: "reservation",
+          customer_id: reservation.customer_id,
+          customer_name: reservation.customer_name,
+          customer_kana: reservation.customer_kana || "",
+          customer_type: "再来",
+          date: nextBookingDate,
+          start_time: nextBookingTime,
+          end_time: endTime,
+          menu_name: reservation.menu_name || "予定あり",
+          status: "booked",
+          is_next_booking: true,
+          is_line_reminder: remind2Days,
+          memo: ""
+        });
+
+        // Send LINE if requested
+        if (sendLine && showLinePreview && accountingId) {
+          const { sendAndLogLineMessage } = await import("@/app/sales/actions");
+          // NOTE: we need customer's line_user_id. For now, fetch it via the server action or pass it if available.
+          const { getCustomerById } = await import("@/lib/customers");
+          const customer = await getCustomerById(reservation.customer_id);
+          if (customer?.line_user_id) {
+            await sendAndLogLineMessage({
+              customerId: reservation.customer_id,
+              accountingId: accountingId,
+              lineUserId: customer.line_user_id,
+              messageType: "next_reservation_confirm",
+              messageBody: previewLineText
+            });
+          }
+        }
+      }
+      
+      toast.success("会計を完了しました");
+      setShowLinePreview(false);
+      setPendingCheckout(false);
+      if (onOptimisticUpdate) {
+        onOptimisticUpdate({ ...reservation, status: "completed" });
+      }
+      onClose();
+      if (onRefresh) onRefresh();
+    } catch (error: any) {
+      toast.error(error.message || "会計処理に失敗しました");
+    } finally {
+      setIsFetchingCheckout(false);
+    }
+  };
+
+  const handleCheckoutClick = async () => {
+    if (hasNextBooking && nextBookingDate && nextBookingTime && sendLine && reservation.customer_id) {
+      // Need to preview LINE first
+      const { getCustomerById } = await import("@/lib/customers");
+      const customer = await getCustomerById(reservation.customer_id);
+      if (customer?.line_user_id) {
+        const { generateBookingConfirmationText } = await import("@/lib/line");
+        const text = await generateBookingConfirmationText(nextBookingDate, nextBookingTime, reservation.store_name);
+        setPreviewLineText(text);
+        setShowLinePreview(true);
+        setPendingCheckout(true);
+        return;
+      }
+    }
+    
+    await executeCheckout();
+  };
 
   useEffect(() => {
     if (isOpen) {
       getStaffList().then(list => setStaffs(list)).catch(console.error);
+      getMasterItems().then(items => {
+        const pmItems = items.filter(item => item.itemType === "paymentMethod" && item.isActive !== false);
+        if (pmItems.length > 0) {
+          pmItems.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+          setPaymentMethods(["未入力", ...pmItems.map(p => p.name)]);
+        }
+      }).catch(console.error);
+
+      if (reservation.status === 'completed') {
+        getSaleByReservationId(reservation.id).then(existing => {
+          if (existing) {
+            setPaymentMethod(existing.payment_method || "未入力");
+          }
+        }).catch(console.error);
+      } else {
+        setPaymentMethod("未入力");
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, reservation]);
 
   const handleStaffChange = async (staffId: string) => {
     const selectedStaff = staffs.find(s => s.id === staffId);
@@ -52,7 +204,8 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
   if (!reservation) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden bg-slate-50">
         <DialogHeader className="p-4 bg-white border-b border-slate-100 flex flex-row items-start justify-between">
           <div>
@@ -113,8 +266,12 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
                   <span className="font-bold text-slate-800 text-sm">{reservation.store_name}店 / </span>
                   {staffs.length > 0 ? (
                     <Select 
-                      disabled={updatingStaff || reservation.status === 'completed' || reservation.status === 'cancelled'} 
-                      value={reservation.staff_id || "unknown"} 
+                      disabled={updatingStaff || reservation.status === 'cancelled'} 
+                      value={
+                        (reservation.staff_id && reservation.staff_id !== "unknown") 
+                          ? reservation.staff_id 
+                          : (staffs.find(s => s.name === reservation.staff_name)?.id || undefined)
+                      } 
                       onValueChange={handleStaffChange}
                     >
                       <SelectTrigger className="h-7 w-[160px] text-xs font-bold bg-slate-50 border-slate-200">
@@ -127,7 +284,7 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
                       </SelectContent>
                     </Select>
                   ) : (
-                    <span className="font-bold text-slate-800 text-sm">{reservation.staff_name}</span>
+                    <span className="font-bold text-slate-800 text-sm">{reservation.staff_name || "未定"}</span>
                   )}
                 </div>
               </div>
@@ -135,15 +292,33 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
           </div>
 
           {/* Menu Info */}
-          <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm space-y-3 text-sm">
+          <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm text-sm">
             <div className="flex items-start gap-3">
               <Tag className="w-4 h-4 text-slate-400 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-slate-500 text-xs font-bold mb-0.5">予約メニュー</p>
-                <p className="font-bold text-slate-800 leading-tight">{reservation.menu_name}</p>
-                {reservation.expected_price ? (
-                  <p className="text-rose-600 font-bold mt-1 text-xs">予定金額: ¥{reservation.expected_price.toLocaleString()}</p>
-                ) : null}
+              <div className="flex-1 space-y-3">
+                <div>
+                  <p className="text-slate-500 text-xs font-bold mb-0.5">予約メニュー</p>
+                  <p className="font-bold text-slate-800 leading-tight">{reservation.menu_name}</p>
+                  {reservation.expected_price ? (
+                    <p className="text-rose-600 font-bold mt-1 text-xs">予定金額: ¥{reservation.expected_price.toLocaleString()}</p>
+                  ) : null}
+                </div>
+                
+                {reservation.status !== 'cancelled' && (
+                  <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
+                    <p className="text-slate-500 text-xs font-bold w-1/3">支払方法</p>
+                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                      <SelectTrigger className="h-8 w-2/3 text-sm font-bold bg-slate-50 border-slate-200">
+                        <SelectValue placeholder="支払方法" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {paymentMethods.map(pm => (
+                          <SelectItem key={pm} value={pm} className="text-xs font-bold">{pm}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -220,14 +395,32 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
             )}
           </div>
 
+          <div className="mb-3 hidden">
+            {onNextBooking ? (
+              <Button 
+                variant="outline" 
+                className="w-full font-bold text-purple-700 bg-purple-50 border-purple-200 hover:bg-purple-100 h-10" 
+                onClick={() => onNextBooking(reservation)}
+              >
+                <Calendar className="w-4 h-4 mr-1" /> このお客様の次回予約を取る
+              </Button>
+            ) : (
+              <Button variant="outline" className="w-full font-bold bg-slate-50 border-slate-300 text-slate-400 h-10" disabled>
+                <Calendar className="w-4 h-4 mr-1" /> このお客様の次回予約を取る
+              </Button>
+            )}
+          </div>
+
           {reservation.status !== 'cancelled' && (
             <div className="mb-3">
-              <Link href={`/staff-portal/sales?res_id=${reservation.id}`} className="block w-full">
-                <Button className={cn("w-full font-bold flex items-center gap-2 text-white h-11 shadow-sm", reservation.status === 'completed' ? "bg-amber-500 hover:bg-amber-600" : "bg-emerald-600 hover:bg-emerald-700")}>
-                  {reservation.status === 'completed' ? <Search className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
-                  {reservation.status === 'completed' ? "お会計を編集する" : "お会計（レジ）へ進む"}
-                </Button>
-              </Link>
+              <Button 
+                onClick={handleCheckoutClick}
+                disabled={isFetchingCheckout}
+                className={cn("w-full font-bold flex items-center gap-2 text-white h-11 shadow-sm", reservation.status === 'completed' ? "bg-amber-500 hover:bg-amber-600" : "bg-emerald-600 hover:bg-emerald-700")}
+              >
+                {reservation.status === 'completed' ? <Search className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
+                {isFetchingCheckout ? "処理中..." : (reservation.status === 'completed' ? "会計を確定する" : "会計を確定する")}
+              </Button>
             </div>
           )}
 
@@ -250,6 +443,37 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
           </div>
         </div>
       </DialogContent>
+
+      {/* LINE Preview Modal */}
+      {showLinePreview && (
+        <Dialog open={showLinePreview} onOpenChange={(open) => !open && setShowLinePreview(false)}>
+          <DialogContent className="sm:max-w-[400px] bg-slate-50 p-0 overflow-hidden">
+            <DialogHeader className="bg-emerald-600 px-4 py-3">
+              <DialogTitle className="text-white text-base font-bold flex items-center gap-2">
+                <MessageSquare className="w-5 h-5" /> LINE送信プレビュー
+              </DialogTitle>
+            </DialogHeader>
+            <div className="p-4 bg-[#8bb5f8]">
+              <div className="bg-[#74e877] p-3 rounded-2xl rounded-tl-sm text-sm font-medium whitespace-pre-wrap leading-relaxed shadow-sm text-slate-900 inline-block max-w-[90%]">
+                {previewLineText}
+              </div>
+            </div>
+            <div className="p-4 bg-white border-t border-slate-200 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowLinePreview(false)} className="font-bold border-slate-300 text-slate-600">
+                キャンセル
+              </Button>
+              <Button 
+                onClick={executeCheckout} 
+                disabled={isFetchingCheckout}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+              >
+                {isFetchingCheckout ? "送信中..." : "送信して会計を確定"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
+    </>
   );
 }

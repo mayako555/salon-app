@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getMonthlySales, SalesRecord } from "@/app/sales/actions";
+import { getMonthlySales, SalesRecord, mapReservationToSalesRecord } from "@/app/sales/actions";
 import { getReservationById, Reservation, updateReservationStatus } from "@/app/reservations/actions";
 import PaymentEditDialog from "@/app/sales/PaymentEditDialog";
 import { format } from "date-fns";
@@ -16,7 +16,7 @@ export default function StaffPortalSalesPage() {
   const { profile } = useAuth();
   const [sales, setSales] = useState<SalesRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [autoCheckoutRes, setAutoCheckoutRes] = useState<Reservation | null>(null);
+  const [autoCheckoutRes, setAutoCheckoutRes] = useState<SalesRecord | null>(null);
   const [autoEditSale, setAutoEditSale] = useState<SalesRecord | null>(null);
 
   const year = new Date().getFullYear();
@@ -37,7 +37,8 @@ export default function StaffPortalSalesPage() {
         if (resId) {
           const res = await getReservationById(resId);
           if (res && res.status !== "completed") {
-            setAutoCheckoutRes(res);
+            const mapped = await mapReservationToSalesRecord(res);
+            setAutoCheckoutRes(mapped);
           } else if (res && res.status === "completed") {
             const { getSaleByReservationId } = await import('@/app/sales/actions');
             const sale = await getSaleByReservationId(resId);
@@ -56,56 +57,7 @@ export default function StaffPortalSalesPage() {
     load();
   }, [year, month]);
 
-  const mapReservationToSalesRecord = (res: Reservation): SalesRecord => {
-    let treatmentMinutes = 60;
-    if (res.start_time && res.end_time) {
-      const [h1, m1] = res.start_time.split(":").map(Number);
-      const [h2, m2] = res.end_time.split(":").map(Number);
-      treatmentMinutes = (h2 * 60 + m2) - (h1 * 60 + m1);
-    }
 
-    const cName = (res.customer_name && res.customer_name !== "-") ? res.customer_name : (res.customer_kana && res.customer_kana !== "-" ? res.customer_kana : "予定");
-    const nameParts = cName !== "予定" ? cName.split(/[\s　]+/) : ["予定", ""];
-    
-    // もし customer_kana が無くても、cName があればそれをカナ枠にも入れる（カタカナしか入力されていないケースへの対応）
-    const kanaStr = res.customer_kana && res.customer_kana !== "-" ? res.customer_kana : (cName !== "予定" ? cName : "");
-    const kanaParts = kanaStr.split(/[\s　]+/);
-
-    return {
-      id: "new",
-      staff_id: res.staff_id,
-      staff_name: res.staff_name,
-      store_name: res.store_name,
-      date: res.date,
-      time: res.start_time,
-      customer_id: res.customer_id,
-      customer_name: cName,
-      last_name: nameParts[0] || "",
-      first_name: nameParts[1] || "",
-      last_name_kana: kanaParts[0] || "",
-      first_name_kana: kanaParts[1] || "",
-      customer_type: "不明",
-      menu_course: res.menu_name || "",
-      tech_sales: res.expected_price || 0,
-      product_sales: 0,
-      is_nominated: false,
-      nomination_fee: 0,
-      discount: 0,
-      discount_reason: "",
-      portal_fee: 0,
-      reservation_route: res.portal === "HPB" ? "HOT PEPPER Beauty" : (res.portal || "Direct"),
-      status: "draft",
-      payment_method: "cash",
-      hpb_points: 0,
-      source: "checkout",
-      source_reservation_id: res.id,
-      hair_material: "",
-      options: "",
-      cancel_fee: 0,
-      treatment_minutes: treatmentMinutes,
-      created_at: Date.now()
-    };
-  };
 
   const mySales = sales.filter(s => s.staff_name === profile?.name && s.date === todayStr && s.merge_status !== "DELETED");
   const allTodaysSales = sales.filter(s => s.date === todayStr && s.merge_status !== "DELETED");
@@ -150,7 +102,7 @@ export default function StaffPortalSalesPage() {
 
       {autoCheckoutRes && (
         <PaymentEditDialog 
-          initialData={mapReservationToSalesRecord(autoCheckoutRes)}
+          initialData={autoCheckoutRes}
           isOpenControlled={true}
           onSuccess={async () => {
              window.location.replace('/staff-portal/reservations');
