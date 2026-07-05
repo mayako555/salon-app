@@ -1486,7 +1486,7 @@ export async function getChannelAnalytics(companyId: string, storeId: string | n
   }
 }
 
-export async function getMenuAnalytics(companyId: string, period: string) {
+export async function getMenuAnalytics(companyId: string, period: string, store: string = "all") {
   try {
     const now = new Date();
     let startDate: Date;
@@ -1520,7 +1520,7 @@ export async function getMenuAnalytics(companyId: string, period: string) {
     );
     const snap = await getDocs(q);
 
-    // Count by menu_name, filter by companyId (via store/staff if needed; we trust companyId stored on reservation or filter all)
+    // Count by menu_name, filter by companyId and store
     const menuMap = new Map<string, { count: number; revenue: number }>();
 
     snap.docs.forEach(d => {
@@ -1529,6 +1529,11 @@ export async function getMenuAnalytics(companyId: string, period: string) {
       if (data.companyId && data.companyId !== companyId) return;
       if (data.status === "cancelled") return;
       if (data.type === "schedule") return;
+
+      const rawStore = data.store_name || "不明";
+      const dataStore = rawStore.endsWith("店") ? rawStore.slice(0, -1) : rawStore;
+      
+      if (store !== "all" && dataStore !== store) return;
 
       const rawMenu = data.menu_name?.trim() || "(メニュー未設定)";
       let menus = rawMenu.split(",").map((m: string) => m.trim()).filter(Boolean);
@@ -1553,8 +1558,36 @@ export async function getMenuAnalytics(companyId: string, period: string) {
     return { success: true, data: result };
   } catch (error: any) {
     console.error("Failed to get menu analytics:", error);
-    return { success: false, error: error.message, data: [] };
+    return { success: false, error: error.message };
   }
 }
 
-
+export async function getStoreNames(companyId: string) {
+  try {
+    const colRef = collection(db, "sales");
+    const q = query(
+      colRef,
+      where("companyId", "==", companyId)
+    );
+    // Since we just need distinct store names, fetching recent sales is a good heuristic.
+    // However, to avoid a huge fetch, we can limit to recent 1000 sales or so.
+    const { limit } = await import("firebase/firestore");
+    const qLimited = query(
+      colRef,
+      where("companyId", "==", companyId),
+      limit(2000)
+    );
+    const snap = await getDocs(qLimited);
+    const stores = new Set<string>();
+    snap.docs.forEach(d => {
+      const store = d.data().store_name;
+      if (store) {
+        stores.add(store.endsWith("店") ? store.slice(0, -1) : store);
+      }
+    });
+    return { success: true, data: Array.from(stores).sort() };
+  } catch (error: any) {
+    console.error("Failed to get store names:", error);
+    return { success: false, error: error.message };
+  }
+}

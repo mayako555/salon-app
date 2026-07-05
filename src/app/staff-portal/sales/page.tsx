@@ -10,6 +10,7 @@ import { ReceiptText, CheckCircle2, UserCircle, Users, Lock, Database, Search } 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
+import CSVUploadButton from "@/app/sales/CSVUploadButton";
 
 export default function StaffPortalSalesPage() {
   const { profile } = useAuth();
@@ -102,15 +103,13 @@ export default function StaffPortalSalesPage() {
       options: "",
       cancel_fee: 0,
       treatment_minutes: treatmentMinutes,
-      created_at: null
+      created_at: Date.now()
     };
   };
 
-  const allTodaysSales = sales
-    .filter(s => s.date === todayStr)
-    .sort((a, b) => b.time?.localeCompare(a.time || "") || 0);
-
-  const mySales = allTodaysSales.filter(s => s.staff_name === profile?.name);
+  const mySales = sales.filter(s => s.staff_name === profile?.name && s.date === todayStr && s.merge_status !== "DELETED");
+  const allTodaysSales = sales.filter(s => s.date === todayStr && s.merge_status !== "DELETED");
+  
   const otherSales = allTodaysSales.filter(s => s.staff_name !== profile?.name);
 
   // Calculate totals: (Tech + Product + HPB Points) - Discount
@@ -137,11 +136,14 @@ export default function StaffPortalSalesPage() {
             <ReceiptText size={20} />
             <h1 className="text-xl font-bold">日計（会計）入力</h1>
           </div>
-          <Link href="/staff-portal/sales/master">
-            <Button variant="ghost" size="sm" className="bg-white/10 text-white hover:bg-white/20 border-white/20 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
-              <Database size={12} /> Master
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <CSVUploadButton />
+            <Link href="/staff-portal/sales/master">
+              <Button variant="ghost" size="sm" className="bg-white/10 text-white hover:bg-white/20 border-white/20 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                <Database size={12} /> Master
+              </Button>
+            </Link>
+          </div>
         </div>
         <p className="opacity-90 text-sm">お客様の会計完了後、速やかにこちらから登録してください。</p>
       </div>

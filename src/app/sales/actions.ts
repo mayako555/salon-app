@@ -408,11 +408,18 @@ export async function importHotPepperCsv(formData: FormData) {
     let importCount = 0;
     let skipCount = 0;
 
+    const { getStaffList } = await import("../staff/actions");
+    const staffs = await getStaffList();
+
     // Step 3: Process each group
     Object.values(groups).forEach(groupRows => {
       const firstRow = groupRows[0];
       const rawStaffName = groupRows.find(r => r["スタッフ"] || r["担当スタッフ"] || r["スタッフ名"])?.["スタッフ"] || "フリー";
       const staffName = String(rawStaffName).replace(/\s+/g, "");
+      
+      const staffMatch = staffs.find(s => s.name.replace(/\s+/g, "") === staffName);
+      const staffId = staffMatch ? staffMatch.id : "unknown";
+
       let rawDate = String(firstRow["会計日"] || firstRow["来店日"] || "");
       let rawTime = String(firstRow["会計時間"] || firstRow["来店時間"] || "");
       
@@ -499,7 +506,7 @@ export async function importHotPepperCsv(formData: FormData) {
 
       batch.set(docRef, {
         companyId: companyId || "company_default",
-        staff_id: "unknown",
+        staff_id: staffId,
         staff_name: staffName,
         store_name: storeName,
         date: dateFormatted,
@@ -569,7 +576,7 @@ export async function importHotPepperCsv(formData: FormData) {
         batch.set(resDocRef, {
           companyId: companyId || "company_default",
           store_name: storeName,
-          staff_id: "unknown",
+          staff_id: staffId,
           staff_name: staffName,
           type: "reservation",
           customer_name: customerName,

@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { getMenuAnalytics } from "./actions";
+import { getMenuAnalytics, getStoreNames } from "./actions";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
   PieChart, Pie, Legend, LabelList,
 } from "recharts";
 import { Loader2, BarChart2, Tag } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const PERIOD_OPTIONS = [
   { label: "今月", value: "thisMonth" },
@@ -40,19 +41,33 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function MenuAnalysis() {
   const { profile } = useAuth();
   const [period, setPeriod] = useState("thisMonth");
+  const [store, setStore] = useState("all");
+  const [stores, setStores] = useState<string[]>([]);
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"bar" | "pie">("bar");
 
   useEffect(() => {
+    async function loadStores() {
+      if (!profile?.companyId) return;
+      const res = await getStoreNames(profile.companyId);
+      if (res.success && res.data) {
+        setStores(res.data);
+      }
+    }
+    loadStores();
+  }, [profile?.companyId]);
+
+  useEffect(() => {
     fetchData();
-  }, [period, profile?.companyId]);
+  }, [period, store, profile?.companyId]);
 
   const fetchData = async () => {
     setLoading(true);
     const res = await getMenuAnalytics(
       profile?.companyId!,
-      period
+      period,
+      store
     );
     if (res.success) setData(res.data || []);
     setLoading(false);
@@ -78,20 +93,36 @@ export default function MenuAnalysis() {
             期間内に予約されたメニューの件数・割合を可視化します
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          {PERIOD_OPTIONS.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setPeriod(p.value)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                period === p.value
-                  ? "bg-indigo-600 text-white shadow-md"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="flex gap-4 flex-wrap items-center">
+          {stores.length > 0 && (
+            <Select value={store} onValueChange={setStore}>
+              <SelectTrigger className="w-[140px] bg-slate-50 border-slate-200 h-9">
+                <SelectValue placeholder="店舗" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全店舗</SelectItem>
+                {stores.map(s => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          <div className="flex gap-2">
+            {PERIOD_OPTIONS.map((p) => (
+              <button
+                key={p.value}
+                onClick={() => setPeriod(p.value)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  period === p.value
+                    ? "bg-indigo-600 text-white shadow-md"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Download, ChevronLeft, ChevronRight, Search, FileUp, Settings, Lock, Trash2, Calendar } from "lucide-react";
 import Link from "next/link";
-import { format, isSameMonth } from "date-fns";
+import { format, isSameMonth, subMonths } from "date-fns";
 import { ja } from "date-fns/locale";
 import CSVUploadButton from "./CSVUploadButton";
 import PaymentEditDialog from "./PaymentEditDialog";
@@ -18,6 +18,15 @@ import DailyScheduleView from "./DailyScheduleView";
 import AuthGuard from "@/components/AuthGuard";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+
+import SalesSummaryCards, { SalesSummaryData } from "./components/SalesSummaryCards";
+import SalesFilterBar from "./components/SalesFilterBar";
+import SalesTable from "./components/SalesTable";
+import StoreTotalBar from "./components/StoreTotalBar";
+import { StaffSalesData, StoreSalesData } from "./components/SalesRow";
+import { exportSalesToCsv, exportSalesToExcel } from "./exportUtils";
+import { getCompanyGoalsForMonth } from "../goals/actions";
+import { useSalesData } from "./hooks/useSalesData";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -36,22 +45,29 @@ export default function SalesPage({
   const month = monthNum;
 
   const [sales, setSales] = useState<SalesRecord[]>([]);
+  const [prevMonthSales, setPrevMonthSales] = useState<SalesRecord[]>([]);
   const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
+  const [goals, setGoals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (authLoading) return;
     async function load() {
-      const [salesData, staffData] = await Promise.all([
+      const prevDate = subMonths(new Date(year, month - 1, 1), 1);
+      const [salesData, prevSalesData, staffData, goalsData] = await Promise.all([
         getMonthlySales(year, month),
-        getStaffList()
+        getMonthlySales(prevDate.getFullYear(), prevDate.getMonth() + 1),
+        getStaffList(),
+        getCompanyGoalsForMonth(targetDateStr)
       ]);
       setSales(salesData);
+      setPrevMonthSales(prevSalesData);
       setStaffProfiles(staffData);
+      setGoals(goalsData);
       setLoading(false);
     }
     load();
-  }, [year, month, authLoading]);
+  }, [year, month, authLoading, targetDateStr]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStaffs, setSelectedStaffs] = useState<Set<string>>(new Set());
@@ -175,97 +191,8 @@ export default function SalesPage({
     }
   };
 
-  const cashSales = sales.filter(s => s.payment_method === '現金');
-  const cashlessSales = sales.filter(s => s.payment_method !== '現金' && s.payment_method !== '不明' && s.payment_method !== '未入力');
-
-  const totalTechSales = sales.reduce((sum, s) => sum + s.tech_sales, 0);
-  const totalProductSales = sales.reduce((sum, s) => sum + s.product_sales, 0);
-  const totalDiscount = sales.reduce((sum, s) => sum + (s.discount || 0), 0);
-  const totalSales = sales.reduce((sum, s) => sum + s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0), 0);
-
-  const cashTechSales = cashSales.reduce((sum, s) => sum + s.tech_sales, 0);
-  const cashlessTechSales = cashlessSales.reduce((sum, s) => sum + s.tech_sales, 0);
-  
-  const cashProductSales = cashSales.reduce((sum, s) => sum + s.product_sales, 0);
-  const cashlessProductSales = cashlessSales.reduce((sum, s) => sum + s.product_sales, 0);
-
-  const stores = availableStores && availableStores.length > 0 ? availableStores : ["メイン店舗"];
-  
-  const sortedProfiles = [...staffProfiles].sort((a, b) => {
-    const orderA = a.sort_order ?? 999;
-    const orderB = b.sort_order ?? 999;
-    if (orderA !== orderB) return orderA - orderB;
-    return a.name.localeCompare(b.name, "ja");
-  });
-
-  const staffNames = sortedProfiles.map(p => p.name);
-
-  const salesStaffNames = Array.from(new Set(sales.map(s => s.staff_name)));
-  salesStaffNames.forEach(name => {
-    if (!name) return;
-    const normalizedName = normalizeName(name);
-    const alreadyExists = staffNames.some(existingName => normalizeName(existingName) === normalizedName);
-    
-    if (!alreadyExists) {
-      staffNames.push(name);
-    }
-  });
-  
-  const getSalesMetrics = (staff: string | null, store: string | null) => {
-    let filtered = sales;
-    if (staff) {
-      const staffNormal = normalizeName(staff);
-      filtered = filtered.filter(s => normalizeName(s.staff_name) === staffNormal);
-    }
-    if (store) filtered = filtered.filter(s => s.store_name === store);
-    
-    const discount = filtered.reduce((sum, s) => sum + (s.discount || 0), 0);
-    const techSales = filtered.reduce((sum, s) => sum + (s.tech_sales || 0), 0);
-    const productSales = filtered.reduce((sum, s) => sum + (s.product_sales || 0), 0);
-    const total = filtered.reduce((sum, s) => sum + s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0), 0);
-    
-    return { total, discount, techSales, productSales };
-  };
-
-  const toggleStaffFilter = (staff: string) => {
-    const next = new Set(selectedStaffs);
-    if (next.has(staff)) next.delete(staff);
-    else next.add(staff);
-    setSelectedStaffs(next);
-    setSelectedIds(new Set());
-  };
-
-  const toggleStoreFilter = (store: string) => {
-    const next = new Set(selectedStores);
-    if (next.has(store)) next.delete(store);
-    else next.add(store);
-    setSelectedStores(next);
-    setSelectedIds(new Set());
-  };
-
-  const toggleMatrixFilter = (staff: string | null, store: string | null) => {
-    if (staff && store) {
-      // Intersection click: special toggle
-      if (selectedStaffs.size === 1 && selectedStaffs.has(staff) && selectedStores.size === 1 && selectedStores.has(store)) {
-        setSelectedStaffs(new Set());
-        setSelectedStores(new Set());
-      } else {
-        setSelectedStaffs(new Set([staff]));
-        setSelectedStores(new Set([store]));
-      }
-    } else if (staff) {
-      toggleStaffFilter(staff);
-    } else if (store) {
-      toggleStoreFilter(store);
-    }
-  };
-
-  const clearFilters = () => {
-    setSelectedStaffs(new Set());
-    setSelectedStores(new Set());
-    setSearchQuery("");
-    setSelectedIds(new Set());
-  };
+  const [selectedDashboardStore, setSelectedDashboardStore] = useState<string>("all");
+  const [hideZeroSales, setHideZeroSales] = useState<boolean>(true);
 
   const handleAddClick = (staff: string, time: string) => {
     setCheckoutInitialStaff(staff);
@@ -276,9 +203,26 @@ export default function SalesPage({
 
   const handleEditClick = (sale: SalesRecord) => {
     setEditingSale(sale);
-    setIsCheckoutOpen(false); // Reset then set to trigger effect? No, let's just set.
+    setIsCheckoutOpen(false); 
     setTimeout(() => setIsCheckoutOpen(true), 10);
   };
+
+  const {
+    stores,
+    staffNames,
+    displayStaffData,
+    summaryData,
+    displaySummaryData,
+  } = useSalesData({
+    sales,
+    prevMonthSales,
+    staffProfiles,
+    goals,
+    availableStores: availableStores || [],
+    searchQuery,
+    hideZeroSales,
+    selectedStore: selectedDashboardStore
+  });
 
   return (
     <AuthGuard requireRole="admin">
@@ -325,104 +269,18 @@ export default function SalesPage({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
-                <p className="text-sm font-medium text-slate-500 mb-1">当月 技術売上</p>
-                <div className="flex items-end gap-2 mb-3">
-                  <p className="text-3xl font-bold text-slate-800">¥{totalTechSales.toLocaleString()}</p>
-                </div>
-                <div className="flex justify-between text-xs mt-auto pt-2 border-t border-slate-100">
-                  <div className="flex flex-col"><span className="text-slate-400">現金</span><span className="font-bold text-slate-700">¥{cashTechSales.toLocaleString()}</span></div>
-                  <div className="flex flex-col text-right"><span className="text-slate-400">キャッシュレス</span><span className="font-bold text-slate-700">¥{cashlessTechSales.toLocaleString()}</span></div>
-                </div>
-              </div>
-              
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
-                <p className="text-sm font-medium text-slate-500 mb-1">当月 店販売上</p>
-                <div className="flex items-end gap-2 mb-3">
-                  <p className="text-3xl font-bold text-slate-800">¥{totalProductSales.toLocaleString()}</p>
-                </div>
-                <div className="flex justify-between text-xs mt-auto pt-2 border-t border-slate-100">
-                  <div className="flex flex-col"><span className="text-slate-400">現金</span><span className="font-bold text-slate-700">¥{cashProductSales.toLocaleString()}</span></div>
-                  <div className="flex flex-col text-right"><span className="text-slate-400">キャッシュレス</span><span className="font-bold text-slate-700">¥{cashlessProductSales.toLocaleString()}</span></div>
-                </div>
-              </div>
-              
-              <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-5 rounded-xl border border-slate-200 shadow-md flex flex-col justify-center relative overflow-hidden">
-                <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white opacity-5 rounded-full blur-xl"></div>
-                <p className="text-sm font-medium text-slate-300 mb-1 relative z-10">当月 総売上</p>
-                <div className="flex items-end gap-2 mb-3 relative z-10">
-                  <p className="text-3xl font-bold text-white">¥{totalSales.toLocaleString()}</p>
-                </div>
-                <div className="flex justify-between text-xs mt-auto pt-2 border-t border-slate-700/50 relative z-10">
-                  <div className="flex flex-col"><span className="text-slate-400">現金合計</span><span className="font-bold text-slate-200">¥{(cashTechSales + cashProductSales).toLocaleString()}</span></div>
-                  <div className="flex flex-col text-right"><span className="text-slate-400">キャッシュレス合計</span><span className="font-bold text-slate-200">¥{(cashlessTechSales + cashlessProductSales).toLocaleString()}</span></div>
-                </div>
-              </div>
-            </div>
-
-            {/* Explicit Filter Panel */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                  <Search size={16} className="text-slate-400" />
-                  絞り込み条件
-                </h3>
-                {(selectedStaffs.size > 0 || selectedStores.size > 0 || searchQuery) && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs h-7 text-rose-500 hover:text-rose-600 font-bold">
-                    条件をすべてクリア
-                  </Button>
-                )}
-              </div>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">対象店舗</p>
-                  <div className="flex flex-wrap gap-3">
-                    {stores.map(store => {
-                      const isChecked = selectedStores.has(store);
-                      return (
-                        <label key={store} className={cn(
-                          "flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all cursor-pointer text-sm font-medium",
-                          isChecked ? "bg-emerald-50 border-emerald-200 text-emerald-700 ring-1 ring-emerald-200" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                        )}>
-                          <input 
-                            type="checkbox" 
-                            checked={isChecked} 
-                            onChange={() => toggleStoreFilter(store)}
-                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                          />
-                          {store}店
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">担当スタッフ</p>
-                  <div className="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto p-1">
-                    {staffNames.map(staff => {
-                      const isChecked = Array.from(selectedStaffs).some(s => normalizeName(s) === normalizeName(staff));
-                      return (
-                        <label key={staff} className={cn(
-                          "flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all cursor-pointer text-xs font-medium",
-                          isChecked ? "bg-blue-50 border-blue-200 text-blue-700 ring-1 ring-blue-200" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                        )}>
-                          <input 
-                            type="checkbox" 
-                            checked={isChecked} 
-                            onChange={() => toggleStaffFilter(staff)}
-                            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          {staff}
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <SalesFilterBar
+              currentDate={new Date(year, month - 1, 1)}
+              selectedStore={selectedDashboardStore}
+              onStoreChange={setSelectedDashboardStore}
+              hideZeroSales={hideZeroSales}
+              onHideZeroSalesChange={setHideZeroSales}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              availableStores={stores}
+              onExportCsv={() => exportSalesToCsv(sales, displayStaffData, displaySummaryData, targetDateStr)}
+              onExportExcel={() => exportSalesToExcel(sales, displayStaffData, displaySummaryData, targetDateStr)}
+            />
 
             {isScheduleView ? (
               <DailyScheduleView 
@@ -433,180 +291,19 @@ export default function SalesPage({
                 onEditClick={handleEditClick}
               />
             ) : (
-              <div className="space-y-6">
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
-              <div className="bg-slate-50 border-b border-slate-100 p-4 flex justify-between items-center">
-                <h2 className="font-bold text-slate-800">店舗・スタッフ別 集計マトリックス</h2>
-              </div>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-slate-50/50">
-                    <TableRow>
-                      <TableHead className="font-bold w-[150px]">スタッフ名</TableHead>
-                      {stores.map(store => (
-                        <TableHead 
-                          key={store} 
-                          className={cn(
-                            "text-right cursor-pointer hover:bg-slate-100 transition-colors",
-                            selectedStores.has(store) && "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200"
-                          )}
-                          onClick={() => toggleMatrixFilter(null, store)}
-                        >
-                          {store}店
-                        </TableHead>
-                      ))}
-                      <TableHead className="text-right font-bold text-emerald-700">合計</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {staffNames.map(staff => (
-                      <TableRow key={staff}>
-                        <TableCell 
-                          className={cn(
-                            "font-medium bg-slate-50/30 cursor-pointer hover:bg-slate-100 transition-colors",
-                            selectedStaffs.has(staff) && "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200"
-                          )}
-                          onClick={() => toggleMatrixFilter(staff, null)}
-                        >
-                          {staff}
-                        </TableCell>
-                        {stores.map(store => {
-                          const { total, discount, techSales, productSales } = getSalesMetrics(staff, store);
-                          const isSelected = selectedStaffs.has(staff) && selectedStores.has(store);
-                          
-                          return (
-                            <TableCell 
-                              key={store} 
-                              className={cn(
-                                "text-right text-slate-600 cursor-pointer hover:bg-blue-50 transition-colors",
-                                isSelected && "bg-blue-100 text-blue-800 ring-1 ring-inset ring-blue-300"
-                              )}
-                              onClick={() => toggleMatrixFilter(staff, store)}
-                            >
-                              <div className="flex flex-col items-end">
-                                <span className="font-medium text-slate-900">¥{total.toLocaleString()}</span>
-                                <div className="flex gap-1.5 text-[9px] font-bold leading-none mt-1">
-                                  <span className="text-indigo-500/80">技 ¥{techSales.toLocaleString()}</span>
-                                  <span className="text-emerald-500/80">店 ¥{productSales.toLocaleString()}</span>
-                                </div>
-                                {discount > 0 && (
-                                  <span className="text-[9px] text-rose-500 font-bold leading-none mt-1">
-                                    (引 ¥{discount.toLocaleString()})
-                                  </span>
-                                )}
-                              </div>
-                            </TableCell>
-                          );
-                        })}
-                        <TableCell className="text-right font-bold text-emerald-700 bg-emerald-50/10">
-                          <div className="flex flex-col items-end">
-                            <span className="text-slate-900">¥{getSalesMetrics(staff, null).total.toLocaleString()}</span>
-                            <div className="flex gap-1.5 text-[9px] font-bold leading-none mt-1">
-                              <span className="text-indigo-500/60">技 ¥{getSalesMetrics(staff, null).techSales.toLocaleString()}</span>
-                              <span className="text-emerald-500/60">店 ¥{getSalesMetrics(staff, null).productSales.toLocaleString()}</span>
-                            </div>
-                            {getSalesMetrics(staff, null).discount > 0 && (
-                              <span className="text-[9px] text-rose-500 font-bold leading-none mt-1">
-                                (引 ¥{getSalesMetrics(staff, null).discount.toLocaleString()})
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow className="bg-slate-50">
-                      <TableCell className="font-bold text-slate-800">店舗合計</TableCell>
-                      {stores.map(store => {
-                        const { total, discount, techSales, productSales } = getSalesMetrics(null, store);
-                        return (
-                          <TableCell key={store} className="text-right font-bold text-slate-800">
-                            <div className="flex flex-col items-end">
-                              <span className="text-slate-900">¥{total.toLocaleString()}</span>
-                              <div className="flex gap-1.5 text-[9px] font-bold leading-none mt-1">
-                                <span className="text-indigo-600/70">技 ¥{techSales.toLocaleString()}</span>
-                                <span className="text-emerald-600/70">店 ¥{productSales.toLocaleString()}</span>
-                              </div>
-                              {discount > 0 && (
-                                <span className="text-[9px] text-rose-600 font-bold leading-none mt-1">
-                                  (引 ¥{discount.toLocaleString()})
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                        );
-                      })}
-                      <TableCell className="text-right font-bold text-emerald-700">
-                        <div className="flex flex-col items-end">
-                          <span className="text-slate-900 text-lg">¥{totalSales.toLocaleString()}</span>
-                          <div className="flex gap-1.5 text-[10px] font-bold leading-none mt-1">
-                            <span className="text-indigo-700">技 ¥{sales.reduce((sum, s) => sum + s.tech_sales, 0).toLocaleString()}</span>
-                            <span className="text-emerald-700">店 ¥{totalProductSales.toLocaleString()}</span>
-                          </div>
-                          {totalDiscount > 0 && (
-                            <span className="text-[10px] text-rose-600 font-bold leading-none mt-1">
-                              (引 ¥{totalDiscount.toLocaleString()})
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
-              <div className="p-4 flex flex-col sm:flex-row items-center justify-between border-b border-slate-100 gap-4 bg-slate-50">
-                <div className="flex items-center gap-1 bg-white border border-slate-200 p-1 rounded-md shadow-sm">
-                  <Link href={`/sales?month=${format(new Date(year, month - 2, 1), "yyyy-MM")}`}>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-slate-100 rounded-sm">
-                      <ChevronLeft size={16} className="text-slate-600" />
-                    </Button>
-                  </Link>
-                  <div className="px-4 font-bold text-slate-700 tabular-nums">
-                    {year}年 {month}月
-                  </div>
-                  <Link href={`/sales?month=${format(new Date(year, month, 1), "yyyy-MM")}`}>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-slate-100 rounded-sm">
-                      <ChevronRight size={16} className="text-slate-600" />
-                    </Button>
-                  </Link>
-                </div>
+              <div className="space-y-6 mt-6">
+                <SalesSummaryCards data={displaySummaryData} />
                 
-                <div className="flex gap-4 items-center">
-                  
-                  {isAdmin && filteredSales.length > 0 && (selectedStaffs.size > 0 || selectedStores.size > 0 || searchQuery) && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => handleBatchDelete(filteredSales.map(s => s.id))}
-                      className="h-8 px-3 text-xs font-bold text-rose-600 border-rose-200 hover:bg-rose-50"
-                    >
-                      表示中の全{filteredSales.length}件を削除
-                    </Button>
-                  )}
-
-                  {(selectedStaffs.size > 0 || selectedStores.size > 0) && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-bold ring-1 ring-blue-100">
-                      絞り込み中: {selectedStaffs.size > 0 ? Array.from(selectedStaffs).join(",") : "全員"} / {selectedStores.size > 0 ? Array.from(selectedStores).join(",") : "全店舗"}
-                      <button onClick={clearFilters} className="hover:text-blue-900 ml-1">×</button>
-                    </div>
-                  )}
-
-                  <div className="relative w-full sm:w-64">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                    <input 
-                      type="text" 
-                      placeholder="担当者・顧客名検索..." 
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                    />
-                  </div>
-                </div>
+                <SalesTable 
+                  data={displayStaffData} 
+                  onStaffClick={(staffId) => window.location.href = `/sales/staff/${staffId}`} 
+                />
               </div>
+            )}
 
-              <div className="overflow-x-auto">
+            <StoreTotalBar data={displaySummaryData} />
+
+            <div className="overflow-x-auto mt-12">
                 <Table className="whitespace-nowrap min-w-[1000px]">
                   <TableHeader className="bg-slate-100/80">
                     <TableRow className="border-b-2 border-slate-200">
@@ -752,10 +449,7 @@ export default function SalesPage({
                     )}
                   </TableBody>
                 </Table>
-              </div>
-            </div>
-            </div>
-            )}
+              </div> {/* overflow-x-auto */}
           </div>
         )}
       </div>

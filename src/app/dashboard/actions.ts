@@ -23,88 +23,90 @@ export async function getDashboardStats() {
 
     // 1. Staff Count
     const staffCol = collection(db, "staff_profiles");
-    const staffCountSnap = await getCountFromServer(staffCol);
+    const staffQuery = query(staffCol, where("companyId", "==", ctx.companyId));
+    const staffCountSnap = await getCountFromServer(staffQuery);
     const staffCount = staffCountSnap.data().count;
 
-    // 2. Unprocessed Attendance (Fetch recent to avoid index requirements)
+    // 2. Unprocessed Attendance
     const attendanceCol = collection(db, "attendance");
     const unprocessedQuery = query(
       attendanceCol, 
+      where("companyId", "==", ctx.companyId),
       where("date", "<", todayStr)
     );
     const unprocessedSnap = await getDocs(unprocessedQuery);
     const unprocessedAttendanceCount = unprocessedSnap.docs.filter(d => !d.data().clock_out).length;
 
-    // 3. Monthly Sales
+    // 3. Monthly Sales & 4. Today's Sales
     const salesCol = collection(db, "sales");
-    const monthlySalesQuery = query(
-      salesCol,
-      where("date", ">=", `${currentMonthPrefix}-01`),
-      where("date", "<=", `${currentMonthPrefix}-31`)
-    );
-    const monthlySalesSnap = await getDocs(monthlySalesQuery);
+    // Fetch all sales for the company to avoid composite index issues, filter in memory
+    const salesQuery = query(salesCol, where("companyId", "==", ctx.companyId));
+    const salesSnap = await getDocs(salesQuery);
+
     let monthlyTotal = 0;
     let monthlyMinimoTotal = 0;
     let monthlyRegularTotal = 0;
     let monthlyMinimoVisits = 0;
     let monthlyRegularVisits = 0;
+    const storeSummary: Record<string, number> = {};
     
-    monthlySalesSnap.forEach(doc => {
+    salesSnap.forEach(doc => {
       const data = doc.data();
-      const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
-      monthlyTotal += amount;
-      
-      const route = String(data.reservation_route || "");
-      const menu = String(data.menu_course || "");
-      const menuLower = menu.toLowerCase();
-      const isMinimo = data.is_minimo === true || 
-                      route.includes("ミニモ") || 
-                      route.toLowerCase().includes("minimo") ||
-                      menu.includes("ミニモ") ||
-                      menu.includes("ミニ") ||
-                      menu.includes("モデル") ||
-                      menuLower.includes("min") ||
-                      menuLower.includes("mini");
+      if (data.source !== "hotpepper" || data.merge_status === "DELETED") return;
 
-      if (isMinimo) {
-        monthlyMinimoTotal += amount;
-        monthlyMinimoVisits++;
-      } else {
-        monthlyRegularTotal += amount;
-        monthlyRegularVisits++;
+      const date = data.date || "";
+      const isThisMonth = date.startsWith(currentMonthPrefix);
+      const isToday = date === todayStr;
+
+      const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
+
+      if (isThisMonth) {
+        monthlyTotal += amount;
+        
+        const route = String(data.reservation_route || "");
+        const menu = String(data.menu_course || "");
+        const menuLower = menu.toLowerCase();
+        const isMinimo = data.is_minimo === true || 
+                        route.includes("ミニモ") || 
+                        route.toLowerCase().includes("minimo") ||
+                        menu.includes("ミニモ") ||
+                        menu.includes("ミニ") ||
+                        menu.includes("モデル") ||
+                        menuLower.includes("min") ||
+                        menuLower.includes("mini");
+
+        if (isMinimo) {
+          monthlyMinimoTotal += amount;
+          monthlyMinimoVisits++;
+        } else {
+          monthlyRegularTotal += amount;
+          monthlyRegularVisits++;
+        }
+      }
+
+      if (isToday) {
+        const rawStore = data.store_name || "不明";
+        const store = rawStore.endsWith("店") ? rawStore.slice(0, -1) : rawStore;
+        if (storeSummary[store] !== undefined) {
+          storeSummary[store] += amount;
+        } else {
+          storeSummary[store] = amount;
+        }
       }
     });
 
     const monthlyMinimoAvg = monthlyMinimoVisits > 0 ? Math.round(monthlyMinimoTotal / monthlyMinimoVisits) : 0;
     const monthlyRegularAvg = monthlyRegularVisits > 0 ? Math.round(monthlyRegularTotal / monthlyRegularVisits) : 0;
 
-    // 4. Today's Sales by Store
-    const todaySalesQuery = query(
-      salesCol,
-      where("date", "==", todayStr)
-    );
-    const todaySalesSnap = await getDocs(todaySalesQuery);
-    const storeSummary: Record<string, number> = {};
-    
-    todaySalesSnap.forEach(doc => {
-      const data = doc.data();
-      const rawStore = data.store_name || "不明";
-      const store = rawStore.endsWith("店") ? rawStore.slice(0, -1) : rawStore;
-      const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
-      if (storeSummary[store] !== undefined) {
-        storeSummary[store] += amount;
-      } else {
-        storeSummary[store] = amount;
-      }
-    });
-
     // 5. Store Targets & Progress
     const storeTargets = await getStoreTargets(currentMonthPrefix);
     
-    // Aggregate monthly sales by store
     const monthlyStoreSales: Record<string, number> = {};
-    monthlySalesSnap.forEach(doc => {
+    salesSnap.forEach(doc => {
       const data = doc.data();
+      if (data.source !== "hotpepper" || data.merge_status === "DELETED") return;
+      if (!data.date?.startsWith(currentMonthPrefix)) return;
+      
       const rawStore = data.store_name || "不明";
       const store = rawStore.endsWith("店") ? rawStore.slice(0, -1) : rawStore;
       const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
@@ -164,6 +166,9 @@ export async function getDashboardStats() {
 
 export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?: any[]; error?: string }> {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) return { success: false, error: "Company ID missing" };
+
     const now = new Date();
     const months = Array.from({ length: 36 }, (_, i) => {
       const d = subMonths(now, i);
@@ -172,17 +177,27 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
 
     const salesCol = collection(db, "sales");
     const shiftsCol = collection(db, "shifts");
+    // Fetch all sales for this company
+    const qSales = query(salesCol, where("companyId", "==", ctx.companyId));
+    const salesSnap = await getDocs(qSales);
+
+    // Group sales by month
+    const salesByMonth: Record<string, any[]> = {};
+    months.forEach(m => salesByMonth[m] = []);
+
+    salesSnap.forEach(doc => {
+      const data = doc.data();
+      if (data.source !== "hotpepper" || data.merge_status === "DELETED") return;
+      
+      const date = data.date || "";
+      const monthStr = date.substring(0, 7);
+      if (salesByMonth[monthStr]) {
+        salesByMonth[monthStr].push(data);
+      }
+    });
 
     const monthlyData = await Promise.all(months.map(async (monthStr) => {
-      const [year, month] = monthStr.split("-").map(Number);
-      
-      // 1. Fetch Sales for this month
-      const qSales = query(
-        salesCol,
-        where("date", ">=", `${monthStr}-01`),
-        where("date", "<=", `${monthStr}-31`)
-      );
-      const salesSnap = await getDocs(qSales);
+      const monthSales = salesByMonth[monthStr] || [];
       
       let total = 0;
       let minimo = 0;
@@ -192,8 +207,7 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
       let totalNextBookingVisits = 0;
       const storeSales: Record<string, { total: number, minimo: number, nextBookings: number, nextBookingVisits: number, count: number, minimoVisits: number, regularVisits: number, regularNewVisits: number, minimoNewVisits: number, routes: Record<string, { visits: number, newVisits: number, sales: number }> }> = {};
       
-      salesSnap.forEach(doc => {
-        const data = doc.data();
+      monthSales.forEach(data => {
         const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
         total += amount;
         
@@ -228,7 +242,7 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
           totalNextBookingVisits++;
         }
 
-        if (data.tech_sales > 0) {
+        if ((data.tech_sales || 0) > 0) {
           treatmentCount++;
           totalTreatmentMinutes += data.treatment_minutes || 60; // 実際の施術時間がない場合は後方互換で60分とする
         }
@@ -251,28 +265,26 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
           storeSales[storeKey].routes[route].visits++;
           storeSales[storeKey].routes[route].sales += amount;
 
-          if (data.customer_type === "新規") {
-            storeSales[storeKey].routes[route].newVisits++;
-            if (isMinimo) {
-              storeSales[storeKey].minimoNewVisits++;
-            } else {
-              storeSales[storeKey].regularNewVisits++;
-            }
-          }
-          
           if (isMinimo) {
             storeSales[storeKey].minimo += amount;
             storeSales[storeKey].minimoVisits++;
+            if (data.customer_type === "新規") {
+              storeSales[storeKey].minimoNewVisits++;
+              storeSales[storeKey].routes[route].newVisits++;
+            }
           } else {
-            if (isNextBookingVisit) {
-              storeSales[storeKey].nextBookingVisits++;
-            } else {
-              storeSales[storeKey].regularVisits++;
+            storeSales[storeKey].regularVisits++;
+            if (data.customer_type === "新規") {
+              storeSales[storeKey].regularNewVisits++;
+              storeSales[storeKey].routes[route].newVisits++;
             }
           }
-
+          
           if (hasNextBooking) {
             storeSales[storeKey].nextBookings++;
+          }
+          if (isNextBookingVisit) {
+            storeSales[storeKey].nextBookingVisits++;
           }
         }
       });

@@ -1,11 +1,15 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Reservation } from "@/app/reservations/actions";
+import { Reservation, updateReservation } from "@/app/reservations/actions";
+import { getStaffList, StaffProfile } from "@/app/staff/actions";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserCircle, Calendar, Clock, MapPin, Tag, MessageSquare, CreditCard, Edit, Search, FileText } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 type Props = {
   reservation: Reservation;
@@ -16,6 +20,35 @@ type Props = {
 };
 
 export default function ReservationDetailDialog({ reservation, isOpen, onClose, onEdit, onRefresh }: Props) {
+  const [staffs, setStaffs] = useState<StaffProfile[]>([]);
+  const [updatingStaff, setUpdatingStaff] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      getStaffList().then(list => setStaffs(list)).catch(console.error);
+    }
+  }, [isOpen]);
+
+  const handleStaffChange = async (staffId: string) => {
+    const selectedStaff = staffs.find(s => s.id === staffId);
+    if (!selectedStaff || !reservation) return;
+    
+    setUpdatingStaff(true);
+    try {
+      await updateReservation(reservation.id, {
+        staff_id: selectedStaff.id,
+        staff_name: selectedStaff.name
+      });
+      toast.success("担当スタッフを変更しました");
+      if (onRefresh) onRefresh();
+    } catch (error) {
+      console.error(error);
+      toast.error("スタッフの変更に失敗しました");
+    } finally {
+      setUpdatingStaff(false);
+    }
+  };
+
   if (!reservation) return null;
 
   return (
@@ -74,9 +107,29 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
             </div>
             <div className="flex items-start gap-3 border-t border-slate-50 pt-3">
               <MapPin className="w-4 h-4 text-slate-400 mt-0.5" />
-              <div>
-                <p className="text-slate-500 text-xs font-bold mb-0.5">担当・店舗</p>
-                <p className="font-bold text-slate-800">{reservation.store_name}店 / {reservation.staff_name}</p>
+              <div className="flex-1">
+                <p className="text-slate-500 text-xs font-bold mb-1">担当・店舗</p>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-800 text-sm">{reservation.store_name}店 / </span>
+                  {staffs.length > 0 ? (
+                    <Select 
+                      disabled={updatingStaff || reservation.status === 'completed' || reservation.status === 'cancelled'} 
+                      value={reservation.staff_id || "unknown"} 
+                      onValueChange={handleStaffChange}
+                    >
+                      <SelectTrigger className="h-7 w-[160px] text-xs font-bold bg-slate-50 border-slate-200">
+                        <SelectValue placeholder="担当者を選択" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {staffs.map(s => (
+                          <SelectItem key={s.id} value={s.id} className="text-xs font-bold">{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className="font-bold text-slate-800 text-sm">{reservation.staff_name}</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>

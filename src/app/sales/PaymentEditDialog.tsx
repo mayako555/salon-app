@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { X, CreditCard } from "lucide-react";
 import { updatePaymentInfo, SalesRecord } from "./actions";
+import { getMasterItems } from "./master-actions";
 
 export default function PaymentEditDialog({ 
   initialData,
@@ -28,8 +29,19 @@ export default function PaymentEditDialog({
   const [paymentMethod, setPaymentMethod] = useState(initialData?.payment_method || "未入力");
   const [paymentStatus, setPaymentStatus] = useState(initialData?.payment_status || "unpaid");
   const [note, setNote] = useState(initialData?.note || "");
+  const [paymentMethods, setPaymentMethods] = useState<string[]>(["未入力", "現金", "クレジットカード", "PayPay", "楽天Pay", "ミニモ事前決済", "スマート支払い", "その他"]);
 
-  const paymentMethods = ["未入力", "現金", "クレジットカード", "PayPay", "楽天Pay", "ミニモ事前決済", "スマート支払い", "その他"];
+  useEffect(() => {
+    if (isOpen) {
+      getMasterItems().then(items => {
+        const pmItems = items.filter(item => item.itemType === "paymentMethod" && item.isActive !== false);
+        if (pmItems.length > 0) {
+          pmItems.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+          setPaymentMethods(["未入力", ...pmItems.map(p => p.name)]);
+        }
+      }).catch(console.error);
+    }
+  }, [isOpen]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

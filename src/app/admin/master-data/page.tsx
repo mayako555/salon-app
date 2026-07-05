@@ -28,7 +28,8 @@ const ITEM_TYPES = [
   { id: "messageCoupon", label: "メッセージクーポン" },
   { id: "product", label: "店販商品" },
   { id: "karteTemplate", label: "カルテテンプレート" },
-  { id: "reservationRoute", label: "予約経路" }
+  { id: "reservationRoute", label: "予約経路" },
+  { id: "paymentMethod", label: "支払い方法" }
 ];
 
 import { useAuth } from "@/lib/auth-context";
