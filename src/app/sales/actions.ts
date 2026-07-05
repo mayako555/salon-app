@@ -124,7 +124,7 @@ export type SalesRecord = {
   created_at: any; // Firestore Timestamp
 };
 
-export const SALES_COLLECTION = "sales";
+const SALES_COLLECTION = "sales";
 
 const MASTER_COLLECTION = "sales_master";
 

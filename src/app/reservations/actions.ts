@@ -258,16 +258,15 @@ export async function updateReservation(id: string, data: Partial<Omit<Reservati
 
     // Sync to sales record if it exists
     if (cleanData.staff_id || cleanData.staff_name) {
-      const { SALES_COLLECTION } = await import("@/app/sales/actions");
       const q = query(
-        collection(db, SALES_COLLECTION),
+        collection(db, "sales"),
         where("source_reservation_id", "==", id),
         limit(1)
       );
       const snap = await getDocs(q);
       if (!snap.empty) {
         const saleDoc = snap.docs[0];
-        await updateDoc(doc(db, SALES_COLLECTION, saleDoc.id), {
+        await updateDoc(doc(db, "sales", saleDoc.id), {
           ...(cleanData.staff_id && { staff_id: cleanData.staff_id }),
           ...(cleanData.staff_name && { staff_name: cleanData.staff_name }),
           updated_at: serverTimestamp()
