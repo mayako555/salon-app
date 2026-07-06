@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/firebase";
-import { collection, getDocs, getDoc, query, where, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, orderBy } from "firebase/firestore";
+import { collection, getDocs, getDoc, query, where, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, orderBy, limit } from "firebase/firestore";
 import { addAuditLog } from "@/app/audit/actions";
 
 export type ReservationStatus = "booked" | "arrived" | "completed" | "cancelled";

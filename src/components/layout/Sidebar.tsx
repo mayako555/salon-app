@@ -37,90 +37,7 @@ function cn(...inputs: ClassValue[]) {
 
 import { useAuth } from "@/lib/auth-context";
 
-const managementCategories = [
-  {
-    title: "ダッシュボード",
-    items: [
-      { name: "管理者ダッシュボード", href: "/dashboard", icon: LayoutDashboard, role: "manager" },
-    ]
-  },
-  {
-    title: "日常業務",
-    items: [
-      { name: "スタッフホーム", href: "/staff-portal", icon: LayoutDashboard, role: "staff" },
-      { name: "予約カレンダー", href: "/staff-portal/reservations", icon: CalendarDays, role: "staff" },
-      { name: "顧客管理", href: "/staff-portal/customers", icon: Users, role: "staff" },
-      { name: "売上管理・レジ締め", href: "/sales", icon: Coins, role: "staff" },
-    ]
-  },
-  {
-    title: "分析・経理",
-    items: [
-      { name: "高度分析", href: "/analytics", icon: Sparkles, role: "admin" }, // All admins can see the page, but tabs are restricted inside
-      { name: "経費・収支管理", href: "/admin/expenses", icon: Wallet, role: "admin" },
-      { name: "給与・報酬計算", href: "/payroll", icon: Calculator, role: "admin" },
-    ]
-  },
-  {
-    title: "勤怠・シフト",
-    items: [
-      { name: "シフト管理", href: "/shifts", icon: CalendarDays, role: "manager" },
-      { name: "勤怠管理", href: "/attendance", icon: Clock, role: "admin" },
-      { name: "店舗用タイムカード", href: "/attendance/setup", icon: Clock, role: "admin" },
-      { name: "有給管理", href: "/admin/paid-leaves", icon: CalendarDays, role: "admin" },
-    ]
-  },
-  {
-    title: "スタッフ・教育",
-    items: [
-      { name: "採用管理", href: "/admin/recruitment", icon: Briefcase, role: "admin" },
-      { name: "スタッフ管理", href: "/staff", icon: Users, role: "admin" },
-      { name: "スタッフ評価", href: "/evaluations", icon: Award, role: "admin" },
-      { name: "新人教育", href: "/training", icon: GraduationCap, role: "admin" },
-    ]
-  },
-  {
-    title: "マスタ・データ管理",
-    items: [
-      { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste, role: "admin" },
-      { name: "口コミ一括取込", href: "/admin/reviews/import", icon: ClipboardPaste, role: "admin" },
-      { name: "店舗運用マスタ", href: "/admin/master/operations", icon: Database, role: "admin" },
-      { name: "システム管理マスタ", href: "/admin/master/system", icon: Settings, role: "systemOwner" },
-      { name: "在庫管理", href: "/inventory", icon: Package, role: "manager" },
-      { name: "雇用・業務委託契約", href: "/contracts", icon: FileText, role: "admin" },
-      { name: "手当管理", href: "/allowances", icon: Gift, role: "admin" },
-      { name: "FC契約・請求管理", href: "/admin/settings/subscription", icon: Building2, role: "companyOwner" },
-      { name: "システム設定", href: "/admin/settings", icon: Settings, role: "systemOwner" },
-      { name: "監査ログ", href: "/audit", icon: Settings, role: "systemOwner" },
-    ]
-  }
-];
 
-const staffCategories = [
-  {
-    title: "各種申請・確認",
-    items: [
-      { name: "自分の明細を確認", href: "/staff-portal/payroll", icon: Calculator },
-      { name: "交通費の申請", href: "/staff-portal/transport", icon: Train },
-      { name: "経費の申請", href: "/staff-portal/expenses", icon: Wallet },
-      { name: "現金・入金管理", href: "/staff-portal/cash", icon: Banknote },
-      { name: "希望休の提出", href: "/staff-portal/holidays", icon: CalendarDays },
-    ]
-  },
-  {
-    title: "マニュアル・規程",
-    items: [
-      { name: "就業規則", href: "/staff-portal/rules", icon: BookOpen },
-      { name: "マニュアル", href: "/manuals", icon: Library },
-    ]
-  },
-  {
-    title: "設定",
-    items: [
-      { name: "プロフィール設定", href: "/staff-portal/settings", icon: Settings },
-    ]
-  }
-];
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -134,6 +51,91 @@ export function Sidebar() {
     if (role === "staff") return isStaff || isManager || isAdmin || isCompanyOwner;
     return true;
   };
+
+  const managementCategories = [
+    {
+      title: "ダッシュボード",
+      items: [
+        { name: "管理者ダッシュボード", href: "/dashboard", icon: LayoutDashboard, role: "manager" },
+      ]
+    },
+    {
+      title: "日常業務",
+      items: [
+        { name: "スタッフホーム", href: "/staff-portal", icon: LayoutDashboard, role: "staff" },
+        { name: "予約カレンダー", href: "/staff-portal/reservations", icon: CalendarDays, role: "staff" },
+        { name: "顧客管理", href: "/staff-portal/customers", icon: Users, role: "staff" },
+        { name: "売上管理・レジ締め", href: isAdmin || isManager ? "/sales" : "/staff-portal/sales", icon: Coins, role: "staff" },
+      ]
+    },
+    {
+      title: "分析・経理",
+      items: [
+        { name: "高度分析", href: "/analytics", icon: Sparkles, role: "admin" }, // All admins can see the page, but tabs are restricted inside
+        { name: "経費・収支管理", href: "/admin/expenses", icon: Wallet, role: "admin" },
+        { name: "給与・報酬計算", href: "/payroll", icon: Calculator, role: "admin" },
+      ]
+    },
+    {
+      title: "勤怠・シフト",
+      items: [
+        { name: "シフト管理", href: "/shifts", icon: CalendarDays, role: "manager" },
+        { name: "勤怠管理", href: "/attendance", icon: Clock, role: "admin" },
+        { name: "店舗用タイムカード", href: "/attendance/setup", icon: Clock, role: "admin" },
+        { name: "有給管理", href: "/admin/paid-leaves", icon: CalendarDays, role: "admin" },
+      ]
+    },
+    {
+      title: "スタッフ・教育",
+      items: [
+        { name: "採用管理", href: "/admin/recruitment", icon: Briefcase, role: "admin" },
+        { name: "スタッフ管理", href: "/staff", icon: Users, role: "admin" },
+        { name: "スタッフ評価", href: "/evaluations", icon: Award, role: "admin" },
+        { name: "新人教育", href: "/training", icon: GraduationCap, role: "admin" },
+      ]
+    },
+    {
+      title: "マスタ・データ管理",
+      items: [
+        { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste, role: "admin" },
+        { name: "口コミ一括取込", href: "/admin/reviews/import", icon: ClipboardPaste, role: "admin" },
+        { name: "店舗運用マスタ", href: "/admin/master/operations", icon: Database, role: "admin" },
+        { name: "システム管理マスタ", href: "/admin/master/system", icon: Settings, role: "systemOwner" },
+        { name: "在庫管理", href: "/inventory", icon: Package, role: "manager" },
+        { name: "雇用・業務委託契約", href: "/contracts", icon: FileText, role: "admin" },
+        { name: "手当管理", href: "/allowances", icon: Gift, role: "admin" },
+        { name: "FC契約・請求管理", href: "/admin/settings/subscription", icon: Building2, role: "companyOwner" },
+        { name: "システム設定", href: "/admin/settings", icon: Settings, role: "systemOwner" },
+        { name: "監査ログ", href: "/audit", icon: Settings, role: "systemOwner" },
+      ]
+    }
+  ];
+
+  const staffCategories = [
+    {
+      title: "各種申請・確認",
+      items: [
+        { name: "自分の明細を確認", href: "/staff-portal/payroll", icon: Calculator },
+        { name: "交通費の申請", href: "/staff-portal/transport", icon: Train },
+        { name: "経費の申請", href: "/staff-portal/expenses", icon: Wallet },
+        { name: "現金・入金管理", href: "/staff-portal/cash", icon: Banknote },
+        { name: "希望休の提出", href: "/staff-portal/holidays", icon: CalendarDays },
+      ]
+    },
+    {
+      title: "マニュアル・規程",
+      items: [
+        { name: "就業規則", href: "/staff-portal/rules", icon: BookOpen },
+        { name: "マニュアル", href: "/manuals", icon: Library },
+      ]
+    },
+    {
+      title: "設定",
+      items: [
+        { name: "プロフィール設定", href: "/staff-portal/settings", icon: Settings },
+      ]
+    }
+  ];
 
   const NavItem = ({ item, colorClass = "text-rose-600", bgClass = "bg-rose-50", iconColor = "text-rose-500" }: { item: any, colorClass?: string, bgClass?: string, iconColor?: string }) => {
     const isActive = pathname.startsWith(item.href);
