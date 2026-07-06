@@ -109,7 +109,7 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
 
         // Send LINE if requested
         if (sendLine && showLinePreview && accountingId) {
-          const { sendAndLogLineMessage } = await import("@/app/sales/actions");
+          const { sendAndLogLineMessage } = await import("@/lib/line");
           // NOTE: we need customer's line_user_id. For now, fetch it via the server action or pass it if available.
           const { getCustomerById } = await import("@/lib/customers");
           const customer = await getCustomerById(reservation.customer_id);
