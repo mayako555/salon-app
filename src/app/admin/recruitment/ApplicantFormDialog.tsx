@@ -122,12 +122,19 @@ export default function ApplicantFormDialog({ isOpen, onClose, onRefresh, initia
     try {
       const applicantId = initialData?.id || `new_${Date.now()}`;
       const storageRef = ref(storage, `recruitment/${applicantId}/resumes/${file.name}`);
-      await uploadBytes(storageRef, file);
+      
+      // タイムアウト設定（CORSエラー時の無限リトライ防止）
+      const uploadTask = uploadBytes(storageRef, file);
+      const timeoutTask = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("アップロードがタイムアウトしました。Firebase StorageのCORS設定、またはファイルサイズを確認してください。")), 15000)
+      );
+      
+      await Promise.race([uploadTask, timeoutTask]);
       const url = await getDownloadURL(storageRef);
       setFormData({ ...formData, resume_url: url });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Upload error:", error);
-      alert("ファイルのアップロードに失敗しました");
+      alert(error.message || "ファイルのアップロードに失敗しました");
     } finally {
       setUploading(false);
     }
