@@ -14,6 +14,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 type Props = {
   reservation: Reservation;
@@ -410,6 +412,75 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
               </Button>
             )}
           </div>
+
+          {reservation.customer_id && reservation.status !== 'completed' && reservation.status !== 'cancelled' && (
+            <div className="mb-4 space-y-4 pt-4 border-t border-slate-200">
+              <div className="flex items-start gap-2 bg-purple-50 p-3 rounded-lg border border-purple-100">
+                <Checkbox 
+                  id="createNextBooking" 
+                  checked={hasNextBooking}
+                  onCheckedChange={(c) => setHasNextBooking(!!c)}
+                  className="mt-1"
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="createNextBooking" className="font-bold text-purple-900 cursor-pointer">
+                    会計と同時に次回予約を登録する
+                  </Label>
+                  <p className="text-xs text-purple-700">
+                    チェックを入れると、会計完了後に自動でカレンダーに次回予約が追加されます。
+                  </p>
+                </div>
+              </div>
+
+              {hasNextBooking && (
+                <div className="pl-6 space-y-3 animate-in slide-in-from-top-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-slate-500 mb-1 block">次回予約日</Label>
+                      <input 
+                        type="date" 
+                        value={nextBookingDate}
+                        onChange={e => setNextBookingDate(e.target.value)}
+                        className="w-full h-8 px-2 text-sm border border-slate-200 rounded"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-slate-500 mb-1 block">次回予約時間</Label>
+                      <input 
+                        type="time" 
+                        value={nextBookingTime}
+                        onChange={e => setNextBookingTime(e.target.value)}
+                        className="w-full h-8 px-2 text-sm border border-slate-200 rounded"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <Checkbox 
+                        id="remind2Days" 
+                        checked={remind2Days}
+                        onCheckedChange={(c) => setRemind2Days(!!c)}
+                      />
+                      <Label htmlFor="remind2Days" className="text-sm cursor-pointer">
+                        2日前リマインドの対象にする
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox 
+                        id="sendLine" 
+                        checked={sendLine}
+                        onCheckedChange={(c) => setSendLine(!!c)}
+                      />
+                      <Label htmlFor="sendLine" className="text-sm cursor-pointer text-emerald-700 font-bold">
+                        会計と同時に予約確定LINEを送信
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {reservation.status !== 'cancelled' && (
             <div className="mb-3">
