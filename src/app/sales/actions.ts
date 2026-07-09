@@ -507,7 +507,6 @@ export async function importHotPepperCsv(formData: FormData) {
       });
     }
 
-    const batch = writeBatch(db);
     let importCount = 0;
     let skipCount = 0;
 
@@ -515,7 +514,19 @@ export async function importHotPepperCsv(formData: FormData) {
     const staffs = await getStaffList();
 
     // Step 3: Process each group
-    Object.values(groups).forEach(groupRows => {
+    let currentBatch = writeBatch(db);
+    let operationCount = 0;
+    const commitPromises: Promise<void>[] = [];
+
+    const commitCurrentBatch = () => {
+      if (operationCount > 0) {
+        commitPromises.push(currentBatch.commit());
+        currentBatch = writeBatch(db);
+        operationCount = 0;
+      }
+    };
+
+    for (const groupRows of Object.values(groups)) {
       const firstRow = groupRows[0];
       const rawStaffName = groupRows.find(r => r["スタッフ"] || r["担当スタッフ"] || r["スタッフ名"])?.["スタッフ"] || "フリー";
       const staffName = String(rawStaffName).replace(/\s+/g, "");
@@ -584,7 +595,7 @@ export async function importHotPepperCsv(formData: FormData) {
         hpbPoints += isCancel ? -Math.abs(parseMoney(row["ポイント使用"])) : Math.abs(parseMoney(row["ポイント使用"]));
       });
 
-      if (groupRows.some(r => String(r["会計区分"] || "").includes("取り消し")) && (techSales + prodSales === 0)) return;
+      if (groupRows.some(r => String(r["会計区分"] || "").includes("取り消し")) && (techSales + prodSales === 0)) continue;
 
       const dateFormatted = formatDate(rawDate);
       let timeFormatted = rawTime.includes(":") ? rawTime : `${rawTime.padStart(4, '0').substring(0, 2)}:${rawTime.padStart(4, '0').substring(2, 4)}`;
@@ -602,12 +613,12 @@ export async function importHotPepperCsv(formData: FormData) {
 
       if (isAlreadyImported) {
         skipCount++;
-        return; // Skip this duplicate CSV record
+        continue; // Skip this duplicate CSV record
       }
 
       const docRef = doc(colRef);
 
-      batch.set(docRef, {
+      currentBatch.set(docRef, {
         companyId: companyId || "company_default",
         staff_id: staffId,
         staff_name: staffName,
@@ -676,7 +687,7 @@ export async function importHotPepperCsv(formData: FormData) {
         const startM = totalM % 60;
         const startTimeFormatted = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
 
-        batch.set(resDocRef, {
+        currentBatch.set(resDocRef, {
           companyId: companyId || "company_default",
           store_name: storeName,
           staff_id: staffId,
@@ -697,13 +708,19 @@ export async function importHotPepperCsv(formData: FormData) {
           created_at: serverTimestamp(),
           updated_at: serverTimestamp(),
         });
+        operationCount++;
       }
       // ---------------------------------
+      operationCount++; // for the sales doc
 
       importCount++;
-    });
+      if (operationCount >= 400) {
+        commitCurrentBatch();
+      }
+    }
 
-    await batch.commit();
+    commitCurrentBatch();
+    await Promise.all(commitPromises);
     revalidatePath("/staff-portal/sales");
     return { success: true, count: importCount, skipped: skipCount, merged: 0 };
   } catch (error: any) {

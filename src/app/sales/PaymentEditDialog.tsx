@@ -97,7 +97,6 @@ export default function PaymentEditDialog({
             </div>
             
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              
               <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">顧客名</span>
@@ -115,64 +114,73 @@ export default function PaymentEditDialog({
                 </div>
               </div>
 
-              <div className="space-y-4 border-t border-slate-100 pt-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">支払方法</label>
-                  <select 
-                    value={paymentMethod} 
-                    onChange={e => setPaymentMethod(e.target.value)}
-                    className="w-full h-10 px-3 border border-slate-300 rounded-md text-sm font-bold bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                  >
-                    {paymentMethods.map(pm => <option key={pm} value={pm}>{pm}</option>)}
-                  </select>
-                </div>
+                <div className="space-y-4 border-t border-slate-100 pt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">支払方法</label>
+                    <select 
+                      value={paymentMethod} 
+                      onChange={e => setPaymentMethod(e.target.value)}
+                      className="w-full h-11 px-3 border border-slate-300 rounded-md text-sm font-bold bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                    >
+                      {paymentMethods.map(pm => <option key={pm} value={pm}>{pm}</option>)}
+                    </select>
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">支払状況</label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        type="radio" 
-                        name="payment_status" 
-                        value="unpaid"
-                        checked={paymentStatus === "unpaid"}
-                        onChange={() => setPaymentStatus("unpaid")}
-                        className="w-4 h-4 text-rose-500"
-                      />
-                      <span className="text-sm font-bold text-slate-700">未払い</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        type="radio" 
-                        name="payment_status" 
-                        value="paid"
-                        checked={paymentStatus === "paid"}
-                        onChange={() => setPaymentStatus("paid")}
-                        className="w-4 h-4 text-emerald-500"
-                      />
-                      <span className="text-sm font-bold text-slate-700">支払い済み</span>
-                    </label>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">支払状況</label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="payment_status" 
+                          value="unpaid"
+                          checked={paymentStatus === "unpaid"}
+                          onChange={() => setPaymentStatus("unpaid")}
+                          className="w-5 h-5 text-rose-500"
+                        />
+                        <span className="text-sm font-bold text-slate-700">未払い</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="payment_status" 
+                          value="paid"
+                          checked={paymentStatus === "paid"}
+                          onChange={() => setPaymentStatus("paid")}
+                          className="w-5 h-5 text-emerald-500"
+                        />
+                        <span className="text-sm font-bold text-slate-700">支払済</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">メモ (任意)</label>
+                    <textarea 
+                      value={note}
+                      onChange={e => setNote(e.target.value)}
+                      rows={3}
+                      placeholder="備考を入力..."
+                      className="w-full p-3 border border-slate-300 rounded-md text-sm"
+                    />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">メモ (任意)</label>
-                  <textarea 
-                    value={note}
-                    onChange={e => setNote(e.target.value)}
-                    rows={3}
-                    placeholder="レジと差異がある場合などのメモ"
-                    className="w-full p-3 border border-slate-300 rounded-md text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={isSubmitting}>
+              <div className="flex gap-3 justify-end px-6 py-4 bg-slate-50 border-t border-slate-100 rounded-b-xl">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsOpen(false)}
+                  className="min-h-[44px]"
+                >
                   キャンセル
                 </Button>
-                <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6">
-                  {isSubmitting ? "保存中..." : "支払い情報を保存"}
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-6 min-h-[44px]"
+                >
+                  {isSubmitting ? "保存中..." : "保存して会計完了"}
                 </Button>
               </div>
             </form>
