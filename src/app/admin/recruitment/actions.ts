@@ -21,9 +21,11 @@ export type ApplicantStatus =
   | "サロン見学調整中"
   | "サロン見学予定"
   | "サロン見学済"
+  | "サロン見学キャンセル"
   | "面接調整中" 
   | "面接確定" 
   | "面接済" 
+  | "面接キャンセル"
   | "内定" 
   | "採用" 
   | "不採用" 
@@ -40,6 +42,7 @@ export type Applicant = {
   category?: string; // 区分
   phone: string;
   email: string;
+  instagram_account?: string; // インスタグラムのアカウント名
   desired_role: string;
   application_source: string;
   status: ApplicantStatus;

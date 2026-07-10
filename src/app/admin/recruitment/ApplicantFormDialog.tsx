@@ -37,9 +37,11 @@ const STATUSES: ApplicantStatus[] = [
   "サロン見学調整中",
   "サロン見学予定",
   "サロン見学済",
+  "サロン見学キャンセル",
   "面接調整中",
   "面接確定",
   "面接済",
+  "面接キャンセル",
   "内定",
   "採用",
   "不採用",
@@ -72,6 +74,7 @@ export default function ApplicantFormDialog({ isOpen, onClose, onRefresh, initia
         category: "",
         phone: "",
         email: "",
+        instagram_account: "",
         desired_role: ROLES[0],
         application_source: SOURCES[0],
         status: "応募受付",
@@ -196,7 +199,7 @@ export default function ApplicantFormDialog({ isOpen, onClose, onRefresh, initia
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>電話番号</Label>
                 <Input name="phone" value={formData.phone || ""} onChange={handleChange} placeholder="090-0000-0000" />
@@ -204,6 +207,10 @@ export default function ApplicantFormDialog({ isOpen, onClose, onRefresh, initia
               <div className="space-y-2">
                 <Label>メールアドレス</Label>
                 <Input type="email" name="email" value={formData.email || ""} onChange={handleChange} placeholder="email@example.com" />
+              </div>
+              <div className="space-y-2">
+                <Label>Instagramアカウント</Label>
+                <Input name="instagram_account" value={formData.instagram_account || ""} onChange={handleChange} placeholder="@username" />
               </div>
             </div>
           </div>

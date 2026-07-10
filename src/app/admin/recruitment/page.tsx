@@ -313,6 +313,9 @@ export default function RecruitmentDashboard() {
                         )}
                       </div>
                       <div className="text-xs text-slate-500">{app.desired_role}</div>
+                      {app.instagram_account && (
+                        <div className="text-[10px] text-pink-500 mt-0.5 font-medium">{app.instagram_account}</div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-sm text-slate-700">{app.age ? `${app.age}歳` : "-"}</div>
