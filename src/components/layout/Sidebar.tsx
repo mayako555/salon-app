@@ -26,7 +26,8 @@ import {
   Sparkles,
   Banknote,
   Briefcase,
-  Building2
+  Building2,
+  ClipboardList
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -63,6 +64,7 @@ export function Sidebar() {
       title: "日常業務",
       items: [
         { name: "スタッフホーム", href: "/staff-portal", icon: LayoutDashboard, role: "staff" },
+        { name: "AIタスク管理", href: "/admin/tasks", icon: ClipboardList, role: "manager" },
         { name: "予約カレンダー", href: "/staff-portal/reservations", icon: CalendarDays, role: "staff" },
         { name: "顧客管理", href: "/staff-portal/customers", icon: Users, role: "staff" },
         { name: "売上管理・レジ締め", href: isAdmin || isManager ? "/sales" : "/staff-portal/sales", icon: Coins, role: "staff" },

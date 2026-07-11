@@ -182,6 +182,7 @@ export async function addStaff(formData: FormData) {
     const m_course = formData.get("m_course") as string || "";
     const e_course = formData.get("e_course") as string || "";
     const evaluation_role = (formData.get("evaluation_role") as EvaluationRole) || "general";
+    const salonIds = formData.getAll("salonIds[]") as string[];
 
     if (!name || !email) {
       return { success: false, error: "名前、メールアドレスは必須です" };
@@ -238,6 +239,7 @@ export async function addStaff(formData: FormData) {
       m_course,
       e_course,
       evaluation_role,
+      salonIds,
       created_at: serverTimestamp()
     };
     
@@ -294,6 +296,7 @@ export async function editStaff(id: string, formData: FormData) {
     const m_course = formData.get("m_course") as string || "";
     const e_course = formData.get("e_course") as string || "";
     const evaluation_role = (formData.get("evaluation_role") as EvaluationRole) || "general";
+    const salonIds = formData.getAll("salonIds[]") as string[];
 
     const is_trainee = formData.get("is_trainee") === "true";
 
@@ -362,6 +365,7 @@ export async function editStaff(id: string, formData: FormData) {
       m_course,
       e_course,
       evaluation_role,
+      salonIds,
       updated_at: serverTimestamp()
     };
 

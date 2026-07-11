@@ -11,8 +11,10 @@ import {
 import { StaffProfile, addStaff, editStaff } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Plus, Edit2 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
 export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
+  const { availableStores } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [employmentType, setEmploymentType] = useState(staff?.employment_type || "outsourcing");
@@ -56,14 +58,14 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
         )}
       </DialogTrigger>
 
-      <DialogContent className="max-w-md p-0 overflow-hidden border-none shadow-2xl">
-        <DialogHeader className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+      <DialogContent className="sm:max-w-md w-[95vw] max-h-[95vh] p-0 overflow-hidden border-none shadow-2xl">
+        <DialogHeader className="px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
           <DialogTitle className="font-bold text-lg text-slate-800">
             {staff ? "スタッフ情報の編集" : "スタッフの登録"}
           </DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[calc(95vh-120px)] overflow-y-auto pb-24">
           <div className="space-y-2">
             <label className="block text-sm font-medium text-slate-700">氏名</label>
             <div className="grid grid-cols-2 gap-2">
@@ -157,6 +159,28 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
               <option value="manager">店長（シフト作成可）</option>
               <option value="admin">管理者（給与設定・全機能）</option>
             </select>
+          </div>
+
+          <div className="pt-2">
+            <label className="block text-sm font-medium text-slate-700 mb-2">所属店舗（複数選択可）</label>
+            <div className="flex flex-wrap gap-2">
+              {availableStores.map(store => (
+                <label key={store} className="flex items-center gap-1.5 p-2 bg-slate-50 border border-slate-200 rounded-md cursor-pointer hover:bg-slate-100 transition-colors">
+                  <input 
+                    type="checkbox" 
+                    name="salonIds[]" 
+                    value={store} 
+                    defaultChecked={staff?.salonIds?.includes(store)}
+                    className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500"
+                  />
+                  <span className="text-sm font-medium text-slate-700">{store}</span>
+                </label>
+              ))}
+              {availableStores.length === 0 && (
+                <span className="text-sm text-slate-400">利用可能な店舗がありません</span>
+              )}
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1">※ チェックした店舗の売上やシフトなどの情報にアクセスできます。一つも選択しない場合、すべての店舗にアクセス可能になります。</p>
           </div>
 
           <div>
@@ -282,12 +306,10 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
             <p className="text-[10px] text-slate-400 mt-1">※ 選択したアカウントがスタッフポータルのタスクに表示されます</p>
           </div>
 
-          <div className="pt-4 flex justify-end gap-3 sticky bottom-0 bg-white pb-2">
-            <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={isSubmitting}>
-              キャンセル
-            </Button>
-            <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[100px]">
-              {isSubmitting ? "保存中..." : staff ? "更新する" : "スタッフを登録"}
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 shrink-0 absolute bottom-0 left-0 right-0">
+            <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>キャンセル</Button>
+            <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold min-w-[120px]">
+              {isSubmitting ? "保存中..." : (staff ? "更新する" : "登録する")}
             </Button>
           </div>
         </form>

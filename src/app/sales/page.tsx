@@ -225,7 +225,7 @@ export default function SalesPage({
   });
 
   return (
-    <AuthGuard requireRole="admin">
+    <AuthGuard requireRole="manager">
       <div className="space-y-6 animate-in fade-in duration-300">
         {loading ? (
           <div className="flex items-center justify-center py-20 text-slate-500">読み込み中...</div>

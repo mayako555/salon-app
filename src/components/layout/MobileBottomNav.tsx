@@ -37,7 +37,7 @@ export function MobileBottomNav() {
     { name: "ホーム", href: "/staff-portal", icon: Home },
     { name: "予約", href: "/staff-portal/reservations", icon: CalendarDays },
     { name: "レジ", href: "/staff-portal/cash", icon: Banknote },
-    { name: "売上", href: "/staff-portal/sales", icon: Coins },
+    { name: "売上", href: isAdmin || isManager ? "/sales" : "/staff-portal/sales", icon: Coins },
   ];
 
   const hasAccess = (role: string) => {
