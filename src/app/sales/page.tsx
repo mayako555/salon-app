@@ -252,6 +252,10 @@ export default function SalesPage({
                     isOpenControlled={isCheckoutOpen}
                     onOpenChangeControlled={setIsCheckoutOpen}
                     initialData={editingSale}
+                    onSuccess={() => {
+                      getMonthlySales(year, month).then(setSales);
+                      setIsCheckoutOpen(false);
+                    }}
                   />
                 )}
                 <CSVUploadButton />

@@ -174,6 +174,7 @@ export default function StaffPortalSalesPage() {
                       
                       <PaymentEditDialog 
                         initialData={sale}
+                        onSuccess={() => getMonthlySales(year, month).then(setSales)}
                         trigger={
                           <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-emerald-600 transition-colors">
                             <Search size={16} />
@@ -229,6 +230,7 @@ export default function StaffPortalSalesPage() {
                   <span className="font-bold text-slate-700 text-sm">¥{(sale.tech_sales + sale.product_sales - (sale.discount || 0)).toLocaleString()}</span>
                   <PaymentEditDialog 
                     initialData={sale}
+                    onSuccess={() => getMonthlySales(year, month).then(setSales)}
                     trigger={
                       <button className="p-2 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-emerald-600 transition-colors">
                         <Search size={16} />

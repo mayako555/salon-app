@@ -40,8 +40,13 @@ export default function PaymentEditDialog({
           setPaymentMethods(["未入力", ...pmItems.map(p => p.name)]);
         }
       }).catch(console.error);
+
+      // Sync initialData to state when opening
+      setPaymentMethod(initialData?.payment_method || "未入力");
+      setPaymentStatus(initialData?.payment_status || "unpaid");
+      setNote(initialData?.note || "");
     }
-  }, [isOpen]);
+  }, [isOpen, initialData]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
