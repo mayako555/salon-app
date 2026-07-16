@@ -7,10 +7,10 @@ export async function GET(request: Request) {
     const sato = satoSnap.empty ? null : satoSnap.docs[0].data();
 
     const companiesSnap = await adminDb.collection("companies").get();
-    const companies = companiesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const companies = companiesSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
 
     const ownersSnap = await adminDb.collection("staff_profiles").where("role", "==", "companyOwner").get();
-    const owners = ownersSnap.docs.map(d => ({ id: d.id, email: d.data().email, companyId: d.data().companyId }));
+    const owners = ownersSnap.docs.map((d: any) => ({ id: d.id, email: d.data().email, companyId: d.data().companyId }));
 
     return NextResponse.json({
       success: true,

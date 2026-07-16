@@ -5,7 +5,7 @@ import { sendLineMessage } from "@/lib/line";
 import { LineAutomationSettings } from "@/app/admin/settings/line-automation-actions";
 import { replaceLineTemplate, validateLineTemplate } from "@/lib/lineTemplate";
 import { format, addDays, subDays, startOfDay, endOfDay, parseISO } from "date-fns";
-import { toZonedTime, formatInTimeZone } from "date-fns-tz"; // Requires date-fns-tz, we might need to install or just use simple math
+// Removed date-fns-tz import as it is unused
 
 // Simplified date string formatter for Asia/Tokyo
 const getTokyoDateString = (date: Date) => {

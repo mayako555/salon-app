@@ -107,7 +107,7 @@ export function Sidebar() {
         { name: "雇用・業務委託契約", href: "/contracts", icon: FileText, role: "admin" },
         { name: "手当管理", href: "/allowances", icon: Gift, role: "admin" },
         { name: "FC契約・請求管理", href: "/admin/settings/subscription", icon: Building2, role: "companyOwner" },
-        { name: "システム設定", href: "/admin/settings", icon: Settings, role: "systemOwner" },
+        { name: "システム設定", href: "/admin/settings", icon: Settings, role: "companyOwner" },
         { name: "監査ログ", href: "/audit", icon: Settings, role: "systemOwner" },
       ]
     }

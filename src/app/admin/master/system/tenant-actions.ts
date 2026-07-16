@@ -51,7 +51,7 @@ export async function getTenants() {
       id: doc.id,
       ...doc.data(),
       adminEmails: emailsByCompany[doc.id] || []
-    })) as CompanyTenant[];
+    })) as unknown as CompanyTenant[];
   } catch (error) {
     console.error("Error fetching tenants:", error);
     // If collection doesn't exist or index missing, might fail. 
@@ -62,7 +62,7 @@ export async function getTenants() {
         id: doc.id,
         ...doc.data(),
         adminEmails: []
-      })) as CompanyTenant[];
+      })) as unknown as CompanyTenant[];
     } catch (e) {
       console.error("Fallback error:", e);
       return [];

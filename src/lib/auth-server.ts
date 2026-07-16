@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminAuth, adminDb } from "./firebase-admin";
 
-export type UserRole = "systemOwner" | "companyOwner" | "manager" | "storeManager" | "staff" | "admin";
+export type UserRole = "systemOwner" | "companyOwner" | "manager" | "storeManager" | "staff" | "admin" | "guest";
 
 export interface UserContext {
   uid: string;

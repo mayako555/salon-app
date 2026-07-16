@@ -27,7 +27,8 @@ import {
   GraduationCap,
   Database,
   Building2,
-  Sparkles
+  Sparkles,
+  Gift
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -80,8 +81,9 @@ export function MobileBottomNav() {
     { name: "経費・収支", href: "/admin/expenses", icon: Wallet, role: "admin" },
     { name: "給与・報酬", href: "/payroll", icon: Calculator, role: "admin" },
     { name: "AIタスク管理", href: "/admin/tasks", icon: ClipboardList, role: "manager" },
+    { name: "手当管理", href: "/allowances", icon: Gift, role: "admin" },
     { name: "システム管理", href: "/admin/master/operations", icon: Database, role: "admin" },
-    { name: "システム設定", href: "/admin/settings", icon: Settings, role: "systemOwner" },
+    { name: "システム設定", href: "/admin/settings", icon: Settings, role: "companyOwner" },
     { name: "FC契約・請求", href: "/admin/settings/subscription", icon: Building2, role: "companyOwner" },
   ];
 
