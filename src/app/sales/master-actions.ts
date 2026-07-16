@@ -40,11 +40,16 @@ export async function getMasterItems(store?: string): Promise<SalesMasterItem[]>
     }) as (SalesMasterItem & { companyId?: string })[];
 
     // --- SaaS Security: Enforce companyId isolation ---
-    if (!ctx.companyId) {
-      throw new Error("会社IDが指定されていません");
+    let effectiveCompanyId = ctx.companyId;
+    if (!effectiveCompanyId) {
+      if (ctx.role === "systemOwner") {
+        effectiveCompanyId = "default";
+      } else {
+        throw new Error("会社IDが指定されていません");
+      }
     }
 
-    items = items.filter(item => item.companyId === ctx.companyId);
+    items = items.filter(item => item.companyId === effectiveCompanyId);
 
     if (store && store !== "all") {
       items = items.filter(item => item.store === store || item.store === "共通");
@@ -67,13 +72,18 @@ export async function getMasterItems(store?: string): Promise<SalesMasterItem[]>
 export async function upsertMasterItem(data: Partial<SalesMasterItem>) {
   try {
     const ctx = await getCurrentUserContext();
-    if (!ctx.companyId) {
-      throw new Error("会社IDが指定されていません");
+    let effectiveCompanyId = ctx.companyId;
+    if (!effectiveCompanyId) {
+      if (ctx.role === "systemOwner") {
+        effectiveCompanyId = (data as any).companyId || "default";
+      } else {
+        throw new Error("会社IDが指定されていません");
+      }
     }
     const colRef = collection(db, MASTER_COLLECTION);
     
     const payload = {
-      companyId: ctx.companyId, // Force the injected companyId
+      companyId: effectiveCompanyId, // Force the injected companyId
       store: data.store,
       itemType: data.itemType,
       category: data.category || "",
@@ -89,6 +99,8 @@ export async function upsertMasterItem(data: Partial<SalesMasterItem>) {
       trackInventory: !!data.trackInventory,
       staffAssignable: !!data.staffAssignable,
       equipmentAssignable: !!data.equipmentAssignable,
+      openTime: data.openTime || "",
+      closeTime: data.closeTime || "",
       updated_at: serverTimestamp()
     };
 

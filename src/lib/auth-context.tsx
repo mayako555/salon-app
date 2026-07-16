@@ -138,12 +138,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setAvailableStores([]);
             }
           } else {
-            // No profile found, but user is authenticated via Auth. Give them default systemOwner access.
-            const fallbackName = firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : "管理者");
+            // No profile found, but user is authenticated via Auth. Give them default guest access.
+            const fallbackName = firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : "ゲスト");
             setProfile({
-              id: "admin_" + firebaseUser.uid,
+              id: "guest_" + firebaseUser.uid,
               name: fallbackName,
-              role: "systemOwner",
+              role: "guest",
               companyId: undefined,
               employment_status: "active",
               is_active: true,

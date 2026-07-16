@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { adminAuth, adminDb } from "./firebase-admin";
 
 export type UserRole = "systemOwner" | "companyOwner" | "manager" | "storeManager" | "staff" | "admin";
@@ -18,7 +19,7 @@ export async function getCurrentUserContext(): Promise<UserContext> {
   const session = cookieStore.get("session")?.value;
 
   if (!session) {
-    throw new Error("セッションが見つかりません (Missing Session Cookie)");
+    redirect("/login");
   }
 
   try {
@@ -36,7 +37,13 @@ export async function getCurrentUserContext(): Promise<UserContext> {
     }
     
     if (!snapshot || snapshot.empty) {
-      throw new Error("ユーザープロフィールが見つかりません (Profile not found)");
+      // No profile found in DB, fallback to guest (same as frontend auth-context)
+      return {
+        uid,
+        role: "guest",
+        companyId: undefined, // guest has no company constraint initially
+        salonIds: [],
+      };
     }
 
     const userData = snapshot.docs[0]?.data();
@@ -59,6 +66,14 @@ export async function getCurrentUserContext(): Promise<UserContext> {
     };
   } catch (error: any) {
     console.error("Auth verification failed:", error);
+    if (
+      error.code === "auth/session-cookie-expired" ||
+      error.code === "auth/session-cookie-revoked" ||
+      error.message?.includes("expired") ||
+      error.message?.includes("auth/")
+    ) {
+      redirect("/login");
+    }
     throw new Error(`認証エラー: ${error.message || String(error)}`);
   }
 }

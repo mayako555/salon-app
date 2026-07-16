@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { getReservationSettings, saveReservationSettings, getLineSettings, saveLineSettings, ReservationSettings, LineSettingsMap, getCompanySettings, saveCompanyAttendanceRule, getKioskSettings, saveKioskSettings } from "./actions";
+import { getLineAutomationSettings, saveLineAutomationSettings, LineAutomationSettings } from "./line-automation-actions";
+import LineAutomationSettingsPanel from "./LineAutomationSettingsPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +15,7 @@ export default function SystemSettingsPage() {
   const { profile, isAdmin, availableStores } = useAuth();
   const [settings, setSettings] = useState<ReservationSettings | null>(null);
   const [lineSettings, setLineSettings] = useState<LineSettingsMap>({});
+  const [lineAutomationSettings, setLineAutomationSettings] = useState<LineAutomationSettings | null>(null);
   const [attendanceRule, setAttendanceRule] = useState<"jasminelash" | "simple">("simple");
   const [kioskSettings, setKioskSettings] = useState<Record<string, { token: string, enabled: boolean }>>({});
   const [loading, setLoading] = useState(true);
@@ -20,16 +23,18 @@ export default function SystemSettingsPage() {
 
   useEffect(() => {
     async function load() {
-      const [data, lineData, compData, kioskData] = await Promise.all([
+      const [data, lineData, compData, kioskData, lineAutomationData] = await Promise.all([
         getReservationSettings(),
         getLineSettings(),
         getCompanySettings(profile?.companyId!),
-        getKioskSettings(profile?.companyId!)
+        getKioskSettings(profile?.companyId!),
+        getLineAutomationSettings(profile?.companyId!)
       ]);
       setSettings(data);
       setLineSettings(lineData);
       setAttendanceRule(compData.attendanceRule || "simple");
       setKioskSettings(kioskData || {});
+      setLineAutomationSettings(lineAutomationData);
       setLoading(false);
     }
     load();
@@ -100,6 +105,14 @@ export default function SystemSettingsPage() {
     
     // Save Attendance Rule
     await saveCompanyAttendanceRule(profile?.companyId!, attendanceRule);
+
+    // Save Line Automation Settings
+    if (lineAutomationSettings) {
+      const lineAuthRes = await saveLineAutomationSettings(lineAutomationSettings);
+      if (!lineAuthRes.success) {
+        toast.error(`自動配信設定の保存に失敗: ${lineAuthRes.error}`);
+      }
+    }
 
     await Promise.all([...linePromises, ...kioskPromises]);
 
@@ -172,6 +185,13 @@ export default function SystemSettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {lineAutomationSettings && (
+        <LineAutomationSettingsPanel 
+          settings={lineAutomationSettings} 
+          onChange={setLineAutomationSettings} 
+        />
+      )}
 
       <div className="space-y-6">
         {availableStores.filter(store => store !== "共通" && store !== "全店舗").map(store => { const storeSettings = settings.stores[store] || { startHour: 8, endHour: 22, slotDuration: 30 }; return (

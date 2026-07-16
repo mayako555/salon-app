@@ -234,7 +234,7 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList, targetMont
           <div className="space-y-2">
             <label className="text-sm font-bold text-slate-700">シフト種別</label>
             <div className="flex flex-wrap gap-2">
-              {(["work", "holiday", "paid_leave"] as ShiftType[]).map((t) => (
+              {(["work", "holiday", "paid_leave", "half_paid_leave"] as ShiftType[]).map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -245,7 +245,7 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList, targetMont
                       : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
                   }`}
                 >
-                  {t === 'work' ? '勤務' : t === 'holiday' ? '公休' : '有休'}
+                  {t === "work" ? "出勤" : t === "holiday" ? "公休" : t === "paid_leave" ? "有休" : "半休"}
                 </button>
               ))}
             </div>

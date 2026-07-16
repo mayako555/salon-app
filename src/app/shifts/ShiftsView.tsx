@@ -60,7 +60,7 @@ export default function ShiftsView({
       } else {
         // Holiday/leave requests always take priority over work shifts
         const isHolidayType = (type: string) => 
-          type === 'holiday' || type === 'paid_leave' || 
+          type === 'holiday' || type === 'paid_leave' || type === 'half_paid_leave' ||
           type === 'requested_holiday' || type === 'requested_paid_leave';
         
         if (isHolidayType(s.type)) {
@@ -87,7 +87,7 @@ export default function ShiftsView({
     if (staffShifts.length === 1) return staffShifts[0];
     
     const isHolidayType = (type: string) => 
-      type === 'holiday' || type === 'paid_leave' || 
+      type === 'holiday' || type === 'paid_leave' || type === 'half_paid_leave' ||
       type === 'requested_holiday' || type === 'requested_paid_leave';
 
     // Holiday/leave takes priority: return it if any exists
@@ -129,9 +129,9 @@ export default function ShiftsView({
           <div className={`font-bold p-1 rounded h-full flex flex-col justify-center ${shift.request_id ? 'text-blue-700 bg-blue-50 border border-blue-200' : 'text-slate-500 bg-slate-100'}`}>
             {shift.request_id ? "希望休" : "休"}
           </div>
-        ) : shift.type === 'paid_leave' ? (
+        ) : shift.type === 'paid_leave' || shift.type === 'half_paid_leave' ? (
           <div className={`font-bold p-1 rounded h-full flex flex-col justify-center ${shift.request_id ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' : 'text-amber-600 bg-amber-50'}`}>
-            {shift.request_id ? "有休(希望)" : "有休"}
+            {shift.request_id ? (shift.type === 'half_paid_leave' ? "半休(希望)" : "有休(希望)") : (shift.type === 'half_paid_leave' ? "半休" : "有休")}
           </div>
         ) : shift.type === 'requested_holiday' ? (
           <div className="text-blue-600 font-bold bg-blue-50 p-1 rounded h-full flex flex-col justify-center repeating-stripes">希望休</div>
@@ -295,7 +295,7 @@ export default function ShiftsView({
                           className={`shrink-0 text-[10px] flex flex-col rounded border shadow-sm leading-none overflow-hidden transition-all
                             ${isReadOnly ? '' : 'cursor-pointer hover:ring-2 hover:ring-slate-400'}
                             ${shift.type === 'holiday' ? (shift.request_id ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-slate-100 border-slate-200 text-slate-600') :
-                              shift.type === 'paid_leave' ? (shift.request_id ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-700') : 
+                              shift.type === 'paid_leave' || shift.type === 'half_paid_leave' ? (shift.request_id ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-700') : 
                               shift.type === 'requested_holiday' ? 'bg-blue-100 border-blue-400 text-blue-900 shadow-md ring-2 ring-blue-200' :
                               shift.type === 'requested_paid_leave' ? 'bg-emerald-100 border-emerald-400 text-emerald-900 shadow-md ring-2 ring-emerald-200' :
                               'bg-white border-slate-200 text-slate-700'}`}
@@ -303,7 +303,7 @@ export default function ShiftsView({
                           <div className={`px-1.5 py-1.5 flex justify-between font-bold ${shift.type === 'work' ? 'bg-slate-50 border-b border-slate-100' : ''}`}>
                              <span className="truncate">{shift.staff_name}</span>
                              {shift.type === 'holiday' && <span className="opacity-70 flex-shrink-0 text-[9px] mt-0.5">{shift.request_id ? '希望休' : '休'}</span>}
-                             {shift.type === 'paid_leave' && <span className={`opacity-70 flex-shrink-0 text-[9px] mt-0.5 ${shift.request_id ? 'text-emerald-700' : 'text-amber-600'}`}>{shift.request_id ? '有休(希望)' : '有休'}</span>}
+                             {(shift.type === 'paid_leave' || shift.type === 'half_paid_leave') && <span className={`opacity-70 flex-shrink-0 text-[9px] mt-0.5 ${shift.request_id ? 'text-emerald-700' : 'text-amber-600'}`}>{shift.request_id ? (shift.type === 'half_paid_leave' ? '半休(希望)' : '有休(希望)') : (shift.type === 'half_paid_leave' ? '半休' : '有休')}</span>}
                              {shift.type === 'requested_holiday' && <span className="bg-blue-500 text-white px-1 py-0.5 rounded text-[8px] flex-shrink-0 mt-0.5 font-bold shadow-sm">★希望休</span>}
                              {shift.type === 'requested_paid_leave' && <span className="bg-emerald-500 text-white px-1 py-0.5 rounded text-[8px] flex-shrink-0 mt-0.5 font-bold shadow-sm">★有給申請</span>}
                           </div>

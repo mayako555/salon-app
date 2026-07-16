@@ -17,7 +17,17 @@ import {
   Settings,
   Library,
   X,
-  Package
+  Package,
+  LayoutDashboard,
+  ClipboardList,
+  Calculator,
+  Clock,
+  Briefcase,
+  Award,
+  GraduationCap,
+  Database,
+  Building2,
+  Sparkles
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -58,7 +68,21 @@ export function MobileBottomNav() {
   ];
 
   const adminItems = [
-    { name: "管理者メニュー", href: "/dashboard", icon: Settings, role: "manager" },
+    { name: "ダッシュボード", href: "/dashboard", icon: LayoutDashboard, role: "manager" },
+    { name: "高度分析", href: "/analytics", icon: Sparkles, role: "admin" },
+    { name: "シフト管理", href: "/shifts", icon: CalendarDays, role: "manager" },
+    { name: "勤怠管理", href: "/attendance", icon: Clock, role: "admin" },
+    { name: "有給管理", href: "/admin/paid-leaves", icon: CalendarDays, role: "admin" },
+    { name: "採用管理", href: "/admin/recruitment", icon: Briefcase, role: "admin" },
+    { name: "スタッフ管理", href: "/staff", icon: Users, role: "admin" },
+    { name: "スタッフ評価", href: "/evaluations", icon: Award, role: "admin" },
+    { name: "新人教育", href: "/training", icon: GraduationCap, role: "admin" },
+    { name: "経費・収支", href: "/admin/expenses", icon: Wallet, role: "admin" },
+    { name: "給与・報酬", href: "/payroll", icon: Calculator, role: "admin" },
+    { name: "AIタスク管理", href: "/admin/tasks", icon: ClipboardList, role: "manager" },
+    { name: "システム管理", href: "/admin/master/operations", icon: Database, role: "admin" },
+    { name: "システム設定", href: "/admin/settings", icon: Settings, role: "systemOwner" },
+    { name: "FC契約・請求", href: "/admin/settings/subscription", icon: Building2, role: "companyOwner" },
   ];
 
   const rulesItems = tenantPlan !== "Solo" ? [

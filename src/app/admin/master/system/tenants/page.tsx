@@ -199,6 +199,21 @@ export default function TenantsPage() {
                     <Key size={14} className="mr-2" />
                     アカウント管理
                   </Button>
+                  {tenant.adminEmails && tenant.adminEmails.length > 0 ? (
+                    <div className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-lg break-all font-mono border border-slate-100">
+                      <p className="font-bold mb-1 text-slate-600">オーナーアカウント:</p>
+                      {tenant.adminEmails.map((email, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5 mb-0.5 last:mb-0">
+                          <span className="w-1 h-1 rounded-full bg-emerald-400 shrink-0"></span>
+                          {email}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-slate-400 bg-slate-50 p-2 rounded-lg text-center border border-slate-100 border-dashed">
+                      未設定
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

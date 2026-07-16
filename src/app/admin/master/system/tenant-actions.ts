@@ -24,6 +24,7 @@ export type CompanyTenant = {
   termsPdfUrl?: string;
   createdAt?: any;
   updatedAt?: any;
+  adminEmails?: string[];
 };
 
 const COMPANIES_COLLECTION = "companies";
@@ -35,9 +36,21 @@ export async function getTenants() {
     const q = query(colRef, orderBy("createdAt", "desc"));
     const snap = await getDocs(q);
     
+    const { adminDb } = require("@/lib/firebase-admin");
+    const profilesSnap = await adminDb.collection("staff_profiles").where("role", "==", "companyOwner").get();
+    const emailsByCompany: Record<string, string[]> = {};
+    profilesSnap.forEach((doc: any) => {
+      const data = doc.data();
+      if (data.companyId && data.email) {
+        if (!emailsByCompany[data.companyId]) emailsByCompany[data.companyId] = [];
+        emailsByCompany[data.companyId].push(data.email);
+      }
+    });
+
     return snap.docs.map(doc => ({
       id: doc.id,
-      ...doc.data()
+      ...doc.data(),
+      adminEmails: emailsByCompany[doc.id] || []
     })) as CompanyTenant[];
   } catch (error) {
     console.error("Error fetching tenants:", error);
@@ -47,7 +60,8 @@ export async function getTenants() {
       const snap = await getDocs(collection(db, COMPANIES_COLLECTION));
       return snap.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
+        adminEmails: []
       })) as CompanyTenant[];
     } catch (e) {
       console.error("Fallback error:", e);
@@ -105,7 +119,7 @@ export async function createTenantAdmin(payload: { email: string, password: stri
     });
 
     // 2. Create user document in Firestore with role and companyId
-    await adminDb.collection("users").doc(userRecord.uid).set({
+    await adminDb.collection("staff_profiles").doc(userRecord.uid).set({
       email: payload.email,
       name: payload.name,
       role: "companyOwner", // Initial owner role for the tenant
@@ -123,7 +137,7 @@ export async function createTenantAdmin(payload: { email: string, password: stri
 export async function getTenantAdmins(companyId: string) {
   try {
     const { adminDb } = require("@/lib/firebase-admin");
-    const snapshot = await adminDb.collection("users")
+    const snapshot = await adminDb.collection("staff_profiles")
       .where("companyId", "==", companyId)
       .get();
     
@@ -156,7 +170,7 @@ export async function updateTenantAdmin(uid: string, payload: { email?: string, 
     if (payload.name) dbUpdates.name = payload.name;
 
     if (Object.keys(dbUpdates).length > 0) {
-      await adminDb.collection("users").doc(uid).update(dbUpdates);
+      await adminDb.collection("staff_profiles").doc(uid).update(dbUpdates);
     }
 
     return { success: true };

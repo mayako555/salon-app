@@ -18,9 +18,10 @@ import {
 import { addAuditLog } from "@/app/audit/actions";
 import { getStaffList } from "@/app/staff/actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
+import { addPaidLeaveTransaction } from "@/app/paid-leaves/actions";
 
 export type StoreLocation = "六甲" | "元町" | "神戸";
-export type ShiftType = "work" | "holiday" | "paid_leave" | "requested_holiday" | "requested_paid_leave";
+export type ShiftType = "work" | "holiday" | "paid_leave" | "half_paid_leave" | "requested_holiday" | "requested_paid_leave";
 
 export type ShiftSegment = {
   start_time: string;
@@ -41,6 +42,28 @@ export type ShiftRecord = {
 };
 
 const SHIFTS_COLLECTION = "shifts";
+
+async function syncPaidLeave(staffId: string, staffName: string, date: string, oldType?: string, newType?: string) {
+  const getDays = (t?: string) => t === 'paid_leave' ? 1 : (t === 'half_paid_leave' ? 0.5 : 0);
+  const oldDays = getDays(oldType);
+  const newDays = getDays(newType);
+  const diff = oldDays - newDays; // negative if we are consuming, positive if we are refunding
+
+  if (diff === 0) return;
+
+  const staffDoc = await getDoc(doc(db, "staff_profiles", staffId));
+  if (!staffDoc.exists()) return;
+  const currentBalance = staffDoc.data().paid_leave_balance || 0;
+
+  if (diff < 0) {
+    // Consume
+    await addPaidLeaveTransaction(staffId, staffName, "consume", diff, `シフト有給設定 (${date})`, currentBalance);
+  } else {
+    // Refund (adjust)
+    await addPaidLeaveTransaction(staffId, staffName, "adjust", diff, `シフト有給取消・変更 (${date})`, currentBalance);
+  }
+}
+
 
 export async function getMonthlyShifts(year: number, month: number): Promise<ShiftRecord[]> {
   const targetPrefix = `${year}-${String(month).padStart(2, '0')}`;
@@ -168,7 +191,20 @@ export async function saveShift(data: Omit<ShiftRecord, "id"> & { id?: string })
       }
     }
 
+    // Determine oldType for syncing
+    let oldType: string | undefined;
+    if (recordId && !existingDocs.empty) {
+      oldType = existingDocs.docs.find(d => d.id === recordId)?.data()?.type;
+      if (!oldType && existingDocs.docs.length > 0) {
+         oldType = existingDocs.docs[0].data().type;
+      }
+    }
+
     await batch.commit();
+
+    // Sync paid leave balance
+    await syncPaidLeave(data.staff_id, data.staff_name, data.date, oldType, data.type);
+
 
     await addAuditLog({
       table_name: SHIFTS_COLLECTION,
@@ -188,7 +224,20 @@ export async function saveShift(data: Omit<ShiftRecord, "id"> & { id?: string })
 
 export async function deleteShift(id: string) {
   try {
-    await deleteDoc(doc(db, SHIFTS_COLLECTION, id));
+    const docRef = doc(db, SHIFTS_COLLECTION, id);
+    const docSnap = await getDoc(docRef);
+    let oldData: any = null;
+    
+    if (docSnap.exists()) {
+      oldData = docSnap.data();
+    }
+
+    await deleteDoc(docRef);
+    
+    if (oldData) {
+      // Sync paid leave balance (refund)
+      await syncPaidLeave(oldData.staff_id, oldData.staff_name, oldData.date, oldData.type, undefined);
+    }
     
     await addAuditLog({
       table_name: SHIFTS_COLLECTION,
@@ -244,7 +293,7 @@ export async function bulkSaveShifts(params: {
     const existingDocsToDelete = existingSnap.docs.filter(d => {
        const data = d.data();
        if (staffIds.includes(data.staff_id) && dates.includes(data.date)) {
-         const isHoliday = data.type === 'holiday' || data.type === 'paid_leave' || data.type === 'requested_holiday' || data.type === 'requested_paid_leave' || !!data.request_id;
+         const isHoliday = data.type === 'holiday' || data.type === 'paid_leave' || data.type === 'half_paid_leave' || data.type === 'requested_holiday' || data.type === 'requested_paid_leave' || !!data.request_id;
          if (isHoliday) {
            keptStaffDates.add(`${data.staff_id}_${data.date}`);
            return false; // DO NOT DELETE holidays or requests
@@ -267,9 +316,14 @@ export async function bulkSaveShifts(params: {
 
     // 既存シフトを削除
     for (const d of existingDocsToDelete) {
+      const data = d.data();
       currentBatch.delete(d.ref);
       operationCount++;
       await commitBatchIfNeeded();
+
+      // If we are deleting a paid leave without replacing it with a new one in this loop, we would refund.
+      // But existingDocsToDelete explicitly EXCLUDES paid leaves (isHoliday check).
+      // So oldType here is only 'work'. Nothing to refund.
     }
 
     // 新規シフトを追加
@@ -294,6 +348,9 @@ export async function bulkSaveShifts(params: {
         });
         operationCount++;
         await commitBatchIfNeeded();
+        
+        // sync paid leave
+        await syncPaidLeave(staffId, staffName, date, undefined, type);
       }
     }
 

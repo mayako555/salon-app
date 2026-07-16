@@ -81,8 +81,8 @@ export async function addPaidLeaveTransaction(
     
     const docRef = await addDoc(colRef, payload);
     
-    // Update staff profile balance
-    const newBalance = Math.max(0, currentBalance + days);
+    // Update staff profile balance (allow negative balance)
+    const newBalance = currentBalance + days;
     const staffDocRef = doc(db, STAFF_COLLECTION, staffId);
     await updateDoc(staffDocRef, {
       paid_leave_balance: newBalance,
