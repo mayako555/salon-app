@@ -56,12 +56,14 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const nodeRef = React.useRef<HTMLDivElement>(null);
   return (
     <DialogPortal>
       <DialogOverlay />
       <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-        <Draggable handle=".dialog-handle" cancel="button, input, select, textarea, .cancel-drag, [data-radix-scroll-area-viewport]">
+        <Draggable nodeRef={nodeRef} handle=".dialog-handle" cancel="button, input, select, textarea, .cancel-drag, [data-radix-scroll-area-viewport]">
           <DialogPrimitive.Content
+            ref={nodeRef}
             data-slot="dialog-content"
             className={cn(
               "pointer-events-auto grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
