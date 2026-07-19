@@ -41,7 +41,30 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
   // Group reservations by staff
   const { grouped, sortedStaff } = useMemo(() => {
     const map: Record<string, Reservation[]> = {};
-    const staffWithRes = new Set(reservations.map(r => r.staff_name));
+    
+    // Create lookup maps for staff
+    const staffById = new Map<string, string>();
+    const normalizedStaffNames = new Map<string, string>();
+    
+    staffList.forEach(s => {
+      staffById.set(s.id, s.name);
+      normalizedStaffNames.set(s.name.replace(/\s+/g, ""), s.name);
+    });
+
+    const staffWithRes = new Set<string>();
+    const matchedReservations = reservations.map(r => {
+      let matchedName = r.staff_name;
+      if (r.staff_id && staffById.has(r.staff_id)) {
+        matchedName = staffById.get(r.staff_id)!;
+      } else {
+        const normName = r.staff_name?.replace(/\s+/g, "") || "";
+        if (normalizedStaffNames.has(normName)) {
+          matchedName = normalizedStaffNames.get(normName)!;
+        }
+      }
+      staffWithRes.add(matchedName);
+      return { ...r, _matchedName: matchedName };
+    });
     
     // Calculate display status for all staff
     const displayStaff = staffList.map(s => {
@@ -78,9 +101,9 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
     });
 
     displayStaff.forEach(s => map[s.name] = []);
-    reservations.forEach(r => {
-      if (map[r.staff_name]) {
-        map[r.staff_name].push(r);
+    matchedReservations.forEach(r => {
+      if (map[r._matchedName]) {
+        map[r._matchedName].push(r);
       } else {
         if (!map["不明"]) map["不明"] = [];
         map["不明"].push(r);

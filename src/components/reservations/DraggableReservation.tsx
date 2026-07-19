@@ -82,47 +82,60 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
     e.preventDefault();
     setShowHover(false);
     
-    if (res.status === 'completed') {
-      if (type === 'move') onClick(res);
-      return;
-    }
+    // Capture pointer to ensure we receive move/up events even if finger slides off the element
+    e.currentTarget.setPointerCapture(e.pointerId);
 
-    if (type === 'move') setIsDragging(true);
-    else setIsResizing(true);
+    if (res.status === 'completed') {
+      // Do not allow dragging completed reservations, but allow clicking on pointer up
+    } else {
+      if (type === 'move') setIsDragging(true);
+      else setIsResizing(true);
+    }
     
     const startX = e.clientX;
     const startY = e.clientY;
     const initialLeft = currentLeft;
     const initialWidth = currentWidth;
     const initialTop = currentTop;
+    const target = e.currentTarget;
+    let hasMoved = false;
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
       const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+        hasMoved = true;
+      }
+      
+      if (res.status === 'completed') return;
+
       if (type === 'resize') {
         const newWidth = Math.max(HOUR_WIDTH / 4, initialWidth + dx); 
         setCurrentWidth(newWidth);
       } else {
-        const dy = moveEvent.clientY - startY;
         setCurrentLeft(initialLeft + dx);
         setCurrentTop(initialTop + dy);
       }
     };
 
     const handlePointerUp = async (upEvent: PointerEvent) => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
+      target.removeEventListener('pointermove', handlePointerMove);
+      target.removeEventListener('pointerup', handlePointerUp);
+      target.releasePointerCapture(upEvent.pointerId);
       
       setIsDragging(false);
       setIsResizing(false);
 
+      if (!hasMoved && Math.abs(upEvent.clientX - startX) < 10 && Math.abs(upEvent.clientY - startY) < 10) {
+        onClick(res);
+        return;
+      }
+
+      if (res.status === 'completed') return;
+
       if (type === 'move') {
         const dx = upEvent.clientX - startX;
         const dy = upEvent.clientY - startY;
-
-        if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
-          onClick(res);
-          return;
-        }
 
         const rowOffset = Math.round(dy / ROW_HEIGHT);
         const newStaffIndex = Math.max(0, Math.min(staffList.length - 1, currentStaffIndex + rowOffset));
@@ -136,7 +149,6 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
         onUpdateComplete();
       } else {
         const dx = upEvent.clientX - startX;
-        if (Math.abs(dx) < 3) return; 
 
         const newEnd = pixelsToTime(initialLeft + initialWidth + dx, startHour, totalHours);
         await updateReservationTime(res.id, res.staff_name, res.start_time, newEnd, res.staff_id);
@@ -144,8 +156,8 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
       }
     };
 
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
+    target.addEventListener('pointermove', handlePointerMove);
+    target.addEventListener('pointerup', handlePointerUp);
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {
