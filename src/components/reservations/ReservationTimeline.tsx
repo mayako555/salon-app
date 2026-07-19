@@ -90,9 +90,9 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
     return { grouped: map, sortedStaff: displayStaff };
   }, [reservations, staffList, shifts, storeName]);
 
-  const activeStaffNames = [
-    ...sortedStaff.map(s => s.name),
-    ...(grouped["不明"] ? ["不明"] : [])
+  const activeStaffList = [
+    ...sortedStaff.map(s => ({ id: s.id, name: s.name })),
+    ...(grouped["不明"] ? [{ id: "manual", name: "不明" }] : [])
   ];
 
   const handleRowClick = (e: React.MouseEvent, staff: string) => {
@@ -117,11 +117,12 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
 
   return (
     <div className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden flex h-full">
-      <div className="w-36 flex-shrink-0 border-r border-slate-300 bg-white z-10 sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
-        <div className="h-8 border-b border-slate-300 flex items-center justify-center bg-slate-100 text-[10px] font-bold text-slate-500 sticky top-0 z-20">
+      <div className="w-36 flex-shrink-0 border-r border-slate-300 bg-white z-20 sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+        <div className="h-8 border-b border-slate-300 flex items-center justify-center bg-slate-100 text-[10px] font-bold text-slate-500 sticky top-0 z-40">
           スタッフ / ベッド
         </div>
-        {activeStaffNames.map((staffName, i) => {
+        {activeStaffList.map((staffObjItem, i) => {
+          const staffName = staffObjItem.name;
           const staffObj = sortedStaff.find(s => s.name === staffName);
           const shift = staffObj?.shift;
           const isOffOrOther = staffObj?.isOffOrOtherStore;
@@ -173,7 +174,7 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
       <div className="flex-1 overflow-auto relative no-scrollbar bg-slate-50">
         <div style={{ width: TOTAL_WIDTH }} className="relative min-h-full">
           
-          <div className="h-8 border-b border-slate-300 flex bg-slate-100 sticky top-0 z-10">
+          <div className="h-8 border-b border-slate-300 flex bg-slate-100 sticky top-0 z-30">
             {Array.from({ length: TOTAL_HOURS }).map((_, i) => (
               <div 
                 key={i} 
@@ -196,7 +197,8 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
           </div>
 
           <div className="relative z-0">
-            {activeStaffNames.map((staffName, rowIndex) => {
+            {activeStaffList.map((staffObjItem, rowIndex) => {
+              const staffName = staffObjItem.name;
               const staffObj = sortedStaff.find(s => s.name === staffName);
               const isOffOrOther = staffObj?.isOffOrOtherStore;
 
@@ -229,11 +231,11 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
                     </div>
                   )}
 
-                  {grouped[staffName].map(res => (
+                  {grouped[staffName]?.map(res => (
                     <DraggableReservation
                       key={res.id}
                       res={res}
-                      staffList={activeStaffNames}
+                      staffList={activeStaffList}
                       currentStaffIndex={rowIndex}
                       onClick={() => setSelectedRes(res)}
                       onUpdateComplete={() => { if(onRefresh) onRefresh(); }}

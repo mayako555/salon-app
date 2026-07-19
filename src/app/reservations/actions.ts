@@ -290,22 +290,26 @@ export async function updateReservation(id: string, data: Partial<Omit<Reservati
   }
 }
 
-export async function updateReservationTime(id: string, staff_name: string, start_time: string, end_time: string) {
+export async function updateReservationTime(id: string, staff_name: string, start_time: string, end_time: string, staff_id?: string) {
   try {
     const docRef = doc(db, RESERVATIONS_COLLECTION, id);
-    await updateDoc(docRef, { 
+    const updateData: any = { 
       staff_name,
       start_time,
       end_time,
       updated_at: serverTimestamp() 
-    });
+    };
+    if (staff_id) {
+      updateData.staff_id = staff_id;
+    }
+    await updateDoc(docRef, updateData);
 
     await addAuditLog({
       table_name: RESERVATIONS_COLLECTION,
       record_id: id,
       action: "UPDATE",
       old_data: null,
-      new_data: { staff_name, start_time, end_time },
+      new_data: updateData,
       actor: "System"
     });
 

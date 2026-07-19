@@ -175,10 +175,14 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
     const firstNameKana = formData.get("first_name_kana") as string || "";
     const customerKana = `${lastNameKana} ${firstNameKana}`.trim();
 
+    const newStaffName = formData.get("staff_name") as string;
+    const selectedStaff = staffList.find(s => s.name === newStaffName);
+    const newStaffId = selectedStaff ? selectedStaff.id : (initialData?.staff_id || "manual");
+
     const data = {
       store_name: storeName,
-      staff_id: initialData?.staff_id || "manual", 
-      staff_name: formData.get("staff_name") as string,
+      staff_id: newStaffId, 
+      staff_name: newStaffName,
       type: recordType,
       customer_id: recordType === "reservation" ? (formDataState.customer_id || undefined) : undefined,
       customer_name: recordType === "reservation" ? customerName : "",

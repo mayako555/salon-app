@@ -81,10 +81,10 @@ export default function ReservationsPage() {
   const allowedStores = isTenantAdmin ? availableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : availableStores);
 
   return (
-    <div className="flex flex-col h-screen bg-slate-100 overflow-hidden text-xs">
+    <div className="flex flex-col h-[100dvh] bg-slate-100 overflow-hidden text-xs">
       {/* Header Bar */}
-      <div className="bg-white border-b border-slate-300 px-4 py-2 flex items-center justify-between shrink-0 shadow-sm z-20">
-        <div className="flex items-center gap-4">
+      <div className="bg-white border-b border-slate-300 px-2 py-2 flex flex-col md:flex-row items-start md:items-center justify-between shrink-0 shadow-sm z-20 gap-2 overflow-x-auto">
+        <div className="flex items-center gap-2 md:gap-4 flex-wrap w-full md:w-auto">
           <div className="flex items-center gap-2 font-black text-slate-800 text-lg">
             <CalendarIcon className="text-blue-600 w-5 h-5" />
             予約台帳

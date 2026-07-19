@@ -48,7 +48,7 @@ function getMenuIcon(menuName: string, isSchedule = false) {
 
 type Props = {
   res: Reservation;
-  staffList: string[];
+  staffList: { id: string, name: string }[];
   currentStaffIndex: number;
   onClick: (res: Reservation) => void;
   onUpdateComplete: () => void;
@@ -132,14 +132,14 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
         const newStartPx = timeToPixels(newStart, startHour, totalHours);
         const newEnd = pixelsToTime(newStartPx + initialWidth, startHour, totalHours);
 
-        await updateReservationTime(res.id, newStaff, newStart, newEnd);
+        await updateReservationTime(res.id, newStaff.name, newStart, newEnd, newStaff.id);
         onUpdateComplete();
       } else {
         const dx = upEvent.clientX - startX;
         if (Math.abs(dx) < 3) return; 
 
         const newEnd = pixelsToTime(initialLeft + initialWidth + dx, startHour, totalHours);
-        await updateReservationTime(res.id, res.staff_name, res.start_time, newEnd);
+        await updateReservationTime(res.id, res.staff_name, res.start_time, newEnd, res.staff_id);
         onUpdateComplete();
       }
     };
