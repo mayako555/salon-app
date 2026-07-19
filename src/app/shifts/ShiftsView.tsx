@@ -37,7 +37,7 @@ export default function ShiftsView({
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
 
   const { profile, availableStores } = useAuth();
-  const isReadOnly = profile?.role !== "admin" && profile?.role !== "manager";
+  const isReadOnly = !["systemOwner", "companyOwner", "admin", "manager", "storeManager"].includes(profile?.role || "");
 
   const getStoreBadgeClasses = (store: string) => {
     switch (store) {
