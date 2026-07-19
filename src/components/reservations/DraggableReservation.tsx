@@ -172,7 +172,7 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
           transform: `translateY(${currentTop}px)`,
           zIndex: isDragging ? 50 : (showHover ? 40 : 10)
         }}
-        className={`absolute top-0.5 bottom-0.5 border flex flex-col p-0.5 overflow-hidden transition-colors text-left select-none
+        className={`absolute top-0.5 bottom-0.5 border flex flex-col p-0.5 overflow-hidden transition-colors text-left select-none touch-none
           ${res.type !== 'schedule' ? 'rounded-sm shadow-sm' : ''}
           ${colorClass}
           ${!isCompleted ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
