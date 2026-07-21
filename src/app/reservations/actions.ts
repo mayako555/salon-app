@@ -204,10 +204,16 @@ export async function updateReservationStatus(id: string, status: ReservationSta
       }
     }
 
-    await updateDoc(docRef, { 
+    const updates: any = { 
       status, 
       updated_at: serverTimestamp() 
-    });
+    };
+
+    if (status === 'completed') {
+      updates.is_confirmed = true;
+    }
+
+    await updateDoc(docRef, updates);
 
     await addAuditLog({
       table_name: RESERVATIONS_COLLECTION,

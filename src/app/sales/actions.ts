@@ -102,6 +102,7 @@ export type SalesRecord = {
   reservation_route: string;
   payment_method: string;
   payment_status?: string;
+  split_payments?: { method: string, amount: number }[];
   note?: string;
   hair_material: string;
   options: string;
@@ -347,7 +348,7 @@ export async function checkoutReservation(reservationId: string, salesData: Part
   }
 }
 
-export async function updatePaymentInfo(id: string, paymentMethod: string, paymentStatus: string, note: string) {
+export async function updatePaymentInfo(id: string, paymentMethod: string, paymentStatus: string, note: string, splitPayments?: { method: string, amount: number }[]) {
   try {
     const ctx = await getCurrentUserContext();
     if (!ctx.companyId) throw new Error("認証エラー");
@@ -358,12 +359,17 @@ export async function updatePaymentInfo(id: string, paymentMethod: string, payme
     const data = snap.data();
     if (data.companyId !== ctx.companyId) throw new Error("権限がありません");
 
-    await updateDoc(docRef, {
+    const updates: any = {
       payment_method: paymentMethod,
       payment_status: paymentStatus,
       note: note,
       updated_at: serverTimestamp()
-    });
+    };
+    if (splitPayments !== undefined) {
+      updates.split_payments = splitPayments;
+    }
+
+    await updateDoc(docRef, updates);
 
     // Mark the source reservation as completed if it exists
     if (data.source_reservation_id) {
@@ -375,8 +381,8 @@ export async function updatePaymentInfo(id: string, paymentMethod: string, payme
       action: "UPDATE",
       table_name: SALES_COLLECTION,
       record_id: id,
-      old_data: { payment_method: data.payment_method, payment_status: data.payment_status, note: data.note },
-      new_data: { payment_method: paymentMethod, payment_status: paymentStatus, note: note },
+      old_data: { payment_method: data.payment_method, payment_status: data.payment_status, note: data.note, split_payments: data.split_payments },
+      new_data: { payment_method: paymentMethod, payment_status: paymentStatus, note: note, split_payments: splitPayments },
       actor: ctx.uid || "unknown",
     });
 

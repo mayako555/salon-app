@@ -9,7 +9,7 @@ import { updateReservation } from "@/app/reservations/actions";
 import { getStaffList, StaffProfile } from "@/app/staff/actions";
 import { getMasterItems } from "@/app/sales/master-actions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserCircle, Calendar, Clock, MapPin, Tag, MessageSquare, CreditCard, Edit, Search, FileText } from "lucide-react";
+import { UserCircle, Calendar, Clock, MapPin, Tag, MessageSquare, CreditCard, Edit, Search, FileText, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -32,8 +32,12 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
   const [updatingStaff, setUpdatingStaff] = useState(false);
   
   const [checkoutData, setCheckoutData] = useState<SalesRecord | null>(null);
-  const [paymentMethods, setPaymentMethods] = useState<string[]>(["未入力", "現金", "クレジットカード", "PayPay", "楽天Pay", "ミニモ事前決済", "スマート支払い", "その他"]);
+  const [paymentMethods, setPaymentMethods] = useState<string[]>(["未入力", "現金", "クレジットカード", "PayPay", "楽天Pay", "ミニモ事前決済", "スマート支払い", "複合決済", "その他"]);
   const [paymentMethod, setPaymentMethod] = useState("未入力");
+  const [splitPayments, setSplitPayments] = useState<{ method: string, amount: number }[]>([
+    { method: "現金", amount: 0 },
+    { method: "クレジットカード", amount: 0 }
+  ]);
   const [isFetchingCheckout, setIsFetchingCheckout] = useState(false);
 
   const [hasNextBooking, setHasNextBooking] = useState(false);
@@ -66,12 +70,19 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
       
       let accountingId = salesData.id;
       if (salesData.id && salesData.id !== "new") {
-        await updatePaymentInfo(salesData.id, paymentMethod, salesData.payment_status || "paid", salesData.note || "");
+        await updatePaymentInfo(
+          salesData.id, 
+          paymentMethod, 
+          salesData.payment_status || "paid", 
+          salesData.note || "",
+          paymentMethod === "複合決済" ? splitPayments : undefined
+        );
       } else {
         const res = await checkoutReservation(reservation.id, {
           ...salesData,
           payment_method: paymentMethod,
           payment_status: "paid",
+          split_payments: paymentMethod === "複合決済" ? splitPayments : undefined,
           status: "closed"
         });
         accountingId = res.id;
@@ -131,7 +142,7 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
       setShowLinePreview(false);
       setPendingCheckout(false);
       if (onOptimisticUpdate) {
-        onOptimisticUpdate({ ...reservation, status: "completed" });
+        onOptimisticUpdate({ ...reservation, status: "completed", is_confirmed: true });
       }
       onClose();
       if (onRefresh) onRefresh();
@@ -167,7 +178,11 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
         const pmItems = items.filter(item => item.itemType === "paymentMethod" && item.isActive !== false);
         if (pmItems.length > 0) {
           pmItems.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-          setPaymentMethods(["未入力", ...pmItems.map(p => p.name)]);
+          const dbMethods = pmItems.map(p => p.name);
+          const finalMethods = ["未入力", ...dbMethods];
+          if (!finalMethods.includes("複合決済")) finalMethods.push("複合決済");
+          if (!finalMethods.includes("その他")) finalMethods.push("その他");
+          setPaymentMethods(finalMethods);
         }
       }).catch(console.error);
 
@@ -307,18 +322,93 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
                 </div>
                 
                 {reservation.status !== 'cancelled' && (
-                  <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
-                    <p className="text-slate-500 text-xs font-bold w-1/3">支払方法</p>
-                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                      <SelectTrigger className="h-8 w-2/3 text-sm font-bold bg-slate-50 border-slate-200">
-                        <SelectValue placeholder="支払方法" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {paymentMethods.map(pm => (
-                          <SelectItem key={pm} value={pm} className="text-xs font-bold">{pm}</SelectItem>
+                  <div className="border-t border-slate-100 pt-3 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-slate-500 text-xs font-bold w-1/3">支払方法</p>
+                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                        <SelectTrigger className="h-8 w-2/3 text-sm font-bold bg-slate-50 border-slate-200">
+                          <SelectValue placeholder="支払方法" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {paymentMethods.map(pm => (
+                            <SelectItem 
+                              key={pm} 
+                              value={pm} 
+                              className={pm === "複合決済" ? "text-xs font-black text-emerald-700 bg-emerald-50 mt-1 border border-emerald-100" : "text-xs font-bold"}
+                            >
+                              {pm === "複合決済" ? "✨ 複合決済 (現金＋カード等)" : pm}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {paymentMethod === "複合決済" && (
+                      <div className="pl-4 mt-2 space-y-2 border-l-2 border-slate-200">
+                        {splitPayments.map((sp, idx) => (
+                          <div key={idx} className="flex gap-2 items-center">
+                            <Select 
+                              value={sp.method} 
+                              onValueChange={(val) => {
+                                const newSp = [...splitPayments];
+                                newSp[idx].method = val;
+                                setSplitPayments(newSp);
+                              }}
+                            >
+                              <SelectTrigger className="h-8 w-1/2 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {paymentMethods.filter(pm => pm !== "未入力" && pm !== "複合決済" && pm !== "その他").map(pm => (
+                                  <SelectItem key={pm} value={pm} className="text-xs">{pm}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <div className="relative w-1/2 flex items-center">
+                              <span className="absolute left-2 text-xs text-slate-500">¥</span>
+                              <input 
+                                type="number" 
+                                className="h-8 w-full pl-6 pr-8 text-right text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-blue-500" 
+                                value={sp.amount || ""}
+                                onChange={(e) => {
+                                  const newSp = [...splitPayments];
+                                  newSp[idx].amount = parseInt(e.target.value) || 0;
+                                  setSplitPayments(newSp);
+                                }}
+                              />
+                              {idx > 1 && (
+                                <button 
+                                  className="absolute right-1 p-1 text-slate-400 hover:text-rose-500"
+                                  onClick={() => {
+                                    setSplitPayments(splitPayments.filter((_, i) => i !== idx));
+                                  }}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         ))}
-                      </SelectContent>
-                    </Select>
+                        <div className="flex justify-between items-center mt-1">
+                          <button 
+                            className="text-xs text-blue-600 font-bold flex items-center gap-1 hover:text-blue-700"
+                            onClick={() => {
+                              setSplitPayments([...splitPayments, { method: "現金", amount: 0 }]);
+                            }}
+                          >
+                            <Plus className="w-3 h-3" /> 決済方法を追加
+                          </button>
+                          {reservation.expected_price && (
+                            <div className={`text-xs font-bold ${
+                              splitPayments.reduce((acc, curr) => acc + (curr.amount || 0), 0) === reservation.expected_price 
+                              ? 'text-emerald-600' : 'text-rose-500'
+                            }`}>
+                              合計: ¥{splitPayments.reduce((acc, curr) => acc + (curr.amount || 0), 0).toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

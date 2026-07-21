@@ -72,7 +72,7 @@ export default function AITaskInputDialog({ isOpen, onClose, onRefresh }: Props)
     setLoading(true);
     try {
       for (const task of parsedTasks) {
-        await createTask({
+        const res = await createTask({
           title: task.title,
           description: "AIによる自動生成",
           category: task.category,
@@ -86,6 +86,7 @@ export default function AITaskInputDialog({ isOpen, onClose, onRefresh }: Props)
           tags: ["AI作成"],
           attachments: []
         });
+        if (!res?.success) throw new Error(res?.error || "不明なエラーが発生しました");
       }
       onRefresh();
       setParsedTasks(null);

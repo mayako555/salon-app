@@ -31,21 +31,27 @@ export default function SalesExportCSVButton({ sales }: { sales: SalesRecord[] }
       "指名有無"
     ];
 
-    const rows = filteredSales.map(s => [
-      s.date,
-      s.store_name,
-      s.staff_name,
-      s.customer_name || "不明",
-      s.menu_course || "-",
-      s.hair_material || "なし",
-      s.options || "なし",
-      s.reservation_route || "その他",
-      s.tech_sales.toString(),
-      s.product_sales.toString(),
-      s.payment_method,
-      (s.portal_fee || 0).toString(),
-      s.is_nominated ? "指名" : "フリー"
-    ]);
+    const rows = filteredSales.map(s => {
+      let paymentStr = s.payment_method;
+      if (s.payment_method === '複合決済' && s.split_payments) {
+        paymentStr = `複合決済(${s.split_payments.map(sp => `${sp.method}:${sp.amount}`).join(', ')})`;
+      }
+      return [
+        s.date,
+        s.store_name,
+        s.staff_name,
+        s.customer_name || "不明",
+        s.menu_course || "-",
+        s.hair_material || "なし",
+        s.options || "なし",
+        s.reservation_route || "その他",
+        s.tech_sales.toString(),
+        s.product_sales.toString(),
+        paymentStr,
+        (s.portal_fee || 0).toString(),
+        s.is_nominated ? "指名" : "フリー"
+      ];
+    });
 
     const csvContent = [
       headers.join(","),

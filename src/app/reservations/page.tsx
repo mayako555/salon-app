@@ -199,7 +199,7 @@ export default function ReservationsPage() {
         ) : (
           <div className={`h-full transition-opacity duration-200 ${isFetching ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
             <ReservationTimeline 
-              reservations={reservations} 
+              reservations={currentStoreReservations} 
               staffList={staffList.filter(s => {
                 if (selectedStore === "全店舗") {
                   if (!s.salonIds || s.salonIds.length === 0) return true;

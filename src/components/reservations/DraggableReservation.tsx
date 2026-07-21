@@ -100,7 +100,7 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
     const target = e.currentTarget;
     let hasMoved = false;
 
-    const handlePointerMove = (moveEvent: PointerEvent) => {
+    const handlePointerMove = (moveEvent: any) => {
       const dx = moveEvent.clientX - startX;
       const dy = moveEvent.clientY - startY;
       if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
@@ -118,7 +118,7 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
       }
     };
 
-    const handlePointerUp = async (upEvent: PointerEvent) => {
+    const handlePointerUp = async (upEvent: any) => {
       target.removeEventListener('pointermove', handlePointerMove);
       target.removeEventListener('pointerup', handlePointerUp);
       target.releasePointerCapture(upEvent.pointerId);

@@ -58,11 +58,22 @@ export default function DailyCloseDialog() {
 
   dailySales.forEach(s => {
     // Payment Method
-    if (s.payment_method === '現金') totals.cash += s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0) - (s.hpb_points || 0);
-    else if (s.payment_method === 'クレジットカード') totals.credit += s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0) - (s.hpb_points || 0);
-    else if (['PayPay', '楽天Pay'].includes(s.payment_method)) totals.eMoney += s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0) - (s.hpb_points || 0);
-    else if (s.payment_method === 'ミニモ事前決済') totals.smart += s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0) - (s.hpb_points || 0);
-    else totals.others += s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0) - (s.hpb_points || 0);
+    if (s.payment_method === '複合決済' && s.split_payments) {
+      s.split_payments.forEach(sp => {
+        if (sp.method === '現金') totals.cash += sp.amount;
+        else if (sp.method === 'クレジットカード') totals.credit += sp.amount;
+        else if (['PayPay', '楽天Pay'].includes(sp.method)) totals.eMoney += sp.amount;
+        else if (sp.method === 'ミニモ事前決済') totals.smart += sp.amount;
+        else totals.others += sp.amount;
+      });
+    } else {
+      const amount = s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0) - (s.hpb_points || 0);
+      if (s.payment_method === '現金') totals.cash += amount;
+      else if (s.payment_method === 'クレジットカード') totals.credit += amount;
+      else if (['PayPay', '楽天Pay'].includes(s.payment_method)) totals.eMoney += amount;
+      else if (s.payment_method === 'ミニモ事前決済') totals.smart += amount;
+      else totals.others += amount;
+    }
 
     // Points (HPB Points)
     totals.points += (s.hpb_points || 0);

@@ -107,50 +107,32 @@ async function autoFixMissingClockOuts(records: AttendanceRecord[], adminDb: any
   
   if (employeeRecords.length === 0) return records;
 
-  const datesToFetch = Array.from(new Set(employeeRecords.map(r => r.date)));
-  const shiftPromises = datesToFetch.map(date => 
-    adminDb.collection("shifts").where("date", "==", date).get()
-  );
-  
-  const shiftSnaps = await Promise.all(shiftPromises);
-  const shifts: any[] = [];
-  shiftSnaps.forEach(snap => {
-    snap.docs.forEach((doc: any) => shifts.push({ id: doc.id, ...doc.data() }));
-  });
+
 
   const batch = adminDb.batch();
   let updatedCount = 0;
 
   for (const record of employeeRecords) {
-    const shift = shifts.find(s => s.staff_id === record.staff_id && s.date === record.date);
-    if (shift && shift.segments && shift.segments.length > 0) {
-      // Filter by store if applicable
-      const targetSegments = record.store 
-        ? shift.segments.filter((s: any) => s.store === record.store) 
-        : shift.segments;
-      const segmentsToUse = targetSegments.length > 0 ? targetSegments : shift.segments;
-      
-      const shiftEnds = segmentsToUse.map((s: any) => s.end_time).sort();
-      const lastEnd = shiftEnds[shiftEnds.length - 1]; // e.g. "19:00"
-      
-      const endDate = new Date(`${record.date}T${lastEnd}:00`);
-      endDate.setHours(endDate.getHours() - 1); // 1 hour before shift end
-      
-      const autoOutTime = endDate.toISOString();
-      const docRef = adminDb.collection(ATTENDANCE_COLLECTION).doc(record.id);
-      
-      batch.update(docRef, {
-        clock_out: autoOutTime,
-        effective_clock_out: autoOutTime,
-        is_auto_clock_out: true,
-        updated_at: new Date()
-      });
-      
-      record.clock_out = autoOutTime;
-      record.effective_clock_out = autoOutTime;
-      record.is_auto_clock_out = true;
-      updatedCount++;
-    }
+    if (!record.clock_in) continue;
+    const clockInTime = new Date(record.clock_in);
+    if (isNaN(clockInTime.getTime())) continue;
+
+    const endDate = new Date(clockInTime.getTime() + 7 * 60 * 60 * 1000); // 7 hours after clock in
+    const autoOutTime = endDate.toISOString();
+    
+    const docRef = adminDb.collection(ATTENDANCE_COLLECTION).doc(record.id);
+    
+    batch.update(docRef, {
+      clock_out: autoOutTime,
+      effective_clock_out: autoOutTime,
+      is_auto_clock_out: true,
+      updated_at: new Date()
+    });
+    
+    record.clock_out = autoOutTime;
+    record.effective_clock_out = autoOutTime;
+    record.is_auto_clock_out = true;
+    updatedCount++;
   }
 
   if (updatedCount > 0) {
@@ -420,15 +402,34 @@ export async function handleQRScan(staffId: string, store?: string) {
 
 export async function updateAttendanceRecord(id: string, data: Partial<AttendanceRecord>) {
   try {
-    const docRef = doc(db, ATTENDANCE_COLLECTION, id);
+    const { adminDb } = await import("@/lib/firebase-admin");
+    const docRef = adminDb.collection(ATTENDANCE_COLLECTION).doc(id);
     const updatePayload = {
       ...data,
-      updated_at: serverTimestamp()
+      updated_at: new Date()
     };
-    await updateDoc(docRef, updatePayload);
+    await docRef.update(updatePayload);
     return { success: true };
   } catch (error: any) {
     console.error("Error updating attendance:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteAttendanceRecords(ids: string[]) {
+  try {
+    const { adminDb } = await import("@/lib/firebase-admin");
+    const batch = adminDb.batch();
+    
+    for (const id of ids) {
+      const docRef = adminDb.collection(ATTENDANCE_COLLECTION).doc(id);
+      batch.delete(docRef);
+    }
+    
+    await batch.commit();
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting attendance records:", error);
     return { success: false, error: error.message };
   }
 }
@@ -520,28 +521,27 @@ export async function getKioskStaffList(companyId: string) {
 
 export async function bulkImportAttendanceRecords(records: Omit<AttendanceRecord, "id">[]) {
   try {
-    const colRef = collection(db, ATTENDANCE_COLLECTION);
+    const { adminDb } = await import("@/lib/firebase-admin");
+    const colRef = adminDb.collection(ATTENDANCE_COLLECTION);
     const batchPromises = records.map(async (r) => {
-      const q = query(
-        colRef, 
-        where("staff_id", "==", r.staff_id), 
-        where("date", "==", r.date)
-      );
-      const snap = await getDocs(q);
+      const snap = await colRef
+        .where("staff_id", "==", r.staff_id)
+        .where("date", "==", r.date)
+        .get();
       
       const payload = {
         ...r,
-        created_at: serverTimestamp()
+        created_at: new Date()
       };
 
       if (!snap.empty) {
-        const docRef = doc(db, ATTENDANCE_COLLECTION, snap.docs[0].id);
-        await updateDoc(docRef, {
+        const docRef = colRef.doc(snap.docs[0].id);
+        await docRef.update({
           ...payload,
-          updated_at: serverTimestamp()
+          updated_at: new Date()
         });
       } else {
-        await addDoc(colRef, payload);
+        await colRef.add(payload);
       }
     });
 

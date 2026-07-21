@@ -6,12 +6,12 @@ import { getDailyAttendance, AttendanceRecord, getAllStaffProfiles, bulkImportAt
 import { getMonthlyShifts, ShiftRecord } from "@/app/shifts/actions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Edit2, Search, Calendar as CalendarIcon, Clock, ArrowRight, Upload, ShieldAlert, FileText, AlertCircle, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Edit2, Search, Calendar as CalendarIcon, Clock, ArrowRight, Upload, ShieldAlert, FileText, AlertCircle, Plus, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { format, addDays, subDays, parseISO } from "date-fns";
 import { ja } from "date-fns/locale";
 import AuthGuard from "@/components/AuthGuard";
 import AttendanceCSVButton from "./AttendanceCSVButton";
-import { updateAttendanceRecord } from "./actions";
+import { updateAttendanceRecord, deleteAttendanceRecords } from "./actions";
 import { toast } from "sonner";
 import { 
   Dialog, 
@@ -30,6 +30,7 @@ export default function AttendancePage() {
   const [shifts, setShifts] = useState<ShiftRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
+  const [editingGroup, setEditingGroup] = useState<AttendanceRecord[]>([]);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [targetDateStr, setTargetDateStr] = useState(format(new Date(), "yyyy-MM-dd"));
 
@@ -373,6 +374,21 @@ export default function AttendancePage() {
     }
   };
 
+  const handleDelete = async (staffId: string, staffName: string) => {
+    if (!confirm(`${staffName}さんのこの日の勤怠記録をすべて削除してもよろしいですか？`)) return;
+    
+    const recordsToDelete = attendanceRecords.filter(r => r.staff_id === staffId);
+    if (recordsToDelete.length === 0) return;
+    
+    const res = await deleteAttendanceRecords(recordsToDelete.map(r => r.id));
+    if (res.success) {
+      toast.success("削除しました");
+      loadData();
+    } else {
+      toast.error("削除に失敗しました: " + res.error);
+    }
+  };
+
   return (
     <AuthGuard requireRole="staff">
 
@@ -399,7 +415,7 @@ export default function AttendancePage() {
                   type="date" 
                   value={targetDateStr}
                   onChange={(e) => setTargetDateStr(e.target.value)}
-                  className="pl-9 pr-4 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 text-slate-700 bg-slate-50 h-9 w-[150px]"
+                  className="pl-9 pr-2 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 text-slate-700 bg-slate-50 h-9 w-[170px]"
                 />
               </div>
               <Button 
@@ -768,6 +784,8 @@ export default function AttendancePage() {
                   const cout = r.clock_out ? format(new Date(r.clock_out), "HH:mm") : "--:--";
                   return `${cin}-${cout}`;
                 }).join(" / ");
+                
+                const storeDisplay = Array.from(new Set(records.flatMap(r => (r.store || "").split(" / ")).map(s => s.trim()).filter(Boolean))).join(" / ") || "未指定";
 
                 const clockInTime = record.clock_in ? format(new Date(record.clock_in), "HH:mm") : "--:--";
                 const clockOutTime = record.clock_out ? format(new Date(record.clock_out), "HH:mm") : "--:--";
@@ -820,30 +838,41 @@ export default function AttendancePage() {
                     <TableCell className="font-medium text-slate-700">{workingHoursText}</TableCell>
                     <TableCell>
                       <span className="font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded text-[10px]">
-                        {record.store || "未指定"}
+                        {storeDisplay}
                       </span>
                     </TableCell>
                     {(isAdmin || isManager) && (
                       <TableCell className="text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-8 gap-1 text-slate-500 hover:text-blue-600"
-                          onClick={() => {
-                            // Edit the most recent/relevant record
-                            const latestRecord = records[records.length - 1];
-                            setEditingRecord({
-                              ...latestRecord,
-                              effective_clock_in: record.effective_clock_in || record.clock_in,
-                              effective_clock_out: record.effective_clock_out || record.clock_out,
-                              break_minutes: record.break_minutes // Use the sum for editing
-                            });
-                            setIsEditDialogOpen(true);
-                          }}
-                        >
-                          <Edit2 size={16} />
-                          <span>編集</span>
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 gap-1 text-slate-500 hover:text-blue-600"
+                            onClick={() => {
+                              const latestRecord = records[records.length - 1];
+                              setEditingRecord({
+                                ...latestRecord,
+                                effective_clock_in: record.effective_clock_in || record.clock_in,
+                                effective_clock_out: record.effective_clock_out || record.clock_out,
+                                break_minutes: record.break_minutes
+                              });
+                              setEditingGroup(records);
+                              setIsEditDialogOpen(true);
+                            }}
+                          >
+                            <Edit2 size={16} />
+                            <span>編集</span>
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 gap-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+                            onClick={() => handleDelete(record.staff_id, record.staff_name)}
+                          >
+                            <Trash2 size={16} />
+                            <span>削除</span>
+                          </Button>
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
@@ -873,7 +902,7 @@ export default function AttendancePage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase ml-1">有効出勤時間</label>
                 <div className="flex gap-2">
@@ -946,7 +975,7 @@ export default function AttendancePage() {
               />
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase ml-1">出勤ステータス</label>
                 <select 
@@ -962,17 +991,69 @@ export default function AttendancePage() {
 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase ml-1">出勤店舗</label>
-                <select 
-                  className="w-full h-10 rounded-lg bg-slate-50 border-none px-4 font-bold text-sm"
-                  value={editingRecord?.store || "元町"}
-                  onChange={(e) => setEditingRecord({...editingRecord!, store: e.target.value})}
-                >
-                  <option value="元町">元町</option>
-                  <option value="神戸">神戸</option>
-                  <option value="六甲">六甲</option>
-                </select>
+                <div className="flex gap-2">
+                  {["元町", "神戸", "六甲"].map(store => {
+                    const isSelected = editingRecord?.store?.includes(store);
+                    return (
+                      <button
+                        key={store}
+                        type="button"
+                        className={`flex-1 h-10 rounded-lg text-sm font-bold border transition-colors ${isSelected ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+                        onClick={() => {
+                          const currentStores = editingRecord?.store ? editingRecord.store.split(" / ").filter(Boolean) : [];
+                          let newStores;
+                          if (isSelected) {
+                            newStores = currentStores.filter(s => s !== store);
+                          } else {
+                            newStores = [...currentStores, store];
+                          }
+                          setEditingRecord({...editingRecord!, store: newStores.length > 0 ? newStores.join(" / ") : ""});
+                        }}
+                      >
+                        {store}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             </div>
+
+            {editingGroup.length > 0 && (
+              <div className="space-y-2 mt-6 pt-4 border-t border-slate-100">
+                <label className="text-[10px] font-black text-rose-500 uppercase ml-1">個別打刻の削除（間違えて打刻した場合など）</label>
+                <div className="bg-rose-50/50 border border-rose-100 rounded-lg p-2 space-y-1">
+                  {editingGroup.map((r) => {
+                     const inT = r.clock_in ? format(new Date(r.clock_in), "HH:mm") : "--:--";
+                     const outT = r.clock_out ? format(new Date(r.clock_out), "HH:mm") : "--:--";
+                     return (
+                       <div key={r.id} className="flex justify-between items-center text-sm px-3 py-2 bg-white rounded shadow-sm border border-rose-100">
+                         <span className="font-mono font-bold text-slate-600">{inT} - {outT}</span>
+                         <Button 
+                           type="button" 
+                           variant="ghost" 
+                           size="sm" 
+                           className="h-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                           onClick={async () => {
+                              if (!confirm(`この打刻データ（${inT} - ${outT}）を削除しますか？`)) return;
+                              const res = await deleteAttendanceRecords([r.id]);
+                              if (res.success) {
+                                toast.success("削除しました");
+                                setEditingGroup(prev => prev.filter(p => p.id !== r.id));
+                                loadData();
+                              } else {
+                                toast.error("削除に失敗しました");
+                              }
+                           }}
+                         >
+                           <Trash2 size={14} className="mr-1" />
+                           <span className="text-xs font-bold">削除</span>
+                         </Button>
+                       </div>
+                     )
+                  })}
+                </div>
+              </div>
+            )}
 
             <DialogFooter className="pt-4">
               <Button type="button" variant="ghost" onClick={() => setIsEditDialogOpen(false)}>キャンセル</Button>

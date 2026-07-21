@@ -76,13 +76,14 @@ export async function getTasks(): Promise<Task[]> {
     const colRef = collection(db, TASKS_COLLECTION);
     
     // System owner can see all (or we could force them to select a company, but for now filter by companyId)
+    const userCompanyId = profile.companyId || "system_default";
     const q = profile.role === "systemOwner" && !profile.companyId
       ? query(colRef, orderBy("createdAt", "desc"))
-      : query(colRef, where("companyId", "==", profile.companyId), orderBy("createdAt", "desc"));
+      : query(colRef, where("companyId", "==", userCompanyId));
 
     const snapshot = await getDocs(q);
     
-    return snapshot.docs.map(docSnap => {
+    let tasks = snapshot.docs.map(docSnap => {
       const data = docSnap.data();
       return {
         id: docSnap.id,
@@ -92,6 +93,16 @@ export async function getTasks(): Promise<Task[]> {
         completedAt: data.completedAt?.toDate ? data.completedAt.toDate().toISOString() : data.completedAt,
       } as Task;
     });
+
+    if (profile.role !== "systemOwner" || profile.companyId) {
+      tasks.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+    }
+
+    return tasks;
   } catch (error) {
     console.error("Error fetching tasks:", error);
     return [];
@@ -135,7 +146,8 @@ export async function updateTask(id: string, data: Partial<Task>) {
     if (!existing.exists()) throw new Error("タスクが見つかりません");
     
     const existingData = existing.data();
-    if (existingData.companyId !== profile.companyId && profile.role !== "systemOwner") {
+    const userCompanyId = profile.companyId || "system_default";
+    if (existingData.companyId !== userCompanyId && profile.role !== "systemOwner") {
       throw new Error("他社のタスクは編集できません");
     }
 
@@ -168,7 +180,9 @@ export async function deleteTask(id: string) {
     
     if (!existing.exists()) throw new Error("タスクが見つかりません");
     
-    if (existing.data().companyId !== profile.companyId && profile.role !== "systemOwner") {
+    const existingData = existing.data();
+    const userCompanyId = profile.companyId || "system_default";
+    if (existingData.companyId !== userCompanyId && profile.role !== "systemOwner") {
       throw new Error("他社のタスクは削除できません");
     }
 

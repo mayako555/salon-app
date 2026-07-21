@@ -125,11 +125,17 @@ export default function TaskFormDialog({ isOpen, onClose, onRefresh, initialData
         notificationRules: finalRules
       };
 
+      let res;
       if (initialData?.id) {
-        await updateTask(initialData.id, dataToSave);
+        res = await updateTask(initialData.id, dataToSave);
       } else {
-        await createTask(dataToSave as any);
+        res = await createTask(dataToSave as any);
       }
+      
+      if (!res?.success) {
+        throw new Error(res?.error || "不明なエラーが発生しました");
+      }
+      
       onRefresh();
       onClose();
     } catch (error: any) {
