@@ -66,7 +66,7 @@ export default async function PayrollPage({
   });
 
   return (
-    <AuthGuard requireRole="admin">
+    <AuthGuard requireRole="admin" requireFeature="payroll">
       <div className="space-y-6 pb-24 animate-in fade-in duration-300">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
           <div className="flex items-center gap-4">

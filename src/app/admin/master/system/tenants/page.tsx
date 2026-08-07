@@ -6,11 +6,13 @@ import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Users, Edit2, ShieldCheck, Check, X, ArrowLeft, Key } from "lucide-react";
+import { Plus, Users, Edit2, ShieldCheck, Check, X, ArrowLeft, Key, Database } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { FeatureManagerDialog } from "./FeatureManagerDialog";
+import { FeatureSettings } from "@/types/master";
 
 export default function TenantsPage() {
   const { isSystemOwner } = useAuth();
@@ -18,8 +20,10 @@ export default function TenantsPage() {
   const [loading, setLoading] = useState(true);
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [featureDialogOpen, setFeatureDialogOpen] = useState(false);
+  const [selectedTenantForFeatures, setSelectedTenantForFeatures] = useState<{id: string, name: string, features?: FeatureSettings} | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: "", plan: "Standard", status: "active" as "active"|"inactive", fee: 0, startDate: "", contractPdfUrl: "", termsPdfUrl: "" });
+  const [formData, setFormData] = useState({ name: "", plan: "Standard", status: "active" as "active"|"inactive", fee: 0, startDate: "", contractPdfUrl: "", termsPdfUrl: "", schoolEnabled: false, schoolName: "" });
 
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [userLoading, setUserLoading] = useState(false);
@@ -70,7 +74,7 @@ export default function TenantsPage() {
 
   const openAddDialog = () => {
     setEditingId(null);
-    setFormData({ name: "", plan: "Standard", status: "active", fee: 0, startDate: "", contractPdfUrl: "", termsPdfUrl: "" });
+    setFormData({ name: "", plan: "Standard", status: "active", fee: 0, startDate: "", contractPdfUrl: "", termsPdfUrl: "", schoolEnabled: false, schoolName: "" });
     setIsDialogOpen(true);
   };
 
@@ -83,7 +87,9 @@ export default function TenantsPage() {
       fee: tenant.fee || 0,
       startDate: tenant.startDate || "",
       contractPdfUrl: tenant.contractPdfUrl || "",
-      termsPdfUrl: tenant.termsPdfUrl || ""
+      termsPdfUrl: tenant.termsPdfUrl || "",
+      schoolEnabled: tenant.schoolEnabled || false,
+      schoolName: tenant.schoolName || ""
     });
     setIsDialogOpen(true);
   };
@@ -139,6 +145,21 @@ export default function TenantsPage() {
     }
   };
 
+  const handleImpersonate = async (companyId: string) => {
+    try {
+      const res = await fetch('/api/impersonate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId })
+      });
+      if (!res.ok) throw new Error('Failed to impersonate');
+      toast.success("代理ログインを開始しました");
+      window.location.href = "/admin/dashboard"; // Redirect to dashboard
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
   if (!isSystemOwner) {
     return <div className="p-8 text-center text-slate-500 font-bold">権限がありません。</div>;
   }
@@ -190,30 +211,62 @@ export default function TenantsPage() {
                       <Edit2 size={16} />
                     </Button>
                   </div>
+                  <div className="flex gap-2 w-full">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => openUserDialog(tenant.id)} 
+                      className="flex-1 text-indigo-600 border-indigo-200 hover:bg-indigo-50 font-bold"
+                    >
+                      <Key size={14} className="mr-2" />
+                      アカウント管理
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        setSelectedTenantForFeatures({
+                          id: tenant.id,
+                          name: tenant.name,
+                          features: (tenant as any).features
+                        });
+                        setFeatureDialogOpen(true);
+                      }} 
+                      className="flex-1 text-emerald-600 border-emerald-200 hover:bg-emerald-50 font-bold"
+                    >
+                      モジュール設定
+                    </Button>
+                  </div>
                   <Button 
-                    variant="outline" 
+                    variant="default" 
                     size="sm" 
-                    onClick={() => openUserDialog(tenant.id)} 
-                    className="w-full text-indigo-600 border-indigo-200 hover:bg-indigo-50 font-bold"
+                    onClick={() => handleImpersonate(tenant.id)} 
+                    className="w-full text-white bg-slate-800 hover:bg-slate-900 font-bold"
                   >
-                    <Key size={14} className="mr-2" />
-                    アカウント管理
+                    このテナントとして画面に入る
                   </Button>
+
                   {tenant.adminEmails && tenant.adminEmails.length > 0 ? (
                     <div className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-lg break-all font-mono border border-slate-100">
-                      <p className="font-bold mb-1 text-slate-600">オーナーアカウント:</p>
-                      {tenant.adminEmails.map((email, idx) => (
-                        <div key={idx} className="flex items-center gap-1.5 mb-0.5 last:mb-0">
-                          <span className="w-1 h-1 rounded-full bg-emerald-400 shrink-0"></span>
-                          {email}
-                        </div>
-                      ))}
+                      Admins: {tenant.adminEmails.join(", ")}
                     </div>
                   ) : (
-                    <div className="text-[10px] text-slate-400 bg-slate-50 p-2 rounded-lg text-center border border-slate-100 border-dashed">
-                      未設定
+                    <div className="text-[10px] text-slate-400 bg-slate-50 p-2 rounded-lg font-mono border border-slate-100">
+                      Admins: なし
                     </div>
                   )}
+                  
+                  {/* データ保存先（データベース接続情報） */}
+                  <div className="mt-2 pt-3 border-t border-slate-100 space-y-2">
+                    <div className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1"><Database size={12}/> データ保存先</div>
+                    <div className="grid grid-cols-2 gap-y-1 gap-x-2 text-[10px] text-slate-500 font-mono bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <div>方式: <span className="font-bold text-indigo-600">Shared (Pool)</span></div>
+                      <div>状態: <span className="font-bold text-emerald-600">接続済</span></div>
+                      <div className="col-span-2 truncate">Project: {process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "未設定"}</div>
+                      <div className="col-span-2 truncate">DB ID: (default)</div>
+                    </div>
+                  </div>
+
                 </div>
               </CardContent>
             </Card>
@@ -224,6 +277,17 @@ export default function TenantsPage() {
             </div>
           )}
         </div>
+      )}
+
+      {selectedTenantForFeatures && (
+        <FeatureManagerDialog 
+          companyId={selectedTenantForFeatures.id}
+          companyName={selectedTenantForFeatures.name}
+          initialFeatures={selectedTenantForFeatures.features}
+          open={featureDialogOpen}
+          onOpenChange={setFeatureDialogOpen}
+          onSaved={loadTenants}
+        />
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -307,6 +371,35 @@ export default function TenantsPage() {
                 placeholder="https://..."
                 className="font-bold h-11"
               />
+            </div>
+
+            <div className="pt-4 border-t border-slate-200">
+              <h4 className="text-sm font-black text-slate-800 mb-4">スクール事業設定</h4>
+              
+              <div className="flex items-center gap-2 mb-4">
+                <input 
+                  type="checkbox" 
+                  id="schoolEnabled"
+                  checked={formData.schoolEnabled}
+                  onChange={e => setFormData({...formData, schoolEnabled: e.target.checked})}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                />
+                <label htmlFor="schoolEnabled" className="text-sm font-bold text-slate-700 cursor-pointer">
+                  スクール機能を有効にする
+                </label>
+              </div>
+
+              {formData.schoolEnabled && (
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-500">スクール名 (表示用)</label>
+                  <Input 
+                    value={formData.schoolName} 
+                    onChange={e => setFormData({...formData, schoolName: e.target.value})}
+                    placeholder="JL Academy"
+                    className="font-bold h-11"
+                  />
+                </div>
+              )}
             </div>
           </div>
           

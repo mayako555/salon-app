@@ -12,6 +12,8 @@ import {
   orderBy
 } from "firebase/firestore";
 import { revalidatePath } from "next/cache";
+import { generateDefaultFeatures } from "@/types/master";
+import { addAuditLog } from "@/app/audit/actions";
 
 export type CompanyTenant = {
   id: string;
@@ -25,6 +27,8 @@ export type CompanyTenant = {
   createdAt?: any;
   updatedAt?: any;
   adminEmails?: string[];
+  schoolEnabled?: boolean;
+  schoolName?: string;
 };
 
 const COMPANIES_COLLECTION = "companies";
@@ -74,10 +78,22 @@ export async function getTenants() {
 export async function addTenant(payload: Omit<CompanyTenant, "id" | "createdAt" | "updatedAt">) {
   try {
     const colRef = collection(db, COMPANIES_COLLECTION);
+    const defaultFeatures = generateDefaultFeatures(false);
     const docRef = await addDoc(colRef, {
       ...payload,
+      features: defaultFeatures,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
+    });
+    
+    // Add audit log
+    await addAuditLog({
+      table_name: "companies",
+      record_id: docRef.id,
+      action: "INSERT",
+      old_data: null,
+      new_data: { features: defaultFeatures },
+      actor: "system"
     });
     
     revalidatePath("/admin/master/system/tenants");

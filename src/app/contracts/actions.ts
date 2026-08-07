@@ -18,6 +18,8 @@ import {
 import { StaffContract } from "./constants";
 import { getStaffList } from "../staff/actions";
 import { addAuditLog } from "../audit/actions";
+import { getCurrentUserContext } from "@/lib/auth-server";
+import { getTenantCollection } from "@/lib/tenant-utils";
 
 const CONTRACTS_COLLECTION = "staff_contracts";
 const STAFF_COLLECTION = "staff_profiles";
@@ -25,13 +27,13 @@ const STAFF_COLLECTION = "staff_profiles";
 export async function getContractsList(): Promise<StaffContract[]> {
   try {
     const { adminDb } = await import("@/lib/firebase-admin");
-    const snapshot = await adminDb
-      .collection(CONTRACTS_COLLECTION)
+    const ctx = await getCurrentUserContext();
+    const snapshot = await getTenantCollection(CONTRACTS_COLLECTION, ctx)
       .orderBy("valid_from", "desc")
       .get();
     
     // Fetch all staff to map names
-    const staffSnapshot = await adminDb.collection(STAFF_COLLECTION).get();
+    const staffSnapshot = await getTenantCollection(STAFF_COLLECTION, ctx).get();
     const staffMap = new Map();
     staffSnapshot.docs.forEach((doc: any) => {
       staffMap.set(doc.id, doc.data().name);

@@ -6,7 +6,7 @@ import { getMonthlySales, SalesRecord, deleteSale, clearMonthlyCsvImports } from
 import { getStaffList, StaffProfile } from "../staff/actions";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Download, ChevronLeft, ChevronRight, Search, FileUp, Settings, Lock, Trash2, Calendar } from "lucide-react";
+import { Plus, Download, ChevronLeft, ChevronRight, Search, FileUp, Settings, Lock, Trash2, Calendar, ArrowUpDown } from "lucide-react";
 import Link from "next/link";
 import { format, isSameMonth, subMonths } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -108,6 +108,16 @@ export default function SalesPage({
   const [checkoutInitialTime, setCheckoutInitialTime] = useState("");
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<SalesRecord | undefined>(undefined);
+
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'date', direction: 'asc' });
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
 
   const handleToggleSelectAll = () => {
     if (selectedIds.size === filteredSales.length) {
@@ -224,8 +234,43 @@ export default function SalesPage({
     selectedStore: selectedDashboardStore
   });
 
+  const sortedSales = [...filteredSales].sort((a, b) => {
+    let aVal: any = a[sortConfig.key as keyof SalesRecord] || "";
+    let bVal: any = b[sortConfig.key as keyof SalesRecord] || "";
+
+    if (sortConfig.key === 'total') {
+      aVal = a.tech_sales + a.product_sales + (a.nomination_fee || 0) + (a.cancel_fee || 0) - (a.discount || 0);
+      bVal = b.tech_sales + b.product_sales + (b.nomination_fee || 0) + (b.cancel_fee || 0) - (b.discount || 0);
+    }
+    
+    if (sortConfig.key === 'date') {
+      const cmp = a.date.localeCompare(b.date) || (a.time || "").localeCompare(b.time || "");
+      return sortConfig.direction === 'asc' ? cmp : -cmp;
+    }
+
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      const cmp = aVal.localeCompare(bVal);
+      return sortConfig.direction === 'asc' ? cmp : -cmp;
+    }
+
+    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const SortableHead = ({ label, sortKey, className }: { label: string, sortKey: string, className?: string }) => (
+    <TableHead className={cn("cursor-pointer hover:bg-slate-200/50 transition-colors select-none", className)} onClick={() => handleSort(sortKey)}>
+      <div className={cn("flex items-center gap-1", className?.includes("text-right") ? "justify-end" : "")}>
+        {label}
+        <ArrowUpDown size={14} className={sortConfig.key === sortKey ? "text-slate-800" : "text-slate-400"} />
+      </div>
+    </TableHead>
+  );
+
+
+
   return (
-    <AuthGuard requireRole="manager">
+    <AuthGuard requireRole="manager" requireFeature="sales">
       <div className="space-y-6 animate-in fade-in duration-300">
         {loading ? (
           <div className="flex items-center justify-center py-20 text-slate-500">読み込み中...</div>
@@ -282,8 +327,8 @@ export default function SalesPage({
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               availableStores={stores}
-              onExportCsv={() => exportSalesToCsv(sales, displayStaffData, displaySummaryData, targetDateStr)}
-              onExportExcel={() => exportSalesToExcel(sales, displayStaffData, displaySummaryData, targetDateStr)}
+              onExportCsv={() => exportSalesToCsv(sales, displayStaffData, displaySummaryData, targetDateStr, stores)}
+              onExportExcel={() => exportSalesToExcel(sales, displayStaffData, displaySummaryData, targetDateStr, stores)}
             />
 
             {isScheduleView ? (
@@ -300,6 +345,7 @@ export default function SalesPage({
                 
                 <SalesTable 
                   data={displayStaffData} 
+                  availableStores={availableStores}
                   onStaffClick={(staffId) => window.location.href = `/sales/staff/${staffId}`} 
                 />
               </div>
@@ -319,20 +365,20 @@ export default function SalesPage({
                           className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                         />
                       </TableHead>
-                      <TableHead className="w-[80px]">日付</TableHead>
-                      <TableHead className="w-[60px]">時間</TableHead>
-                      <TableHead className="w-[80px]">店舗</TableHead>
-                      <TableHead className="w-[100px]">担当</TableHead>
-                      <TableHead className="w-[120px]">お客様名</TableHead>
+                      <SortableHead sortKey="date" label="日付" className="w-[80px]" />
+                      <SortableHead sortKey="time" label="時間" className="w-[60px]" />
+                      <SortableHead sortKey="store_name" label="店舗" className="w-[80px]" />
+                      <SortableHead sortKey="staff_name" label="担当" className="w-[100px]" />
+                      <SortableHead sortKey="customer_name" label="お客様名" className="w-[120px]" />
                       <TableHead className="w-[80px] text-center">新・リピ</TableHead>
                       <TableHead>コース</TableHead>
-                      <TableHead className="text-right w-[80px]">技術売上</TableHead>
-                      <TableHead className="text-right w-[80px]">店販売上</TableHead>
-                      <TableHead className="text-right w-[80px]">指名料</TableHead>
-                      <TableHead className="text-right w-[80px] text-rose-600">割引</TableHead>
-                      <TableHead className="text-right w-[80px] text-orange-500">HPB pt</TableHead>
+                      <SortableHead sortKey="tech_sales" label="技術売上" className="text-right w-[80px]" />
+                      <SortableHead sortKey="product_sales" label="店販売上" className="text-right w-[80px]" />
+                      <SortableHead sortKey="nomination_fee" label="指名料" className="text-right w-[80px]" />
+                      <SortableHead sortKey="discount" label="割引" className="text-right w-[80px] text-rose-600" />
+                      <SortableHead sortKey="hpb_points" label="HPB pt" className="text-right w-[80px] text-orange-500" />
                       <TableHead className="w-[120px] text-center">支払方法</TableHead>
-                      <TableHead className="text-right font-bold w-[100px]">合計金額</TableHead>
+                      <SortableHead sortKey="total" label="合計金額" className="text-right font-bold w-[100px]" />
                       <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -344,7 +390,7 @@ export default function SalesPage({
                         </TableCell>
                       </TableRow>
                     ) : (
-                      [...filteredSales].sort((a, b) => a.date.localeCompare(b.date) || a.time?.localeCompare(b.time || "")).map((sale) => {
+                      sortedSales.map((sale) => {
                         const saleTotal = sale.tech_sales + sale.product_sales + (sale.nomination_fee || 0) + (sale.cancel_fee || 0) - (sale.discount || 0);
                         const isRowSelected = selectedIds.has(sale.id);
 

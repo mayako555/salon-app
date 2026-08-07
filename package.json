@@ -6,7 +6,8 @@
     "dev": "next dev --port 3005",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:tenant-isolation": "tsx scripts/test-tenant-isolation.ts"
   },
   "dependencies": {
     "@babel/runtime": "^7.29.2",
@@ -22,13 +23,14 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "decimal.js": "^10.6.0",
     "firebase": "^11.4.0",
     "firebase-admin": "^13.2.0",
     "framer-motion": "^12.38.0",
     "jschardet": "^3.1.4",
     "lucide-react": "^1.8.0",
     "next": "16.2.4",
-    "papaparse": "^5.5.3",
+    "papaparse": "^5.5.4",
     "pdfjs-dist": "^3.11.174",
     "qrcode.react": "^4.2.0",
     "radix-ui": "^1.4.3",
@@ -53,6 +55,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.23.10",
     "typescript": "^5"
   }
 }

@@ -19,11 +19,13 @@ import {
   getDoc,
   limit
 } from "firebase/firestore";
-import { SalesMasterItem, seedSalesMasterData } from "./seeds";
+import { seedSalesMasterData } from "./seeds";
+import { SalesMasterItem } from "@/types/master";
 import { addAuditLog } from "../audit/actions";
 import { addCustomer } from "@/lib/customers";
 import { syncInventoryFromSale } from "../inventory/inventory-actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
+import { requireFeature } from "@/lib/feature-utils";
 
 export async function mapReservationToSalesRecord(res: any): Promise<SalesRecord> {
   let treatmentMinutes = 60;
@@ -213,6 +215,7 @@ export async function duplicateSalesMasterItem(id: string) {
 export async function getSaleByReservationId(resId: string): Promise<SalesRecord | null> {
   try {
     const ctx = await getCurrentUserContext();
+  if (ctx.companyId) await requireFeature(ctx.companyId, "sales");
     const q = query(
       collection(db, SALES_COLLECTION),
       where("source_reservation_id", "==", resId),
@@ -240,6 +243,7 @@ export async function executeSeed() {
 export async function getMonthlySales(year: number, month: number): Promise<SalesRecord[]> {
   try {
     const ctx = await getCurrentUserContext();
+  if (ctx.companyId) await requireFeature(ctx.companyId, "sales");
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
     const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
 
@@ -304,6 +308,7 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
 export async function checkoutReservation(reservationId: string, salesData: Partial<SalesRecord>) {
   try {
     const ctx = await getCurrentUserContext();
+  if (ctx.companyId) await requireFeature(ctx.companyId, "sales");
     if (!ctx.companyId) throw new Error("認証エラー");
 
     // Check if sales record already exists for this reservation
@@ -351,6 +356,7 @@ export async function checkoutReservation(reservationId: string, salesData: Part
 export async function updatePaymentInfo(id: string, paymentMethod: string, paymentStatus: string, note: string, splitPayments?: { method: string, amount: number }[]) {
   try {
     const ctx = await getCurrentUserContext();
+  if (ctx.companyId) await requireFeature(ctx.companyId, "sales");
     if (!ctx.companyId) throw new Error("認証エラー");
 
     const docRef = doc(db, SALES_COLLECTION, id);
@@ -403,6 +409,7 @@ export async function importHotPepperCsv(formData: FormData) {
     const storeName = formData.get("store_name") as string || "不明店舗";
     
     const ctx = await getCurrentUserContext();
+  if (ctx.companyId) await requireFeature(ctx.companyId, "sales");
     const companyId = ctx.companyId;
 
     if (!file) return { success: false, error: "ファイルが選択されていません。" };

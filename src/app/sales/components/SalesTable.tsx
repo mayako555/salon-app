@@ -6,16 +6,17 @@ import { ChevronUp, ChevronDown } from "lucide-react";
 import SalesRow, { StaffSalesData } from "./SalesRow";
 
 type SortConfig = {
-  key: "name" | "rokko" | "kobe" | "motomachi" | "total" | "achievement" | "visits" | "totalAvg";
+  key: "name" | "total" | "achievement" | "visits" | "totalAvg" | string;
   direction: "asc" | "desc";
 };
 
 type Props = {
   data: StaffSalesData[];
+  availableStores: string[];
   onStaffClick: (staffId: string) => void;
 };
 
-const SalesTable = React.memo(function SalesTable({ data, onStaffClick }: Props) {
+const SalesTable = React.memo(function SalesTable({ data, availableStores, onStaffClick }: Props) {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: "total", direction: "desc" });
 
   const handleSort = (key: SortConfig["key"]) => {
@@ -35,18 +36,6 @@ const SalesTable = React.memo(function SalesTable({ data, onStaffClick }: Props)
         aVal = a.name;
         bVal = b.name;
         break;
-      case "rokko":
-        aVal = a.storeSales["六甲"]?.total || 0;
-        bVal = b.storeSales["六甲"]?.total || 0;
-        break;
-      case "kobe":
-        aVal = a.storeSales["神戸"]?.total || 0;
-        bVal = b.storeSales["神戸"]?.total || 0;
-        break;
-      case "motomachi":
-        aVal = a.storeSales["元町"]?.total || 0;
-        bVal = b.storeSales["元町"]?.total || 0;
-        break;
       case "total":
         aVal = a.totalSales;
         bVal = b.totalSales;
@@ -62,6 +51,13 @@ const SalesTable = React.memo(function SalesTable({ data, onStaffClick }: Props)
       case "achievement":
         aVal = a.goal ? (a.totalSales / a.goal) : -1;
         bVal = b.goal ? (b.totalSales / b.goal) : -1;
+        break;
+      default:
+        if (sortConfig.key.startsWith("store_")) {
+          const storeName = sortConfig.key.replace("store_", "");
+          aVal = a.storeSales[storeName]?.total || 0;
+          bVal = b.storeSales[storeName]?.total || 0;
+        }
         break;
     }
 
@@ -107,33 +103,18 @@ const SalesTable = React.memo(function SalesTable({ data, onStaffClick }: Props)
             >
               スタッフ名 {renderSortIcon("name")}
             </TableHead>
-            <TableHead 
-              className="text-right text-xs font-bold text-slate-500 cursor-pointer hover:bg-slate-100 transition-colors focus:outline-none focus:bg-slate-100 focus:ring-2 focus:ring-inset focus:ring-slate-300" 
-              onClick={() => handleSort("rokko")}
-              onKeyDown={(e) => handleKeyDown(e, "rokko")}
-              tabIndex={0}
-              aria-label="六甲店売上で並び替え"
-            >
-              六甲店 {renderSortIcon("rokko")}
-            </TableHead>
-            <TableHead 
-              className="text-right text-xs font-bold text-slate-500 cursor-pointer hover:bg-slate-100 transition-colors focus:outline-none focus:bg-slate-100 focus:ring-2 focus:ring-inset focus:ring-slate-300" 
-              onClick={() => handleSort("kobe")}
-              onKeyDown={(e) => handleKeyDown(e, "kobe")}
-              tabIndex={0}
-              aria-label="神戸店売上で並び替え"
-            >
-              神戸店 {renderSortIcon("kobe")}
-            </TableHead>
-            <TableHead 
-              className="text-right text-xs font-bold text-slate-500 cursor-pointer hover:bg-slate-100 transition-colors focus:outline-none focus:bg-slate-100 focus:ring-2 focus:ring-inset focus:ring-slate-300" 
-              onClick={() => handleSort("motomachi")}
-              onKeyDown={(e) => handleKeyDown(e, "motomachi")}
-              tabIndex={0}
-              aria-label="元町店売上で並び替え"
-            >
-              元町店 {renderSortIcon("motomachi")}
-            </TableHead>
+            {availableStores.map(store => (
+              <TableHead 
+                key={store}
+                className="text-right text-xs font-bold text-slate-500 cursor-pointer hover:bg-slate-100 transition-colors focus:outline-none focus:bg-slate-100 focus:ring-2 focus:ring-inset focus:ring-slate-300" 
+                onClick={() => handleSort(`store_${store}`)}
+                onKeyDown={(e) => handleKeyDown(e, `store_${store}`)}
+                tabIndex={0}
+                aria-label={`${store}店売上で並び替え`}
+              >
+                {store}店 {renderSortIcon(`store_${store}`)}
+              </TableHead>
+            ))}
             <TableHead 
               className="text-right text-xs font-bold text-slate-500 cursor-pointer hover:bg-slate-100 transition-colors focus:outline-none focus:bg-slate-100 focus:ring-2 focus:ring-inset focus:ring-slate-300" 
               onClick={() => handleSort("total")}
@@ -185,6 +166,7 @@ const SalesTable = React.memo(function SalesTable({ data, onStaffClick }: Props)
                 key={staff.id} 
                 data={staff} 
                 rank={index + 1}
+                availableStores={availableStores}
                 onClick={() => onStaffClick(staff.id)} 
               />
             ))

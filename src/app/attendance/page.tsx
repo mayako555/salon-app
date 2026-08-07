@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import Papa from "papaparse";
 
 export default function AttendancePage() {
-  const { profile, isAdmin, isManager } = useAuth();
+  const { profile, isAdmin, isManager, availableStoreObjects, attendancePolicy } = useAuth();
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [shifts, setShifts] = useState<ShiftRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,12 +38,14 @@ export default function AttendancePage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [previewRecords, setPreviewRecords] = useState<any[]>([]);
-  const [roundingRule, setRoundingRule] = useState<'none' | '15' | '30'>('30');
+  const actualRoundingRule = attendancePolicy.roundingEnabled 
+    ? (attendancePolicy.roundingIntervalMinutes === 15 ? '15' : '30') 
+    : 'none';
   const [staffProfiles, setStaffProfiles] = useState<any[]>([]);
 
   // Manual Add States
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [addRecordData, setAddRecordData] = useState<any>({ staffId: "", clockIn: "", clockOut: "", store: "元町", breakMinutes: 60, status: "normal" });
+  const [addRecordData, setAddRecordData] = useState<any>({ staffId: "", clockIn: "", clockOut: "", store: "", storeId: "", breakMinutes: 60, status: "normal" });
   const [isAdding, setIsAdding] = useState(false);
 
   const applyRounding = (isoStr: string | null, type: 'in' | 'out', rule: 'none' | '15' | '30') => {
@@ -235,14 +237,14 @@ export default function AttendancePage() {
         if (r.resolvedInTime) {
           const dateObj = new Date(`${r.date}T${r.resolvedInTime}`);
           clock_in = r.rawIn || dateObj.toISOString();
-          const roundedTime = applyRounding(clock_in, 'in', roundingRule);
+          const roundedTime = applyRounding(clock_in, 'in', actualRoundingRule);
           effective_clock_in = new Date(`${r.date}T${roundedTime}`).toISOString();
         }
 
         if (r.resolvedOutTime) {
           const dateObj = new Date(`${r.date}T${r.resolvedOutTime}`);
           clock_out = r.rawOut || dateObj.toISOString();
-          const roundedTime = applyRounding(clock_out, 'out', roundingRule);
+          const roundedTime = applyRounding(clock_out, 'out', actualRoundingRule);
           effective_clock_out = new Date(`${r.date}T${roundedTime}`).toISOString();
         }
 
@@ -288,8 +290,8 @@ export default function AttendancePage() {
       const dateObjIn = new Date(`${targetDateStr}T${addRecordData.clockIn}`);
       const dateObjOut = new Date(`${targetDateStr}T${addRecordData.clockOut}`);
       
-      const roundedIn = applyRounding(dateObjIn.toISOString(), 'in', '30');
-      const roundedOut = applyRounding(dateObjOut.toISOString(), 'out', '30');
+      const roundedIn = applyRounding(dateObjIn.toISOString(), 'in', actualRoundingRule);
+      const roundedOut = applyRounding(dateObjOut.toISOString(), 'out', actualRoundingRule);
       
       const effIn = new Date(`${targetDateStr}T${roundedIn}`).toISOString();
       const effOut = new Date(`${targetDateStr}T${roundedOut}`).toISOString();
@@ -304,14 +306,15 @@ export default function AttendancePage() {
         effective_clock_out: effOut,
         break_minutes: addRecordData.breakMinutes,
         status: addRecordData.status as any,
-        store: addRecordData.store
+        store: addRecordData.store,
+        storeId: addRecordData.storeId,
       };
 
       const res = await bulkImportAttendanceRecords([newRecord]);
       if (res.success) {
         toast.success("勤怠記録を追加しました");
         setIsAddDialogOpen(false);
-        setAddRecordData({ staffId: "", clockIn: "", clockOut: "", store: "元町", breakMinutes: 60, status: "normal" });
+        setAddRecordData({ staffId: "", clockIn: "", clockOut: "", store: "", storeId: "", breakMinutes: 60, status: "normal" });
         loadData();
       } else {
         toast.error("追加に失敗しました: " + res.error);
@@ -390,7 +393,7 @@ export default function AttendancePage() {
   };
 
   return (
-    <AuthGuard requireRole="staff">
+    <AuthGuard requireRole="staff" requireFeature="attendance">
 
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
@@ -450,6 +453,11 @@ export default function AttendancePage() {
                       variant="outline"
                       size="sm"
                       className="bg-blue-600 hover:bg-blue-500 text-white hover:text-white font-bold border-none gap-2 shadow-sm h-9"
+                      onClick={() => {
+                        if (availableStoreObjects.length > 0) {
+                          setAddRecordData({ ...addRecordData, store: availableStoreObjects[0].name, storeId: availableStoreObjects[0].id });
+                        }
+                      }}
                     >
                       <Plus size={14} />
                       勤怠を手動追加
@@ -501,14 +509,24 @@ export default function AttendancePage() {
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-slate-500">出勤店舗</label>
                         <select 
-                          value={addRecordData.store} 
-                          onChange={(e) => setAddRecordData({...addRecordData, store: e.target.value})} 
+                          value={addRecordData.storeId || ""} 
+                          onChange={(e) => {
+                            const selected = availableStoreObjects.find(s => s.id === e.target.value);
+                            if (selected) {
+                              setAddRecordData({...addRecordData, storeId: selected.id, store: selected.name});
+                            }
+                          }} 
                           className="w-full h-10 px-3 rounded-lg bg-slate-50 border-slate-200 text-sm font-bold"
+                          required
                         >
-                          <option value="元町">元町</option>
-                          <option value="神戸">神戸</option>
-                          <option value="六甲">六甲</option>
+                          <option value="" disabled>店舗を選択</option>
+                          {availableStoreObjects.map(storeObj => (
+                            <option key={storeObj.id} value={storeObj.id}>{storeObj.name}</option>
+                          ))}
                         </select>
+                        {availableStoreObjects.length === 0 && (
+                          <p className="text-[10px] text-rose-500 mt-1">※登録済みの有効な店舗がありません。店舗マスタから追加してください。</p>
+                        )}
                       </div>
                       <DialogFooter className="pt-4 border-t border-slate-100">
                         <Button type="button" variant="ghost" onClick={() => setIsAddDialogOpen(false)}>キャンセル</Button>
@@ -519,7 +537,7 @@ export default function AttendancePage() {
                     </form>
                   </DialogContent>
                 </Dialog>
-                <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
+<Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
                   <DialogTrigger asChild>
                     <Button
                       variant="outline"
@@ -545,46 +563,7 @@ export default function AttendancePage() {
                       {/* Settings and File Upload */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs">
                         <div className="space-y-2">
-                          <label className="font-bold text-slate-600 block">① 丸めルール設定（給与用の有効時間）</label>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setRoundingRule('none')}
-                              className={`px-3 py-1.5 rounded-lg border font-bold ${
-                                roundingRule === 'none'
-                                  ? 'bg-slate-900 border-slate-900 text-white'
-                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                              }`}
-                            >
-                              丸めなし
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setRoundingRule('15')}
-                              className={`px-3 py-1.5 rounded-lg border font-bold ${
-                                roundingRule === '15'
-                                  ? 'bg-slate-900 border-slate-900 text-white'
-                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                              }`}
-                            >
-                              15分単位
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setRoundingRule('30')}
-                              className={`px-3 py-1.5 rounded-lg border font-bold ${
-                                roundingRule === '30'
-                                  ? 'bg-slate-900 border-slate-900 text-white'
-                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                              }`}
-                            >
-                              30分単位
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="font-bold text-slate-600 block">② GoogleフォームCSVを選択</label>
+                          <label className="font-bold text-slate-600 block">① GoogleフォームCSVを選択</label>
                           <input
                             type="file"
                             accept=".csv"
@@ -624,8 +603,8 @@ export default function AttendancePage() {
                               </TableHeader>
                               <TableBody>
                                 {previewRecords.map((row, index) => {
-                                  const roundedIn = applyRounding(row.rawIn, 'in', roundingRule);
-                                  const roundedOut = applyRounding(row.rawOut, 'out', roundingRule);
+                                  const roundedIn = applyRounding(row.rawIn, 'in', actualRoundingRule);
+                                  const roundedOut = applyRounding(row.rawOut, 'out', actualRoundingRule);
 
                                   return (
                                     <TableRow key={index} className={row.hasIssue ? "bg-amber-50/30 hover:bg-amber-50/50" : ""}>

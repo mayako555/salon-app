@@ -544,7 +544,7 @@ export default function AdminExpensesDashboard() {
   };
 
   return (
-    <AuthGuard requireRole="manager">
+    <AuthGuard requireRole="manager" requireFeature="expenses">
       <div className="space-y-6 animate-in fade-in duration-500 max-w-[1600px] mx-auto px-4 md:px-0">
         
         {/* Header Control Panel */}

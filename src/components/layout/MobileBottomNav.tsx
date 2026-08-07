@@ -41,14 +41,14 @@ function cn(...inputs: ClassValue[]) {
 
 export function MobileBottomNav() {
   const pathname = usePathname();
-  const { tenantPlan, isAdmin, isManager, isCompanyOwner, isSystemOwner } = useAuth();
+  const { tenantPlan, isAdmin, isManager, isCompanyOwner, isSystemOwner, hasFeature } = useAuth();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   const mainTabs = [
     { name: "ホーム", href: "/staff-portal", icon: Home },
-    { name: "予約", href: "/staff-portal/reservations", icon: CalendarDays },
-    { name: "レジ", href: "/staff-portal/cash", icon: Banknote },
-    { name: "売上", href: isAdmin || isManager ? "/sales" : "/staff-portal/sales", icon: Coins },
+    { name: "予約", href: "/staff-portal/reservations", icon: CalendarDays, feature: "reservations" },
+    { name: "レジ", href: "/staff-portal/cash", icon: Banknote, feature: "cash_management" },
+    { name: "売上", href: isAdmin || isManager ? "/sales" : "/staff-portal/sales", icon: Coins, feature: "sales" },
   ];
 
   const hasAccess = (role: string) => {
@@ -60,43 +60,43 @@ export function MobileBottomNav() {
   };
 
   const moreItems = [
-    { name: "顧客管理", href: "/staff-portal/customers", icon: Users, role: "staff" },
-    { name: "シフト・勤怠", href: "/staff-portal/shifts", icon: CalendarDays, role: "staff" },
-    { name: "交通費申請", href: "/staff-portal/transport", icon: Train, role: "staff" },
-    { name: "経費申請", href: "/staff-portal/expenses", icon: Wallet, role: "staff" },
-    { name: "希望休提出", href: "/staff-portal/holidays", icon: CalendarHeart, role: "staff" },
-    { name: "在庫管理", href: "/inventory", icon: Package, role: "manager" },
+    { name: "顧客管理", href: "/staff-portal/customers", icon: Users, role: "staff", feature: "customers" },
+    { name: "シフト・勤怠", href: "/staff-portal/shifts", icon: CalendarDays, role: "staff", feature: "shifts" },
+    { name: "交通費申請", href: "/staff-portal/transport", icon: Train, role: "staff", feature: "payroll" },
+    { name: "経費申請", href: "/staff-portal/expenses", icon: Wallet, role: "staff", feature: "expenses" },
+    { name: "希望休提出", href: "/staff-portal/holidays", icon: CalendarHeart, role: "staff", feature: "shifts" },
+    { name: "在庫管理", href: "/inventory", icon: Package, role: "manager", feature: "inventory" },
   ];
 
   const adminItems = [
     { name: "ダッシュボード", href: "/dashboard", icon: LayoutDashboard, role: "manager" },
     { name: "高度分析", href: "/analytics", icon: Sparkles, role: "admin" },
-    { name: "シフト管理", href: "/shifts", icon: CalendarDays, role: "manager" },
-    { name: "勤怠管理", href: "/attendance", icon: Clock, role: "admin" },
-    { name: "有給管理", href: "/admin/paid-leaves", icon: CalendarDays, role: "admin" },
+    { name: "シフト管理", href: "/shifts", icon: CalendarDays, role: "manager", feature: "shifts" },
+    { name: "勤怠管理", href: "/attendance", icon: Clock, role: "admin", feature: "attendance" },
+    { name: "有給管理", href: "/admin/paid-leaves", icon: CalendarDays, role: "admin", feature: "attendance" },
     { name: "採用管理", href: "/admin/recruitment", icon: Briefcase, role: "admin" },
     { name: "スタッフ管理", href: "/staff", icon: Users, role: "admin" },
-    { name: "スタッフ評価", href: "/evaluations", icon: Award, role: "admin" },
-    { name: "新人教育", href: "/training", icon: GraduationCap, role: "admin" },
-    { name: "経費・収支", href: "/admin/expenses", icon: Wallet, role: "admin" },
-    { name: "給与・報酬", href: "/payroll", icon: Calculator, role: "admin" },
-    { name: "AIタスク管理", href: "/admin/tasks", icon: ClipboardList, role: "manager" },
+    { name: "スタッフ評価", href: "/evaluations", icon: Award, role: "admin", feature: "evaluations" },
+    { name: "新人教育", href: "/training", icon: GraduationCap, role: "admin", feature: "training" },
+    { name: "経費・収支", href: "/admin/expenses", icon: Wallet, role: "admin", feature: "expenses" },
+    { name: "給与・報酬", href: "/payroll", icon: Calculator, role: "admin", feature: "payroll" },
+    { name: "AIタスク管理", href: "/admin/tasks", icon: ClipboardList, role: "manager", feature: "tasks" },
     { name: "手当管理", href: "/allowances", icon: Gift, role: "admin" },
     { name: "システム管理", href: "/admin/master/operations", icon: Database, role: "admin" },
     { name: "システム設定", href: "/admin/settings", icon: Settings, role: "companyOwner" },
-    { name: "FC契約・請求", href: "/admin/settings/subscription", icon: Building2, role: "companyOwner" },
+    { name: "請求書", href: "/admin/settings/subscription", icon: Building2, role: "companyOwner" },
   ];
 
   const rulesItems = tenantPlan !== "Solo" ? [
-    { name: "就業規則", href: "/staff-portal/rules", icon: BookOpen, role: "staff" },
-    { name: "マニュアル", href: "/manuals", icon: Library, role: "staff" },
+    { name: "就業規則", href: "/staff-portal/rules", icon: BookOpen, role: "staff", feature: "training" },
+    { name: "マニュアル", href: "/manuals", icon: Library, role: "staff", feature: "training" },
   ] : [];
 
   return (
     <>
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 pb-safe">
         <div className="flex justify-around items-center h-16">
-          {mainTabs.map((tab) => {
+          {mainTabs.filter(t => !(t as any).feature || hasFeature((t as any).feature)).map((tab) => {
             const isActive = pathname === tab.href;
             return (
               <Link
@@ -170,7 +170,11 @@ export function MobileBottomNav() {
                 <div>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">業務メニュー</p>
                   <div className="grid grid-cols-4 gap-y-6 gap-x-2">
-                    {moreItems.filter(i => hasAccess(i.role)).map(item => (
+                    {moreItems.filter(item => {
+                    if (item.role && !hasAccess(item.role)) return false;
+                    if ((item as any).feature && !hasFeature((item as any).feature)) return false;
+                    return true;
+                  }).map(item => (
                       <Link 
                         key={item.name} 
                         href={item.href}
@@ -190,18 +194,22 @@ export function MobileBottomNav() {
                   <div>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">規程・マニュアル</p>
                     <div className="grid grid-cols-4 gap-y-6 gap-x-2">
-                      {rulesItems.map(item => (
-                        <Link 
-                          key={item.name} 
-                          href={item.href}
-                          onClick={() => setIsMoreOpen(false)}
-                          className="flex flex-col items-center gap-2"
-                        >
-                          <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-600 border border-slate-100 shadow-sm active:scale-90 transition-transform">
-                            <item.icon size={24} strokeWidth={2} />
-                          </div>
-                          <span className="text-[10px] font-bold text-slate-600 text-center leading-tight whitespace-nowrap">{item.name}</span>
-                        </Link>
+                      {rulesItems.filter(item => {
+                          if (item.role && !hasAccess(item.role)) return false;
+                          if ((item as any).feature && !hasFeature((item as any).feature)) return false;
+                          return true;
+                        }).map(item => (
+                      <Link 
+                        key={item.name} 
+                        href={item.href}
+                        onClick={() => setIsMoreOpen(false)}
+                        className="flex flex-col items-center gap-2"
+                      >
+                        <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-600 border border-slate-100 shadow-sm active:scale-90 transition-transform">
+                          <item.icon size={24} strokeWidth={2} />
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-600 text-center leading-tight whitespace-nowrap">{item.name}</span>
+                      </Link>
                       ))}
                     </div>
                   </div>
@@ -221,7 +229,7 @@ export function MobileBottomNav() {
                       <span className="text-[10px] font-bold text-slate-600 text-center leading-tight whitespace-nowrap">個人設定</span>
                     </Link>
                     
-                    {adminItems.filter(i => hasAccess(i.role)).map(item => (
+                    {adminItems.filter(i => hasAccess(i.role)).filter(item => !(item as any).feature || hasFeature((item as any).feature)).map(item => (
                       <Link 
                         key={item.name} 
                         href={item.href}

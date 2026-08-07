@@ -248,52 +248,6 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
                 </div>
                 <div className="text-center text-xs mt-1 border-b border-black pb-1">支給内訳</div>
                 <div className="p-2 space-y-2 h-[200px] overflow-y-auto">
-                   {stmt.type === "salary" && (
-                     <div className="flex justify-between">
-                       <span className="text-xs">基本給</span>
-                       <span>{stmt.base_amount.toLocaleString()}</span>
-                     </div>
-                   )}
-                   {stmt.details.base_tech_salary > 0 && (
-                     <div className="flex justify-between text-xs"><span>技術歩合/インセンティブ</span><span>{stmt.details.base_tech_salary.toLocaleString()}</span></div>
-                   )}
-                   {stmt.details.base_product_salary > 0 && (
-                     <div className="flex justify-between text-xs"><span>店販歩合</span><span>{stmt.details.base_product_salary.toLocaleString()}</span></div>
-                   )}
-                   
-                   {/* Separated Allowances */}
-                   {stmt.details.nomination_reward > 0 && (
-                     <div className="flex justify-between text-xs"><span>指名手当</span><span>{stmt.details.nomination_reward.toLocaleString()}</span></div>
-                   )}
-                   {stmt.details.transport_fee > 0 && (
-                     <div className="flex justify-between text-xs"><span>通勤手当</span><span>{stmt.details.transport_fee.toLocaleString()}</span></div>
-                   )}
-                   {/* @ts-ignore */}
-                   {stmt.details.review_allowance > 0 && (
-                     <div className="flex justify-between text-xs">
-                       <span>口コミ手当</span>
-                       {/* @ts-ignore */}
-                       <span>{stmt.details.review_allowance.toLocaleString()}</span>
-                     </div>
-                   )}
-                   {/* @ts-ignore */}
-                   {stmt.details.blog_allowance > 0 && (
-                     <div className="flex justify-between text-xs">
-                       <span>ブログ手当</span>
-                       {/* @ts-ignore */}
-                       <span>{stmt.details.blog_allowance.toLocaleString()}</span>
-                     </div>
-                   )}
-                    {/* @ts-ignore */}
-                    {stmt.details.executive_allowance > 0 && (
-                      <div className="flex justify-between text-xs">
-                        <span>役職・その他手当</span>
-                        {/* @ts-ignore */}
-                        <span>{stmt.details.executive_allowance.toLocaleString()}</span>
-                      </div>
-                    )}
-
-                   {/* Legacy fallback / Unallocated Allowances */}
                    {(() => {
                      const allocated = 
                        (stmt.details.transport_fee || 0) + 
@@ -305,17 +259,58 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
                        // @ts-ignore
                        (stmt.details.executive_allowance || 0);
                      
-                     const unallocated = stmt.total_allowances - allocated;
-                     
-                     if (unallocated > 0) {
-                       return (
-                         <div className="flex justify-between text-xs">
-                           <span>各種手当（内訳未登録分・その他）</span>
-                           <span>{unallocated.toLocaleString()}</span>
-                         </div>
-                       );
-                     }
-                     return null;
+                     const unallocated = Math.max(0, stmt.total_allowances - allocated);
+                     const baseSalaryOnly = stmt.base_amount - (stmt.details.base_tech_salary || 0) - (stmt.details.base_product_salary || 0);
+                     // @ts-ignore
+                     const bundledBasicSalary = baseSalaryOnly + unallocated;
+
+                     return (
+                       <>
+                         {stmt.type === "salary" && (
+                           <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-2">
+                             <div className="text-xs">
+                               <div className="font-bold">基本給</div>
+                               <div className="text-[10px] text-slate-500 scale-90 origin-left">(ベース給＋皆勤手当＋業務手当)</div>
+                             </div>
+                             <span>{bundledBasicSalary.toLocaleString()}</span>
+                           </div>
+                         )}
+                         {stmt.details.base_tech_salary > 0 && (
+                           <div className="flex justify-between text-xs"><span>技術歩合/インセンティブ</span><span>{stmt.details.base_tech_salary.toLocaleString()}</span></div>
+                         )}
+                         {stmt.details.base_product_salary > 0 && (
+                           <div className="flex justify-between text-xs"><span>店販歩合</span><span>{stmt.details.base_product_salary.toLocaleString()}</span></div>
+                         )}
+                         {/* @ts-ignore */}
+                         {stmt.details.executive_allowance > 0 && (
+                           <div className="flex justify-between text-xs"><span>役職・その他手当</span><span>{(stmt.details.executive_allowance || 0).toLocaleString()}</span></div>
+                         )}
+                         
+                         {/* Separated Allowances */}
+                         {(stmt.details.nomination_reward > 0 || stmt.details.nomination_reward === 0) && (
+                           <div className="flex justify-between text-xs"><span>指名手当</span><span>{stmt.details.nomination_reward.toLocaleString()}</span></div>
+                         )}
+                         {stmt.details.transport_fee > 0 && (
+                           <div className="flex justify-between text-xs"><span>通勤手当</span><span>{stmt.details.transport_fee.toLocaleString()}</span></div>
+                         )}
+                         {/* @ts-ignore */}
+                         {stmt.details.review_allowance > 0 && (
+                           <div className="flex justify-between text-xs">
+                             <span>口コミ手当</span>
+                             {/* @ts-ignore */}
+                             <span>{stmt.details.review_allowance.toLocaleString()}</span>
+                           </div>
+                         )}
+                         {/* @ts-ignore */}
+                         {stmt.details.blog_allowance > 0 && (
+                           <div className="flex justify-between text-xs">
+                             <span>ブログ手当</span>
+                             {/* @ts-ignore */}
+                             <span>{stmt.details.blog_allowance.toLocaleString()}</span>
+                           </div>
+                         )}
+                       </>
+                     );
                    })()}
 
                    {stmt.details.tax_addition > 0 && (

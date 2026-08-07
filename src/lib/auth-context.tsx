@@ -5,6 +5,7 @@ import { onAuthStateChanged, User } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { StaffProfile, StaffRole } from "@/app/staff/actions";
+import { SalesMasterItem, AttendancePolicy, FeatureKey, FeatureSettings, ensureFeatureDefaults } from "@/types/master";
 
 interface AuthContextType {
   user: User | null;
@@ -12,13 +13,22 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   isSystemOwner: boolean;
+  isAccountant: boolean;
+  impersonatingCompanyId: string | null;
+  stopImpersonating: () => void;
   isManager: boolean;
   isStaff: boolean;
   selectedStore: string;
   setSelectedStore: (store: string) => void;
   availableStores: string[];
+  availableStoreObjects: SalesMasterItem[];
   tenantPlan: string;
   isCompanyOwner: boolean;
+  schoolEnabled: boolean;
+  schoolName: string;
+  isSystemOwnerCompany: boolean;
+  attendancePolicy: AttendancePolicy;
+  hasFeature: (feature: FeatureKey) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -27,13 +37,22 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   isAdmin: false,
   isSystemOwner: false,
+  isAccountant: false,
+  impersonatingCompanyId: null,
+  stopImpersonating: () => {},
   isManager: false,
   isStaff: false,
   selectedStore: "",
   setSelectedStore: () => {},
   availableStores: [],
+  availableStoreObjects: [],
   tenantPlan: "Standard",
   isCompanyOwner: false,
+  schoolEnabled: false,
+  schoolName: "",
+  isSystemOwnerCompany: false,
+  attendancePolicy: { roundingEnabled: false, roundingIntervalMinutes: 0 },
+  hasFeature: () => false,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -43,7 +62,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<StaffProfile | null>(null);
   const [selectedStore, setSelectedStoreState] = useState<string>("");
   const [availableStores, setAvailableStores] = useState<string[]>([]);
+  const [availableStoreObjects, setAvailableStoreObjects] = useState<SalesMasterItem[]>([]);
   const [tenantPlan, setTenantPlan] = useState<string>("Standard");
+  const [schoolEnabled, setSchoolEnabled] = useState<boolean>(false);
+  const [schoolName, setSchoolName] = useState<string>("");
+  const [isSystemOwner, setIsSystemOwner] = useState(false);
+  const [isAccountant, setIsAccountant] = useState(false);
+  const [impersonatingCompanyId, setImpersonatingCompanyId] = useState<string | null>(null);
+  const [isSystemOwnerCompany, setIsSystemOwnerCompany] = useState<boolean>(false);
+  const [attendancePolicy, setAttendancePolicy] = useState<AttendancePolicy>({ roundingEnabled: false, roundingIntervalMinutes: 0 });
+  const [features, setFeatures] = useState<Record<string, boolean>>({});
+
+  // Stop impersonating function
+  const stopImpersonating = () => {
+    document.cookie = "impersonated_company_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    window.location.href = "/admin/master/system/tenants";
+  };
+
+  const hasFeature = (feature: FeatureKey) => {
+    return !!features[feature];
+  };
   const [loading, setLoading] = useState(true);
 
   // Persistence for selected store
@@ -87,9 +125,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const data = staffDoc.data();
             setProfile({ id: staffDoc.id, ...data } as StaffProfile);
             
-            // Fetch tenant plan
+            // Fetch tenant plan and settings
             let currentPlan = "Standard";
-            const companyIdToUse = data.companyId;
+            let currentSchoolEnabled = false;
+            let currentSchoolName = "";
+            let companyIdToUse = data.companyId;
+
+            setIsSystemOwner(data.role === "systemOwner");
+            setIsAccountant(data.role === "accountant");
+            setTenantPlan(currentPlan);
+            
+            // Impersonation logic for systemOwner
+            if (data.role === "systemOwner") {
+              const cookies = document.cookie.split(';');
+              const impCookie = cookies.find(c => c.trim().startsWith('impersonated_company_id='));
+              if (impCookie) {
+                const impId = impCookie.split('=')[1];
+                if (impId) {
+                  companyIdToUse = impId;
+                  setImpersonatingCompanyId(impId);
+                }
+              }
+            }
 
             if (!companyIdToUse && data.role !== "systemOwner") {
               console.error("会社情報が未設定です");
@@ -101,44 +158,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (companyIdToUse) {
               try {
                 const companyDoc = await getDoc(doc(db, "companies", companyIdToUse));
-                if (companyDoc.exists()) {
-                  currentPlan = companyDoc.data().plan || "Standard";
+                const companyData = companyDoc.exists() ? companyDoc.data() : {};
+                
+                currentPlan = companyData.plan || "Standard";
+                currentSchoolEnabled = !!companyData.schoolEnabled;
+                currentSchoolName = companyData.schoolName || "";
+                
+                const isSystemOwner = companyData.companyType === "system_owner";
+                setIsSystemOwnerCompany(isSystemOwner);
+                setAttendancePolicy(companyData.attendancePolicy || (
+                  isSystemOwner 
+                    ? { roundingEnabled: true, roundingIntervalMinutes: 30, linkWithShifts: true }
+                    : { roundingEnabled: false, roundingIntervalMinutes: 0, linkWithShifts: false }
+                ));
+
+                // Load features or apply defaults
+                const safeFeatures = ensureFeatureDefaults(companyData.features, isSystemOwner);
+                setFeatures(safeFeatures);
+
+                setTenantPlan(currentPlan);
+                setSchoolEnabled(currentSchoolEnabled);
+                setSchoolName(currentSchoolName);
+
+                // Fetch available stores for this company
+                const masterRef = collection(db, "sales_master");
+                const storeQ = query(masterRef, where("itemType", "==", "store"));
+                const storeSnap = await getDocs(storeQ);
+                const storeObjects = storeSnap.docs
+                  .map(d => ({ id: d.id, ...d.data() } as SalesMasterItem))
+                  .filter(d => d.companyId === companyIdToUse && d.isActive !== false)
+                  .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+                  
+                const stores = storeObjects.map(d => d.name);
+                setAvailableStores(stores);
+                setAvailableStoreObjects(storeObjects);
+
+                const savedStore = localStorage.getItem("selected_store");
+                if (savedStore && stores.includes(savedStore)) {
+                  setSelectedStoreState(savedStore);
+                } else if (data.store_name && stores.includes(data.store_name)) {
+                  setSelectedStore(data.store_name);
+                } else if (stores.length > 0) {
+                  setSelectedStore(stores[0]);
                 }
               } catch (e) {
-                console.error("Failed to fetch company plan:", e);
+                console.error("Failed to fetch company info:", e);
               }
-            }
-            setTenantPlan(currentPlan);
-
-            // Fetch available stores for this company
-            try {
-              const masterRef = collection(db, "sales_master");
-              // Query all stores, filter by companyId in memory in case of missing compound index
-              const storeQ = query(masterRef, where("itemType", "==", "store"));
-              const storeSnap = await getDocs(storeQ);
-              const stores = storeSnap.docs
-                .map(d => d.data())
-                .filter(d => d.companyId === companyIdToUse && d.isActive !== false)
-                .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
-                .map(d => d.name);
-                
-              const finalStores = stores.length > 0 ? stores : []; 
-              setAvailableStores(finalStores);
-
-              const savedStore = localStorage.getItem("selected_store");
-              if (savedStore && finalStores.includes(savedStore)) {
-                setSelectedStoreState(savedStore);
-              } else if (data.store_name && finalStores.includes(data.store_name)) {
-                setSelectedStore(data.store_name);
-              } else if (finalStores.length > 0) {
-                setSelectedStore(finalStores[0]);
-              }
-            } catch (err) {
-              console.error("Error fetching stores:", err);
-              setAvailableStores([]);
             }
           } else {
-            // No profile found, but user is authenticated via Auth. Give them default guest access.
             const fallbackName = firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : "ゲスト");
             setProfile({
               id: "guest_" + firebaseUser.uid,
@@ -179,7 +246,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     selectedStore,
     setSelectedStore,
     availableStores,
-    tenantPlan
+    availableStoreObjects,
+    tenantPlan,
+    schoolEnabled,
+    schoolName,
+    isSystemOwnerCompany,
+    attendancePolicy,
+    hasFeature,
+    isAccountant,
+    impersonatingCompanyId,
+    stopImpersonating
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

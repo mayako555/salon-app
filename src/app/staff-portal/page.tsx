@@ -38,7 +38,7 @@ import { toast } from "sonner";
 import SNSTaskSection from "@/app/tasks/SNSTaskSection";
 
 export default function StaffDashboardPage() {
-  const { profile, availableStores: contextAvailableStores } = useAuth();
+  const { profile, availableStores: contextAvailableStores, hasFeature } = useAuth();
   const [recentCustomers, setRecentCustomers] = useState<Customer[]>([]);
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [storeStats, setStoreStats] = useState<any[]>([]);
@@ -502,6 +502,7 @@ export default function StaffDashboardPage() {
         </div>
 
         {/* Today's Staffing by Store */}
+        {hasFeature("shifts") && (
         <div>
           <div className="flex justify-between items-center mb-3 px-1">
             <h2 className="font-bold text-slate-800 flex items-center gap-2">
@@ -556,9 +557,10 @@ export default function StaffDashboardPage() {
             })}
           </div>
         </div>
+        )}
 
         {/* Store Sales Targets */}
-        {canViewRestrictedStats && (
+        {canViewRestrictedStats && hasFeature("sales") && hasFeature("goals") && (
         <div>
           <div className="flex justify-between items-center mb-3 px-1">
             <h2 className="font-bold text-slate-800 flex items-center gap-2">
@@ -604,6 +606,7 @@ export default function StaffDashboardPage() {
         )}
 
         {/* Recent Registrations */}
+        {hasFeature("customers") && (
         <div>
           <div className="flex justify-between items-center mb-3 px-1">
             <h2 className="font-bold text-slate-800 flex items-center gap-2">
@@ -655,6 +658,7 @@ export default function StaffDashboardPage() {
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* Reply Generator Modal */}

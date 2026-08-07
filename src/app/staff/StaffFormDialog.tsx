@@ -14,7 +14,7 @@ import { Plus, Edit2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
-  const { availableStores } = useAuth();
+  const { availableStores, isSystemOwner, isCompanyOwner } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [employmentType, setEmploymentType] = useState(staff?.employment_type || "outsourcing");
@@ -158,6 +158,12 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
               <option value="staff">スタッフ（閲覧・売上入力のみ）</option>
               <option value="manager">店長（シフト作成可）</option>
               <option value="admin">管理者（給与設定・全機能）</option>
+              {(isSystemOwner || isCompanyOwner) && (
+                <>
+                  <option value="companyOwner">オーナー（全権限・テナント管理）</option>
+                  <option value="accountant">税理士（経理情報閲覧のみ）</option>
+                </>
+              )}
             </select>
           </div>
 

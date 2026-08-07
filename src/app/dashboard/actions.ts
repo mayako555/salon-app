@@ -42,6 +42,14 @@ export async function getDashboardStats() {
     // Fetch all sales for the company to avoid composite index issues, filter in memory
     const salesQuery = query(salesCol, where("companyId", "==", ctx.companyId));
     const salesSnap = await getDocs(salesQuery);
+    
+    // Fetch School Sales if enabled
+    let schoolSalesSnap: any = { docs: [] };
+    if (ctx.schoolEnabled) {
+      const schoolSalesCol = collection(db, "school_sales");
+      const schoolSalesQuery = query(schoolSalesCol, where("companyId", "==", ctx.companyId));
+      schoolSalesSnap = await getDocs(schoolSalesQuery);
+    }
 
     let monthlyTotal = 0;
     let monthlyMinimoTotal = 0;
@@ -113,6 +121,26 @@ export async function getDashboardStats() {
       monthlyStoreSales[store] = (monthlyStoreSales[store] || 0) + amount;
     });
 
+    // Process school sales
+    if (ctx.schoolEnabled && ctx.schoolName) {
+      schoolSalesSnap.forEach((doc: any) => {
+        const data = doc.data();
+        const date = data.date || "";
+        const isThisMonth = date.startsWith(currentMonthPrefix);
+        const isToday = date === todayStr;
+        const amount = data.amount || 0;
+
+        if (isThisMonth) {
+          monthlyTotal += amount;
+          monthlyStoreSales[ctx.schoolName!] = (monthlyStoreSales[ctx.schoolName!] || 0) + amount;
+        }
+
+        if (isToday) {
+          storeSummary[ctx.schoolName!] = (storeSummary[ctx.schoolName!] || 0) + amount;
+        }
+      });
+    }
+
     // Use user's salonIds if available, otherwise fallback to all targets
     const isTenantAdmin = ctx.role === "systemOwner" || ctx.role === "admin" || ctx.role === "companyOwner";
     const availableStores = isTenantAdmin 
@@ -122,6 +150,11 @@ export async function getDashboardStats() {
           : storeTargets.map(t => t.store_name.endsWith("店") ? t.store_name.slice(0, -1) : t.store_name));
           
     const uniqueStores = Array.from(new Set(availableStores));
+    if (ctx.schoolEnabled && ctx.schoolName) {
+      if (!uniqueStores.includes(ctx.schoolName)) {
+        uniqueStores.push(ctx.schoolName);
+      }
+    }
     
     // Initialize summary to 0 for unique stores
     uniqueStores.forEach(name => {

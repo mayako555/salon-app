@@ -42,14 +42,21 @@ import { useAuth } from "@/lib/auth-context";
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { profile, isAdmin, isManager, isStaff, isSystemOwner, isCompanyOwner, tenantPlan } = useAuth();
+  const { profile, isAdmin, isManager, isStaff, isSystemOwner, isCompanyOwner, isAccountant, tenantPlan, schoolEnabled, hasFeature } = useAuth();
 
   const hasAccess = (role: string) => {
     if (role === "systemOwner") return isSystemOwner;
     if (role === "companyOwner") return isCompanyOwner || isSystemOwner;
-    if (role === "admin") return isAdmin;
-    if (role === "manager") return isManager || isAdmin || isCompanyOwner;
-    if (role === "staff") return isStaff || isManager || isAdmin || isCompanyOwner;
+    
+    // If the user is exclusively an accountant, they ONLY get access to accountant roles
+    if (isAccountant && !isCompanyOwner && !isSystemOwner) {
+      return role === "accountant";
+    }
+
+    if (role === "accountant") return isAccountant || isSystemOwner || isCompanyOwner || isAdmin;
+    if (role === "admin") return isAdmin || isSystemOwner || isCompanyOwner;
+    if (role === "manager") return isManager || isAdmin || isCompanyOwner || isSystemOwner;
+    if (role === "staff") return isStaff || isManager || isAdmin || isCompanyOwner || isSystemOwner;
     return true;
   };
 
@@ -64,27 +71,27 @@ export function Sidebar() {
       title: "日常業務",
       items: [
         { name: "スタッフホーム", href: "/staff-portal", icon: LayoutDashboard, role: "staff" },
-        { name: "AIタスク管理", href: "/admin/tasks", icon: ClipboardList, role: "manager" },
-        { name: "予約カレンダー", href: "/staff-portal/reservations", icon: CalendarDays, role: "staff" },
-        { name: "顧客管理", href: "/staff-portal/customers", icon: Users, role: "staff" },
-        { name: "売上管理・レジ締め", href: isAdmin || isManager ? "/sales" : "/staff-portal/sales", icon: Coins, role: "staff" },
+        { name: "AIタスク管理", href: "/admin/tasks", icon: ClipboardList, role: "manager", feature: "tasks" },
+        { name: "予約カレンダー", href: "/staff-portal/reservations", icon: CalendarDays, role: "staff", feature: "reservations" },
+        { name: "顧客管理", href: "/staff-portal/customers", icon: Users, role: "staff", feature: "customers" },
+        { name: "売上管理・レジ締め", href: isAdmin || isManager ? "/sales" : "/staff-portal/sales", icon: Coins, role: "staff", feature: "sales" },
       ]
     },
     {
       title: "分析・経理",
       items: [
         { name: "高度分析", href: "/analytics", icon: Sparkles, role: "admin" }, // All admins can see the page, but tabs are restricted inside
-        { name: "経費・収支管理", href: "/admin/expenses", icon: Wallet, role: "admin" },
-        { name: "給与・報酬計算", href: "/payroll", icon: Calculator, role: "admin" },
+        { name: "経費・収支管理", href: "/admin/expenses", icon: Wallet, role: "admin", feature: "expenses" },
+        { name: "給与・報酬計算", href: "/payroll", icon: Calculator, role: "admin", feature: "payroll" },
       ]
     },
     {
       title: "勤怠・シフト",
       items: [
-        { name: "シフト管理", href: "/shifts", icon: CalendarDays, role: "manager" },
-        { name: "勤怠管理", href: "/attendance", icon: Clock, role: "admin" },
-        { name: "店舗用タイムカード", href: "/attendance/setup", icon: Clock, role: "admin" },
-        { name: "有給管理", href: "/admin/paid-leaves", icon: CalendarDays, role: "admin" },
+        { name: "シフト管理", href: "/shifts", icon: CalendarDays, role: "manager", feature: "shifts" },
+        { name: "勤怠管理", href: "/attendance", icon: Clock, role: "admin", feature: "attendance" },
+        { name: "店舗用タイムカード", href: "/attendance/setup", icon: Clock, role: "admin", feature: "attendance" },
+        { name: "有給管理", href: "/admin/paid-leaves", icon: CalendarDays, role: "admin", feature: "attendance" },
       ]
     },
     {
@@ -92,43 +99,56 @@ export function Sidebar() {
       items: [
         { name: "採用管理", href: "/admin/recruitment", icon: Briefcase, role: "admin" },
         { name: "スタッフ管理", href: "/staff", icon: Users, role: "admin" },
-        { name: "スタッフ評価", href: "/evaluations", icon: Award, role: "admin" },
-        { name: "新人教育", href: "/training", icon: GraduationCap, role: "admin" },
+        { name: "スタッフ評価", href: "/evaluations", icon: Award, role: "admin", feature: "evaluations" },
+        { name: "新人教育", href: "/training", icon: GraduationCap, role: "admin", feature: "training" },
       ]
     },
     {
       title: "マスタ・データ管理",
       items: [
-        { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste, role: "admin" },
-        { name: "口コミ一括取込", href: "/admin/reviews/import", icon: ClipboardPaste, role: "admin" },
+        { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste, role: "admin", feature: "customers" },
+        { name: "口コミ一括取込", href: "/admin/reviews/import", icon: ClipboardPaste, role: "admin", feature: "sales" },
         { name: "店舗運用マスタ", href: "/admin/master/operations", icon: Database, role: "admin" },
         { name: "システム管理マスタ", href: "/admin/master/system", icon: Settings, role: "systemOwner" },
-        { name: "在庫管理", href: "/inventory", icon: Package, role: "manager" },
+        { name: "在庫管理", href: "/inventory", icon: Package, role: "manager", feature: "inventory" },
         { name: "雇用・業務委託契約", href: "/contracts", icon: FileText, role: "admin" },
         { name: "手当管理", href: "/allowances", icon: Gift, role: "admin" },
-        { name: "FC契約・請求管理", href: "/admin/settings/subscription", icon: Building2, role: "companyOwner" },
+        { name: "請求書", href: "/admin/settings/subscription", icon: Building2, role: "companyOwner" },
         { name: "システム設定", href: "/admin/settings", icon: Settings, role: "companyOwner" },
         { name: "監査ログ", href: "/audit", icon: Settings, role: "systemOwner" },
       ]
     }
   ];
 
+  if (schoolEnabled) {
+    managementCategories.push({
+      title: "スクール管理",
+      items: [
+        { name: "スクールダッシュボード", href: "/admin/school/dashboard", icon: LayoutDashboard, role: "manager" },
+        { name: "予約カレンダー", href: "/admin/school/reservations", icon: CalendarDays, role: "manager" },
+        { name: "受講生管理", href: "/admin/school/students", icon: Users, role: "manager" },
+        { name: "講座マスタ", href: "/admin/school/courses", icon: BookOpen, role: "admin" },
+        { name: "経理レポート", href: "/admin/school/accounting-report", icon: FileText, role: "accountant" },
+      ]
+    });
+  }
+
   const staffCategories = [
     {
       title: "各種申請・確認",
       items: [
-        { name: "自分の明細を確認", href: "/staff-portal/payroll", icon: Calculator },
-        { name: "交通費の申請", href: "/staff-portal/transport", icon: Train },
-        { name: "経費の申請", href: "/staff-portal/expenses", icon: Wallet },
-        { name: "現金・入金管理", href: "/staff-portal/cash", icon: Banknote },
-        { name: "希望休の提出", href: "/staff-portal/holidays", icon: CalendarDays },
+        { name: "自分の明細を確認", href: "/staff-portal/payroll", icon: Calculator, feature: "payroll" },
+        { name: "交通費の申請", href: "/staff-portal/transport", icon: Train, feature: "payroll" },
+        { name: "経費の申請", href: "/staff-portal/expenses", icon: Wallet, feature: "expenses" },
+        { name: "現金・入金管理", href: "/staff-portal/cash", icon: Banknote, feature: "cash_management" },
+        { name: "希望休の提出", href: "/staff-portal/holidays", icon: CalendarDays, feature: "shifts" },
       ]
     },
     {
       title: "マニュアル・規程",
       items: [
-        { name: "就業規則", href: "/staff-portal/rules", icon: BookOpen },
-        { name: "マニュアル", href: "/manuals", icon: Library },
+        { name: "就業規則", href: "/staff-portal/rules", icon: BookOpen, feature: "training" },
+        { name: "マニュアル", href: "/manuals", icon: Library, feature: "training" },
       ]
     },
     {
@@ -180,7 +200,11 @@ export function Sidebar() {
           {/* Management & Operations Section */}
           <div className="space-y-6">
             {managementCategories.map((category) => {
-              const visibleItems = category.items.filter(item => hasAccess(item.role));
+              const visibleItems = category.items.filter(item => {
+                if (item.role && !hasAccess(item.role)) return false;
+                if ((item as any).feature && !hasFeature((item as any).feature)) return false;
+                return true;
+              });
               if (visibleItems.length === 0) return null;
               
               return (

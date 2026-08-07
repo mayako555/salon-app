@@ -11,7 +11,7 @@ import { signOut } from "firebase/auth";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, impersonatingCompanyId, stopImpersonating } = useAuth();
   const isLoginPage = pathname === "/login";
 
   if (isLoginPage) {
@@ -41,6 +41,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="flex flex-1 flex-col overflow-hidden">
+        {impersonatingCompanyId && (
+          <div className="bg-amber-500 text-white px-4 py-2 flex items-center justify-between shadow-sm z-20">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-sm">⚠️ 現在、代理ログイン中（テナントID: {impersonatingCompanyId}）</span>
+            </div>
+            <button
+              onClick={stopImpersonating}
+              className="text-xs font-bold bg-white text-amber-600 px-3 py-1 rounded shadow-sm hover:bg-amber-50"
+            >
+              元に戻る
+            </button>
+          </div>
+        )}
         <header className="flex h-14 md:h-16 flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 md:px-8 shadow-sm z-10">
           <div className="flex flex-1 items-center gap-2">
             <div className="flex items-center gap-2 md:hidden">

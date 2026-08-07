@@ -17,7 +17,7 @@ import {
 import { addAuditLog } from "../audit/actions";
 import { revalidatePath } from "next/cache";
 
-export type StaffRole = "systemOwner" | "companyOwner" | "manager" | "storeManager" | "staff" | "admin";
+export type StaffRole = "systemOwner" | "companyOwner" | "manager" | "storeManager" | "staff" | "admin" | "accountant";
 export type EvaluationRole = "general" | "educator" | "sub_manager" | "manager" | "area_manager";
 
 export type StaffProfile = {
@@ -58,12 +58,13 @@ export type StaffProfile = {
 const STAFF_COLLECTION = "staff_profiles";
 
 import { getCurrentUserContext } from "@/lib/auth-server";
+import { getTenantCollection, getTenantDoc } from "@/lib/tenant-utils";
 
 export async function getStaffList(): Promise<StaffProfile[]> {
   try {
     const ctx = await getCurrentUserContext();
     const { adminDb } = await import("@/lib/firebase-admin");
-    const snapshot = await adminDb.collection(STAFF_COLLECTION).get();
+    const snapshot = await getTenantCollection(STAFF_COLLECTION, ctx).get();
     
     if (snapshot.empty) {
       return [];
@@ -100,7 +101,7 @@ export async function getStaffList(): Promise<StaffProfile[]> {
       throw new Error("会社IDが指定されていません");
     }
 
-    const filteredStaff = staff.filter(s => s.companyId === ctx.companyId);
+    const filteredStaff = staff;
 
     if (filteredStaff.length === 0) {
       return [{
@@ -271,6 +272,8 @@ export async function addStaff(formData: FormData) {
 
 export async function editStaff(id: string, formData: FormData) {
   try {
+    const ctx = await getCurrentUserContext();
+    await getTenantDoc(STAFF_COLLECTION, id, ctx);
     const lastName = formData.get("last_name") as string || "";
     const firstName = formData.get("first_name") as string || "";
     const lastNameKana = formData.get("last_name_kana") as string || "";
@@ -390,6 +393,8 @@ export async function editStaff(id: string, formData: FormData) {
 
 export async function deleteStaff(id: string, uid?: string) {
   try {
+    const ctx = await getCurrentUserContext();
+    await getTenantDoc(STAFF_COLLECTION, id, ctx);
     // 1. Delete from Firebase Auth if uid exists
     if (uid) {
       try {
@@ -424,6 +429,10 @@ export async function deleteStaff(id: string, uid?: string) {
 
 export async function updateStaffOrder(orderedIds: string[]) {
   try {
+    const ctx = await getCurrentUserContext();
+    for (const id of orderedIds) {
+      await getTenantDoc(STAFF_COLLECTION, id, ctx);
+    }
     const batch = writeBatch(db);
     orderedIds.forEach((id, index) => {
       const docRef = doc(db, STAFF_COLLECTION, id);
@@ -440,6 +449,8 @@ export async function updateStaffOrder(orderedIds: string[]) {
 
 export async function updateStaffPasscode(staffId: string, passcode: string) {
   try {
+    const ctx = await getCurrentUserContext();
+    await getTenantDoc(STAFF_COLLECTION, staffId, ctx);
     if (!staffId || !passcode) {
       return { success: false, error: "無効な入力データです" };
     }

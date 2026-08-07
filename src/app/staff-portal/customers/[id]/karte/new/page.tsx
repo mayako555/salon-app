@@ -6,7 +6,7 @@ import { getCustomerById, Customer } from "@/lib/customers";
 import { addKarteRecord } from "@/lib/karte";
 import { getStaffList, StaffProfile } from "@/app/staff/actions";
 import { getMasterItems } from "@/app/sales/master-actions";
-import { SalesMasterItem } from "@/app/sales/seeds";
+import { SalesMasterItem } from "@/types/master";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";

@@ -77,21 +77,15 @@ export default function CustomerDetailPage() {
   const [entryUrl, setEntryUrl] = useState(""); // New: Entry URL
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
 
-  const { availableStores } = useAuth();
+  const { availableStores, availableStoreObjects } = useAuth();
 
-  const LINE_OA_IDS = availableStores.reduce((acc, store) => {
-    if (store === '六甲道') acc[store] = process.env.NEXT_PUBLIC_LINE_OA_ROKKO || process.env.NEXT_PUBLIC_LINE_OA_ID || "@dummy_line_id";
-    else if (store === '神戸') acc[store] = process.env.NEXT_PUBLIC_LINE_OA_KOBE || process.env.NEXT_PUBLIC_LINE_OA_ID || "@dummy_line_id";
-    else if (store === '元町') acc[store] = process.env.NEXT_PUBLIC_LINE_OA_MOTOMACHI || process.env.NEXT_PUBLIC_LINE_OA_ID || "@dummy_line_id";
-    else acc[store] = process.env.NEXT_PUBLIC_LINE_OA_ID || "@dummy_line_id";
+  const LINE_OA_IDS = availableStoreObjects.reduce((acc, store) => {
+    acc[store.name] = store.lineOaId || process.env.NEXT_PUBLIC_LINE_OA_ID || "@dummy_line_id";
     return acc;
   }, {} as Record<string, string>);
 
-  const LIFF_IDS = availableStores.reduce((acc, store) => {
-    if (store === '六甲道') acc[store] = process.env.NEXT_PUBLIC_LIFF_ID_ROKKO || process.env.NEXT_PUBLIC_LIFF_ID || "2009912937-1KgShdZB";
-    else if (store === '神戸') acc[store] = process.env.NEXT_PUBLIC_LIFF_ID_KOBE || process.env.NEXT_PUBLIC_LIFF_ID || "2009912937-1KgShdZB";
-    else if (store === '元町') acc[store] = process.env.NEXT_PUBLIC_LIFF_ID_MOTOMACHI || process.env.NEXT_PUBLIC_LIFF_ID || "2009912937-1KgShdZB";
-    else acc[store] = process.env.NEXT_PUBLIC_LIFF_ID || "2009912937-1KgShdZB";
+  const LIFF_IDS = availableStoreObjects.reduce((acc, store) => {
+    acc[store.name] = store.liffId || process.env.NEXT_PUBLIC_LIFF_ID || "2009912937-1KgShdZB";
     return acc;
   }, {} as Record<string, string>);
 

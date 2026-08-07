@@ -7,6 +7,19 @@ import { format, parseISO, isBefore, isAfter } from "date-fns";
 import { getMonthlyAttendance } from "./actions";
 import { getMonthlyShifts } from "@/app/shifts/actions";
 
+function normalizeStaffName(name: string) {
+  if (!name) return "";
+  return name.replace(/[\s　]+/g, "")
+    .replace(/凜/g, "凛")
+    .replace(/邊/g, "辺")
+    .replace(/齊|齋/g, "斉")
+    .replace(/澤/g, "沢")
+    .replace(/濱/g, "浜")
+    .replace(/嶋/g, "島")
+    .replace(/﨑|嵜/g, "崎")
+    .replace(/髙/g, "高");
+}
+
 export default function AttendanceCSVButton({ 
   date,
   isSaaS = false,
@@ -70,7 +83,11 @@ export default function AttendanceCSVButton({
     const startMins = inH * 60 + inM;
     const endMins = outH * 60 + outM;
     
-    const diff = endMins - startMins - breakMins;
+    let diff = endMins - startMins;
+    if (diff < 0) {
+      diff += 24 * 60; // Next day
+    }
+    diff -= breakMins;
     return diff > 0 ? (diff / 60).toFixed(2) : "0.00";
   };
 
@@ -89,33 +106,22 @@ export default function AttendanceCSVButton({
         return;
       }
 
-      // SaaSモードのヘッダーと直営店モードのヘッダーを分岐
-      const headers = isSaaS ? [
+      const headers = [
         "スタッフ名",
         "日付",
-        "出勤時刻",
-        "退勤時刻",
-        "実働時間(h)",
-        "休憩(分)",
-        "状態"
-      ] : [
-        "日付",
-        "スタッフ名",
-        "打刻(出勤)",
-        "打刻(退勤)",
-        "丸め後(出勤)",
-        "丸め後(退勤)",
-        "実働時間(h)",
-        "休憩(分)",
+        "有効時間 (給与計算用)",
+        "休憩時間(分)",
+        "実労働時間(h)",
+        "店舗",
         "状態"
       ];
 
-      // SaaSモード時はスタッフ名＞日付の順にソートする
+      // スタッフID＞日付の順にソートする (IDがない場合は名前でフォールバック)
       const sortedRecords = [...records].sort((a, b) => {
-        if (isSaaS) {
-          if (a.staff_name !== b.staff_name) {
-            return a.staff_name.localeCompare(b.staff_name);
-          }
+        const idA = a.staff_id || normalizeStaffName(a.staff_name);
+        const idB = b.staff_id || normalizeStaffName(b.staff_name);
+        if (idA !== idB) {
+          return idA.localeCompare(idB);
         }
         return a.date.localeCompare(b.date);
       });
@@ -133,29 +139,17 @@ export default function AttendanceCSVButton({
         const hours = calculateHours(r.clock_in, r.clock_out, r.break_minutes, shiftStart, shiftEnd);
         const statusStr = r.status === 'normal' ? '出勤' : r.status === 'leave' ? '有給' : '欠勤';
 
-        if (isSaaS) {
-          return [
-            r.staff_name,
-            r.date,
-            clockInStr,
-            clockOutStr,
-            hours,
-            r.break_minutes,
-            statusStr
-          ].join(",");
-        } else {
-          return [
-            r.date,
-            r.staff_name,
-            clockInStr,
-            clockOutStr,
-            roundedInStr,
-            roundedOutStr,
-            hours,
-            r.break_minutes,
-            statusStr
-          ].join(",");
-        }
+        const effectiveTimeStr = roundedInStr || roundedOutStr ? `${roundedInStr} - ${roundedOutStr}` : "";
+
+        return [
+          r.staff_name,
+          r.date,
+          effectiveTimeStr,
+          r.break_minutes,
+          hours,
+          r.store || "",
+          statusStr
+        ].join(",");
       });
 
       const csvContent = [headers.join(","), ...rows].join("\n");

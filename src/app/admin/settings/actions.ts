@@ -14,6 +14,13 @@ export type ReservationSettings = {
   stores: Record<string, StoreReservationSettings>;
 };
 
+export type ProductCommissionRule = {
+  keyword: string;
+  salesPrice: number; // 税込販売価格（基本歩合対象から除外する金額）
+  baseAmount: number; // 歩合対象金額（税抜単価など）
+  commissionRate: number; // 歩合率（％）
+};
+
 const DEFAULT_SETTINGS: ReservationSettings = {
   stores: {
     "六甲": { startHour: 8, endHour: 22, slotDuration: 30 },
@@ -120,20 +127,45 @@ export async function getCompanySettings(companyId: string) {
     if (snap.exists()) {
       return snap.data();
     }
-    return { attendanceRule: "simple" };
+    return { attendancePolicy: { roundingEnabled: false, roundingIntervalMinutes: 0 } };
   } catch (error) {
     console.error("Failed to get company settings:", error);
-    return { attendanceRule: "simple" };
+    return { attendancePolicy: { roundingEnabled: false, roundingIntervalMinutes: 0 } };
   }
 }
 
-export async function saveCompanyAttendanceRule(companyId: string, rule: "jasminelash" | "simple") {
+export async function saveCompanyAttendancePolicy(companyId: string, policy: { roundingEnabled: boolean, roundingIntervalMinutes: number, linkWithShifts?: boolean }, callerId: string) {
   try {
+    const callerRef = doc(db, "staff", callerId);
+    const callerSnap = await getDoc(callerRef);
+    if (!callerSnap.exists()) throw new Error("Caller not found");
+    const callerData = callerSnap.data();
+    
+    if (callerData.role !== "systemOwner") {
+      throw new Error("Permission denied: Only system owners can modify attendance policies.");
+    }
+
     const docRef = doc(db, "companies", companyId);
-    await setDoc(docRef, { attendanceRule: rule }, { merge: true });
+    const companySnap = await getDoc(docRef);
+    if (companySnap.exists() && companySnap.data().companyType !== "system_owner") {
+      throw new Error("Permission denied: Cannot set custom attendance policy for general franchise.");
+    }
+
+    await setDoc(docRef, { attendancePolicy: policy }, { merge: true });
     return { success: true };
   } catch (error: any) {
-    console.error("Failed to save attendance rule:", error);
+    console.error("Failed to save attendance policy:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function saveCompanyProductRules(companyId: string, rules: ProductCommissionRule[]) {
+  try {
+    const docRef = doc(db, "companies", companyId);
+    await setDoc(docRef, { productCommissionRules: rules }, { merge: true });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to save product commission rules:", error);
     return { success: false, error: error.message };
   }
 }

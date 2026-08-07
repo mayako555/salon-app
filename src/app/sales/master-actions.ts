@@ -14,7 +14,7 @@ import {
   deleteDoc,
   writeBatch
 } from "firebase/firestore";
-import { SalesMasterItem } from "./seeds";
+import { SalesMasterItem } from "@/types/master";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { addAuditLog } from "../audit/actions";
 
@@ -101,6 +101,8 @@ export async function upsertMasterItem(data: Partial<SalesMasterItem>) {
       equipmentAssignable: !!data.equipmentAssignable,
       openTime: data.openTime || "",
       closeTime: data.closeTime || "",
+      lineOaId: data.lineOaId || "",
+      liffId: data.liffId || "",
       updated_at: serverTimestamp()
     };
 

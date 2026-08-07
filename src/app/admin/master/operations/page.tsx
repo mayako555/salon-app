@@ -11,7 +11,7 @@ import {
   duplicateMasterItem
 } from "@/app/sales/master-actions";
 import { resetSalesMasterData } from "@/app/sales/actions";
-import { SalesMasterItem } from "@/app/sales/seeds";
+import { SalesMasterItem } from "@/types/master";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -779,6 +779,7 @@ export default function MasterManagementPage() {
                 />
               </div>
             {editingItem?.itemType === 'store' && (
+              <>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Open Time (開店時間)</label>
@@ -799,6 +800,27 @@ export default function MasterManagementPage() {
                   />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">LINE OA ID (公式LINE ID)</label>
+                  <Input 
+                    value={editingItem?.lineOaId || ""} 
+                    onChange={(e) => setEditingItem({ ...editingItem!, lineOaId: e.target.value })}
+                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
+                    placeholder="@123abcde"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">LIFF ID</label>
+                  <Input 
+                    value={editingItem?.liffId || ""} 
+                    onChange={(e) => setEditingItem({ ...editingItem!, liffId: e.target.value })}
+                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4"
+                    placeholder="1234567890-abcdefgh"
+                  />
+                </div>
+              </div>
+              </>
             )}
 
             {editingItem?.itemType !== 'reservationRoute' && editingItem?.itemType !== 'paymentMethod' && editingItem?.itemType !== 'store' && (

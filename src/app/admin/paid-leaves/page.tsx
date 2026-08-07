@@ -201,7 +201,7 @@ export default function PaidLeavesPage() {
   };
 
   return (
-    <AuthGuard requireRole="admin">
+    <AuthGuard requireRole="admin" requireFeature="attendance">
       <div className="space-y-6 max-w-6xl mx-auto">
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-3">

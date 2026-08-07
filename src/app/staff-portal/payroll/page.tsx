@@ -80,7 +80,7 @@ export default function StaffPayrollPage() {
   };
 
   return (
-    <AuthGuard requireRole="staff">
+    <AuthGuard requireRole="staff" requireFeature="payroll">
       <div className="space-y-6 animate-in fade-in duration-500">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
           <div>

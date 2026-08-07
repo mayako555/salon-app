@@ -8,19 +8,19 @@ export function exportSalesToCsv(
   sales: SalesRecord[], 
   staffData: StaffSalesData[], 
   summaryData: SalesSummaryData[],
-  yearMonth: string
+  yearMonth: string,
+  availableStores: string[]
 ) {
   // CSV logic (Implementation could use papaparse or just join)
   // For simplicity, let's just do a basic CSV for the staff summary
-  let csvContent = "スタッフ名,六甲店,神戸店,元町店,入客数,技術単価,総客単価,合計売上,技術売上,店販売上,値引,達成率\n";
+  const storeHeaders = availableStores.map(store => `${store}店`).join(",");
+  let csvContent = `スタッフ名,${storeHeaders},入客数,技術単価,総客単価,合計売上,技術売上,店販売上,値引,達成率\n`;
   
   staffData.forEach(staff => {
-    const rokko = staff.storeSales["六甲"]?.total || 0;
-    const kobe = staff.storeSales["神戸"]?.total || 0;
-    const motomachi = staff.storeSales["元町"]?.total || 0;
+    const storeValues = availableStores.map(store => staff.storeSales[store]?.total || 0).join(",");
     const achievement = staff.goal ? Math.round((staff.totalSales / staff.goal) * 100) : "";
     
-    csvContent += `"${staff.name}",${rokko},${kobe},${motomachi},${staff.visits || 0},${staff.techAvg || 0},${staff.totalAvg || 0},${staff.totalSales},${staff.totalTech},${staff.totalProduct},${staff.totalDiscount},${achievement}%\n`;
+    csvContent += `"${staff.name}",${storeValues},${staff.visits || 0},${staff.techAvg || 0},${staff.totalAvg || 0},${staff.totalSales},${staff.totalTech},${staff.totalProduct},${staff.totalDiscount},${achievement}%\n`;
   });
 
   const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: "text/csv;charset=utf-8;" });
@@ -36,18 +36,18 @@ export function exportSalesToExcel(
   sales: SalesRecord[], 
   staffData: StaffSalesData[], 
   summaryData: SalesSummaryData[],
-  yearMonth: string
+  yearMonth: string,
+  availableStores: string[]
 ) {
   const wb = XLSX.utils.book_new();
 
   // Sheet 1: Staff Summary
+  const storeHeaders = availableStores.map(store => `${store}店`);
   const staffSheetData = [
-    ["スタッフ名", "六甲店", "神戸店", "元町店", "入客数", "技術単価", "総客単価", "合計売上", "技術売上", "店販売上", "値引額", "達成率"],
+    ["スタッフ名", ...storeHeaders, "入客数", "技術単価", "総客単価", "合計売上", "技術売上", "店販売上", "値引額", "達成率"],
     ...staffData.map(staff => [
       staff.name,
-      staff.storeSales["六甲"]?.total || 0,
-      staff.storeSales["神戸"]?.total || 0,
-      staff.storeSales["元町"]?.total || 0,
+      ...availableStores.map(store => staff.storeSales[store]?.total || 0),
       staff.visits || 0,
       staff.techAvg || 0,
       staff.totalAvg || 0,

@@ -5,13 +5,17 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
+import { FeatureKey } from "@/types/master";
+import { FeatureDenied } from "@/components/layout/FeatureDenied";
+
 interface AuthGuardProps {
   children: React.ReactNode;
-  requireRole?: "admin" | "manager" | "staff" | "systemOwner";
+  requireRole?: "admin" | "manager" | "staff" | "systemOwner" | "companyOwner";
+  requireFeature?: FeatureKey;
 }
 
-export default function AuthGuard({ children, requireRole = "staff" }: AuthGuardProps) {
-  const { user, profile, loading, isAdmin, isManager, isStaff, isSystemOwner } = useAuth();
+export default function AuthGuard({ children, requireRole = "staff", requireFeature }: AuthGuardProps) {
+  const { user, profile, loading, isAdmin, isManager, isStaff, isSystemOwner, isCompanyOwner, hasFeature } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -50,13 +54,18 @@ export default function AuthGuard({ children, requireRole = "staff" }: AuthGuard
   const isAuthorized = 
     user && (
       (requireRole === "staff" && isStaff) ||
-      (requireRole === "manager" && (isManager || isAdmin || isSystemOwner)) ||
-      (requireRole === "admin" && (isAdmin || isSystemOwner)) ||
+      (requireRole === "manager" && (isManager || isAdmin || isSystemOwner || isCompanyOwner)) ||
+      (requireRole === "admin" && (isAdmin || isSystemOwner || isCompanyOwner)) ||
+      (requireRole === "companyOwner" && (isCompanyOwner || isSystemOwner)) ||
       (requireRole === "systemOwner" && isSystemOwner)
     );
 
   if (!isAuthorized) {
     return null; // Will redirect in useEffect
+  }
+
+  if (requireFeature && !hasFeature(requireFeature)) {
+    return <FeatureDenied />;
   }
 
   return <>{children}</>;

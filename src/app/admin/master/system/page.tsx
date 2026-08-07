@@ -2,7 +2,8 @@
 
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Users, Brain, FileText, LayoutDashboard, Calculator, ShieldCheck, Award, Beaker, Banknote } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Settings, Users, Brain, FileText, LayoutDashboard, Calculator, ShieldCheck, Award, Beaker, Banknote, Database } from "lucide-react";
 
 export default function SystemMasterPage() {
   const { isSystemOwner } = useAuth();
@@ -30,9 +31,15 @@ export default function SystemMasterPage() {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8 bg-slate-50/50 min-h-screen">
       <div>
-        <h1 className="text-3xl font-black tracking-tight text-slate-900 flex items-center gap-2">
-          <Settings className="text-indigo-600" /> システム管理マスタ
-        </h1>
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-3xl font-black tracking-tight text-slate-900 flex items-center gap-2">
+            <Settings className="text-indigo-600" /> システム管理マスタ
+          </h1>
+          <Badge variant="outline" className="text-xs py-1 px-2 border-indigo-200 bg-indigo-50 text-indigo-700 flex items-center gap-1">
+            <Database size={12} />
+            接続先: {process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "未設定"}
+          </Badge>
+        </div>
         <p className="text-slate-500 font-medium">システムオーナー専用の全テナント共通設定</p>
       </div>
 

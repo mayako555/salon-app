@@ -5,6 +5,8 @@ import { isNationalHoliday, isSalonEvent } from "@/lib/seasonal-events";
 import { fetchHistoricalWeather } from "@/lib/weather";
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { format, subMonths, addMonths, eachDayOfInterval, isWeekend, getDate, getDay, isAfter, isBefore, addDays, subDays, endOfMonth, startOfMonth, startOfYear } from "date-fns";
+import { getCurrentUserContext } from "@/lib/auth-server";
+import { getTenantCollection } from "@/lib/tenant-utils";
 
 // Minimal Matrix Math for Multiple Linear Regression
 function invertMatrix(M: number[][]): number[][] {
@@ -1285,6 +1287,7 @@ export async function getStaffAnalytics(companyId: string, storeId: string | nul
 
     // Fetch attendance to calculate work hours
     const attendanceSnap = await adminDb.collection("attendance")
+      .where("companyId", "==", companyId)
       .where("date", ">=", startStr)
       .where("date", "<=", endStr)
       .get(); // can't composite query on date + companyId if index missing, we filter in memory

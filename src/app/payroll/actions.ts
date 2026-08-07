@@ -1,5 +1,7 @@
 "use server";
 
+import { Decimal, applyRounding, calculateByRate } from "@/lib/decimal-utils";
+import { resolveAttendanceTimes } from "@/lib/attendance-utils";
 import { db } from "@/lib/firebase";
 import { 
   collection, 
@@ -174,20 +176,36 @@ export async function getAllStatements(): Promise<MonthlyStatement[]> {
   }
 }
 
-function calculateProductCommission(sales: any[], contract: any, cashlessRetail: number) {
-  let customBaseSum = 0;
+function calculateProductCommission(sales: any[], contract: any, cashlessRetail: number, rules: any[] = []) {
+  let customCommission = 0;
   let customOriginalSum = 0;
 
   for (const sale of sales) {
     if (sale.product_sales > 0 && sale.menu_course) {
       const menus = sale.menu_course.split(/ \+ |\, /);
       for (const m of menus) {
-        if (m.includes("コーティング")) {
-          customBaseSum += 1500;
-          customOriginalSum += 1760;
-        } else if (m.includes("リルジュ")) {
-          customBaseSum += 4300;
-          customOriginalSum += 4840;
+        let matched = false;
+        // First check custom rules
+        for (const rule of rules) {
+          if (rule.keyword && m.includes(rule.keyword)) {
+            const price = rule.salesPrice || 0;
+            const baseAmt = rule.baseAmount || price; // fallback to salesPrice if baseAmount is missing
+            const rate = rule.commissionRate || 0;
+            customOriginalSum += price;
+            customCommission += Math.floor(baseAmt * (rate / 100));
+            matched = true;
+            break;
+          }
+        }
+        // Fallback to legacy hardcoded if no rules match or no rules defined
+        if (!matched && rules.length === 0) {
+          if (m.includes("コーティング")) {
+            customCommission += 150;
+            customOriginalSum += 1760;
+          } else if (m.includes("リルジュ")) {
+            customCommission += 430;
+            customOriginalSum += 4840;
+          }
         }
       }
     }
@@ -208,7 +226,6 @@ function calculateProductCommission(sales: any[], contract: any, cashlessRetail:
     standardCommissionable = Math.floor(standardProductSales / 1.1);
   }
 
-  const customCommission = Math.floor(customBaseSum * (contract.product_sales_ratio / 100));
   const standardCommission = Math.floor(standardCommissionable * (contract.product_sales_ratio / 100));
 
   return customCommission + standardCommission;
@@ -255,6 +272,10 @@ export async function generateStatements(year: number, month: number) {
 
   // 3. Fetch dependencies
   const contracts = await getContractsList(); 
+  const companySnap = await getDocs(query(collection(db, "companies")));
+  const companyData = !companySnap.empty ? companySnap.docs[0].data() : {};
+  const productCommissionRules = companyData.productCommissionRules || [];
+
   const activeContracts = getActiveContractsForMonth(contracts, year, month);
   const sales = await getMonthlySales(year, month);
   const allowances = await getMonthlyAllowances(year, month);
@@ -275,13 +296,14 @@ export async function generateStatements(year: number, month: number) {
     const staffNameNormal = normalizeStaffName(contract.staff_name);
     const staffSales = sales.filter((s: any) => s.staff_name && normalizeStaffName(s.staff_name) === staffNameNormal);
     const staffAllowances = allowances.filter((a: any) => a.staff_name && normalizeStaffName(a.staff_name) === staffNameNormal);
-    const staffAttendances = attendances.filter((a: AttendanceRecord) => a.staff_name && normalizeStaffName(a.staff_name) === staffNameNormal);
+    const staffAttendances = attendances.filter((a: AttendanceRecord) => (a.staff_id && contract.staff_id && a.staff_id === contract.staff_id) || (a.staff_name && normalizeStaffName(a.staff_name) === staffNameNormal));
     const staffPaidLeaves = shifts.filter((s: ShiftRecord) => s.staff_id === contract.staff_id && s.type === "paid_leave").length;
 
     const storesWorkedSet = new Set<string>();
     staffAttendances.forEach((att: any) => {
       if (att.store) {
-        storesWorkedSet.add(att.store);
+        // Handle cases where multiple stores are joined by "/"
+        att.store.split(" / ").forEach((s: string) => storesWorkedSet.add(s.trim()));
       }
     });
     const storesWorked = Array.from(storesWorkedSet).filter(Boolean);
@@ -315,27 +337,49 @@ export async function generateStatements(year: number, month: number) {
       .filter((a: any) => ["other", "treatment"].includes(a.type))
       .reduce((acc: number, curr: any) => acc + curr.amount, 0);
 
-    // Track real attendance data
-    const workedDays = staffAttendances.length;
-    let workedHours = 0;
+    // Group by date to calculate daily hours correctly for multiple punches
+    const dailyRecords: Record<string, { in: Date, out: Date, break: number, status: string }> = {};
+    
+    staffAttendances.forEach((att: AttendanceRecord) => {
+      const date = att.date;
+      let { startTime: start, endTime: end } = resolveAttendanceTimes(att);
+      
+      if (!start || !end) return;
 
-    staffAttendances.forEach((record: AttendanceRecord) => {
-       const start = record.effective_clock_in ? new Date(record.effective_clock_in) : (record.clock_in ? new Date(new Date(record.clock_in).getTime() + 30 * 60 * 1000) : null);
-       const end = record.effective_clock_out ? new Date(record.effective_clock_out) : (record.clock_out ? new Date(record.clock_out) : null);
-       if (start && end) {
-          const diffMs = end.getTime() - start.getTime();
-          let diffMins = Math.floor(diffMs / 60000);
-          
-          diffMins -= (record.break_minutes || 0);
+      if (end < start) {
+        end = new Date(end.getTime() + 24 * 60 * 60 * 1000);
+      }
 
-          if (diffMins > 480) {
-             diffMins = 480;
-          }
-
-          workedHours += (diffMins / 60);
-       }
+      if (!dailyRecords[date]) {
+        dailyRecords[date] = { in: start, out: end, break: att.break_minutes || 0, status: att.status || "normal" };
+      } else {
+        if (start < dailyRecords[date].in) dailyRecords[date].in = start;
+        if (end > dailyRecords[date].out) dailyRecords[date].out = end;
+        dailyRecords[date].break = Math.max(dailyRecords[date].break, att.break_minutes || 0);
+      }
     });
 
+    const workedDays = Object.keys(dailyRecords).length;
+    let workedHours = 0;
+    let hourlyTotalMinutesWorked = 0;
+
+    Object.values(dailyRecords).forEach(daily => {
+      let diffMins = Math.floor((daily.out.getTime() - daily.in.getTime()) / 60000);
+      diffMins = Math.max(0, diffMins - daily.break);
+      
+      if (diffMins > 0) {
+        // non-hourly calc uses cap
+        let cappedMins = diffMins;
+        if (cappedMins > 480) cappedMins = 480;
+        workedHours += (cappedMins / 60);
+
+        // hourly calc does not use cap
+        if (daily.status === "normal") {
+          hourlyTotalMinutesWorked += diffMins;
+        }
+      }
+    });
+    
     workedHours = Math.round(workedHours * 10) / 10;
     
     // Use preserved values if no real attendance exists or if preserved exists
@@ -343,28 +387,24 @@ export async function generateStatements(year: number, month: number) {
     let finalWorkedHours = workedHours > 0 ? workedHours : (preserved?.worked_hours ?? (contract.contract_type === "hourly" ? 0 : 168));
 
     if (contract.contract_type === "hourly") {
-      let totalMinutesWorked = 0;
-      for (const att of staffAttendances) {
-        const start = att.effective_clock_in ? new Date(att.effective_clock_in) : (att.clock_in ? new Date(new Date(att.clock_in).getTime() + 30 * 60 * 1000) : null);
-        const end = att.effective_clock_out ? new Date(att.effective_clock_out) : (att.clock_out ? new Date(att.clock_out) : null);
-        if (start && end && att.status === "normal") {
-          const inMs = start.getTime();
-          const outMs = end.getTime();
-          const workedMinsRaw = Math.floor((outMs - inMs) / 60000);
-          const workedMinsNet = Math.max(0, workedMinsRaw - att.break_minutes);
-          totalMinutesWorked += workedMinsNet;
-        }
-      }
-
-      const totalHours = totalMinutesWorked > 0 ? (totalMinutesWorked / 60) : (preserved?.worked_hours ?? 0);
+      const totalHours = hourlyTotalMinutesWorked > 0 ? (hourlyTotalMinutesWorked / 60) : (preserved?.worked_hours ?? 0);
       const baseHourlySalary = Math.floor(totalHours * (contract.hourly_wage || 0));
       finalWorkedHours = totalHours;
+
+      let cashlessProductSales = 0;
+      for (const sale of staffSales) {
+        if (sale.payment_method !== "現金" && sale.payment_method !== "不明") {
+          cashlessProductSales += sale.product_sales;
+        }
+      }
+      const effectiveCashlessRetail = preservedAdjusts?.retail_cashless_sales_override ?? cashlessProductSales;
+      const productCommission = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules);
 
       const transportFee = preservedAdjusts?.transport_fee_override ?? transportAllowanceDb;
       const allowanceTotal = transportFee + nominationAllowanceDb + reviewAllowanceDb + blogAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
       const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
 
-      const intermediatePaidAmount = baseHourlySalary + allowanceTotal + customAdjustTotal;
+      const intermediatePaidAmount = baseHourlySalary + productCommission + allowanceTotal + customAdjustTotal;
       const taxAddition = 0; 
       const finalPaidAmount = intermediatePaidAmount + taxAddition;
 
@@ -444,7 +484,7 @@ export async function generateStatements(year: number, month: number) {
          techCommission = Math.floor((techSalesTaxFree - quota) * (contract.tech_sales_ratio / 100));
       }
       
-      const productCommission = calculateProductCommission(staffSales, contract, effectiveCashlessRetail);
+      const productCommission = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules);
       const nominationReward = nominationCount * contract.nomination_fee;
       
       const baseMonthlySalary = contract.monthly_base_salary || 0;
@@ -527,12 +567,14 @@ export async function generateStatements(year: number, month: number) {
           incentive = Math.floor(personalTaxFreeSales / 50000) * 5000 - 35000;
       }
       
+      const productCommission = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules);
+      
       const nominationReward = nominationCount * contract.nomination_fee;
       const transportFee = preservedAdjusts?.transport_fee_override ?? (transportAllowanceDb > 0 ? transportAllowanceDb : 17950);
       const allowanceTotal = transportFee + nominationAllowanceDb + reviewAllowanceDb + blogAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
       const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
 
-      const intermediatePaidAmount = baseMonthlySalary + incentive + nominationReward + allowanceTotal + customAdjustTotal;
+      const intermediatePaidAmount = baseMonthlySalary + incentive + productCommission + nominationReward + allowanceTotal + customAdjustTotal;
       const finalPaidAmount = intermediatePaidAmount;
 
       const statementPayload = {
@@ -540,7 +582,7 @@ export async function generateStatements(year: number, month: number) {
         staff_name: contract.staff_name || "不明",
         target_month: targetMonth,
         type: "salary", 
-        base_amount: baseMonthlySalary + incentive,
+        base_amount: baseMonthlySalary + incentive + productCommission,
         total_allowances: allowanceTotal,
         total_deductions: 0,
         final_paid_amount: finalPaidAmount,
@@ -548,7 +590,7 @@ export async function generateStatements(year: number, month: number) {
         adjustments: preservedAdjusts,
         work_location: storeLocation,
         details: {
-          base_tech_salary: incentive,
+          base_tech_salary: incentive + productCommission,
           base_product_salary: 0,
           nomination_reward: nominationReward,
           transport_fee: transportFee,
@@ -583,7 +625,7 @@ export async function generateStatements(year: number, month: number) {
     const baseTechSalary = Math.floor(commissionableTechSales * (contract.tech_sales_ratio / 100));
     const productCashlessFee = contract.deduction_cashless_ratio > 0 ? Math.floor(effectiveCashlessRetail * (contract.deduction_cashless_ratio / 100)) : 0;
     
-    const baseProductSalary = calculateProductCommission(staffSales, contract, effectiveCashlessRetail);
+    const baseProductSalary = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules);
     
     const nominationReward = nominationCount * contract.nomination_fee;
     let baseAmount = baseTechSalary + baseProductSalary + nominationReward;
@@ -777,6 +819,9 @@ export async function createManualStatement(data: {
 export async function getStaffPayrollDefaultValues(staffId: string, year: number, month: number) {
   try {
     const contracts = await getContractsList();
+    const companySnap = await getDocs(query(collection(db, "companies")));
+    const companyData = !companySnap.empty ? companySnap.docs[0].data() : {};
+    const productCommissionRules = companyData.productCommissionRules || [];
     const activeContracts = getActiveContractsForMonth(contracts, year, month);
     const contract = activeContracts.find(c => c.staff_id === staffId);
     if (!contract) {
@@ -798,12 +843,12 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
     const staffNameNormal = normalizeStaffName(contract.staff_name);
     const staffSales = sales.filter((s: any) => s.staff_name && normalizeStaffName(s.staff_name) === staffNameNormal);
     const staffAllowances = allowances.filter((a: any) => a.staff_name && normalizeStaffName(a.staff_name) === staffNameNormal);
-    const staffAttendances = attendances.filter((a: any) => a.staff_name && normalizeStaffName(a.staff_name) === staffNameNormal);
+    const staffAttendances = attendances.filter((a: any) => (a.staff_id && contract.staff_id && a.staff_id === contract.staff_id) || (a.staff_name && normalizeStaffName(a.staff_name) === staffNameNormal));
 
     const storesWorkedSet = new Set<string>();
     staffAttendances.forEach((att: any) => {
       if (att.store) {
-        storesWorkedSet.add(att.store);
+        att.store.split(" / ").forEach((s: string) => storesWorkedSet.add(s.trim()));
       }
     });
     const storesWorked = Array.from(storesWorkedSet).filter(Boolean);
@@ -830,20 +875,43 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
       }
     }
 
-    // Calculate worked days & hours
-    const workedDays = staffAttendances.length;
-    let workedHours = 0;
-    staffAttendances.forEach((record: any) => {
-       const start = record.effective_clock_in ? new Date(record.effective_clock_in) : (record.clock_in ? new Date(new Date(record.clock_in).getTime() + 30 * 60 * 1000) : null);
-       const end = record.effective_clock_out ? new Date(record.effective_clock_out) : (record.clock_out ? new Date(record.clock_out) : null);
-       if (start && end) {
-          const diffMs = end.getTime() - start.getTime();
-          let diffMins = Math.floor(diffMs / 60000);
-          diffMins -= (record.break_minutes || 0);
-          if (diffMins > 480) diffMins = 480;
-          workedHours += (diffMins / 60);
-       }
+    // Group by date to calculate daily hours correctly for multiple punches
+    const dailyRecords: Record<string, { in: Date, out: Date, break: number, status: string }> = {};
+    
+    staffAttendances.forEach((att: any) => {
+      const date = att.date;
+      let { startTime: start, endTime: end } = resolveAttendanceTimes(att);
+      
+      if (!start || !end) return;
+
+      if (!dailyRecords[date]) {
+        dailyRecords[date] = { in: start, out: end, break: att.break_minutes || 0, status: att.status || "normal" };
+      } else {
+        if (start < dailyRecords[date].in) dailyRecords[date].in = start;
+        if (end > dailyRecords[date].out) dailyRecords[date].out = end;
+        dailyRecords[date].break = Math.max(dailyRecords[date].break, att.break_minutes || 0);
+      }
     });
+
+    const workedDays = Object.keys(dailyRecords).length;
+    let workedHours = 0;
+    let hourlyTotalMinutesWorked = 0;
+
+    Object.values(dailyRecords).forEach(daily => {
+      let diffMins = Math.floor((daily.out.getTime() - daily.in.getTime()) / 60000);
+      diffMins = Math.max(0, diffMins - daily.break);
+      
+      if (diffMins > 0) {
+        let cappedMins = diffMins;
+        if (cappedMins > 480) cappedMins = 480;
+        workedHours += (cappedMins / 60);
+
+        if (daily.status === "normal") {
+          hourlyTotalMinutesWorked += diffMins;
+        }
+      }
+    });
+    
     workedHours = Math.round(workedHours * 10) / 10;
     const finalWorkedDays = workedDays > 0 ? workedDays : 21;
     const finalWorkedHours = workedHours > 0 ? workedHours : (contract.contract_type === "hourly" ? 0 : 168);
@@ -882,32 +950,14 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
       .filter((a: any) => ["other", "treatment"].includes(a.type))
       .reduce((acc: number, curr: any) => acc + curr.amount, 0);
 
-    let nominationCount = 0;
-    for (const sale of staffSales) {
-      if (sale.is_nominated) nominationCount += 1;
-    }
-    const nominationReward = nominationCount * (contract.nomination_fee || 0);
-
     let transportAllowance = transportAllowanceDb;
-    let nominationAllowance = nominationAllowanceDb + nominationReward;
+    let nominationAllowance = nominationAllowanceDb;
     let reviewAllowance = reviewAllowanceDb;
     let blogAllowance = blogAllowanceDb;
     let executiveAllowance = otherAllowanceDb + contractCustomAllowanceTotal;
 
     if (contract.contract_type === "hourly") {
-      let totalMinutesWorked = 0;
-      for (const att of staffAttendances) {
-        const start = att.effective_clock_in ? new Date(att.effective_clock_in) : (att.clock_in ? new Date(new Date(att.clock_in).getTime() + 30 * 60 * 1000) : null);
-        const end = att.effective_clock_out ? new Date(att.effective_clock_out) : (att.clock_out ? new Date(att.clock_out) : null);
-        if (start && end && att.status === "normal") {
-          const inMs = start.getTime();
-          const outMs = end.getTime();
-          const workedMinsRaw = Math.floor((outMs - inMs) / 60000);
-          const workedMinsNet = Math.max(0, workedMinsRaw - att.break_minutes);
-          totalMinutesWorked += workedMinsNet;
-        }
-      }
-      const totalHours = totalMinutesWorked > 0 ? (totalMinutesWorked / 60) : 0;
+      const totalHours = hourlyTotalMinutesWorked > 0 ? (hourlyTotalMinutesWorked / 60) : 0;
       base_amount = Math.floor(totalHours * finalHourlyWage);
 
       const totalAllowancesTmp = transportAllowance + nominationAllowance + reviewAllowance + blogAllowance + executiveAllowance;

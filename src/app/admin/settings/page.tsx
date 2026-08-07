@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getReservationSettings, saveReservationSettings, getLineSettings, saveLineSettings, ReservationSettings, LineSettingsMap, getCompanySettings, saveCompanyAttendanceRule, getKioskSettings, saveKioskSettings } from "./actions";
+import { getReservationSettings, saveReservationSettings, getLineSettings, saveLineSettings, ReservationSettings, LineSettingsMap, getCompanySettings, saveCompanyAttendancePolicy, getKioskSettings, saveKioskSettings, saveCompanyProductRules, ProductCommissionRule } from "./actions";
 import { getLineAutomationSettings, saveLineAutomationSettings, LineAutomationSettings } from "./line-automation-actions";
 import LineAutomationSettingsPanel from "./LineAutomationSettingsPanel";
+import ProductCommissionSettingsPanel from "./ProductCommissionSettingsPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,11 +13,12 @@ import { Save, Settings, MessageCircle, HelpCircle, Clock, LayoutDashboard } fro
 import { useAuth } from "@/lib/auth-context";
 
 export default function SystemSettingsPage() {
-  const { profile, isAdmin, availableStores } = useAuth();
+  const { profile, isAdmin, availableStores, isSystemOwnerCompany } = useAuth();
   const [settings, setSettings] = useState<ReservationSettings | null>(null);
   const [lineSettings, setLineSettings] = useState<LineSettingsMap>({});
   const [lineAutomationSettings, setLineAutomationSettings] = useState<LineAutomationSettings | null>(null);
-  const [attendanceRule, setAttendanceRule] = useState<"jasminelash" | "simple">("simple");
+  const [attendancePolicy, setAttendancePolicy] = useState<{roundingEnabled: boolean, roundingIntervalMinutes: number, linkWithShifts?: boolean}>({ roundingEnabled: false, roundingIntervalMinutes: 0 });
+  const [productRules, setProductRules] = useState<ProductCommissionRule[]>([]);
   const [kioskSettings, setKioskSettings] = useState<Record<string, { token: string, enabled: boolean }>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -32,7 +34,8 @@ export default function SystemSettingsPage() {
       ]);
       setSettings(data);
       setLineSettings(lineData);
-      setAttendanceRule(compData.attendanceRule || "simple");
+      setAttendancePolicy(compData.attendancePolicy || { roundingEnabled: false, roundingIntervalMinutes: 0 });
+      setProductRules(compData.productCommissionRules || []);
       setKioskSettings(kioskData || {});
       setLineAutomationSettings(lineAutomationData);
       setLoading(false);
@@ -103,8 +106,8 @@ export default function SystemSettingsPage() {
       return saveKioskSettings(profile?.companyId!, store, data.token, data.enabled);
     });
     
-    // Save Attendance Rule
-    await saveCompanyAttendanceRule(profile?.companyId!, attendanceRule);
+    // Save Attendance Policy
+    await saveCompanyAttendancePolicy(profile?.companyId!, attendancePolicy, profile?.id!);
 
     // Save Line Automation Settings
     if (lineAutomationSettings) {
@@ -112,6 +115,11 @@ export default function SystemSettingsPage() {
       if (!lineAuthRes.success) {
         toast.error(`自動配信設定の保存に失敗: ${lineAuthRes.error}`);
       }
+    }
+
+    // Save Product Commission Rules
+    if (profile?.companyId) {
+      await saveCompanyProductRules(profile.companyId, productRules);
     }
 
     await Promise.all([...linePromises, ...kioskPromises]);
@@ -143,53 +151,72 @@ export default function SystemSettingsPage() {
         </Button>
       </div>
 
-      <Card className="border-none shadow-lg shadow-slate-200/50 rounded-3xl overflow-hidden bg-white mb-8">
-        <CardHeader className="bg-amber-50 border-b border-amber-100">
-          <CardTitle className="text-lg font-black text-slate-800 flex items-center gap-2">
-            <Clock className="text-amber-600" /> 勤怠ルール設定（テナント全体）
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="space-y-4">
-            <p className="text-sm font-bold text-slate-500">
-              全店舗共通のタイムカード（打刻）処理ルールを選択します。<br/>
-              ※「Jasminelashルール」は、シフトデータと連携して出退勤時刻を自動補正（30分丸め等）します。<br/>
-              ※「Simpleルール」は、打刻された実時刻をそのまま記録します。
-            </p>
-            <div className="flex gap-4">
-              <label className={`flex-1 border-2 rounded-2xl p-4 cursor-pointer transition-all ${attendanceRule === 'jasminelash' ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-amber-200'}`}>
-                <input 
-                  type="radio" 
-                  name="attendanceRule" 
-                  value="jasminelash" 
-                  checked={attendanceRule === 'jasminelash'}
-                  onChange={(e) => setAttendanceRule(e.target.value as any)}
-                  className="hidden" 
-                />
-                <div className="font-black text-slate-800">Jasminelashルール</div>
-                <div className="text-xs text-slate-500 mt-1">シフト連動・30分丸め自動補正</div>
-              </label>
-              <label className={`flex-1 border-2 rounded-2xl p-4 cursor-pointer transition-all ${attendanceRule === 'simple' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-200'}`}>
-                <input 
-                  type="radio" 
-                  name="attendanceRule" 
-                  value="simple" 
-                  checked={attendanceRule === 'simple'}
-                  onChange={(e) => setAttendanceRule(e.target.value as any)}
-                  className="hidden" 
-                />
-                <div className="font-black text-slate-800">Simpleルール</div>
-                <div className="text-xs text-slate-500 mt-1">実時刻打刻（補正・丸めなし）</div>
-              </label>
+      {isSystemOwnerCompany && (
+        <Card className="border-none shadow-lg shadow-slate-200/50 rounded-3xl overflow-hidden bg-white mb-8">
+          <CardHeader className="bg-amber-50 border-b border-amber-100">
+            <CardTitle className="text-lg font-black text-slate-800 flex items-center gap-2">
+              <Clock className="text-amber-600" /> 勤怠ルール設定（テナント全体）
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              <p className="text-sm font-bold text-slate-500">
+                全店舗共通のタイムカード（打刻）処理ルールを設定します。
+              </p>
+              <div className="flex flex-col gap-4 mt-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={attendancePolicy.roundingEnabled}
+                    onChange={(e) => setAttendancePolicy(p => ({ ...p, roundingEnabled: e.target.checked }))}
+                    className="w-5 h-5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span className="font-bold text-slate-700">出退勤時間の丸め処理を有効にする</span>
+                </label>
+
+                {attendancePolicy.roundingEnabled && (
+                  <div className="pl-8 flex items-center gap-3">
+                    <span className="text-sm font-bold text-slate-600">丸め単位:</span>
+                    <select 
+                      value={attendancePolicy.roundingIntervalMinutes}
+                      onChange={(e) => setAttendancePolicy(p => ({ ...p, roundingIntervalMinutes: parseInt(e.target.value) }))}
+                      className="border-2 border-slate-200 rounded-xl p-2 text-sm font-bold text-slate-700 bg-white"
+                    >
+                      <option value={15}>15分単位</option>
+                      <option value={30}>30分単位</option>
+                    </select>
+                  </div>
+                )}
+
+                <label className="flex items-center gap-3 cursor-pointer mt-2">
+                  <input 
+                    type="checkbox" 
+                    checked={attendancePolicy.linkWithShifts || false}
+                    onChange={(e) => setAttendancePolicy(p => ({ ...p, linkWithShifts: e.target.checked }))}
+                    className="w-5 h-5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <div>
+                    <span className="font-bold text-slate-700 block">シフト連動モード（高度な判定）を有効にする</span>
+                    <span className="text-xs text-slate-500">シフト情報と連携し、遅刻・早退・休憩時間の自動補正などの高度な判定を行います。</span>
+                  </div>
+                </label>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {lineAutomationSettings && (
         <LineAutomationSettingsPanel 
           settings={lineAutomationSettings} 
           onChange={setLineAutomationSettings} 
+        />
+      )}
+
+      {profile?.companyId && (
+        <ProductCommissionSettingsPanel
+          rules={productRules}
+          onChange={setProductRules}
         />
       )}
 
@@ -256,6 +283,16 @@ export default function SystemSettingsPage() {
           </h2>
           <p className="text-slate-500 font-medium">各店舗のLINE Messaging API（チャネルアクセストークン）の設定</p>
         </div>
+
+        {availableStores.filter(store => store !== "共通" && store !== "全店舗").length === 0 && (
+          <div className="p-6 bg-slate-50 border border-slate-100 rounded-2xl text-center">
+            <p className="text-sm font-bold text-slate-500 mb-2">店舗が登録されていません</p>
+            <p className="text-xs text-slate-400">
+              左メニューの「店舗運用マスタ」から店舗を登録すると、<br/>
+              こちらに店舗ごとのLINE設定項目が表示されます。
+            </p>
+          </div>
+        )}
 
         {availableStores.filter(store => store !== "共通" && store !== "全店舗").map((store) => (
           <Card key={`line-${store}`} className="border-none shadow-lg shadow-slate-200/50 rounded-3xl overflow-hidden bg-white">

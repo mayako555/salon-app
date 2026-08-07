@@ -54,7 +54,9 @@ export async function getReservations(store: string, dateStr: string): Promise<R
     const snapshot = await getDocs(q);
     
     const { getCurrentUserContext } = await import("@/lib/auth-server");
+    const { requireFeature } = await import("@/lib/feature-utils");
     const ctx = await getCurrentUserContext();
+  if (ctx.companyId) await requireFeature(ctx.companyId, "reservations");
     if (!ctx.companyId) throw new Error("会社IDが指定されていません");
 
     let results = snapshot.docs.map(d => {
@@ -125,7 +127,9 @@ export async function getReservations(store: string, dateStr: string): Promise<R
 export async function addReservation(data: Omit<Reservation, "id" | "created_at" | "updated_at">) {
   try {
     const { getCurrentUserContext } = await import("@/lib/auth-server");
+    const { requireFeature } = await import("@/lib/feature-utils");
     const ctx = await getCurrentUserContext();
+  if (ctx.companyId) await requireFeature(ctx.companyId, "reservations");
     if (!ctx.companyId) throw new Error("会社IDが指定されていません");
 
     const colRef = collection(db, RESERVATIONS_COLLECTION);
@@ -335,7 +339,9 @@ export async function getReservationById(id: string): Promise<Reservation | null
     const data = snap.data();
     
     const { getCurrentUserContext } = await import("@/lib/auth-server");
+    const { requireFeature } = await import("@/lib/feature-utils");
     const ctx = await getCurrentUserContext();
+  if (ctx.companyId) await requireFeature(ctx.companyId, "reservations");
     if (ctx.role !== "systemOwner") {
       if (!ctx.companyId || data.companyId !== ctx.companyId) {
         return null;

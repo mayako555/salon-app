@@ -30,7 +30,9 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // States prefilled with the stmt values
-  const [techSalary, setTechSalary] = useState((stmt.details.base_tech_salary || 0).toString());
+  const [hourlyBasePay, setHourlyBasePay] = useState("0");
+
+  const [techSalary, setTechSalary] = useState(stmt.details.base_tech_salary?.toString() || "0");
   const [productSalary, setProductSalary] = useState((stmt.details.base_product_salary || 0).toString());
   const [transportAllowance, setTransportAllowance] = useState((stmt.details.transport_fee || 0).toString());
   const [nominationAllowance, setNominationAllowance] = useState((stmt.details.nomination_reward || 0).toString());
@@ -122,8 +124,13 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
           setProductSalesRecords(filtered);
         });
       }
+
+      // Initialize hourlyBasePay after contractType is determined
+      if (stmt.type === "salary" && contractType !== "monthly" && contractType !== "tier_monthly") {
+         setHourlyBasePay((stmt.base_amount - (stmt.details.base_tech_salary || 0) - (stmt.details.base_product_salary || 0)).toString());
+      }
     }
-  }, [isOpen, stmt.staff_id, stmt.staff_name, stmt.target_month]);
+  }, [isOpen, stmt.staff_id, stmt.staff_name, stmt.target_month, contractType]);
 
   // Manual tax calculation trigger
   const handleRecalculateTaxes = () => {
@@ -157,11 +164,12 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   };
 
   // Calculations
+  const isHourly = stmt.type === "salary" && contractType !== "monthly" && contractType !== "tier_monthly";
   const numTech = Number(techSalary) || 0;
   const numProduct = Number(productSalary) || 0;
   const monthlyBaseSalary = (contractType === "monthly" || contractType === "tier_monthly")
     ? (contractData?.monthly_base_salary ?? (stmt.base_amount - (stmt.details.base_tech_salary || 0) - (stmt.details.base_product_salary || 0)))
-    : 0;
+    : (isHourly ? Number(hourlyBasePay) : 0);
   const numBase = monthlyBaseSalary + numTech + numProduct;
   const numTransport = Number(transportAllowance) || 0;
   const numNomination = Number(nominationAllowance) || 0;
@@ -193,14 +201,14 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
     setHourlyWage(val);
     const wage = Number(val) || 0;
     const hours = Number(workedHours) || 0;
-    setTechSalary(Math.floor(wage * hours).toString());
+    setHourlyBasePay(Math.floor(wage * hours).toString());
   };
 
   const handleWorkedHoursChange = (val: string) => {
     setWorkedHours(val);
     const wage = Number(hourlyWage) || 0;
     const hours = Number(val) || 0;
-    setTechSalary(Math.floor(wage * hours).toString());
+    setHourlyBasePay(Math.floor(wage * hours).toString());
   };
 
   const handleSave = async (status: "draft" | "closed") => {
@@ -430,12 +438,21 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 block">
+                {isHourly && (
+                  <div className="mb-2">
+                    <label className="text-[10px] font-bold text-slate-500 block">基本給 (時給ベース) (円)</label>
+                    <Input 
+                      type="number" 
+                      value={hourlyBasePay} 
+                      onChange={(e) => setHourlyBasePay(e.target.value)}
+                      className="h-10 text-xs rounded-lg font-bold border-slate-200 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+                <label className="text-[10px] font-bold text-slate-500 block mt-2">
                   {stmt.type === "reward" 
                     ? "技術歩合報酬ベース (円)" 
-                    : (contractType === "monthly" || contractType === "tier_monthly") 
-                      ? "基本給 (円)" 
-                      : "基本給 (時給ベース) (円)"}
+                    : "技術歩合/インセンティブ (円)"}
                 </label>
                 <Input 
                   type="number" 

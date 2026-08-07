@@ -16,6 +16,7 @@ import {
   Timestamp
 } from "firebase/firestore";
 import { getCurrentUserContext } from "@/lib/auth-server";
+import { requireFeature } from "@/lib/feature-utils";
 
 const TASKS_COLLECTION = "tasks";
 
@@ -59,6 +60,7 @@ export type Task = {
 // Check if current user has permission
 async function enforceAdminAccess() {
   const profile = await getCurrentUserContext();
+  if (profile.companyId) await requireFeature(profile.companyId, "tasks");
   if (!profile) throw new Error("認証されていません");
   if (!["systemOwner", "companyOwner", "admin", "manager"].includes(profile.role)) {
     throw new Error("アクセス権限がありません");

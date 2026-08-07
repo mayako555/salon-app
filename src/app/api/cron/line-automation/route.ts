@@ -4,6 +4,7 @@ import { collection, query, getDocs, doc, setDoc, where, getDoc } from "firebase
 import { sendLineMessage } from "@/lib/line";
 import { LineAutomationSettings } from "@/app/admin/settings/line-automation-actions";
 import { replaceLineTemplate, validateLineTemplate } from "@/lib/lineTemplate";
+import { requireFeature } from "@/lib/feature-utils";
 import { format, addDays, subDays, startOfDay, endOfDay, parseISO } from "date-fns";
 // Removed date-fns-tz import as it is unused
 
@@ -33,12 +34,18 @@ export async function GET(request: Request) {
 
     const settingsSnap = await getDocs(collection(db, "line_automation_settings"));
     const allSettings: LineAutomationSettings[] = [];
-    settingsSnap.forEach((doc) => {
+    for (const doc of settingsSnap.docs) {
       const data = doc.data() as LineAutomationSettings;
       if (data.automationEnabled) {
-        allSettings.push({ ...data, id: doc.id });
+        try {
+          await requireFeature(doc.id, "line_automation");
+          allSettings.push({ ...data, id: doc.id });
+        } catch (e) {
+          // Feature disabled for this tenant, skip
+          console.log(`Skipping line automation for ${doc.id} (Feature disabled)`);
+        }
       }
-    });
+    }
 
     if (allSettings.length === 0) {
       return NextResponse.json({

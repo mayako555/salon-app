@@ -1,5 +1,5 @@
 "use client";
-
+import React from "react";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { clsx, type ClassValue } from "clsx";
@@ -35,10 +35,11 @@ export type StaffSalesData = {
 type Props = {
   data: StaffSalesData;
   rank: number;
+  availableStores: string[];
   onClick: () => void;
 };
 
-export default function SalesRow({ data, rank, onClick }: Props) {
+export default function SalesRow({ data, rank, availableStores, onClick }: Props) {
   const formatMoney = (val: number) => new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY" }).format(val);
 
   const getRankBadge = (r: number) => {
@@ -92,9 +93,11 @@ export default function SalesRow({ data, rank, onClick }: Props) {
         </div>
       </TableCell>
       
-      {renderStoreCell("六甲")}
-      {renderStoreCell("神戸")}
-      {renderStoreCell("元町")}
+      {availableStores.map(store => (
+        <React.Fragment key={store}>
+          {renderStoreCell(store)}
+        </React.Fragment>
+      ))}
 
       <TableCell className="text-right py-2 bg-slate-50/50 group-hover:bg-blue-50/30 transition-colors">
         <div className="flex flex-col items-end">

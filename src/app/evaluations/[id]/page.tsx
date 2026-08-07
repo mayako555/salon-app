@@ -181,7 +181,7 @@ export default function GrowthChartPage() {
   const aiFeedback = getAIFeedback(latestEval);
 
   return (
-    <AuthGuard requireRole="admin">
+    <AuthGuard requireRole="admin" requireFeature="evaluations">
       <div className="p-6 max-w-5xl mx-auto space-y-6">
         <Button variant="ghost" onClick={() => router.push("/evaluations")} className="text-slate-500 mb-2">
           <ArrowLeft className="w-4 h-4 mr-2" />

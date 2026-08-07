@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { getMasterItems, upsertMasterItem, deleteMasterItem, toggleItemStatus } from "@/app/sales/master-actions";
-import { SalesMasterItem } from "@/app/sales/seeds";
+import { SalesMasterItem } from "@/types/master";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 

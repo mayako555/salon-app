@@ -1,14 +1,20 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminAuth, adminDb } from "./firebase-admin";
+import { requireFeature } from "./feature-utils";
+import { FeatureKey } from "@/types/master";
 
-export type UserRole = "systemOwner" | "companyOwner" | "manager" | "storeManager" | "staff" | "admin" | "guest";
+export type UserRole = "systemOwner" | "companyOwner" | "manager" | "storeManager" | "staff" | "admin" | "accountant" | "guest";
 
 export interface UserContext {
   uid: string;
   role: UserRole;
   companyId?: string;
   salonIds: string[];
+  schoolEnabled?: boolean;
+  schoolName?: string;
+  isImpersonating?: boolean;
+  originalSystemOwnerUid?: string;
 }
 
 /**
@@ -43,6 +49,8 @@ export async function getCurrentUserContext(): Promise<UserContext> {
         role: "guest",
         companyId: undefined, // guest has no company constraint initially
         salonIds: [],
+        schoolEnabled: false,
+        schoolName: "",
       };
     }
 
@@ -52,17 +60,47 @@ export async function getCurrentUserContext(): Promise<UserContext> {
     }
 
     const role = (userData?.role as UserRole) || "staff";
-    const companyId = userData?.companyId;
+    let companyId = userData?.companyId;
+
+    let isImpersonating = false;
+    let originalSystemOwnerUid: string | undefined = undefined;
+
+    if (role === "systemOwner") {
+      const impCookie = cookieStore.get("impersonated_company_id")?.value;
+      if (impCookie) {
+        companyId = impCookie;
+        isImpersonating = true;
+        originalSystemOwnerUid = uid;
+      }
+    }
 
     if (!companyId && role !== "systemOwner") {
       throw new Error("会社情報が未設定です (Company ID missing)");
     }
     
+    let schoolEnabled = false;
+    let schoolName = "";
+    if (companyId) {
+      try {
+        const companySnap = await adminDb.collection("companies").doc(companyId).get();
+        if (companySnap.exists) {
+          schoolEnabled = !!companySnap.data()?.schoolEnabled;
+          schoolName = companySnap.data()?.schoolName || "";
+        }
+      } catch (e) {
+        console.error("Failed to fetch company info in auth-server:", e);
+      }
+    }
+
     return {
       uid,
       role,
       companyId,
       salonIds: userData?.salonIds || [],
+      schoolEnabled,
+      schoolName,
+      isImpersonating,
+      originalSystemOwnerUid
     };
   } catch (error: any) {
     console.error("Auth verification failed:", error);

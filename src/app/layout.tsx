@@ -34,6 +34,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { Toaster } from "sonner";
 import { TrackingProvider } from "@/components/layout/TrackingProvider";
 import { TestPlanFeedbackModal } from "@/components/layout/TestPlanFeedbackModal";
+import AIChatWidget from "@/components/AIChatWidget";
 
 export default function RootLayout({
   children,
@@ -50,6 +51,7 @@ export default function RootLayout({
           <TrackingProvider>
             <AppLayout>{children}</AppLayout>
             <TestPlanFeedbackModal />
+            <AIChatWidget />
           </TrackingProvider>
           <Toaster position="top-center" richColors />
         </AuthProvider>

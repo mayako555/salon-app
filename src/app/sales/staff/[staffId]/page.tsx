@@ -69,7 +69,7 @@ export default function StaffSalesDetailPage({
   if (authLoading) return null;
 
   return (
-    <AuthGuard requireRole="admin">
+    <AuthGuard requireRole="admin" requireFeature="sales">
       <div className="pb-24 bg-slate-50 min-h-screen">
         <div className="bg-white border-b border-slate-200 sticky top-0 z-20 px-4 py-3 shadow-sm flex items-center justify-between">
           <div className="flex items-center gap-3">

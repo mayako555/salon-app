@@ -18,6 +18,7 @@ import {
 import { addAuditLog } from "@/app/audit/actions";
 import { getStaffList } from "@/app/staff/actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
+import { requireFeature } from "@/lib/feature-utils";
 import { addPaidLeaveTransaction } from "@/app/paid-leaves/actions";
 
 export type StoreLocation = "六甲" | "元町" | "神戸";
@@ -70,6 +71,7 @@ export async function getMonthlyShifts(year: number, month: number): Promise<Shi
   
   try {
     const ctx = await getCurrentUserContext();
+  if (ctx.companyId) await requireFeature(ctx.companyId, "shifts");
     const colRef = collection(db, SHIFTS_COLLECTION);
     const q = query(
       colRef, 
@@ -104,6 +106,7 @@ export async function getMonthlyShifts(year: number, month: number): Promise<Shi
 export async function getShiftsForDate(dateStr: string): Promise<ShiftRecord[]> {
   try {
     const ctx = await getCurrentUserContext();
+  if (ctx.companyId) await requireFeature(ctx.companyId, "shifts");
     const colRef = collection(db, SHIFTS_COLLECTION);
     const q = query(colRef, where("date", "==", dateStr));
     const snapshot = await getDocs(q);
@@ -469,6 +472,7 @@ export async function getAllHolidayRequests(year: number, month: number): Promis
   const targetPrefix = `${year}-${String(month).padStart(2, '0')}`;
   try {
     const ctx = await getCurrentUserContext();
+  if (ctx.companyId) await requireFeature(ctx.companyId, "shifts");
     const colRef = collection(db, HOLIDAY_REQUESTS_COLLECTION);
     const q = query(
       colRef, 

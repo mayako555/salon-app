@@ -1,30 +1,7 @@
 import { db } from "@/lib/firebase";
 import { collection, writeBatch, doc, serverTimestamp } from "firebase/firestore";
 
-export type SalesMasterItem = {
-  id?: string;
-  store: "六甲" | "神戸" | "元町" | "共通";
-  itemType: "menu" | "coupon" | "messageCoupon" | "option" | "discount" | "fee" | "karteTemplate" | "product" | "reservationRoute" | "paymentMethod" | "store";
-  majorCategory?: string; // 施術、店販、割引・サービス、オプションなど
-  category: string;
-  name: string;
-  internalName?: string;
-  price: number;
-  imageUrl?: string;
-  duration?: string; // 所要時間
-  openTime?: string; // 営業時間(開始)
-  closeTime?: string; // 営業時間(終了)
-  hpbName?: string;  // HPBクーポン名
-  restrictions?: string; // 制約
-  notes?: string; // その他
-  isActive: boolean;
-  staffAssignable?: boolean;
-  equipmentAssignable?: boolean;
-  sortOrder?: number;
-  trackInventory?: boolean;
-  created_at?: any;
-  updated_at?: any;
-};
+import { SalesMasterItem } from "@/types/master";
 
 const MOTOMACHI_DATA: Partial<SalesMasterItem>[] = [
   // 通常メニュー

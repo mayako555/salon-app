@@ -74,7 +74,7 @@ export default function StaffTransportPage() {
   };
 
   return (
-    <AuthGuard requireRole="staff">
+    <AuthGuard requireRole="staff" requireFeature="payroll">
       <div className="space-y-6 animate-in fade-in duration-500 max-w-2xl mx-auto">
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
