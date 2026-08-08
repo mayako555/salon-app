@@ -26,7 +26,7 @@ export default function EvaluationsPage() {
     setLoading(true);
     try {
       const [staffRes, evalsRes] = await Promise.all([
-        getStaffList(),
+        getStaffList({ includeResigned: true }),
         getAllEvaluations()
       ]);
       setStaffList(staffRes.filter(s => s.is_active && s.employment_status !== "retired"));

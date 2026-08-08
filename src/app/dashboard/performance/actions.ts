@@ -13,7 +13,7 @@ export async function getStaffPerformanceStats(year: number, month: number) {
     const targetMonth = `${year}-${String(month).padStart(2, '0')}`;
     
     const [staffList, sales, shifts, monthlyTargets] = await Promise.all([
-      getStaffList(),
+      getStaffList({ includeResigned: true }),
       getMonthlySales(year, month),
       getMonthlyShifts(year, month),
       getMonthlyStaffTargets(targetMonth)

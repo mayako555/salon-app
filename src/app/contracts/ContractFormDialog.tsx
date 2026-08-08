@@ -40,7 +40,7 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
 
   useEffect(() => {
     if (isOpen) {
-      getStaffList().then(setStaffList);
+      getStaffList({ includeResigned: true }).then(setStaffList);
       getSalaryGrades().then(setDbGrades);
     }
   }, [isOpen]);

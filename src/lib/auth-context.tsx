@@ -160,11 +160,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const companyDoc = await getDoc(doc(db, "companies", companyIdToUse));
                 const companyData = companyDoc.exists() ? companyDoc.data() : {};
                 
+                const isSystemOwner = companyData.companyType === "system_owner";
+                
                 currentPlan = companyData.plan || "Standard";
-                currentSchoolEnabled = !!companyData.schoolEnabled;
+                currentSchoolEnabled = isSystemOwner || data.role === "systemOwner" ? true : !!companyData.schoolEnabled;
                 currentSchoolName = companyData.schoolName || "";
                 
-                const isSystemOwner = companyData.companyType === "system_owner";
+
                 setIsSystemOwnerCompany(isSystemOwner);
                 setAttendancePolicy(companyData.attendancePolicy || (
                   isSystemOwner 

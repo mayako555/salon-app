@@ -57,7 +57,7 @@ export default function SalesPage({
       const [salesData, prevSalesData, staffData, goalsData] = await Promise.all([
         getMonthlySales(year, month),
         getMonthlySales(prevDate.getFullYear(), prevDate.getMonth() + 1),
-        getStaffList(),
+        getStaffList({ includeResigned: true }),
         getCompanyGoalsForMonth(targetDateStr)
       ]);
       setSales(salesData);

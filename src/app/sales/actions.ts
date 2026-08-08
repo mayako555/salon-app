@@ -287,7 +287,7 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
     );
 
     const { getStaffList } = await import("../staff/actions");
-    const staffList = await getStaffList();
+    const staffList = await getStaffList({ includeResigned: true });
     filteredSales = filteredSales.map(sale => {
       if (sale.staff_id) {
         const staff = staffList.find(s => s.id === sale.staff_id);
@@ -526,7 +526,7 @@ export async function importHotPepperCsv(formData: FormData) {
     let skipCount = 0;
 
     const { getStaffList } = await import("../staff/actions");
-    const staffs = await getStaffList();
+    const staffs = await getStaffList({ includeResigned: true });
 
     // Step 3: Process each group
     let currentBatch = writeBatch(db);

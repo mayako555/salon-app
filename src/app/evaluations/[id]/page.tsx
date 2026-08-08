@@ -31,7 +31,7 @@ export default function GrowthChartPage() {
     setLoading(true);
     try {
       const [staffList, evalsRes] = await Promise.all([
-        getStaffList(),
+        getStaffList({ includeResigned: true }),
         getAllEvaluations()
       ]);
       const currentStaff = staffList.find(s => s.id === staffId);

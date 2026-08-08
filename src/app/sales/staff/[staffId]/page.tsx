@@ -31,7 +31,7 @@ export default function StaffSalesDetailPage({
       // Fetch current month for now
       const [salesData, staffs] = await Promise.all([
         getMonthlySales(now.getFullYear(), now.getMonth() + 1),
-        getStaffList()
+        getStaffList({ includeResigned: true })
       ]);
       
       const profile = staffs.find(s => s.id === staffId);

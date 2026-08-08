@@ -60,7 +60,7 @@ const STAFF_COLLECTION = "staff_profiles";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { getTenantCollection, getTenantDoc } from "@/lib/tenant-utils";
 
-export async function getStaffList(): Promise<StaffProfile[]> {
+export async function getStaffList(options?: { includeResigned?: boolean }): Promise<StaffProfile[]> {
   try {
     const ctx = await getCurrentUserContext();
     const { adminDb } = await import("@/lib/firebase-admin");
@@ -120,10 +120,9 @@ export async function getStaffList(): Promise<StaffProfile[]> {
       }];
     }
 
-    // Sort in-memory instead
-    return filteredStaff.sort((a, b) => {
-      const aIsRetired = a.employment_status === "retired";
-      const bIsRetired = b.employment_status === "retired";
+    const sorted = filteredStaff.sort((a, b) => {
+      const aIsRetired = a.employment_status === "retired" || a.employment_status === "resigned" || a.status === "resigned";
+      const bIsRetired = b.employment_status === "retired" || b.employment_status === "resigned" || b.status === "resigned";
       
       if (aIsRetired && !bIsRetired) return 1;
       if (!aIsRetired && bIsRetired) return -1;
@@ -133,6 +132,12 @@ export async function getStaffList(): Promise<StaffProfile[]> {
       if (orderA !== orderB) return orderA - orderB;
       return (a.name || "").localeCompare(b.name || "", "ja");
     });
+
+    if (!options?.includeResigned) {
+      return sorted.filter(s => s.employment_status !== 'retired' && s.employment_status !== 'resigned' && s.status !== 'resigned');
+    }
+
+    return sorted;
   } catch (error: any) {
     console.error("Error fetching staff from Firestore:", error);
     // Return a dummy profile with the error message so we can see it on the frontend

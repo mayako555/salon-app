@@ -39,7 +39,7 @@ export default function PaidLeavesPage() {
 
   const loadData = async () => {
     setLoading(true);
-    const staffs = await getStaffList();
+    const staffs = await getStaffList({ includeResigned: true });
     // Only active employees and part_timers typically get paid leave, but we'll show all who have > 0 balance or are active
     const activeStaffs = staffs.filter(s => s.employment_status !== "retired");
     setStaffList(activeStaffs);

@@ -57,7 +57,7 @@ export default async function PayrollPage({
   const prevMonth = format(new Date(year, month - 2, 1), "yyyy-MM");
   const nextMonth = format(new Date(year, month, 1), "yyyy-MM");
 
-  const staffList = await getStaffList();
+  const staffList = await getStaffList({ includeResigned: true });
   const simpleStaffList = staffList.map(s => ({ id: s.id, name: s.name }));
 
   // Find staff members without a statement in the current month
