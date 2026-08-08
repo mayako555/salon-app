@@ -74,14 +74,14 @@ export default function AIChatWidget() {
       {!isOpen && (
         <Button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-xl bg-indigo-600 hover:bg-indigo-700 hover:scale-105 transition-all z-50 p-0"
+          className="fixed bottom-[88px] md:bottom-6 right-4 md:right-6 h-14 w-14 rounded-full shadow-xl bg-indigo-600 hover:bg-indigo-700 hover:scale-105 transition-all z-50 p-0"
         >
           <MessageCircle size={28} className="text-white" />
         </Button>
       )}
 
       {isOpen && (
-        <Card className="fixed bottom-6 right-6 w-[360px] h-[550px] max-h-[80vh] shadow-2xl flex flex-col z-50 border-indigo-100 overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-300">
+        <Card className="fixed bottom-[88px] md:bottom-6 right-4 md:right-6 w-[calc(100vw-32px)] md:w-[360px] h-[550px] max-h-[80vh] shadow-2xl flex flex-col z-50 border-indigo-100 overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-300">
           <CardHeader className="bg-gradient-to-r from-indigo-600 to-indigo-700 p-4 py-3 flex flex-row items-center justify-between text-white shrink-0">
             <div className="flex items-center gap-2">
               <Bot size={22} className="text-indigo-100" />

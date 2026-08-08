@@ -145,8 +145,13 @@ async function autoFixMissingClockOuts(records: AttendanceRecord[], adminDb: any
 }
 
 export async function recordClockIn(staffId: string, staffName: string, store?: string) {
+  const ctx = await getCurrentUserContext();
+  return _recordClockIn(staffId, staffName, store, ctx);
+}
+
+async function _recordClockIn(staffId: string, staffName: string, store: string | undefined, ctx: any) {
   try {
-    const ctx = await getCurrentUserContext();
+    // ctx passed in
     const { adminDb } = await import("@/lib/firebase-admin");
     const now = new Date();
     // UTC time converted to JST for calculating the correct "today" string
@@ -213,8 +218,13 @@ export async function recordClockIn(staffId: string, staffName: string, store?: 
 }
 
 export async function recordFcClockIn(staffId: string, staffName: string, store?: string) {
+  const ctx = await getCurrentUserContext();
+  return _recordFcClockIn(staffId, staffName, store, ctx);
+}
+
+async function _recordFcClockIn(staffId: string, staffName: string, store: string | undefined, ctx: any) {
   try {
-    const ctx = await getCurrentUserContext();
+    // ctx passed in
     const { adminDb } = await import("@/lib/firebase-admin");
     const now = new Date();
     // UTC time converted to JST for calculating the correct "today" string
@@ -259,8 +269,13 @@ export async function recordFcClockIn(staffId: string, staffName: string, store?
 }
 
 export async function recordClockOut(staffId: string) {
+  const ctx = await getCurrentUserContext();
+  return _recordClockOut(staffId, ctx);
+}
+
+async function _recordClockOut(staffId: string, ctx: any) {
   try {
-    const ctx = await getCurrentUserContext();
+    // ctx passed in
     const { adminDb } = await import("@/lib/firebase-admin");
     const now = new Date();
     // UTC time converted to JST for calculating the correct "today" string
@@ -332,8 +347,13 @@ export async function recordClockOut(staffId: string) {
 }
 
 export async function recordFcClockOut(staffId: string) {
+  const ctx = await getCurrentUserContext();
+  return _recordFcClockOut(staffId, ctx);
+}
+
+async function _recordFcClockOut(staffId: string, ctx: any) {
   try {
-    const ctx = await getCurrentUserContext();
+    // ctx passed in
     const { adminDb } = await import("@/lib/firebase-admin");
     const now = new Date();
     // UTC time converted to JST for calculating the correct "today" string
@@ -655,18 +675,20 @@ export async function recordKioskAction(
 
     // IN / OUT
     if (actionType === "IN") {
+      const kioskCtx = { companyId, role: "staff", isImpersonating: false };
       if (linkWithShifts) {
-        return await recordClockIn(staffId, staffName, storeId);
+        return await _recordClockIn(staffId, staffName, storeId, kioskCtx);
       } else {
-        return await recordFcClockIn(staffId, staffName, storeId);
+        return await _recordFcClockIn(staffId, staffName, storeId, kioskCtx);
       }
     }
     
     if (actionType === "OUT") {
+      const kioskCtx = { companyId, role: "staff", isImpersonating: false };
       if (linkWithShifts) {
-        return await recordClockOut(staffId);
+        return await _recordClockOut(staffId, kioskCtx);
       } else {
-        return await recordFcClockOut(staffId);
+        return await _recordFcClockOut(staffId, kioskCtx);
       }
     }
 
