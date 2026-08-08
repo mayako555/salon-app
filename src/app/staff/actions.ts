@@ -121,8 +121,8 @@ export async function getStaffList(options?: { includeResigned?: boolean }): Pro
     }
 
     const sorted = filteredStaff.sort((a, b) => {
-      const aIsRetired = a.employment_status === "retired" || a.employment_status === "resigned" || a.status === "resigned";
-      const bIsRetired = b.employment_status === "retired" || b.employment_status === "resigned" || b.status === "resigned";
+      const aIsRetired = a.employment_status === "retired" || (a as any).employment_status === "resigned" || (a as any).status === "resigned";
+      const bIsRetired = b.employment_status === "retired" || (b as any).employment_status === "resigned" || (b as any).status === "resigned";
       
       if (aIsRetired && !bIsRetired) return 1;
       if (!aIsRetired && bIsRetired) return -1;
@@ -134,7 +134,7 @@ export async function getStaffList(options?: { includeResigned?: boolean }): Pro
     });
 
     if (!options?.includeResigned) {
-      return sorted.filter(s => s.employment_status !== 'retired' && s.employment_status !== 'resigned' && s.status !== 'resigned');
+      return sorted.filter(s => s.employment_status !== 'retired' && (s as any).employment_status !== 'resigned' && (s as any).status !== 'resigned');
     }
 
     return sorted;

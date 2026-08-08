@@ -21,11 +21,24 @@ export async function getCourses(): Promise<SchoolCourse[]> {
 
     const q = query(
       collection(db, COURSES_COL),
-      where("companyId", "==", ctx.companyId),
-      orderBy("createdAt", "desc")
+      where("companyId", "==", ctx.companyId)
     );
     const snap = await getDocs(q);
-    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SchoolCourse[];
+    const results = snap.docs.map(doc => {
+      const data = doc.data();
+      return { 
+        id: doc.id, 
+        ...data,
+        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : (data.createdAt || null),
+        updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : (data.updatedAt || null),
+      };
+    }) as SchoolCourse[];
+    
+    return results.sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    });
   } catch (error: any) {
     console.error("Error fetching courses:", error);
     return [];
@@ -98,11 +111,24 @@ export async function getStudents(): Promise<SchoolStudent[]> {
 
     const q = query(
       collection(db, STUDENTS_COL),
-      where("companyId", "==", ctx.companyId),
-      orderBy("createdAt", "desc")
+      where("companyId", "==", ctx.companyId)
     );
     const snap = await getDocs(q);
-    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SchoolStudent[];
+    const results = snap.docs.map(doc => {
+      const data = doc.data();
+      return { 
+        id: doc.id, 
+        ...data,
+        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : (data.createdAt || null),
+        updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : (data.updatedAt || null),
+      };
+    }) as SchoolStudent[];
+    
+    return results.sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    });
   } catch (error: any) {
     console.error("Error fetching students:", error);
     return [];
