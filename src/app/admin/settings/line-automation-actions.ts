@@ -1,4 +1,5 @@
 "use server";
+import { setTenantOwnedDoc } from "@/lib/tenant-ownership";
 
 import { db } from "@/lib/firebase";
 import { collection, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -60,7 +61,7 @@ export async function saveLineAutomationSettings(settings: LineAutomationSetting
     const docId = settings.storeId ? `${settings.tenantId}_${settings.storeId}` : settings.tenantId;
     const docRef = doc(db, "line_automation_settings", docId);
     
-    await setDoc(docRef, {
+    await setTenantOwnedDoc(docRef, {
       ...settings,
       updatedAt: serverTimestamp(),
       createdAt: settings.createdAt || serverTimestamp(),

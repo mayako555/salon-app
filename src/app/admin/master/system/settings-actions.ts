@@ -1,4 +1,5 @@
 "use server";
+import { setTenantOwnedDoc } from "@/lib/tenant-ownership";
 
 import { db } from "@/lib/firebase";
 import { 
@@ -44,7 +45,7 @@ export async function getPayrollRules(): Promise<PayrollRules> {
 export async function updatePayrollRules(rules: PayrollRules) {
   try {
     const docRef = doc(db, SETTINGS_COLLECTION, "payroll_rules");
-    await setDoc(docRef, {
+    await setTenantOwnedDoc(docRef, {
       ...rules,
       updatedAt: serverTimestamp()
     }, { merge: true });
@@ -89,7 +90,7 @@ export async function getAISettings(): Promise<AISettings> {
 export async function updateAISettings(settings: AISettings) {
   try {
     const docRef = doc(db, SETTINGS_COLLECTION, "ai_settings");
-    await setDoc(docRef, {
+    await setTenantOwnedDoc(docRef, {
       ...settings,
       updatedAt: serverTimestamp()
     }, { merge: true });

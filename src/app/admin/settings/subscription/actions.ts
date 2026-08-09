@@ -2,6 +2,8 @@
 
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, updateDoc } from "firebase/firestore";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export async function getTenantContractInfo(companyId: string) {
   try {
@@ -30,7 +32,7 @@ export async function getTenantBillings(companyId: string) {
 export async function reportPayment(billingId: string) {
   try {
     const docRef = doc(db, "tenant_billings", billingId);
-    await updateDoc(docRef, { status: "入金確認待ち" });
+    await updateTenantOwnedDoc(docRef, { status: "入金確認待ち" });
     return { success: true };
   } catch (error: any) {
     console.error("Error reporting payment:", error);

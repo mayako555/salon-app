@@ -5,6 +5,8 @@ import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc, query, where, s
 import { revalidatePath } from "next/cache";
 import { getCurrentUserContext, UserContext } from "@/lib/auth-server";
 import { SchoolReservation, SchoolPayment, SchoolSalesRecord, SchoolReservationStatus, SchoolPaymentStatus } from "./types";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 const RESERVATIONS_COL = "school_reservations";
 const PAYMENTS_COL = "school_payments";
@@ -32,15 +34,11 @@ export async function getReservations(): Promise<SchoolReservation[]> {
 
     const q = query(
       collection(db, RESERVATIONS_COL),
-      where("companyId", "==", ctx.companyId)
+      where("companyId", "==", ctx.companyId),
+      orderBy("date", "desc")
     );
     const snap = await getDocs(q);
-    const results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SchoolReservation[];
-    return results.sort((a, b) => {
-      const ta = a.date ? new Date(a.date).getTime() : 0;
-      const tb = b.date ? new Date(b.date).getTime() : 0;
-      return tb - ta;
-    });
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SchoolReservation[];
   } catch (error: any) {
     console.error("Error fetching reservations:", error);
     return [];
@@ -53,7 +51,7 @@ export async function addReservation(payload: Omit<SchoolReservation, "id" | "co
     if (ctx.role === "accountant") throw new Error("Read-only access");
     if (!ctx.companyId) throw new Error("テナントIDが見つかりません");
 
-    const docRef = await addDoc(collection(db, RESERVATIONS_COL), {
+    const docRef = await addTenantOwnedDoc(collection(db, RESERVATIONS_COL), {
       ...payload,
       companyId: ctx.companyId,
       createdAt: serverTimestamp(),
@@ -193,7 +191,7 @@ export async function deleteReservation(id: string) {
     if (!ctx.companyId) throw new Error("テナントIDが見つかりません");
 
     await removeReservationSales(id, ctx.companyId);
-    await deleteDoc(doc(db, RESERVATIONS_COL, id));
+    await deleteTenantOwnedDoc(doc(db, RESERVATIONS_COL, id));
     
     await logImpersonationAction(ctx, "DELETE", RESERVATIONS_COL, id);
 
@@ -221,7 +219,7 @@ export async function addPayment(payload: Omit<SchoolPayment, "id" | "companyId"
     const resData = resSnap.data() as SchoolReservation;
 
     // Add payment
-    await addDoc(collection(db, PAYMENTS_COL), {
+    await addTenantOwnedDoc(collection(db, PAYMENTS_COL), {
       ...payload,
       companyId: ctx.companyId,
       student_name: resData.student_name || "",
@@ -336,22 +334,11 @@ export async function getPaymentsByReservation(reservationId: string): Promise<S
     const q = query(
       collection(db, PAYMENTS_COL),
       where("companyId", "==", ctx.companyId),
-      where("reservation_id", "==", reservationId)
+      where("reservation_id", "==", reservationId),
+      orderBy("createdAt", "desc")
     );
     const snap = await getDocs(q);
-    const results = snap.docs.map(doc => {
-      const data = doc.data();
-      return { 
-        id: doc.id, 
-        ...data,
-        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : (data.createdAt || null)
-      };
-    }) as SchoolPayment[];
-    return results.sort((a, b) => {
-      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return tb - ta;
-    });
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SchoolPayment[];
   } catch (error: any) {
     console.error("Error fetching payments:", error);
     return [];
@@ -363,22 +350,11 @@ export async function getAllPayments(): Promise<SchoolPayment[]> {
     const ctx = await getCurrentUserContext();
     const q = query(
       collection(db, PAYMENTS_COL),
-      where("companyId", "==", ctx.companyId)
+      where("companyId", "==", ctx.companyId),
+      orderBy("payment_date", "desc")
     );
     const snap = await getDocs(q);
-    const results = snap.docs.map(doc => {
-      const data = doc.data();
-      return { 
-        id: doc.id, 
-        ...data,
-        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : (data.createdAt || null)
-      };
-    }) as SchoolPayment[];
-    return results.sort((a, b) => {
-      const ta = a.payment_date ? new Date(a.payment_date).getTime() : 0;
-      const tb = b.payment_date ? new Date(b.payment_date).getTime() : 0;
-      return tb - ta;
-    });
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SchoolPayment[];
   } catch (error: any) {
     console.error("Error fetching all payments:", error);
     return [];
@@ -390,23 +366,11 @@ export async function getAllSales(): Promise<SchoolSalesRecord[]> {
     const ctx = await getCurrentUserContext();
     const q = query(
       collection(db, SALES_COL),
-      where("companyId", "==", ctx.companyId)
+      where("companyId", "==", ctx.companyId),
+      orderBy("date", "desc")
     );
     const snap = await getDocs(q);
-    const results = snap.docs.map(doc => {
-      const data = doc.data();
-      return { 
-        id: doc.id, 
-        ...data,
-        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : (data.createdAt || null),
-        updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : (data.updatedAt || null)
-      };
-    }) as SchoolSalesRecord[];
-    return results.sort((a, b) => {
-      const ta = a.date ? new Date(a.date).getTime() : 0;
-      const tb = b.date ? new Date(b.date).getTime() : 0;
-      return tb - ta;
-    });
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SchoolSalesRecord[];
   } catch (error: any) {
     console.error("Error fetching all sales:", error);
     return [];

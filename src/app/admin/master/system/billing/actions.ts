@@ -3,6 +3,8 @@
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp, query, orderBy } from "firebase/firestore";
 import { revalidatePath } from "next/cache";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 const BILLINGS_COLLECTION = "tenant_billings";
 const COMPANIES_COLLECTION = "companies";
@@ -34,7 +36,7 @@ export async function getAllBillings() {
 
 export async function createBilling(data: { companyId: string, billingMonth: string, billingType: string, amount: number }) {
   try {
-    await addDoc(collection(db, BILLINGS_COLLECTION), {
+    await addTenantOwnedDoc(collection(db, BILLINGS_COLLECTION), {
       ...data,
       status: "請求済",
       issueDate: new Date().toISOString().split('T')[0],
@@ -51,7 +53,7 @@ export async function createBilling(data: { companyId: string, billingMonth: str
 export async function confirmPayment(billingId: string) {
   try {
     const docRef = doc(db, BILLINGS_COLLECTION, billingId);
-    await updateDoc(docRef, {
+    await updateTenantOwnedDoc(docRef, {
       status: "支払済",
       paidDate: new Date().toISOString().split('T')[0],
       updatedAt: serverTimestamp()

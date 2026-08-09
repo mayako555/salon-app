@@ -14,6 +14,8 @@ import {
   Timestamp 
 } from "firebase/firestore";
 import { getCurrentUserContext } from "./auth-server";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export type Customer = {
   id: string;
@@ -150,7 +152,7 @@ export async function updateCustomer(id: string, data: Partial<Customer>) {
       Object.entries(data).filter(([_, v]) => v !== undefined)
     );
 
-    await updateDoc(docRef, {
+    await updateTenantOwnedDoc(docRef, {
       ...cleanData,
       updated_at: serverTimestamp(),
     });
@@ -165,7 +167,7 @@ export async function deleteCustomer(id: string) {
   try {
     const { doc, deleteDoc } = await import("firebase/firestore");
     const docRef = doc(db, CUSTOMERS_COLLECTION, id);
-    await deleteDoc(docRef);
+    await deleteTenantOwnedDoc(docRef);
     return { success: true };
   } catch (error: any) {
     console.error("Error deleting customer:", error);

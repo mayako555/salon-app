@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import { Reservation } from "@/app/reservations/actions";
 import { StaffProfile } from "@/app/staff/actions";
 import { ShiftRecord } from "@/app/shifts/actions";
@@ -23,12 +24,22 @@ type Props = {
 export const HOUR_WIDTH = 120; // 120px per hour
 export const ROW_HEIGHT = 48; // h-12 = 48px
 
-export default function ReservationTimeline({ reservations, staffList, shifts = [], date, storeName = "メイン店舗", settings, onRefresh, onOptimisticUpdate }: Props) {
+export default function ReservationTimeline({ reservations, staffList, shifts = [], date, storeName = "", settings, onRefresh, onOptimisticUpdate }: Props) {
   const [selectedRes, setSelectedRes] = useState<Reservation | null>(null);
   const [editRes, setEditRes] = useState<Reservation | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [clickData, setClickData] = useState({ staff: "", time: "" });
   
+  if (!storeName) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2 p-10">
+        <AlertTriangle className="w-8 h-8 text-amber-500" />
+        <p className="font-bold text-sm">店舗情報を取得できません</p>
+        <p className="text-xs">店舗マスターが未設定か、権限が不足している可能性があります。</p>
+      </div>
+    );
+  }
+
   const storeSettings = settings?.stores[storeName] || settings?.stores["共通"] || { startHour: 8, endHour: 22, slotDuration: 30 };
   const START_HOUR = Number(storeSettings.startHour) || 8;
   const END_HOUR = Number(storeSettings.endHour) || 22;

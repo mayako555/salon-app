@@ -13,6 +13,8 @@ import {
   orderBy
 } from "firebase/firestore";
 import { revalidatePath } from "next/cache";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export type ContractTemplate = {
   id: string;
@@ -53,13 +55,13 @@ export async function saveContractTemplate(id: string | null, payload: Omit<Cont
   try {
     if (id) {
       const docRef = doc(db, TEMPLATES_COLLECTION, id);
-      await updateDoc(docRef, {
+      await updateTenantOwnedDoc(docRef, {
         ...payload,
         updatedAt: serverTimestamp()
       });
     } else {
       const colRef = collection(db, TEMPLATES_COLLECTION);
-      await addDoc(colRef, {
+      await addTenantOwnedDoc(colRef, {
         ...payload,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
@@ -76,7 +78,7 @@ export async function saveContractTemplate(id: string | null, payload: Omit<Cont
 export async function deleteContractTemplate(id: string) {
   try {
     const docRef = doc(db, TEMPLATES_COLLECTION, id);
-    await deleteDoc(docRef);
+    await deleteTenantOwnedDoc(docRef);
     revalidatePath("/admin/master/system/contracts");
     return { success: true };
   } catch (error: any) {
@@ -216,7 +218,7 @@ export async function seedDefaultTemplates() {
     }
 
     const promises = DEFAULT_TEMPLATES.map(template => {
-      return addDoc(colRef, {
+      return addTenantOwnedDoc(colRef, {
         ...template,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()

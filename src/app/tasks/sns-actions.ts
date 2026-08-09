@@ -17,6 +17,8 @@ import { generateSNSContent as generateAI } from "@/lib/gemini";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { getStaffList } from "@/app/staff/actions";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export type SNSPostStatus = "uncreated" | "draft" | "posted";
 
@@ -76,7 +78,7 @@ export async function saveSNSPost(data: Partial<SNSPost> & { account: string; ta
       const docRef = doc(db, SNS_POSTS_COLLECTION, data.id);
       const updateData = { ...data };
       delete updateData.id;
-      await updateDoc(docRef, {
+      await updateTenantOwnedDoc(docRef, {
         ...updateData,
         updated_at: serverTimestamp()
       });
@@ -85,7 +87,7 @@ export async function saveSNSPost(data: Partial<SNSPost> & { account: string; ta
       return { success: true, id: data.id };
     } else {
       // Create
-      const docRef = await addDoc(colRef, {
+      const docRef = await addTenantOwnedDoc(colRef, {
         ...data,
         status: data.status || "uncreated",
         content: data.content || "",
@@ -105,7 +107,7 @@ export async function saveSNSPost(data: Partial<SNSPost> & { account: string; ta
 export async function deleteSNSPost(id: string) {
   try {
     const docRef = doc(db, SNS_POSTS_COLLECTION, id);
-    await updateDoc(docRef, { is_deleted: true }); // Using soft delete for safety
+    await updateTenantOwnedDoc(docRef, { is_deleted: true }); // Using soft delete for safety
     revalidatePath("/dashboard");
     revalidatePath("/staff-portal");
     return { success: true };
@@ -117,7 +119,7 @@ export async function deleteSNSPost(id: string) {
 export async function updateSNSPostStatus(id: string, status: SNSPostStatus) {
   try {
     const docRef = doc(db, SNS_POSTS_COLLECTION, id);
-    await updateDoc(docRef, {
+    await updateTenantOwnedDoc(docRef, {
       status,
       updated_at: serverTimestamp()
     });

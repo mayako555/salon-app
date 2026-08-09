@@ -151,34 +151,7 @@ export default function GrowthChartPage() {
   
   const promotionCandidates = getPromotionCandidates();
 
-  // 4. AI評価サマリー (Mock)
-  const getAIFeedback = (evaluation: StaffEvaluation | null) => {
-    if (!evaluation) return null;
-    
-    // In a real app, we'd call an LLM API here, passing the evaluation data.
-    // Here we generate a mock summary based on the scores.
-    const autoScores = evaluation.auto_scores || {};
-    const strengths = [];
-    const weaknesses = [];
-    const actions = [];
-    
-    if (autoScores["sales_target_ratio"] > 10) strengths.push("売上目標達成率が非常に高い");
-    else if (autoScores["sales_target_ratio"] !== undefined && autoScores["sales_target_ratio"] < 5) weaknesses.push("売上達成率が伸び悩んでいる");
-    
-    if (autoScores["next_booking_rate"] > 5) strengths.push("次回予約率が高く、リピート顧客が定着している");
-    else if (autoScores["next_booking_rate"] !== undefined && autoScores["next_booking_rate"] < 3) weaknesses.push("次回予約率の改善が必要");
-    
-    if (strengths.length === 0) strengths.push("日々の業務を真面目に取り組んでいる");
-    if (weaknesses.length === 0) weaknesses.push("特筆すべき課題は少ないが、更なる売上拡大を目指したい");
-    
-    if (weaknesses.some(w => w.includes("売上"))) actions.push("店販の提案力強化トレーニングを受講する");
-    if (weaknesses.some(w => w.includes("予約"))) actions.push("カウンセリング時の次回提案トークスクリプトを見直す");
-    if (actions.length === 0) actions.push("後輩スタッフの育成・フォローに回る");
-
-    return { strengths, weaknesses, actions };
-  };
-
-  const aiFeedback = getAIFeedback(latestEval);
+  let aiFeedback: { strengths: string[], weaknesses: string[], actions: string[] } | null = null; // AI feedback is not implemented yet
 
   return (
     <AuthGuard requireRole="admin" requireFeature="evaluations">
@@ -285,7 +258,7 @@ export default function GrowthChartPage() {
                         <CheckCircle2 className="w-4 h-4" /> 強み
                       </h4>
                       <ul className="space-y-2">
-                        {aiFeedback.strengths.map((s, i) => (
+                        {(aiFeedback as any).strengths.map((s: string, i: number) => (
                           <li key={i} className="text-sm text-emerald-700 flex items-start gap-2">
                             <span className="w-1 h-1 bg-emerald-400 rounded-full mt-2 shrink-0"></span>
                             {s}
@@ -299,7 +272,7 @@ export default function GrowthChartPage() {
                         <AlertCircle className="w-4 h-4" /> 課題
                       </h4>
                       <ul className="space-y-2">
-                        {aiFeedback.weaknesses.map((w, i) => (
+                        {(aiFeedback as any).weaknesses.map((w: string, i: number) => (
                           <li key={i} className="text-sm text-rose-700 flex items-start gap-2">
                             <span className="w-1 h-1 bg-rose-400 rounded-full mt-2 shrink-0"></span>
                             {w}
@@ -313,7 +286,7 @@ export default function GrowthChartPage() {
                         <Lightbulb className="w-4 h-4" /> 推奨アクション
                       </h4>
                       <ul className="space-y-2">
-                        {aiFeedback.actions.map((a, i) => (
+                        {(aiFeedback as any).actions.map((a: string, i: number) => (
                           <li key={i} className="text-sm text-blue-700 flex items-start gap-2">
                             <span className="w-1 h-1 bg-blue-400 rounded-full mt-2 shrink-0"></span>
                             {a}

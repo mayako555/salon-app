@@ -17,6 +17,8 @@ import {
 import { SalesMasterItem } from "@/types/master";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { addAuditLog } from "../audit/actions";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc, setTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 const MASTER_COLLECTION = "sales_master";
 
@@ -114,10 +116,10 @@ export async function upsertMasterItem(data: Partial<SalesMasterItem>) {
         actionType = "UPDATE";
         recordId = data.id;
         const docRef = doc(db, MASTER_COLLECTION, data.id);
-        await setDoc(docRef, payload, { merge: true });
+        await setTenantOwnedDoc(docRef, payload, { merge: true });
       } else {
         actionType = "INSERT";
-        const docRef = await addDoc(colRef, {
+        const docRef = await addTenantOwnedDoc(colRef, {
           ...payload,
           created_at: serverTimestamp()
         });
@@ -142,7 +144,7 @@ export async function upsertMasterItem(data: Partial<SalesMasterItem>) {
         );
         const invSnap = await getDocs(invQ);
         if (invSnap.empty) {
-          await addDoc(collection(db, "inventory"), {
+          await addTenantOwnedDoc(collection(db, "inventory"), {
             name: payload.name,
             storeName: payload.store,
             category: payload.itemType === "product" ? "product" : "material",
@@ -173,7 +175,7 @@ export async function upsertMasterItem(data: Partial<SalesMasterItem>) {
 export async function deleteMasterItem(id: string) {
   try {
     await Promise.race([
-      deleteDoc(doc(db, MASTER_COLLECTION, id)),
+      deleteTenantOwnedDoc(doc(db, MASTER_COLLECTION, id)),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error("Firestore operation timed out (10s)")), 10000)
       )
@@ -198,7 +200,7 @@ export async function deleteMasterItem(id: string) {
 export async function toggleItemStatus(id: string, active: boolean) {
   try {
     await Promise.race([
-      setDoc(doc(db, MASTER_COLLECTION, id), { isActive: active }, { merge: true }),
+      setTenantOwnedDoc(doc(db, MASTER_COLLECTION, id), { isActive: active }, { merge: true }),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error("Firestore operation timed out (10s)")), 10000)
       )
@@ -223,7 +225,7 @@ export async function toggleItemStatus(id: string, active: boolean) {
 export async function updateMasterItemOrder(id: string, newOrder: number) {
   try {
     await Promise.race([
-      setDoc(doc(db, MASTER_COLLECTION, id), { sortOrder: newOrder }, { merge: true }),
+      setTenantOwnedDoc(doc(db, MASTER_COLLECTION, id), { sortOrder: newOrder }, { merge: true }),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error("Firestore operation timed out (10s)")), 10000)
       )
@@ -286,7 +288,7 @@ export async function duplicateMasterItem(id: string) {
       updated_at: serverTimestamp()
     };
     
-    const res = await addDoc(colRef, newPayload);
+    const res = await addTenantOwnedDoc(colRef, newPayload);
     
     await addAuditLog({
       table_name: MASTER_COLLECTION,

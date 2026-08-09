@@ -19,6 +19,8 @@ import {
 import { addNotification } from "@/lib/notifications";
 
 import { getCurrentUserContext, verifyPermission } from "@/lib/auth-server";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export async function getAvailableStores() {
   try {
@@ -144,7 +146,7 @@ export async function requestOrder(itemId: string, count: number, staffName: str
       throw new Error("権限がありません");
     }
 
-    await addDoc(collection(db, "inventory_orders"), {
+    await addTenantOwnedDoc(collection(db, "inventory_orders"), {
       itemId,
       itemName: itemData.name,
       count,
@@ -177,7 +179,7 @@ export async function updateOrderStatus(orderId: string, status: string, staffNa
     const orderSnap = await getDocs(query(collection(db, "inventory_orders"), where("__name__", "==", orderId)));
     const orderData = orderSnap.docs[0].data();
     
-    await updateDoc(orderRef, { 
+    await updateTenantOwnedDoc(orderRef, { 
       status, 
       updatedAt: serverTimestamp(),
       updatedBy: staffName 
@@ -267,7 +269,7 @@ export async function updateInventoryItem(itemId: string, data: any) {
       throw new Error("権限がありません");
     }
 
-    await updateDoc(docRef, {
+    await updateTenantOwnedDoc(docRef, {
       ...data,
       updatedAt: serverTimestamp()
     });

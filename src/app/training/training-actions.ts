@@ -16,6 +16,8 @@ import {
   setDoc
 } from "firebase/firestore";
 import { revalidatePath } from "next/cache";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc, setTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export type TrainingStatus = "not_started" | "free_model" | "paid_model" | "ready_for_check" | "passed";
 
@@ -127,9 +129,9 @@ export async function saveCurriculumItem(data: Partial<CurriculumItem>) {
   const colRef = collection(db, CURRICULUM_COLLECTION);
   if (data.id) {
     const docRef = doc(db, CURRICULUM_COLLECTION, data.id);
-    await updateDoc(docRef, { ...data, updated_at: serverTimestamp() });
+    await updateTenantOwnedDoc(docRef, { ...data, updated_at: serverTimestamp() });
   } else {
-    await addDoc(colRef, { ...data, created_at: serverTimestamp() });
+    await addTenantOwnedDoc(colRef, { ...data, created_at: serverTimestamp() });
   }
   revalidatePath("/training");
   return { success: true };
@@ -150,9 +152,9 @@ export async function updateProgress(staffId: string, curriculumId: string, upda
   
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) {
-    await updateDoc(docRef, { ...updates, updated_at: serverTimestamp() });
+    await updateTenantOwnedDoc(docRef, { ...updates, updated_at: serverTimestamp() });
   } else {
-    await setDoc(docRef, {
+    await setTenantOwnedDoc(docRef, {
       staff_id: staffId,
       curriculum_id: curriculumId,
       status: "not_started",
@@ -174,9 +176,9 @@ export async function saveModelRecord(data: Partial<ModelRecord>) {
   
   if (docId) {
     const docRef = doc(db, MODEL_RECORDS_COLLECTION, docId);
-    await updateDoc(docRef, { ...data, updated_at: serverTimestamp() });
+    await updateTenantOwnedDoc(docRef, { ...data, updated_at: serverTimestamp() });
   } else {
-    const res = await addDoc(colRef, { ...data, created_at: serverTimestamp() });
+    const res = await addTenantOwnedDoc(colRef, { ...data, created_at: serverTimestamp() });
     docId = res.id;
     
     // Auto-increment progress counts
@@ -215,13 +217,13 @@ export async function saveModelRecord(data: Partial<ModelRecord>) {
         };
 
         if (snap.empty) {
-          await addDoc(customerCol, {
+          await addTenantOwnedDoc(customerCol, {
             ...customerData,
             created_at: serverTimestamp()
           });
         } else {
           const docId = snap.docs[0].id;
-          await updateDoc(doc(db, "customers", docId), customerData);
+          await updateTenantOwnedDoc(doc(db, "customers", docId), customerData);
         }
       }
     } catch (err) {
@@ -246,7 +248,7 @@ export async function getModelRecords(staffId: string, curriculumId?: string): P
 
 export async function recordEvaluation(data: Partial<EvaluationRecord>) {
   const colRef = collection(db, EVALUATIONS_COLLECTION);
-  const res = await addDoc(colRef, { ...data, date: serverTimestamp() });
+  const res = await addTenantOwnedDoc(colRef, { ...data, date: serverTimestamp() });
   
   // Update training status if passed
   if (data.result === "pass" && data.staff_id && data.curriculum_id) {
@@ -264,7 +266,7 @@ export async function recordEvaluation(data: Partial<EvaluationRecord>) {
 
 export async function saveOJTSession(data: Partial<OJTSession>) {
   const colRef = collection(db, "training_ojt_sessions");
-  const res = await addDoc(colRef, {
+  const res = await addTenantOwnedDoc(colRef, {
     ...data,
     created_at: serverTimestamp()
   });

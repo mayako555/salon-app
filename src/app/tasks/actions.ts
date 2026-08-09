@@ -16,6 +16,8 @@ import { revalidatePath } from "next/cache";
 import { sendLineMessage } from "@/lib/line";
 import { getCustomerById } from "@/lib/customers";
 import { GoogleGenAI } from "@google/genai";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
@@ -62,7 +64,7 @@ export async function getAllPendingTasks(): Promise<TaskRecord[]> {
 export async function createTaskForStaff(data: Omit<TaskRecord, "id" | "status" | "created_at">) {
   try {
     const colRef = collection(db, TASKS_COLLECTION);
-    await addDoc(colRef, {
+    await addTenantOwnedDoc(colRef, {
       ...data,
       status: "pending",
       created_at: serverTimestamp()
@@ -79,7 +81,7 @@ export async function createTaskForStaff(data: Omit<TaskRecord, "id" | "status" 
 export async function completeTask(taskId: string) {
   try {
     const docRef = doc(db, TASKS_COLLECTION, taskId);
-    await updateDoc(docRef, { 
+    await updateTenantOwnedDoc(docRef, { 
       status: "completed",
       updated_at: serverTimestamp()
     });
@@ -107,7 +109,7 @@ export async function sendReplyAndCompleteTask(taskId: string, customerId: strin
 
     // 3. Complete Task
     const docRef = doc(db, TASKS_COLLECTION, taskId);
-    await updateDoc(docRef, { 
+    await updateTenantOwnedDoc(docRef, { 
       status: "completed",
       reply_sent: replyMessage,
       completed_at: serverTimestamp()

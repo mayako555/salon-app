@@ -1,32 +1,50 @@
+import { addTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { NextResponse } from "next/server";
-import { addReservation, getReservations, updateReservationStatus } from "@/app/reservations/actions";
-import { getStaffList } from "@/app/staff/actions";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
 
 export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get("authorization");
-    // VERY Basic security check for now (In production, use proper API keys)
-    if (authHeader !== "Bearer SALON_BOARD_SYNC_SECRET_KEY") {
+    const secretKey = process.env.WEBHOOK_SECRET_KEY || "SALON_BOARD_SYNC_SECRET_KEY";
+
+    if (authHeader !== `Bearer ${secretKey}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const { action, payload } = body;
     
-    // action: 'SYNC_DAILY_SCHEDULE'
-    // payload: { store_name, date, reservations: [...] }
-    
     if (action === "SYNC_DAILY_SCHEDULE") {
       const { store_name, date, reservations } = payload;
+
+      // Legacy fallback: resolve companyId from store_name since the legacy payload lacks it
+      const storesQuery = query(collection(db, "tenant_stores"), where("name", "==", store_name));
+      const storesSnap = await getDocs(storesQuery);
+      if (storesSnap.empty) {
+        return NextResponse.json({ error: `Store '${store_name}' not found` }, { status: 404 });
+      }
+      const companyId = storesSnap.docs[0].data().companyId;
       
-      // Get existing reservations for this day to avoid pure duplicates
-      const existing = await getReservations(store_name, date);
-      const staffList = await getStaffList();
+      // Get existing reservations for this day AND this company
+      const resQuery = query(
+        collection(db, "reservations"), 
+        where("companyId", "==", companyId), 
+        where("date", "==", date),
+        where("store_name", "==", store_name)
+      );
+      const resSnap = await getDocs(resQuery);
+      const existing = resSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+
+      // Fetch staff list for this company
+      const staffQuery = query(collection(db, "staff_profiles"), where("companyId", "==", companyId));
+      const staffSnap = await getDocs(staffQuery);
+      const staffList = staffSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
       
       let added = 0;
       let updated = 0;
 
-      for (const res of reservations) {
+      for (const res of reservations as any[]) {
         // Try to match by time and customer name (simplistic duplicate prevention)
         const duplicate = existing.find(e => 
           e.start_time === res.start_time && 
@@ -44,12 +62,16 @@ export async function POST(request: Request) {
         if (duplicate) {
           // Update status if it changed
           if (duplicate.status !== res.status && res.status) {
-            await updateReservationStatus(duplicate.id, res.status);
+            await updateDoc(doc(db, "reservations", duplicate.id), {
+              status: res.status,
+              updated_at: serverTimestamp()
+            });
             updated++;
           }
         } else {
           // Add new reservation
-          await addReservation({
+          await addTenantOwnedDoc(collection(db, "reservations"), {
+            companyId,
             store_name,
             staff_id,
             staff_name: res.staff_name,
@@ -64,6 +86,8 @@ export async function POST(request: Request) {
             status: res.status || "booked",
             memo: res.memo || "",
             expected_price: res.expected_price || 0,
+            created_at: serverTimestamp(),
+            updated_at: serverTimestamp()
           });
           added++;
         }

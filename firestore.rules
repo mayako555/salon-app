@@ -11,106 +11,47 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    function isUserActive() {
+      return isSignedIn() && getUserData().active == true;
+    }
+
     function isSystemOwner() {
-      return isSignedIn() && getUserData().role == "systemOwner";
+      return isUserActive() && getUserData().role == "systemOwner";
     }
 
-    function isPayrollMasterAdmin() {
-      return isSignedIn() && (getUserData().role == "systemOwner" || getUserData().role == "payrollMasterAdmin");
+    // Default: block everything
+    match /{document=**} {
+      allow read, write: if false;
     }
 
-    function isTenantAdmin(tenantId) {
-      return isSignedIn() && getUserData().tenant_id == tenantId && 
-             (getUserData().role == "companyOwner" || getUserData().role == "payrollAdmin" || getUserData().role == "systemOwner");
+    // --- Users Collection ---
+    // Users can read their own profile, or systemOwner can read all
+    match /users/{userId} {
+      allow read: if isSystemOwner() || (isSignedIn() && request.auth.uid == userId);
+      // Writes are strictly done via Server Actions / Admin SDK
+      allow write: if false; 
     }
 
-    // --- System Master Collections (Tenant Independent) ---
-    // Only readable by everyone authenticated. Writable ONLY by SystemOwner/PayrollMasterAdmin.
-    // Active masters cannot be updated or deleted directly via UI rules, but enforced via backend.
     
-    match /master_health_insurance_rates/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isPayrollMasterAdmin();
-    }
-    match /master_pension_rates/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isPayrollMasterAdmin();
-    }
-    match /master_care_insurance_rates/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isPayrollMasterAdmin();
-    }
-    match /master_employment_insurance_rates/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isPayrollMasterAdmin();
-    }
-    match /master_childcare_support_rates/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isPayrollMasterAdmin();
-    }
-    match /master_health_remuneration_brackets/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isPayrollMasterAdmin();
-    }
-    match /master_pension_remuneration_brackets/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isPayrollMasterAdmin();
-    }
-    match /master_income_tax_tables/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isPayrollMasterAdmin();
-      
-      match /rows/{rowId} {
-        allow read: if isSignedIn();
-        allow write: if isPayrollMasterAdmin();
-      }
+    // --- Staff Profiles ---
+    // Users can read their own staff profile (required for auth context initialization)
+    match /staff_profiles/{profileId} {
+      // Allow read if system owner, OR if the email matches AND the user is active (or trying to become active)
+      allow read: if isSystemOwner() || (isSignedIn() && resource.data.email == request.auth.token.email);
+      allow write: if false; 
     }
 
-    // --- Tenant Specific Collections ---
-    // Strict Tenant Isolation Enforcement
+    // --- General Collections (Read Only via Client SDK) ---
+    // Instead of duplicating rules for every collection, we can use wildcards
+    // BUT we must ensure the document actually has a companyId field!
     
-    match /staff_social_insurance_history/{docId} {
-      allow read: if isTenantAdmin(resource.data.tenant_id);
-      allow create: if isTenantAdmin(request.resource.data.tenant_id);
-      allow update: if isTenantAdmin(resource.data.tenant_id) && isTenantAdmin(request.resource.data.tenant_id);
-      allow delete: if false; // Hard delete not allowed
+    match /{collection}/{docId} {
+      allow read: if isSystemOwner() || 
+                  (isUserActive() && 
+                   ((resource.data.companyId != null && resource.data.companyId == getUserData().companyId) ||
+                    (resource.data.tenant_id != null && resource.data.tenant_id == getUserData().companyId)));
+      // Writes are strictly done via Server Actions / Admin SDK
+      allow write: if false;
     }
-    
-    match /staff_employment_insurance_history/{docId} {
-      allow read: if isTenantAdmin(resource.data.tenant_id);
-      allow create: if isTenantAdmin(request.resource.data.tenant_id);
-      allow update: if isTenantAdmin(resource.data.tenant_id) && isTenantAdmin(request.resource.data.tenant_id);
-      allow delete: if false;
-    }
-    
-    match /staff_income_tax_history/{docId} {
-      allow read: if isTenantAdmin(resource.data.tenant_id);
-      allow create: if isTenantAdmin(request.resource.data.tenant_id);
-      allow update: if isTenantAdmin(resource.data.tenant_id) && isTenantAdmin(request.resource.data.tenant_id);
-      allow delete: if false;
-    }
-    
-    match /staff_resident_tax_schedules/{docId} {
-      allow read: if isTenantAdmin(resource.data.tenant_id);
-      allow create: if isTenantAdmin(request.resource.data.tenant_id);
-      allow update: if isTenantAdmin(resource.data.tenant_id) && isTenantAdmin(request.resource.data.tenant_id);
-      allow delete: if false;
-    }
-    
-    match /staff_care_insurance_history/{docId} {
-      allow read: if isTenantAdmin(resource.data.tenant_id);
-      allow create: if isTenantAdmin(request.resource.data.tenant_id);
-      allow update: if isTenantAdmin(resource.data.tenant_id) && isTenantAdmin(request.resource.data.tenant_id);
-      allow delete: if false;
-    }
-    
-    // Existing Monthly Statements (example pattern to enforce isolation)
-    match /monthly_statements/{docId} {
-      allow read: if isTenantAdmin(resource.data.tenant_id);
-      allow create: if isTenantAdmin(request.resource.data.tenant_id);
-      allow update: if isTenantAdmin(resource.data.tenant_id) && isTenantAdmin(request.resource.data.tenant_id);
-      allow delete: if false; // Re-enforce no hard delete
-    }
-
   }
 }

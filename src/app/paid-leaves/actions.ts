@@ -14,6 +14,8 @@ import {
   limit
 } from "firebase/firestore";
 import { addAuditLog } from "@/app/audit/actions";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export type PaidLeaveTransaction = {
   id: string;
@@ -79,12 +81,12 @@ export async function addPaidLeaveTransaction(
       created_at: serverTimestamp()
     };
     
-    const docRef = await addDoc(colRef, payload);
+    const docRef = await addTenantOwnedDoc(colRef, payload);
     
     // Update staff profile balance (allow negative balance)
     const newBalance = currentBalance + days;
     const staffDocRef = doc(db, STAFF_COLLECTION, staffId);
-    await updateDoc(staffDocRef, {
+    await updateTenantOwnedDoc(staffDocRef, {
       paid_leave_balance: newBalance,
       updated_at: serverTimestamp()
     });

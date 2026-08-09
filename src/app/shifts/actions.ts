@@ -20,6 +20,8 @@ import { getStaffList } from "@/app/staff/actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { requireFeature } from "@/lib/feature-utils";
 import { addPaidLeaveTransaction } from "@/app/paid-leaves/actions";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export type StoreLocation = "六甲" | "元町" | "神戸";
 export type ShiftType = "work" | "holiday" | "paid_leave" | "half_paid_leave" | "requested_holiday" | "requested_paid_leave";
@@ -235,7 +237,7 @@ export async function deleteShift(id: string) {
       oldData = docSnap.data();
     }
 
-    await deleteDoc(docRef);
+    await deleteTenantOwnedDoc(docRef);
     
     if (oldData) {
       // Sync paid leave balance (refund)

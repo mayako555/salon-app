@@ -18,6 +18,8 @@ import { addAuditLog } from "@/app/audit/actions";
 import { getStaffList } from "@/app/staff/actions";
 import { getMonthlySales, SalesRecord } from "@/app/sales/actions";
 import { getMonthlyReviews } from "@/app/admin/reviews/actions";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc, setTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export type AllowanceType = "review" | "blog" | "sns" | "treatment" | "transport" | "nomination" | "other";
 
@@ -69,7 +71,7 @@ export async function submitTransportRequest(data: {
       created_at: serverTimestamp()
     };
 
-    const docRef = await addDoc(colRef, payload);
+    const docRef = await addTenantOwnedDoc(colRef, payload);
     return { success: true, id: docRef.id };
   } catch (error: any) {
     console.error("Error submitting transport request:", error);
@@ -294,7 +296,7 @@ export async function markAllowanceChecked(staff_id: string, target_month: strin
   try {
     const checkId = `${staff_id}_${target_month}`;
     const checkRef = doc(db, ALLOWANCE_CHECKS_COLLECTION, checkId);
-    await setDoc(checkRef, {
+    await setTenantOwnedDoc(checkRef, {
       staff_id,
       target_month,
       updated_at: serverTimestamp()
@@ -310,7 +312,7 @@ export async function markAllowanceChecked(staff_id: string, target_month: strin
 export async function unmarkAllowanceChecked(staff_id: string, target_month: string) {
   try {
     const checkId = `${staff_id}_${target_month}`;
-    await deleteDoc(doc(db, ALLOWANCE_CHECKS_COLLECTION, checkId));
+    await deleteTenantOwnedDoc(doc(db, ALLOWANCE_CHECKS_COLLECTION, checkId));
     return { success: true };
   } catch(error: any) {
     return { success: false, error: error.message };
@@ -421,7 +423,7 @@ export async function addAllowance(formData: FormData) {
       created_at: serverTimestamp()
     };
 
-    const docRef = await addDoc(colRef, payload);
+    const docRef = await addTenantOwnedDoc(colRef, payload);
 
     await addAuditLog({
       table_name: ALLOWANCES_COLLECTION,
@@ -441,7 +443,7 @@ export async function addAllowance(formData: FormData) {
 
 export async function deleteAllowance(id: string) {
   try {
-    await deleteDoc(doc(db, ALLOWANCES_COLLECTION, id));
+    await deleteTenantOwnedDoc(doc(db, ALLOWANCES_COLLECTION, id));
 
     await addAuditLog({
       table_name: ALLOWANCES_COLLECTION,
@@ -462,7 +464,7 @@ export async function deleteAllowance(id: string) {
 export async function toggleTreatmentExclusion(saleId: string, exclude: boolean) {
   try {
     const saleRef = doc(db, "sales", saleId);
-    await updateDoc(saleRef, { treatment_excluded: exclude });
+    await updateTenantOwnedDoc(saleRef, { treatment_excluded: exclude });
     return { success: true };
   } catch (err: any) {
     console.error("Error toggling treatment exclusion:", err);

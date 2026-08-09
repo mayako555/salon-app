@@ -1,4 +1,5 @@
 "use server";
+import { addTenantOwnedDoc } from "@/lib/tenant-ownership";
 
 import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, where, serverTimestamp } from "firebase/firestore";
@@ -24,7 +25,7 @@ export async function submitFeedback(
     const usageStats = await getUsageStats(companyId);
 
     const colRef = collection(db, FEEDBACK_COLLECTION);
-    await addDoc(colRef, {
+    await addTenantOwnedDoc(colRef, {
       companyId,
       userId,
       month: currentMonth,

@@ -19,9 +19,7 @@ export async function parseTasksFromText(text: string): Promise<{ success: boole
   const timeStr = format(new Date(), "HH:mm");
 
   if (!genAI) {
-    // Fallback Mock Logic
-    console.warn("AI Task Parser: API Key not found. Using mock parsing.");
-    return mockParse(text, todayStr);
+    return { success: false, tasks: [], error: "AI Task Parser: API Key not found." };
   }
 
   try {
@@ -74,41 +72,6 @@ ${text}
 
   } catch (error: any) {
     console.error("AI Parsing Error:", error);
-    // Fallback on error
-    return mockParse(text, todayStr, "AIの解析中にエラーが発生しました。簡易解析結果を表示します。");
+    return { success: false, tasks: [], error: "AIの解析中にエラーが発生しました。" };
   }
-}
-
-function mockParse(text: string, todayStr: string, errorMsg?: string): { success: boolean; tasks: ParsedAITask[]; error?: string; isMock: boolean } {
-  const tasks: ParsedAITask[] = [];
-  
-  // Very basic split by "して" or "と"
-  const parts = text.split(/(?:して|と|、|。)/).filter(p => p.trim().length > 0);
-  
-  parts.forEach(p => {
-    let category: ParsedAITask["category"] = "その他";
-    let priority: 1|2|3|4|5 = 3;
-    
-    if (p.includes("助成金")) { category = "助成金"; priority = 4; }
-    else if (p.includes("採用") || p.includes("面接")) { category = "採用"; priority = 5; }
-    else if (p.includes("計算") || p.includes("経理") || p.includes("給与")) { category = "経理"; priority = 5; }
-    else if (p.includes("資料") || p.includes("経営") || p.includes("M&A")) { category = "経営"; priority = 5; }
-
-    tasks.push({
-      title: p.trim(),
-      category,
-      priority,
-      project: "",
-      dueDate: todayStr,
-      dueTime: ""
-    });
-  });
-
-  return { success: true, tasks: tasks.length > 0 ? tasks : [{
-    title: text,
-    category: "その他",
-    priority: 3,
-    dueDate: todayStr,
-    dueTime: ""
-  }], isMock: true, error: errorMsg };
 }

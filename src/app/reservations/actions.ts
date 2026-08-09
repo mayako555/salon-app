@@ -3,6 +3,8 @@
 import { db } from "@/lib/firebase";
 import { collection, getDocs, getDoc, query, where, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, orderBy, limit } from "firebase/firestore";
 import { addAuditLog } from "@/app/audit/actions";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export type ReservationStatus = "booked" | "arrived" | "completed" | "cancelled";
 export type ReservationPortal = "HPB" | "Minimo" | "Nailie" | "Rakuten" | "Direct" | "Other";
@@ -138,7 +140,7 @@ export async function addReservation(data: Omit<Reservation, "id" | "created_at"
     const cleanData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined));
     cleanData.companyId = ctx.companyId;
 
-    const newDoc = await addDoc(colRef, {
+    const newDoc = await addTenantOwnedDoc(colRef, {
       ...cleanData,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp()
@@ -217,7 +219,7 @@ export async function updateReservationStatus(id: string, status: ReservationSta
       updates.is_confirmed = true;
     }
 
-    await updateDoc(docRef, updates);
+    await updateTenantOwnedDoc(docRef, updates);
 
     await addAuditLog({
       table_name: RESERVATIONS_COLLECTION,
@@ -238,7 +240,7 @@ export async function updateReservationStatus(id: string, status: ReservationSta
 export async function deleteReservation(id: string) {
   try {
     const docRef = doc(db, RESERVATIONS_COLLECTION, id);
-    await deleteDoc(docRef);
+    await deleteTenantOwnedDoc(docRef);
 
     await addAuditLog({
       table_name: RESERVATIONS_COLLECTION,
@@ -261,7 +263,7 @@ export async function updateReservation(id: string, data: Partial<Omit<Reservati
     const docRef = doc(db, RESERVATIONS_COLLECTION, id);
     const cleanData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined));
     
-    await updateDoc(docRef, { 
+    await updateTenantOwnedDoc(docRef, { 
       ...cleanData,
       updated_at: serverTimestamp() 
     });
@@ -276,7 +278,7 @@ export async function updateReservation(id: string, data: Partial<Omit<Reservati
       const snap = await getDocs(q);
       if (!snap.empty) {
         const saleDoc = snap.docs[0];
-        await updateDoc(doc(db, "sales", saleDoc.id), {
+        await updateTenantOwnedDoc(doc(db, "sales", saleDoc.id), {
           ...(cleanData.staff_id && { staff_id: cleanData.staff_id }),
           ...(cleanData.staff_name && { staff_name: cleanData.staff_name }),
           updated_at: serverTimestamp()
@@ -312,7 +314,7 @@ export async function updateReservationTime(id: string, staff_name: string, star
     if (staff_id) {
       updateData.staff_id = staff_id;
     }
-    await updateDoc(docRef, updateData);
+    await updateTenantOwnedDoc(docRef, updateData);
 
     await addAuditLog({
       table_name: RESERVATIONS_COLLECTION,

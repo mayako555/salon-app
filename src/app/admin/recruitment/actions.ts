@@ -1,8 +1,9 @@
 "use server";
 
 import { db } from "@/lib/firebase";
-import { 
-  collection, 
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+import {
+  collection,
   getDocs, 
   getDoc,
   addDoc,
@@ -81,7 +82,7 @@ export async function getApplicants(): Promise<Applicant[]> {
     const snapshot = await getDocs(q);
     
     return snapshot.docs.map(doc => {
-      const data = doc.data();
+      const data = doc.data() as any;
       return {
         id: doc.id,
         ...data,
@@ -98,7 +99,7 @@ export async function getApplicants(): Promise<Applicant[]> {
 export async function createApplicant(data: Omit<Applicant, "id" | "created_at" | "updated_at">) {
   try {
     const colRef = collection(db, APPLICANTS_COLLECTION);
-    const docRef = await addDoc(colRef, {
+    const docRef = await addTenantOwnedDoc(colRef, {
       ...data,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp()
@@ -117,7 +118,7 @@ export async function updateApplicant(id: string, data: Partial<Applicant>) {
     delete updateData.id;
     delete updateData.created_at;
     
-    await updateDoc(docRef, {
+    await updateTenantOwnedDoc(docRef, {
       ...updateData,
       updated_at: serverTimestamp()
     });
@@ -131,7 +132,7 @@ export async function updateApplicant(id: string, data: Partial<Applicant>) {
 export async function deleteApplicant(id: string) {
   try {
     const docRef = doc(db, APPLICANTS_COLLECTION, id);
-    await deleteDoc(docRef);
+    await deleteTenantOwnedDoc(docRef);
     return { success: true };
   } catch (error: any) {
     console.error("Error deleting applicant:", error);

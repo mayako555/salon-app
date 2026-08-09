@@ -26,6 +26,8 @@ import { addCustomer } from "@/lib/customers";
 import { syncInventoryFromSale } from "../inventory/inventory-actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { requireFeature } from "@/lib/feature-utils";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export async function mapReservationToSalesRecord(res: any): Promise<SalesRecord> {
   let treatmentMinutes = 60;
@@ -203,7 +205,7 @@ export async function duplicateSalesMasterItem(id: string) {
       updated_at: serverTimestamp()
     };
     
-    const res = await addDoc(collection(db, MASTER_COLLECTION), newPayload);
+    const res = await addTenantOwnedDoc(collection(db, MASTER_COLLECTION), newPayload);
     revalidatePath("/staff-portal/sales/master");
     return { success: true, id: res.id };
   } catch (error: any) {
@@ -323,13 +325,13 @@ export async function checkoutReservation(reservationId: string, salesData: Part
     if (!snap.empty) {
       saleId = snap.docs[0].id;
       const docRef = doc(db, SALES_COLLECTION, saleId);
-      await updateDoc(docRef, {
+      await updateTenantOwnedDoc(docRef, {
         ...salesData,
         updated_at: serverTimestamp()
       });
     } else {
       const { id, ...dataToCreate } = salesData;
-      const docRef = await addDoc(collection(db, SALES_COLLECTION), {
+      const docRef = await addTenantOwnedDoc(collection(db, SALES_COLLECTION), {
         ...dataToCreate,
         source_reservation_id: reservationId,
         companyId: ctx.companyId,
@@ -375,7 +377,7 @@ export async function updatePaymentInfo(id: string, paymentMethod: string, payme
       updates.split_payments = splitPayments;
     }
 
-    await updateDoc(docRef, updates);
+    await updateTenantOwnedDoc(docRef, updates);
 
     // Mark the source reservation as completed if it exists
     if (data.source_reservation_id) {
@@ -770,7 +772,7 @@ export async function deleteSale(id: string, deletedByStaffName?: string) {
       // 削除時に元の予約のステータスを戻す
       if (saleData.source_reservation_id) {
         try {
-          await updateDoc(doc(db, "reservations", saleData.source_reservation_id), { 
+          await updateTenantOwnedDoc(doc(db, "reservations", saleData.source_reservation_id), { 
             status: "booked",
             updated_at: serverTimestamp()
           });
@@ -788,7 +790,7 @@ export async function deleteSale(id: string, deletedByStaffName?: string) {
         actor: deletedByStaffName || "不明スタッフ"
       });
     }
-    await deleteDoc(docRef);
+    await deleteTenantOwnedDoc(docRef);
     revalidatePath("/staff-portal/sales");
     return { success: true };
   } catch (error: any) {

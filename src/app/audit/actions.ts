@@ -1,3 +1,4 @@
+import { addTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { db } from "@/lib/firebase";
 import { 
   collection, 
@@ -44,7 +45,7 @@ export async function getAuditLogs(): Promise<AuditLog[]> {
 export async function addAuditLog(log: Omit<AuditLog, "id" | "changed_at">) {
   try {
     const colRef = collection(db, AUDIT_COLLECTION);
-    await addDoc(colRef, {
+    await addTenantOwnedDoc(colRef, {
       ...log,
       changed_at: serverTimestamp()
     });

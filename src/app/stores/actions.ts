@@ -1,4 +1,5 @@
 "use server";
+import { setTenantOwnedDoc } from "@/lib/tenant-ownership";
 
 import { db } from "@/lib/firebase";
 import { 
@@ -46,7 +47,7 @@ export async function updateStoreTarget(storeName: string, month: string, target
   try {
     const id = `${month}_${storeName}`;
     const docRef = doc(db, STORE_TARGETS_COLLECTION, id);
-    await setDoc(docRef, {
+    await setTenantOwnedDoc(docRef, {
       store_name: storeName,
       month,
       target,

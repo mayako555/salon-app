@@ -227,7 +227,7 @@ export async function performRegressionAnalysis(params: RegressionParams) {
         tech_sales: 0,
         product_sales: 0,
         next_bookings: 0,
-        cancels: Math.floor(pseudoRandom(dStr, "cancel") * 2), // mock cancels
+        cancels: 0,
         debutedCount: 0,
         traineeCount: 0
       };

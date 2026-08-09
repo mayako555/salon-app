@@ -5,6 +5,8 @@ import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc, query, where, s
 import { revalidatePath } from "next/cache";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { SchoolCourse, SchoolStudent, SchoolReservation, SchoolPayment, SchoolSalesRecord } from "./types";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 const COURSES_COL = "school_courses";
 const STUDENTS_COL = "school_students";
@@ -21,24 +23,11 @@ export async function getCourses(): Promise<SchoolCourse[]> {
 
     const q = query(
       collection(db, COURSES_COL),
-      where("companyId", "==", ctx.companyId)
+      where("companyId", "==", ctx.companyId),
+      orderBy("createdAt", "desc")
     );
     const snap = await getDocs(q);
-    const results = snap.docs.map(doc => {
-      const data = doc.data();
-      return { 
-        id: doc.id, 
-        ...data,
-        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : (data.createdAt || null),
-        updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : (data.updatedAt || null),
-      };
-    }) as SchoolCourse[];
-    
-    return results.sort((a, b) => {
-      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return tb - ta;
-    });
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SchoolCourse[];
   } catch (error: any) {
     console.error("Error fetching courses:", error);
     return [];
@@ -51,7 +40,7 @@ export async function addCourse(payload: Omit<SchoolCourse, "id" | "companyId" |
     if (ctx.role === "accountant") throw new Error("Read-only access");
     if (!ctx.companyId) throw new Error("テナントIDが見つかりません");
 
-    await addDoc(collection(db, COURSES_COL), {
+    await addTenantOwnedDoc(collection(db, COURSES_COL), {
       ...payload,
       companyId: ctx.companyId,
       createdAt: serverTimestamp(),
@@ -74,7 +63,7 @@ export async function updateCourse(id: string, payload: Partial<Omit<SchoolCours
 
     // Consider verifying companyId of the document before update for extra security
     const docRef = doc(db, COURSES_COL, id);
-    await updateDoc(docRef, {
+    await updateTenantOwnedDoc(docRef, {
       ...payload,
       updatedAt: serverTimestamp()
     });
@@ -93,7 +82,7 @@ export async function deleteCourse(id: string) {
     if (ctx.role === "accountant") throw new Error("Read-only access");
     if (!ctx.companyId) throw new Error("テナントIDが見つかりません");
 
-    await deleteDoc(doc(db, COURSES_COL, id));
+    await deleteTenantOwnedDoc(doc(db, COURSES_COL, id));
     revalidatePath("/admin/school/courses");
     return { success: true };
   } catch (error: any) {
@@ -111,24 +100,11 @@ export async function getStudents(): Promise<SchoolStudent[]> {
 
     const q = query(
       collection(db, STUDENTS_COL),
-      where("companyId", "==", ctx.companyId)
+      where("companyId", "==", ctx.companyId),
+      orderBy("createdAt", "desc")
     );
     const snap = await getDocs(q);
-    const results = snap.docs.map(doc => {
-      const data = doc.data();
-      return { 
-        id: doc.id, 
-        ...data,
-        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : (data.createdAt || null),
-        updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : (data.updatedAt || null),
-      };
-    }) as SchoolStudent[];
-    
-    return results.sort((a, b) => {
-      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return tb - ta;
-    });
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SchoolStudent[];
   } catch (error: any) {
     console.error("Error fetching students:", error);
     return [];
@@ -141,7 +117,7 @@ export async function addStudent(payload: Omit<SchoolStudent, "id" | "companyId"
     if (ctx.role === "accountant") throw new Error("Read-only access");
     if (!ctx.companyId) throw new Error("テナントIDが見つかりません");
 
-    await addDoc(collection(db, STUDENTS_COL), {
+    await addTenantOwnedDoc(collection(db, STUDENTS_COL), {
       ...payload,
       companyId: ctx.companyId,
       createdAt: serverTimestamp(),
@@ -163,7 +139,7 @@ export async function updateStudent(id: string, payload: Partial<Omit<SchoolStud
     if (!ctx.companyId) throw new Error("テナントIDが見つかりません");
 
     const docRef = doc(db, STUDENTS_COL, id);
-    await updateDoc(docRef, {
+    await updateTenantOwnedDoc(docRef, {
       ...payload,
       updatedAt: serverTimestamp()
     });
@@ -182,7 +158,7 @@ export async function deleteStudent(id: string) {
     if (ctx.role === "accountant") throw new Error("Read-only access");
     if (!ctx.companyId) throw new Error("テナントIDが見つかりません");
 
-    await deleteDoc(doc(db, STUDENTS_COL, id));
+    await deleteTenantOwnedDoc(doc(db, STUDENTS_COL, id));
     revalidatePath("/admin/school/students");
     return { success: true };
   } catch (error: any) {

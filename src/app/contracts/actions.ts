@@ -20,6 +20,8 @@ import { getStaffList } from "../staff/actions";
 import { addAuditLog } from "../audit/actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { getTenantCollection } from "@/lib/tenant-utils";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 const CONTRACTS_COLLECTION = "staff_contracts";
 const STAFF_COLLECTION = "staff_profiles";
@@ -106,11 +108,11 @@ export async function upsertContract(data: Partial<StaffContract>, saveMode: "ad
 
           // 2. Close the old contract
           const oldDocRef = doc(db, CONTRACTS_COLLECTION, data.id);
-          await updateDoc(oldDocRef, { valid_to: prevValidTo, updated_at: serverTimestamp() });
+          await updateTenantOwnedDoc(oldDocRef, { valid_to: prevValidTo, updated_at: serverTimestamp() });
 
           // 3. Insert the new contract
           actionType = "INSERT";
-          const newDocRef = await addDoc(colRef, {
+          const newDocRef = await addTenantOwnedDoc(colRef, {
             ...contractData,
             created_at: serverTimestamp()
           });
@@ -120,11 +122,11 @@ export async function upsertContract(data: Partial<StaffContract>, saveMode: "ad
           actionType = "UPDATE";
           recordId = data.id;
           const docRef = doc(db, CONTRACTS_COLLECTION, data.id);
-          await updateDoc(docRef, contractData);
+          await updateTenantOwnedDoc(docRef, contractData);
         }
       } else {
         actionType = "INSERT";
-        const docRef = await addDoc(colRef, {
+        const docRef = await addTenantOwnedDoc(colRef, {
           ...contractData,
           created_at: serverTimestamp()
         });
@@ -165,7 +167,7 @@ export async function deleteContract(contractId: string) {
     const snapshot = await getDoc(docRef);
     const oldData = snapshot.exists() ? snapshot.data() : null;
 
-    await updateDoc(docRef, { deleted: true, updated_at: serverTimestamp() }); // Soft delete
+    await updateTenantOwnedDoc(docRef, { deleted: true, updated_at: serverTimestamp() }); // Soft delete
     
     // Audit Log
     await addAuditLog({

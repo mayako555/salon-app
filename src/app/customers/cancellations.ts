@@ -2,6 +2,8 @@
 
 import { db } from "@/lib/firebase";
 import { collection, doc, getDocs, addDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp, getDoc } from "firebase/firestore";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export type SameDayCancellationRecord = {
   id: string;
@@ -45,7 +47,7 @@ export async function getSameDayCancellations(customerId: string): Promise<SameD
 export async function addSameDayCancellation(data: Omit<SameDayCancellationRecord, "id" | "created_at" | "updated_at">) {
   try {
     const colRef = collection(db, COLLECTION_NAME);
-    const docRef = await addDoc(colRef, {
+    const docRef = await addTenantOwnedDoc(colRef, {
       ...data,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp()
@@ -60,7 +62,7 @@ export async function addSameDayCancellation(data: Omit<SameDayCancellationRecor
 export async function updateSameDayCancellation(id: string, data: Partial<SameDayCancellationRecord>) {
   try {
     const docRef = doc(db, COLLECTION_NAME, id);
-    await updateDoc(docRef, {
+    await updateTenantOwnedDoc(docRef, {
       ...data,
       updated_at: serverTimestamp()
     });
@@ -74,7 +76,7 @@ export async function updateSameDayCancellation(id: string, data: Partial<SameDa
 export async function deleteSameDayCancellation(id: string) {
   try {
     const docRef = doc(db, COLLECTION_NAME, id);
-    await deleteDoc(docRef);
+    await deleteTenantOwnedDoc(docRef);
     return { success: true };
   } catch (error: any) {
     console.error("Error deleting cancellation:", error);

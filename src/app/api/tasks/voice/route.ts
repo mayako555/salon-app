@@ -1,3 +1,4 @@
+import { addTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { NextResponse } from "next/server";
 import { parseTasksFromText } from "@/lib/ai-task-parser";
 import { db } from "@/lib/firebase";
@@ -69,7 +70,7 @@ export async function POST(req: Request) {
         completedAt: null
       };
 
-      const docRef = await addDoc(colRef, docData);
+      const docRef = await addTenantOwnedDoc(colRef, docData);
       createdIds.push(docRef.id);
     }
 

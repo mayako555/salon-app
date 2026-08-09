@@ -3,6 +3,8 @@
 import { db } from "@/lib/firebase";
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, serverTimestamp, orderBy } from "firebase/firestore";
 import { getCurrentUserContext } from "@/lib/auth-server";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , setTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export type MonthlyGoal = {
   id: string; // companyId_staffId_YYYY-MM
@@ -103,7 +105,7 @@ export async function getMonthlyGoal(staffId: string, staffName: string, storeNa
     reflection: ""
   };
 
-  await setDoc(docRef, {
+  await setTenantOwnedDoc(docRef, {
     ...newGoal,
     created_at: serverTimestamp(),
     updated_at: serverTimestamp()
@@ -121,7 +123,7 @@ export async function updateMonthlyGoal(id: string, data: Partial<MonthlyGoal>) 
   try {
     const docRef = doc(db, GOALS_COL, id);
     const updateData = { ...data, updated_at: serverTimestamp() };
-    await updateDoc(docRef, updateData);
+    await updateTenantOwnedDoc(docRef, updateData);
     return { success: true };
   } catch (error: any) {
     console.error("Error updating monthly goal:", error);

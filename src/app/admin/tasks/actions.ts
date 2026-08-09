@@ -17,6 +17,8 @@ import {
 } from "firebase/firestore";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { requireFeature } from "@/lib/feature-utils";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 const TASKS_COLLECTION = "tasks";
 
@@ -130,7 +132,7 @@ export async function createTask(data: Omit<Task, "id" | "companyId" | "createdB
       completedAt: data.status === "完了" ? serverTimestamp() : null
     };
 
-    const docRef = await addDoc(colRef, docData);
+    const docRef = await addTenantOwnedDoc(colRef, docData);
     return { success: true, id: docRef.id };
   } catch (error: any) {
     console.error("Error creating task:", error);
@@ -165,7 +167,7 @@ export async function updateTask(id: string, data: Partial<Task>) {
       updateData.completedAt = null;
     }
 
-    await updateDoc(docRef, updateData);
+    await updateTenantOwnedDoc(docRef, updateData);
     return { success: true };
   } catch (error: any) {
     console.error("Error updating task:", error);
@@ -188,7 +190,7 @@ export async function deleteTask(id: string) {
       throw new Error("他社のタスクは削除できません");
     }
 
-    await deleteDoc(docRef);
+    await deleteTenantOwnedDoc(docRef);
     return { success: true };
   } catch (error: any) {
     console.error("Error deleting task:", error);

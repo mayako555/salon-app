@@ -2,6 +2,8 @@
 import { db } from "@/lib/firebase";
 import { collection, writeBatch, doc, getDocs, query, where, serverTimestamp } from "firebase/firestore";
 import { addAuditLog } from "@/app/audit/actions";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export type ReviewRecord = {
   id?: string;
@@ -95,7 +97,7 @@ export async function deleteReviewAction(id: string) {
   try {
     const docRef = doc(db, REVIEWS_COLLECTION, id);
     const { deleteDoc } = await import("firebase/firestore");
-    await deleteDoc(docRef);
+    await deleteTenantOwnedDoc(docRef);
     await addAuditLog({
       table_name: REVIEWS_COLLECTION,
       record_id: id,

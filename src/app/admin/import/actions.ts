@@ -1,4 +1,5 @@
 "use server";
+import { setTenantOwnedDoc } from "@/lib/tenant-ownership";
 
 import { db } from "@/lib/firebase";
 import { collection, writeBatch, doc, serverTimestamp } from "firebase/firestore";
@@ -74,7 +75,7 @@ export async function importCustomersFromSalonBoard(customers: any[]) {
     try {
       const { doc, setDoc } = await import("firebase/firestore");
       const importMetaRef = doc(db, "system_settings", "customer_import");
-      await setDoc(importMetaRef, {
+      await setTenantOwnedDoc(importMetaRef, {
         last_imported_at: new Date().toISOString()
       }, { merge: true });
     } catch (metaErr) {

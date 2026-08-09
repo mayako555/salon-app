@@ -13,6 +13,8 @@ import {
   deleteDoc
 } from "firebase/firestore";
 import { addAuditLog } from "@/app/audit/actions";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc, setTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export type SalaryGrade = {
   id?: string;
@@ -68,10 +70,10 @@ export async function upsertSalaryGrade(data: SalaryGrade) {
       actionType = "UPDATE";
       recordId = data.id;
       const docRef = doc(db, GRADES_COLLECTION, data.id);
-      await setDoc(docRef, payload, { merge: true });
+      await setTenantOwnedDoc(docRef, payload, { merge: true });
     } else {
       actionType = "INSERT";
-      const docRef = await addDoc(colRef, {
+      const docRef = await addTenantOwnedDoc(colRef, {
         ...payload,
         created_at: serverTimestamp()
       });
@@ -96,7 +98,7 @@ export async function upsertSalaryGrade(data: SalaryGrade) {
 
 export async function deleteSalaryGrade(id: string) {
   try {
-    await deleteDoc(doc(db, GRADES_COLLECTION, id));
+    await deleteTenantOwnedDoc(doc(db, GRADES_COLLECTION, id));
     
     await addAuditLog({
       table_name: GRADES_COLLECTION,

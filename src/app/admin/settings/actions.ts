@@ -1,8 +1,10 @@
 "use server";
+import { setTenantOwnedDoc } from "@/lib/tenant-ownership";
 
 import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc, collection, query, getDocs } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, getDocs, where, deleteDoc } from "firebase/firestore";
 import { revalidatePath } from "next/cache";
+import { getCurrentUserContext } from "@/lib/auth-server";
 
 export type StoreReservationSettings = {
   startHour: number;
@@ -30,12 +32,15 @@ const DEFAULT_SETTINGS: ReservationSettings = {
   }
 };
 
-const SETTINGS_DOC_ID = "reservation_settings";
+// We append companyId to doc ID for tenant isolation
 const SETTINGS_COLLECTION = "system_settings";
 
 export async function getReservationSettings(): Promise<ReservationSettings> {
   try {
-    const docRef = doc(db, SETTINGS_COLLECTION, SETTINGS_DOC_ID);
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) return DEFAULT_SETTINGS;
+
+    const docRef = doc(db, SETTINGS_COLLECTION, `reservation_settings_${ctx.companyId}`);
     const snapshot = await getDoc(docRef);
     if (snapshot.exists()) {
       const data = snapshot.data();
@@ -56,8 +61,11 @@ export async function getReservationSettings(): Promise<ReservationSettings> {
 
 export async function saveReservationSettings(settings: ReservationSettings) {
   try {
-    const docRef = doc(db, SETTINGS_COLLECTION, SETTINGS_DOC_ID);
-    await setDoc(docRef, settings, { merge: true });
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) return { success: false, error: "Company ID missing" };
+
+    const docRef = doc(db, SETTINGS_COLLECTION, `reservation_settings_${ctx.companyId}`);
+    await setTenantOwnedDoc(docRef, { ...settings, companyId: ctx.companyId }, { merge: true });
     revalidatePath("/reservations");
     revalidatePath("/admin/settings");
     return { success: true };
@@ -71,8 +79,12 @@ export type LineSettingsMap = Record<string, string>;
 
 export async function getLineSettings(): Promise<LineSettingsMap> {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) return {};
+
     const colRef = collection(db, "line_integrations");
-    const snapshot = await getDocs(colRef);
+    const q = query(colRef, where("companyId", "==", ctx.companyId));
+    const snapshot = await getDocs(q);
     const result: LineSettingsMap = {};
     snapshot.docs.forEach(doc => {
       const data = doc.data();
@@ -89,7 +101,10 @@ export async function getLineSettings(): Promise<LineSettingsMap> {
 
 export async function saveLineSettings(storeName: string, channelAccessToken: string) {
   try {
-    const q = query(collection(db, "line_integrations"));
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) return { success: false, error: "Company ID missing" };
+
+    const q = query(collection(db, "line_integrations"), where("companyId", "==", ctx.companyId), where("storeName", "==", storeName));
     const snapshot = await getDocs(q);
     
     // Find if the store already has an integration
@@ -101,14 +116,16 @@ export async function saveLineSettings(storeName: string, channelAccessToken: st
     });
 
     if (docId) {
-      await setDoc(doc(db, "line_integrations", docId), {
+      await setTenantOwnedDoc(doc(db, "line_integrations", docId), {
         storeName,
-        channelAccessToken
+        channelAccessToken,
+        companyId: ctx.companyId
       }, { merge: true });
     } else {
-      await setDoc(doc(collection(db, "line_integrations")), {
+      await setTenantOwnedDoc(doc(collection(db, "line_integrations")), {
         storeName,
-        channelAccessToken
+        channelAccessToken,
+        companyId: ctx.companyId
       });
     }
 
@@ -151,7 +168,7 @@ export async function saveCompanyAttendancePolicy(companyId: string, policy: { r
       throw new Error("Permission denied: Cannot set custom attendance policy for general franchise.");
     }
 
-    await setDoc(docRef, { attendancePolicy: policy }, { merge: true });
+    await setTenantOwnedDoc(docRef, { attendancePolicy: policy }, { merge: true });
     return { success: true };
   } catch (error: any) {
     console.error("Failed to save attendance policy:", error);
@@ -162,7 +179,7 @@ export async function saveCompanyAttendancePolicy(companyId: string, policy: { r
 export async function saveCompanyProductRules(companyId: string, rules: ProductCommissionRule[]) {
   try {
     const docRef = doc(db, "companies", companyId);
-    await setDoc(docRef, { productCommissionRules: rules }, { merge: true });
+    await setTenantOwnedDoc(docRef, { productCommissionRules: rules }, { merge: true });
     return { success: true };
   } catch (error: any) {
     console.error("Failed to save product commission rules:", error);
@@ -195,27 +212,26 @@ export async function getKioskSettings(companyId: string) {
 
 export async function saveKioskSettings(companyId: string, storeName: string, token: string, enabled: boolean) {
   try {
-    const q = query(collection(db, "kiosk_settings"));
+    const q = query(collection(db, "kiosk_settings"), where("companyId", "==", companyId));
     const snap = await getDocs(q);
     
     let docId = "";
     snap.docs.forEach(d => {
       const data = d.data();
-      const docCompanyId = data.companyId;
-      if (docCompanyId === companyId && data.storeName === storeName) {
+      if (data.storeName === storeName) {
         docId = d.id;
       }
     });
 
     if (docId) {
-      await setDoc(doc(db, "kiosk_settings", docId), {
+      await setTenantOwnedDoc(doc(db, "kiosk_settings", docId), {
         companyId,
         storeName,
         token,
         enabled
       }, { merge: true });
     } else {
-      await setDoc(doc(collection(db, "kiosk_settings")), {
+      await setTenantOwnedDoc(doc(collection(db, "kiosk_settings")), {
         companyId,
         storeName,
         token,

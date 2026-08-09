@@ -1,8 +1,9 @@
 "use server";
 
 import { db } from "./firebase";
-import { 
-  collection, 
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc } from "@/lib/tenant-ownership";
+import {
+  collection,
   getDocs, 
   addDoc, 
   query, 
@@ -113,7 +114,7 @@ export async function editKarteRecord(karteId: string, newData: Partial<KarteRec
     delete cleanData.created_at;
     delete cleanData.edit_history;
 
-    await updateDoc(docRef, {
+    await updateTenantOwnedDoc(docRef, {
       ...cleanData,
       edit_history: updatedHistory
     });
@@ -131,10 +132,10 @@ export async function getKarteByCustomer(customerId: string): Promise<KarteRecor
     const q = query(colRef, where("customer_id", "==", customerId));
     const snapshot = await getDocs(q);
     
-    const records = snapshot.docs.map(d => {
-      const data = d.data();
+    const records = snapshot.docs.map(doc => {
+      const data = doc.data() as any;
       return { 
-        id: d.id, 
+        id: doc.id, 
         ...data,
         created_at: data.created_at?.toMillis?.() || data.created_at || null,
         date: data.date?.toMillis?.() || data.date || null

@@ -15,6 +15,8 @@ import {
 } from "firebase/firestore";
 import { revalidatePath } from "next/cache";
 import { addAuditLog } from "@/app/audit/actions";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export type CashTransactionType = "collection" | "deposit" | "adjustment";
 export type CashTransactionStatus = "pending" | "verified";
@@ -71,7 +73,7 @@ export async function getCashTransactions(year: number, month: number, storeName
 export async function addCashTransaction(data: Omit<CashTransactionRecord, 'id' | 'created_at' | 'updated_at'>) {
   try {
     const colRef = collection(db, CASH_TRANSACTIONS_COLLECTION);
-    const docRef = await addDoc(colRef, {
+    const docRef = await addTenantOwnedDoc(colRef, {
       ...data,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp()
@@ -97,7 +99,7 @@ export async function addCashTransaction(data: Omit<CashTransactionRecord, 'id' 
 export async function verifyCashTransaction(id: string, staffName: string) {
   try {
     const docRef = doc(db, CASH_TRANSACTIONS_COLLECTION, id);
-    await updateDoc(docRef, {
+    await updateTenantOwnedDoc(docRef, {
       status: "verified",
       updated_at: serverTimestamp()
     });
@@ -122,7 +124,7 @@ export async function verifyCashTransaction(id: string, staffName: string) {
 export async function deleteCashTransaction(id: string, staffName: string) {
   try {
     const docRef = doc(db, CASH_TRANSACTIONS_COLLECTION, id);
-    await deleteDoc(docRef);
+    await deleteTenantOwnedDoc(docRef);
 
     await addAuditLog({
       table_name: CASH_TRANSACTIONS_COLLECTION,

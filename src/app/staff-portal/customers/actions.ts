@@ -1,4 +1,5 @@
 "use server";
+import { addTenantOwnedDoc } from "@/lib/tenant-ownership";
 
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
@@ -260,7 +261,7 @@ export async function registerScannedCustomer(
         const isEyelash = trimmedContent.includes("エクステ") || trimmedContent.includes("本");
         const isPerm = trimmedContent.includes("パーマ") || trimmedContent.includes("リフト");
         
-        await addDoc(collection(db, "karte_records"), {
+        await addTenantOwnedDoc(collection(db, "karte_records"), {
           customer_id: customerId,
           date: visitDate,
           staff_id: "scanned_import",

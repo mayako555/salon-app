@@ -20,6 +20,8 @@ import { getAdvancedAnalytics } from "@/app/dashboard/actions";
 import { addAuditLog } from "@/app/audit/actions";
 import * as Papa from "papaparse";
 import * as crypto from "crypto";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc, setTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export type ExpenseRecord = {
   id?: string;
@@ -70,7 +72,7 @@ export async function getExpenses(year: number, month: number, storeName?: strin
 export async function addExpense(data: Omit<ExpenseRecord, 'id' | 'created_at'>) {
   try {
     const colRef = collection(db, EXPENSES_COLLECTION);
-    const docRef = await addDoc(colRef, {
+    const docRef = await addTenantOwnedDoc(colRef, {
       ...data,
       created_at: serverTimestamp()
     });
@@ -128,7 +130,7 @@ export async function addExpensesBatch(expenses: Omit<ExpenseRecord, 'id' | 'cre
 
     // Insert new expenses
     await Promise.all(newExpenses.map(async (data) => {
-      await addDoc(colRef, {
+      await addTenantOwnedDoc(colRef, {
         ...data,
         is_imported: true, // Flag as imported via CSV
         created_at: serverTimestamp()
@@ -157,7 +159,7 @@ export async function addExpensesBatch(expenses: Omit<ExpenseRecord, 'id' | 'cre
 export async function updateExpense(id: string, data: Partial<ExpenseRecord>) {
   try {
     const docRef = doc(db, EXPENSES_COLLECTION, id);
-    await updateDoc(docRef, {
+    await updateTenantOwnedDoc(docRef, {
       ...data,
       updated_at: serverTimestamp()
     });
@@ -182,7 +184,7 @@ export async function updateExpense(id: string, data: Partial<ExpenseRecord>) {
 export async function deleteExpense(id: string) {
   try {
     const docRef = doc(db, EXPENSES_COLLECTION, id);
-    await deleteDoc(docRef);
+    await deleteTenantOwnedDoc(docRef);
 
     await addAuditLog({
       table_name: EXPENSES_COLLECTION,
@@ -975,7 +977,7 @@ ${JSON.stringify(aiQueue.map(q => ({ desc: q.desc, amount: q.amount })))}
         
         // Save to cache
         try {
-          await setDoc(doc(db, "ai_expense_rules", q.hash), {
+          await setTenantOwnedDoc(doc(db, "ai_expense_rules", q.hash), {
             description: q.desc, classification: "経費", category: aiRes.category, updated_at: serverTimestamp()
           });
         } catch (e) { console.error("Cache save error", e); }
@@ -1013,7 +1015,7 @@ export async function updatePettyCashBalance(year: number, month: number, storeN
     const docId = `${storeName}_${targetPrefix}`;
     const docRef = doc(db, PETTY_CASH_COLLECTION, docId);
     
-    await setDoc(docRef, {
+    await setTenantOwnedDoc(docRef, {
       store_name: storeName,
       target_month: targetPrefix,
       balance: balance,

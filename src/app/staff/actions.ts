@@ -140,25 +140,13 @@ export async function getStaffList(options?: { includeResigned?: boolean }): Pro
     return sorted;
   } catch (error: any) {
     console.error("Error fetching staff from Firestore:", error);
-    // Return a dummy profile with the error message so we can see it on the frontend
-    return [{
-      id: "error-debug",
-      name: `ERROR: ${error.message || String(error)}`,
-      role: "staff",
-      email: "",
-      employment_type: "employee",
-      employment_status: "active",
-      passcode: "",
-      is_invoice_registered: false,
-      max_holiday_requests: 0,
-      is_trainee: false,
-      is_active: true,
-      created_at: new Date().toISOString()
-    }];
+    return [];
   }
 }
 
 import { adminAuth } from "@/lib/firebase-admin";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 export async function addStaff(formData: FormData) {
   try {
@@ -250,13 +238,27 @@ export async function addStaff(formData: FormData) {
     };
     
     const addDocWithTimeout = Promise.race([
-      addDoc(colRef, staffData),
+      addTenantOwnedDoc(colRef, staffData),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error("Firestore operation timed out (15s)")), 15000)
       )
     ]);
 
     const docRef = await addDocWithTimeout as any;
+
+    // 2.5 Sync Security Rules Projection
+    if (uid) {
+      const syncResult = await syncUserDoc(uid, {
+        role: staffData.role,
+        companyId: staffData.companyId,
+        email: staffData.email,
+        active: staffData.is_active && staffData.employment_status !== "retired",
+        salonIds: staffData.salonIds
+      });
+      if (!syncResult.success) {
+        throw new Error(`権限同期に失敗しました: ${syncResult.error}`);
+      }
+    }
 
     // 3. Add Audit Log
     await addAuditLog({
@@ -377,7 +379,21 @@ export async function editStaff(id: string, formData: FormData) {
       updated_at: serverTimestamp()
     };
 
-    await updateDoc(colRef, staffData);
+    await updateTenantOwnedDoc(colRef, staffData);
+
+    // Sync Security Rules Projection
+    if (currentUid) {
+      const syncResult = await syncUserDoc(currentUid, {
+        role: staffData.role,
+        companyId: ctx.companyId,
+        email: staffData.email,
+        active: staffData.is_active && staffData.employment_status !== "retired",
+        salonIds: staffData.salonIds
+      });
+      if (!syncResult.success) {
+        throw new Error(`権限同期に失敗しました: ${syncResult.error}`);
+      }
+    }
 
     await addAuditLog({
       table_name: STAFF_COLLECTION,
@@ -399,28 +415,48 @@ export async function editStaff(id: string, formData: FormData) {
 export async function deleteStaff(id: string, uid?: string) {
   try {
     const ctx = await getCurrentUserContext();
-    await getTenantDoc(STAFF_COLLECTION, id, ctx);
-    // 1. Delete from Firebase Auth if uid exists
+    const existingStaff = await getTenantDoc(STAFF_COLLECTION, id, ctx);
+    
+    // 1. Disable in Firebase Auth instead of deleting
     if (uid) {
       try {
-        await adminAuth.deleteUser(uid);
+        await adminAuth.updateUser(uid, { disabled: true });
       } catch (authError) {
-        console.error("Error deleting from Firebase Auth:", authError);
-        // Continue even if auth delete fails (maybe user doesn't exist anymore)
+        console.error("Error disabling in Firebase Auth:", authError);
+        throw new Error("Authアカウントの無効化に失敗しました");
       }
     }
 
-    // 2. Delete from Firestore
+    // 2. Soft Delete in Firestore (update employment_status and is_active)
     const docRef = doc(db, STAFF_COLLECTION, id);
-    await deleteDoc(docRef);
+    const retiredData = {
+      employment_status: "retired",
+      is_active: false,
+      updated_at: serverTimestamp()
+    };
+    await updateTenantOwnedDoc(docRef, retiredData);
+
+    // 2.5 Sync Security Rules Projection (active: false)
+    if (uid) {
+      const syncResult = await syncUserDoc(uid, {
+        role: existingStaff.role,
+        companyId: ctx.companyId,
+        email: existingStaff.email,
+        active: false,
+        salonIds: existingStaff.salonIds || []
+      });
+      if (!syncResult.success) {
+        throw new Error(`権限同期に失敗しました: ${syncResult.error}`);
+      }
+    }
 
     // 3. Audit log
     await addAuditLog({
       table_name: STAFF_COLLECTION,
       record_id: id,
-      action: "DELETE",
-      old_data: { id, uid },
-      new_data: null,
+      action: "SOFT_DELETE",
+      old_data: existingStaff,
+      new_data: { ...retiredData, updated_at: "now" },
       actor: "管理者"
     });
 
@@ -478,7 +514,7 @@ export async function updateStaffPasscode(staffId: string, passcode: string) {
       }
     }
 
-    await updateDoc(docRef, {
+    await updateTenantOwnedDoc(docRef, {
       passcode,
       updated_at: serverTimestamp()
     });

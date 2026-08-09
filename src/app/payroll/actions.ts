@@ -23,6 +23,8 @@ import { getMonthlyAttendance, AttendanceRecord } from "@/app/attendance/actions
 import { getMonthlyShifts, ShiftRecord } from "@/app/shifts/actions";
 import { addAuditLog } from "@/app/audit/actions";
 import { calculatePayrollTaxes } from "@/lib/tax-calculator";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 function normalizeStaffName(name: string) {
   if (!name) return "";
@@ -149,7 +151,7 @@ export async function getMonthlyStatements(year: number, month: number, staffId?
 export async function toggleTransferStatus(id: string, currentStatus: boolean): Promise<{success: boolean, error?: string}> {
   try {
     const docRef = doc(db, STATEMENTS_COLLECTION, id);
-    await updateDoc(docRef, {
+    await updateTenantOwnedDoc(docRef, {
       is_transferred: !currentStatus,
       updated_at: serverTimestamp()
     });
@@ -761,7 +763,7 @@ export async function updateStatementMetrics(
 
     const finalPaidAmount = baseAmount + currentData.total_allowances + customAdjustTotal - totalDeductions + (currentData.details.tax_addition || 0);
 
-    await updateDoc(docRef, {
+    await updateTenantOwnedDoc(docRef, {
       base_amount: baseAmount,
       total_deductions: totalDeductions,
       final_paid_amount: finalPaidAmount,
@@ -794,7 +796,7 @@ export async function createManualStatement(data: {
 }) {
   try {
     const colRef = collection(db, STATEMENTS_COLLECTION);
-    const docRef = await addDoc(colRef, {
+    const docRef = await addTenantOwnedDoc(colRef, {
       ...data,
       status: "draft",
       created_at: serverTimestamp()
@@ -1126,7 +1128,7 @@ export async function deleteStatement(id: string) {
     const currentData = snap.docs[0].data() as MonthlyStatement;
     if (currentData.status === "closed") return { success: false, error: "確定済みのデータは削除できません" };
 
-    await deleteDoc(docRef);
+    await deleteTenantOwnedDoc(docRef);
 
     await addAuditLog({
       table_name: "monthly_statements",
@@ -1184,7 +1186,7 @@ export async function updateManualStatement(id: string, data: {
       updatePayload.status = data.status;
     }
 
-    await updateDoc(docRef, updatePayload);
+    await updateTenantOwnedDoc(docRef, updatePayload);
 
     await addAuditLog({
       table_name: "monthly_statements",
@@ -1210,7 +1212,7 @@ export async function updateStatementStatus(id: string, status: "draft" | "close
     
     const currentData = snap.docs[0].data() as MonthlyStatement;
 
-    await updateDoc(docRef, {
+    await updateTenantOwnedDoc(docRef, {
       status,
       updated_at: serverTimestamp()
     });

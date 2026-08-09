@@ -1,4 +1,5 @@
 "use server";
+import { addTenantOwnedDoc } from "@/lib/tenant-ownership";
 
 import { db } from "@/lib/firebase";
 import { 
@@ -79,7 +80,7 @@ export async function addTenant(payload: Omit<CompanyTenant, "id" | "createdAt" 
   try {
     const colRef = collection(db, COMPANIES_COLLECTION);
     const defaultFeatures = generateDefaultFeatures(false);
-    const docRef = await addDoc(colRef, {
+    const docRef = await addTenantOwnedDoc(colRef, {
       ...payload,
       features: defaultFeatures,
       createdAt: serverTimestamp(),
@@ -143,6 +144,18 @@ export async function createTenantAdmin(payload: { email: string, password: stri
       createdAt: new Date()
     });
 
+    const { syncUserDoc } = require("@/lib/user-sync");
+    const syncResult = await syncUserDoc(userRecord.uid, {
+      role: "companyOwner",
+      companyId: payload.companyId,
+      email: payload.email,
+      active: true,
+      salonIds: []
+    });
+    if (!syncResult.success) {
+      throw new Error(`権限同期に失敗しました: ${syncResult.error}`);
+    }
+
     return { success: true, uid: userRecord.uid };
   } catch (error: any) {
     console.error("Error creating tenant admin:", error);
@@ -187,6 +200,22 @@ export async function updateTenantAdmin(uid: string, payload: { email?: string, 
 
     if (Object.keys(dbUpdates).length > 0) {
       await adminDb.collection("staff_profiles").doc(uid).update(dbUpdates);
+    }
+
+    const updatedProfileSnap = await adminDb.collection("staff_profiles").doc(uid).get();
+    if (updatedProfileSnap.exists) {
+      const data = updatedProfileSnap.data();
+      const { syncUserDoc } = require("@/lib/user-sync");
+      const syncResult = await syncUserDoc(uid, {
+        role: data.role,
+        companyId: data.companyId,
+        email: data.email,
+        active: data.is_active !== false && data.employment_status !== "retired",
+        salonIds: data.salonIds || []
+      });
+      if (!syncResult.success) {
+        throw new Error(`権限同期に失敗しました: ${syncResult.error}`);
+      }
     }
 
     return { success: true };

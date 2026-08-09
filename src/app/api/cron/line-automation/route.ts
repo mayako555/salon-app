@@ -1,3 +1,4 @@
+import { setTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
 import { collection, query, getDocs, doc, setDoc, where, getDoc } from "firebase/firestore";
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
     const authHeader = request.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -62,10 +63,11 @@ export async function GET(request: Request) {
     };
 
     // Helper to fetch reservations for a specific date
-    const fetchReservationsByDate = async (dateStr: string) => {
+    const fetchReservationsByDate = async (dateStr: string, tenantId: string) => {
       const q = query(
         collection(db, "reservations"),
-        where("date", "==", dateStr)
+        where("date", "==", dateStr),
+        where("companyId", "==", tenantId)
       );
       const snap = await getDocs(q);
       const reservations: any[] = [];
@@ -132,7 +134,7 @@ export async function GET(request: Request) {
       const message = replaceLineTemplate(template, templateData);
 
       // Create Processing Log
-      await setDoc(logDocRef, {
+      await setTenantOwnedDoc(logDocRef, {
         tenantId: setting.tenantId,
         storeId: setting.storeId || res.store_name,
         reservationId: res.id,
@@ -152,7 +154,7 @@ export async function GET(request: Request) {
       const sendResult = await sendLineMessage(customer.line_user_id, message, res.store_name);
 
       // Update Log
-      await setDoc(logDocRef, {
+      await setTenantOwnedDoc(logDocRef, {
         status: sendResult.success ? "sent" : "failed",
         sentAt: sendResult.success ? new Date() : null,
         errorMessage: sendResult.error || null,
@@ -173,7 +175,7 @@ export async function GET(request: Request) {
         reminderTargetDate.setDate(reminderTargetDate.getDate() + setting.reminderDaysBefore);
         const reminderDateStr = getTokyoDateString(reminderTargetDate);
         
-        const reservations = await fetchReservationsByDate(reminderDateStr);
+        const reservations = await fetchReservationsByDate(reminderDateStr, setting.tenantId);
         stats.reminder.target += reservations.length;
 
         // Process in batches
@@ -189,7 +191,7 @@ export async function GET(request: Request) {
         thanksTargetDate.setDate(thanksTargetDate.getDate() - setting.thanksDaysAfter);
         const thanksDateStr = getTokyoDateString(thanksTargetDate);
         
-        const reservations = await fetchReservationsByDate(thanksDateStr);
+        const reservations = await fetchReservationsByDate(thanksDateStr, setting.tenantId);
         
         // Only target completed/arrived
         const completedReservations = reservations.filter(r => r.status === "completed" || r.status === "arrived");

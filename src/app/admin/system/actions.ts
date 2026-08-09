@@ -91,7 +91,7 @@ export async function getSystemAdoptionStats() {
       
       // If no data structure yet, estimate based on lastUsedAt to avoid showing 0 for active tenants
       if (!data.usageCounts && lastUsedMs && (now - lastUsedMs < sevenDaysMs)) {
-        usageValueScore = 50 + Math.floor(Math.random() * 30); // dummy backfill for active
+        usageValueScore = 50; 
       }
       
       sumUsageScore += usageValueScore;

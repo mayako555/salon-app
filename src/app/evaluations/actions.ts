@@ -26,6 +26,8 @@ import {
   parseISO 
 } from "date-fns";
 import { revalidatePath } from "next/cache";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 const EVALUATIONS_COLLECTION = "staff_evaluations";
 
@@ -103,7 +105,7 @@ export async function saveEvaluation(data: Omit<StaffEvaluation, "id" | "created
     };
 
     const colRef = collection(db, EVALUATIONS_COLLECTION);
-    const docRef = await addDoc(colRef, saveData);
+    const docRef = await addTenantOwnedDoc(colRef, saveData);
     
     revalidatePath("/evaluations");
     return { success: true, id: docRef.id };
@@ -142,7 +144,7 @@ export async function updateEvaluation(id: string, data: Partial<StaffEvaluation
     delete updateData.id;
     delete updateData.created_at;
 
-    await updateDoc(docRef, updateData);
+    await updateTenantOwnedDoc(docRef, updateData);
     
     revalidatePath("/evaluations");
     return { success: true };
@@ -154,7 +156,7 @@ export async function updateEvaluation(id: string, data: Partial<StaffEvaluation
 export async function deleteEvaluation(id: string) {
   try {
     const docRef = doc(db, EVALUATIONS_COLLECTION, id);
-    await deleteDoc(docRef);
+    await deleteTenantOwnedDoc(docRef);
     
     revalidatePath("/evaluations");
     return { success: true };
@@ -172,14 +174,14 @@ export async function unfinalizeEvaluation(id: string, reason: string, userId: s
 
     const data = snap.data();
     
-    await updateDoc(docRef, {
+    await updateTenantOwnedDoc(docRef, {
       status: "pending",
       snapshot: null,
       updated_at: serverTimestamp()
     });
 
     const auditRef = collection(db, "audit_logs");
-    await addDoc(auditRef, {
+    await addTenantOwnedDoc(auditRef, {
       action: "UNFINALIZE_EVALUATION",
       target_id: id,
       staff_id: data.staff_id,

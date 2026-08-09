@@ -14,10 +14,11 @@ import { Plus, Edit2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
-  const { availableStores, isSystemOwner, isCompanyOwner } = useAuth();
+  const { availableStores, isSystemOwner, isCompanyOwner, isSystemOwnerCompany } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [employmentType, setEmploymentType] = useState(staff?.employment_type || "outsourcing");
+  const [role, setRole] = useState(staff?.role || "staff");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -90,7 +91,8 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4">
+          {role !== "companyOwner" && role !== "accountant" && role !== "systemOwner" && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">雇用形態</label>
               <select 
@@ -104,7 +106,8 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
                 <option value="part_time">パート</option>
               </select>
             </div>
-            <div>
+          )}
+          <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">在籍状況</label>
               <select 
                 name="employment_status" 
@@ -152,7 +155,8 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
             <label className="block text-sm font-medium text-slate-700 mb-1">アクセス権限</label>
             <select 
               name="role" 
-              defaultValue={staff?.role || "staff"}
+              value={role}
+              onChange={(e) => setRole(e.target.value as any)}
               className="w-full h-10 px-3 border border-slate-300 rounded-md shadow-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none bg-white"
             >
               <option value="staff">スタッフ（閲覧・売上入力のみ）</option>
@@ -240,52 +244,75 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
             <p className="text-[10px] text-slate-400 mt-1">※ 有給の自動付与（入社半年後・1年後等）の計算に使用されます</p>
           </div>
 
-          <div className="space-y-3 pt-2 border-t border-slate-100">
-            <h4 className="text-sm font-bold text-slate-800">キャリアコース</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-600 mb-1">Jコース (Junior)</label>
-                <select name="j_course" defaultValue={staff?.j_course || ""} className="w-full h-8 px-2 border border-slate-200 rounded text-xs font-bold text-slate-700 bg-white">
-                  <option value="">未設定</option>
-                  <option value="J1">J1: スクール生（アイブロウ）</option>
-                  <option value="J2">J2: ラッシュリフトデビュー</option>
-                  <option value="J3">J3: シングルエクステデビュー</option>
-                  <option value="J4">J4: ボリュームまたは＆Healthyデビュー</option>
-                  <option value="J5">J5: ボリューム＋＆Healthy習得</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-600 mb-1">Pコース (Professional)</label>
-                <select name="p_course" defaultValue={staff?.p_course || ""} className="w-full h-8 px-2 border border-slate-200 rounded text-xs font-bold text-slate-700 bg-white">
-                  <option value="">未設定</option>
-                  <option value="P1">P1: デビュー1年以上・売上60万</option>
-                  <option value="P2">P2: デビュー2年以上・売上65万</option>
-                  <option value="P3">P3: デビュー3年以上・売上70万</option>
-                  <option value="P4">P4: デビュー4年以上・売上80万</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-600 mb-1">Mコース (Management)</label>
-                <select name="m_course" defaultValue={staff?.m_course || ""} className="w-full h-8 px-2 border border-slate-200 rounded text-xs font-bold text-slate-700 bg-white">
-                  <option value="">未設定</option>
-                  <option value="M1">M1: 副店長</option>
-                  <option value="M2">M2: 店長</option>
-                  <option value="M3">M3: エリアマネージャー</option>
-                  <option value="M4">M4: 統括マネージャー</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-600 mb-1">Eコース (Education)</label>
-                <select name="e_course" defaultValue={staff?.e_course || ""} className="w-full h-8 px-2 border border-slate-200 rounded text-xs font-bold text-slate-700 bg-white">
-                  <option value="">未設定</option>
-                  <option value="E1">E1: 教育担当</option>
-                  <option value="E2">E2: 主任講師</option>
-                  <option value="E3">E3: 認定講師</option>
-                  <option value="E4">E4: Academy講師</option>
-                </select>
+          {isSystemOwnerCompany && (
+            <div className="space-y-3 pt-2 border-t border-slate-100">
+              <h4 className="text-sm font-bold text-slate-800">キャリアコース</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 mb-1">Jコース (Junior)</label>
+                  <select name="j_course" defaultValue={staff?.j_course || ""} className="w-full h-8 px-2 border border-slate-200 rounded text-xs font-bold text-slate-700 bg-white">
+                    <option value="">未設定</option>
+                    <option value="J1">J1: スクール生（アイブロウ）</option>
+                    <option value="J2">J2: スクール生（ラッシュ）</option>
+                    <option value="J3">J3: 見習い・アシスタント</option>
+                    <option value="J4">J4: ジュニアアイリスト（眉）</option>
+                    <option value="J5">J5: ジュニアアイリスト（両方）</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 mb-1">Pコース (Professional)</label>
+                  <select name="p_course" defaultValue={staff?.p_course || ""} className="w-full h-8 px-2 border border-slate-200 rounded text-xs font-bold text-slate-700 bg-white">
+                    <option value="">未設定</option>
+                    <option value="P1">P1: プロ（月売上50万~）</option>
+                    <option value="P2">P2: トッププロ（月売上80万~）</option>
+                    <option value="P3">P3: シニアプロ（月売上100万~）</option>
+                    <option value="P4">P4: エグゼクティブ（月売上150万~）</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 mb-1">Mコース (Management)</label>
+                  <select name="m_course" defaultValue={staff?.m_course || ""} className="w-full h-8 px-2 border border-slate-200 rounded text-xs font-bold text-slate-700 bg-white">
+                    <option value="">未設定</option>
+                    <option value="M1">M1: 副店長候補</option>
+                    <option value="M2">M2: 副店長</option>
+                    <option value="M3">M3: 店長</option>
+                    <option value="M4">M4: エリアマネージャー</option>
+                    <option value="M5">M5: 幹部陣</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 mb-1">Eコース (Education)</label>
+                  <select name="e_course" defaultValue={staff?.e_course || ""} className="w-full h-8 px-2 border border-slate-200 rounded text-xs font-bold text-slate-700 bg-white">
+                    <option value="">未設定</option>
+                    <option value="E1">E1: メンター</option>
+                    <option value="E2">E2: インストラクター</option>
+                    <option value="E3">E3: トップエデュケーター</option>
+                  </select>
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {isSystemOwnerCompany && (
+            <div className="space-y-3 pt-2 border-t border-slate-100">
+              <h4 className="text-sm font-bold text-slate-800">SNS投稿担当（連携アカウント）</h4>
+              <div className="grid grid-cols-2 gap-3">
+                {["BROW GYM", "Jasmine Lash", "JL Academy", "岡田万耶子"].map(acc => (
+                  <label key={acc} className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-100 rounded-lg cursor-pointer hover:bg-slate-100">
+                    <input 
+                      type="checkbox" 
+                      name="sns_accounts[]" 
+                      value={acc}
+                      defaultChecked={staff?.sns_accounts?.includes(acc)}
+                      className="w-4 h-4 rounded text-blue-600 border-slate-300"
+                    />
+                    <span className="text-xs font-bold text-slate-700">{acc}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-400">※ 選択したアカウントがスタッフポータルのタスクに表示されます</p>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1 font-bold text-blue-700">暗証番号（打刻・ポータル用）</label>

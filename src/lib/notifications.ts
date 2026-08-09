@@ -1,8 +1,9 @@
 "use server";
 
 import { db } from "./firebase";
-import { 
-  collection, 
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc } from "@/lib/tenant-ownership";
+import {
+  collection,
   addDoc, 
   query, 
   where, 
@@ -75,7 +76,7 @@ export async function getNotifications(filters: { role?: string, store?: string,
 export async function markAsRead(notificationId: string) {
   try {
     const docRef = doc(db, NOTIFICATIONS_COLLECTION, notificationId);
-    await updateDoc(docRef, { read: true });
+    await updateTenantOwnedDoc(docRef, { read: true });
     return { success: true };
   } catch (error: any) {
     console.error("Error marking notification as read:", error);
