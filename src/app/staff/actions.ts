@@ -386,9 +386,9 @@ export async function editStaff(id: string, formData: FormData) {
     if (currentUid) {
       const syncResult = await syncUserDoc(currentUid, {
         role: staffData.role,
-        companyId: ctx.companyId,
+        companyId: ctx.companyId || "",
         email: staffData.email,
-        active: staffData.is_active && staffData.employment_status !== "retired",
+        active: staffData.employment_status !== "retired",
         salonIds: staffData.salonIds
       });
       if (!syncResult.success) {
@@ -441,7 +441,7 @@ export async function deleteStaff(id: string, uid?: string) {
     if (uid) {
       const syncResult = await syncUserDoc(uid, {
         role: existingStaff.role,
-        companyId: ctx.companyId,
+        companyId: ctx.companyId || "",
         email: existingStaff.email,
         active: false,
         salonIds: existingStaff.salonIds || []
@@ -455,7 +455,7 @@ export async function deleteStaff(id: string, uid?: string) {
     await addAuditLog({
       table_name: STAFF_COLLECTION,
       record_id: id,
-      action: "SOFT_DELETE",
+      action: "UPDATE",
       old_data: existingStaff,
       new_data: { ...retiredData, updated_at: "now" },
       actor: "管理者"
