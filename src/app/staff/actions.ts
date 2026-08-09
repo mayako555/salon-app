@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 import { addAuditLog } from "../audit/actions";
 import { revalidatePath } from "next/cache";
+import { syncUserDoc, deleteUserDoc } from "@/lib/user-sync";
 
 export type StaffRole = "systemOwner" | "companyOwner" | "manager" | "storeManager" | "staff" | "admin" | "accountant";
 export type EvaluationRole = "general" | "educator" | "sub_manager" | "manager" | "area_manager";
