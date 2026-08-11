@@ -1,5 +1,5 @@
 import { addTenantOwnedDoc } from "@/lib/tenant-ownership";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
@@ -7,7 +7,7 @@ import {
   query, 
   orderBy, 
   serverTimestamp 
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 
 export type AuditLog = {
   id: string;

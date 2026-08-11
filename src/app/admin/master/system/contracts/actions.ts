@@ -1,17 +1,17 @@
 "use server";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc,
+  getDocsUnfiltered, 
+  addDocUnfiltered, 
+  updateDocUnfiltered, 
+  deleteDocUnfiltered,
   doc, 
   serverTimestamp,
   query,
   orderBy
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 import { revalidatePath } from "next/cache";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
 
@@ -31,7 +31,7 @@ export async function getContractTemplates() {
   try {
     const colRef = collection(db, TEMPLATES_COLLECTION);
     const q = query(colRef, orderBy("createdAt", "desc"));
-    const snap = await getDocs(q);
+    const snap = await getDocsUnfiltered(q);
     
     return snap.docs.map(doc => ({
       id: doc.id,
@@ -40,7 +40,7 @@ export async function getContractTemplates() {
   } catch (error) {
     console.error("Error fetching contract templates:", error);
     try {
-      const snap = await getDocs(collection(db, TEMPLATES_COLLECTION));
+      const snap = await getDocsUnfiltered(collection(db, TEMPLATES_COLLECTION));
       return snap.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -212,7 +212,7 @@ export async function seedDefaultTemplates() {
     const colRef = collection(db, TEMPLATES_COLLECTION);
     
     // First check if templates already exist
-    const snap = await getDocs(colRef);
+    const snap = await getDocsUnfiltered(colRef);
     if (snap.size > 0) {
       return { success: false, error: "すでにテンプレートが存在します。" };
     }

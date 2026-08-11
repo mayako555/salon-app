@@ -33,6 +33,8 @@ export default async function ShiftsPage({
     getStaffList()
   ]);
   
+  console.log(`[DEBUG ShiftsPage] Fetched ${shifts.length} shifts and ${staffList.length} staff for ${year}-${month}`);
+  
   // Derive unique staff from shifts and official list
   // We keep sort_order for the ones in staffList
   const allStaff = staffList.map(s => ({ id: s.id, name: s.name, sort_order: s.sort_order }));

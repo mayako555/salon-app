@@ -1,5 +1,5 @@
-import { db } from "@/lib/firebase";
-import { collection, writeBatch, doc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { collection, writeBatch, doc, serverTimestamp } from "@/lib/firestore-admin-wrapper";
 
 import { SalesMasterItem } from "@/types/master";
 

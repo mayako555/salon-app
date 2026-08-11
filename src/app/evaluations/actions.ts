@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
@@ -13,7 +13,7 @@ import {
   orderBy,
   serverTimestamp,
   where
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 import { StaffEvaluation, calculateDynamicScore, EVALUATION_TEMPLATES } from "./shared";
 import { 
   subMonths, 
@@ -26,19 +26,31 @@ import {
   parseISO 
 } from "date-fns";
 import { revalidatePath } from "next/cache";
-import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc, getTenantOwnedDoc } from "@/lib/tenant-ownership";
+import { getCurrentUserContext } from "@/lib/auth-server";
 
 
 const EVALUATIONS_COLLECTION = "staff_evaluations";
 
 export async function getEvaluationReminders(quarter: string) {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId && ctx.role !== "systemOwner") return [];
+
     const colRef = collection(db, "staff_profiles");
-    const staffSnap = await getDocs(query(colRef, where("isActive", "==", true)));
+    const staffQuery = ctx.role === "systemOwner" && !ctx.isImpersonating
+      ? query(colRef, where("isActive", "==", true))
+      : query(colRef, where("isActive", "==", true), where("companyId", "==", ctx.companyId));
+    
+    const staffSnap = await getDocs(staffQuery);
     const staffList = staffSnap.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
 
     const evalCol = collection(db, EVALUATIONS_COLLECTION);
-    const evalSnap = await getDocs(query(evalCol, where("target_quarter", "==", quarter)));
+    const evalQuery = ctx.role === "systemOwner" && !ctx.isImpersonating
+      ? query(evalCol, where("target_quarter", "==", quarter))
+      : query(evalCol, where("target_quarter", "==", quarter), where("companyId", "==", ctx.companyId));
+
+    const evalSnap = await getDocs(evalQuery);
     const evaluatedStaffIds = new Set(evalSnap.docs.map(doc => doc.data().staff_id));
 
     return staffList.filter(s => !evaluatedStaffIds.has(s.id));
@@ -49,8 +61,13 @@ export async function getEvaluationReminders(quarter: string) {
 }
 export async function getEvaluationsByStaffId(staffId: string): Promise<StaffEvaluation[]> {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId && ctx.role !== "systemOwner") return [];
+
     const colRef = collection(db, EVALUATIONS_COLLECTION);
-    const q = query(colRef, where("staff_id", "==", staffId), orderBy("target_year", "desc"), orderBy("target_quarter", "desc"));
+    const q = ctx.role === "systemOwner" && !ctx.isImpersonating
+      ? query(colRef, where("staff_id", "==", staffId), orderBy("target_year", "desc"), orderBy("target_quarter", "desc"))
+      : query(colRef, where("staff_id", "==", staffId), where("companyId", "==", ctx.companyId), orderBy("target_year", "desc"), orderBy("target_quarter", "desc"));
     const snapshot = await getDocs(q);
     
     return snapshot.docs.map(doc => {
@@ -70,8 +87,13 @@ export async function getEvaluationsByStaffId(staffId: string): Promise<StaffEva
 
 export async function getAllEvaluations(): Promise<StaffEvaluation[]> {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId && ctx.role !== "systemOwner") return [];
+
     const colRef = collection(db, EVALUATIONS_COLLECTION);
-    const q = query(colRef, orderBy("target_year", "desc"), orderBy("target_quarter", "desc"));
+    const q = ctx.role === "systemOwner" && !ctx.isImpersonating
+      ? query(colRef, orderBy("target_year", "desc"), orderBy("target_quarter", "desc"))
+      : query(colRef, where("companyId", "==", ctx.companyId), orderBy("target_year", "desc"), orderBy("target_quarter", "desc"));
     const snapshot = await getDocs(q);
     
     return snapshot.docs.map(doc => {
@@ -204,8 +226,9 @@ export async function unfinalizeEvaluation(id: string, reason: string, userId: s
 
 export async function getStaffAutoMetrics(staffId: string, targetYear: number, targetQuarter: number, hireDateStr?: string) {
   try {
-    // ターゲットの四半期の開始月と終了月を計算する
-    // Q1: 1月〜3月, Q2: 4月〜6月, Q3: 7月〜9月, Q4: 10月〜12月
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId && ctx.role !== "systemOwner") return { success: false, error: "Unauthorized" };
+
     const startMonthIndex = (targetQuarter - 1) * 3; // 0, 3, 6, 9
     const startOfQuarter = new Date(targetYear, startMonthIndex, 1);
     const endOfQuarter = endOfMonth(new Date(targetYear, startMonthIndex + 2, 1));
@@ -214,12 +237,20 @@ export async function getStaffAutoMetrics(staffId: string, targetYear: number, t
     const endStr = format(endOfQuarter, "yyyy-MM-dd");
 
     const salesCol = collection(db, "sales");
-    const q = query(
-      salesCol,
-      where("staff_id", "==", staffId),
-      where("date", ">=", startStr),
-      where("date", "<=", endStr)
-    );
+    const q = ctx.role === "systemOwner" && !ctx.isImpersonating
+      ? query(
+          salesCol,
+          where("staff_id", "==", staffId),
+          where("date", ">=", startStr),
+          where("date", "<=", endStr)
+        )
+      : query(
+          salesCol,
+          where("staff_id", "==", staffId),
+          where("companyId", "==", ctx.companyId),
+          where("date", ">=", startStr),
+          where("date", "<=", endStr)
+        );
     const snapshot = await getDocs(q);
 
     let total_sales = 0;
@@ -268,9 +299,9 @@ export async function getStaffAutoMetrics(staffId: string, targetYear: number, t
     let target = 0;
     try {
       const staffRef = doc(db, "staff_profiles", staffId);
-      const staffSnap = await getDoc(staffRef);
-      if (staffSnap.exists()) {
-        target = staffSnap.data().monthly_sales_target || 0;
+      const staffSnap = await getTenantOwnedDoc(staffRef);
+      if (staffSnap.exists) {
+        target = staffSnap.data()?.monthly_sales_target || 0;
       }
     } catch (e) {}
 

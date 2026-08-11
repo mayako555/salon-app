@@ -1,7 +1,7 @@
 "use server";
 
-import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { collection, getDocs, query, where, orderBy } from "@/lib/firestore-admin-wrapper";
 import { getCurrentUserContext } from "@/lib/auth-server";
 
 const SALES_COL = "school_sales";

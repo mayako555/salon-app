@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
@@ -15,7 +15,7 @@ import {
   increment,
   Timestamp,
   limit
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 import { addNotification } from "@/lib/notifications";
 
 import { getCurrentUserContext, verifyPermission } from "@/lib/auth-server";

@@ -1,8 +1,8 @@
 "use server";
 import { addTenantOwnedDoc } from "@/lib/tenant-ownership";
 
-import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { collection, addDoc, serverTimestamp } from "@/lib/firestore-admin-wrapper";
 import { Customer, addCustomer } from "@/lib/customers";
 import { addCounselingResponse } from "@/lib/counseling";
 import { revalidatePath } from "next/cache";

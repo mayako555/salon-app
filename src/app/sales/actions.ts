@@ -2,7 +2,7 @@
 
 import Papa from "papaparse";
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
@@ -18,7 +18,7 @@ import {
   serverTimestamp,
   getDoc,
   limit
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 import { seedSalesMasterData } from "./seeds";
 import { SalesMasterItem } from "@/types/master";
 import { addAuditLog } from "../audit/actions";

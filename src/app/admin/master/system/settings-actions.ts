@@ -1,13 +1,13 @@
 "use server";
 import { setTenantOwnedDoc } from "@/lib/tenant-ownership";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   doc, 
   getDoc,
   setDoc,
   serverTimestamp
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 import { revalidatePath } from "next/cache";
 
 const SETTINGS_COLLECTION = "system_settings";

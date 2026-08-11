@@ -1,7 +1,7 @@
 "use server";
 
-import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp, query, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { collection, getDocsUnfiltered, addDocUnfiltered, updateDocUnfiltered, doc, serverTimestamp, query, orderBy } from "@/lib/firestore-admin-wrapper";
 import { revalidatePath } from "next/cache";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
 
@@ -11,10 +11,10 @@ const COMPANIES_COLLECTION = "companies";
 
 export async function getAllBillings() {
   try {
-    const billingsSnap = await getDocs(query(collection(db, BILLINGS_COLLECTION)));
+    const billingsSnap = await getDocsUnfiltered(query(collection(db, BILLINGS_COLLECTION)));
     const billings = billingsSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
     
-    const companiesSnap = await getDocs(collection(db, COMPANIES_COLLECTION));
+    const companiesSnap = await getDocsUnfiltered(collection(db, COMPANIES_COLLECTION));
     const companies = companiesSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
     
     // Attach company name to billings

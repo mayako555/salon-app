@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { SalesRecord } from "@/app/sales/actions";
 

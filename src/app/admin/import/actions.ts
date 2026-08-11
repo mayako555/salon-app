@@ -1,8 +1,8 @@
 "use server";
 import { setTenantOwnedDoc } from "@/lib/tenant-ownership";
 
-import { db } from "@/lib/firebase";
-import { collection, writeBatch, doc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { collection, writeBatch, doc, serverTimestamp } from "@/lib/firestore-admin-wrapper";
 import { revalidatePath } from "next/cache";
 
 export async function importCustomersFromSalonBoard(customers: any[]) {

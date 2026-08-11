@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
 import {
   collection,
@@ -13,7 +13,7 @@ import {
   query,
   orderBy,
   serverTimestamp
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 
 const APPLICANTS_COLLECTION = "applicants";
 

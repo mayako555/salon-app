@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
@@ -11,7 +11,7 @@ import {
   updateDoc,
   doc,
   serverTimestamp 
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 import { addAuditLog } from "@/app/audit/actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { getTenantCollection, getTenantDoc } from "@/lib/tenant-utils";

@@ -1,8 +1,8 @@
 "use server";
 import { addTenantOwnedDoc } from "@/lib/tenant-ownership";
 
-import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, where, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { collection, addDoc, getDocs, query, where, serverTimestamp } from "@/lib/firestore-admin-wrapper";
 import { format } from "date-fns";
 import { getUsageStats } from "@/lib/usage-logger";
 

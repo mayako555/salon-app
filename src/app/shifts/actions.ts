@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
@@ -9,12 +9,12 @@ import {
   updateDoc,
   deleteDoc,
   doc,
-  writeBatch,
   query, 
-  where, 
-  orderBy,
+  where,
+  orderBy, 
+  writeBatch,
   serverTimestamp 
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 import { addAuditLog } from "@/app/audit/actions";
 import { getStaffList } from "@/app/staff/actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
@@ -213,7 +213,7 @@ export async function saveShift(data: Omit<ShiftRecord, "id"> & { id?: string })
 
     await addAuditLog({
       table_name: SHIFTS_COLLECTION,
-      record_id: recordId,
+      record_id: recordId || "unknown",
       action: "UPDATE",
       old_data: null,
       new_data: cleanedData,

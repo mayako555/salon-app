@@ -1,9 +1,9 @@
 "use server";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { isNationalHoliday, isSalonEvent } from "@/lib/seasonal-events";
 import { fetchHistoricalWeather } from "@/lib/weather";
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import { collection, getDocs, query, where, orderBy } from "@/lib/firestore-admin-wrapper";
 import { format, subMonths, addMonths, eachDayOfInterval, isWeekend, getDate, getDay, isAfter, isBefore, addDays, subDays, endOfMonth, startOfMonth, startOfYear } from "date-fns";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { getTenantCollection } from "@/lib/tenant-utils";
@@ -167,6 +167,9 @@ export type RegressionParams = {
 
 export async function performRegressionAnalysis(params: RegressionParams) {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId && ctx.role !== "systemOwner") return { success: false, error: "Unauthorized" };
+
     const { store, targetY, featuresX, period } = params;
     const now = new Date();
     let startDate = subMonths(now, 1);
@@ -192,20 +195,34 @@ export async function performRegressionAnalysis(params: RegressionParams) {
 
     // Fetch Sales
     const salesCol = collection(db, "sales");
-    const qSales = query(
-      salesCol,
-      where("date", ">=", startStr),
-      where("date", "<=", endStr)
-    );
+    const qSales = ctx.role === "systemOwner" && !ctx.isImpersonating
+      ? query(
+          salesCol,
+          where("date", ">=", startStr),
+          where("date", "<=", endStr)
+        )
+      : query(
+          salesCol,
+          where("companyId", "==", ctx.companyId),
+          where("date", ">=", startStr),
+          where("date", "<=", endStr)
+        );
     const salesSnap = await getDocs(qSales);
     
     // Fetch Shifts to count staff
     const shiftsCol = collection(db, "shifts");
-    const qShifts = query(
-      shiftsCol,
-      where("date", ">=", startStr),
-      where("date", "<=", endStr)
-    );
+    const qShifts = ctx.role === "systemOwner" && !ctx.isImpersonating
+      ? query(
+          shiftsCol,
+          where("date", ">=", startStr),
+          where("date", "<=", endStr)
+        )
+      : query(
+          shiftsCol,
+          where("companyId", "==", ctx.companyId),
+          where("date", ">=", startStr),
+          where("date", "<=", endStr)
+        );
     const shiftsSnap = await getDocs(qShifts);
 
     // Aggregate daily data
@@ -545,6 +562,9 @@ export type SarimaxParams = {
 
 export async function performSarimaxForecast(params: SarimaxParams) {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId && ctx.role !== "systemOwner") return { success: false, error: "Unauthorized" };
+
     const { store, targetY, featuresX, forecastDays, period = "last_3m" } = params;
     const now = new Date();
     
@@ -564,7 +584,9 @@ export async function performSarimaxForecast(params: SarimaxParams) {
 
     // Fetch Sales
     const salesCol = collection(db, "sales");
-    const qSales = query(salesCol, where("date", ">=", startStr), where("date", "<=", endStr));
+    const qSales = ctx.role === "systemOwner" && !ctx.isImpersonating
+      ? query(salesCol, where("date", ">=", startStr), where("date", "<=", endStr))
+      : query(salesCol, where("companyId", "==", ctx.companyId), where("date", ">=", startStr), where("date", "<=", endStr));
     const salesSnap = await getDocs(qSales);
     
     // Fetch Weather Data
@@ -616,7 +638,9 @@ export async function performSarimaxForecast(params: SarimaxParams) {
 
     // fetch past shifts as well
     const shiftsCol = collection(db, "shifts");
-    const qShifts = query(shiftsCol, where("date", ">=", startStr), where("date", "<=", endStr));
+    const qShifts = ctx.role === "systemOwner" && !ctx.isImpersonating
+      ? query(shiftsCol, where("date", ">=", startStr), where("date", "<=", endStr))
+      : query(shiftsCol, where("companyId", "==", ctx.companyId), where("date", ">=", startStr), where("date", "<=", endStr));
     const shiftsSnap = await getDocs(qShifts);
     
     shiftsSnap.forEach(doc => {
@@ -842,6 +866,9 @@ export type RepeatAnalysisParams = {
 
 export async function getRepeatAnalysis(params: RepeatAnalysisParams) {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId && ctx.role !== "systemOwner") return { success: false, error: "Unauthorized" };
+
     const { store, months } = params;
     const now = new Date();
     const startDate = subMonths(now, months);
@@ -849,7 +876,9 @@ export async function getRepeatAnalysis(params: RepeatAnalysisParams) {
     const endStr = format(now, "yyyy-MM-dd");
 
     const salesCol = collection(db, "sales");
-    let qSales = query(salesCol, where("date", ">=", startStr), where("date", "<=", endStr));
+    let qSales = ctx.role === "systemOwner" && !ctx.isImpersonating
+      ? query(salesCol, where("date", ">=", startStr), where("date", "<=", endStr))
+      : query(salesCol, where("companyId", "==", ctx.companyId), where("date", ">=", startStr), where("date", "<=", endStr));
     const salesSnap = await getDocs(qSales);
 
     // 顧客ごとの来店履歴を整理
@@ -1009,6 +1038,9 @@ export type LTVForecastParams = {
 
 export async function predictLTVAndRepeaters(params: LTVForecastParams) {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId && ctx.role !== "systemOwner") return { success: false, error: "Unauthorized" };
+
     const { store, forecastMonths } = params;
     const now = new Date();
     // 過去24ヶ月分のデータを取得
@@ -1017,7 +1049,9 @@ export async function predictLTVAndRepeaters(params: LTVForecastParams) {
     const endStr = format(now, "yyyy-MM-dd");
 
     const salesCol = collection(db, "sales");
-    const qSales = query(salesCol, where("date", ">=", startStr), where("date", "<=", endStr));
+    const qSales = ctx.role === "systemOwner" && !ctx.isImpersonating
+      ? query(salesCol, where("date", ">=", startStr), where("date", "<=", endStr))
+      : query(salesCol, where("companyId", "==", ctx.companyId), where("date", ">=", startStr), where("date", "<=", endStr));
     const salesSnap = await getDocs(qSales);
 
     // 顧客ごとの来店月履歴
@@ -1233,8 +1267,12 @@ function getPeriodDates(period: string) {
   };
 }
 
-export async function getStaffAnalytics(companyId: string, storeId: string | null | undefined, period: string, empType: string = "all") {
+export async function getStaffAnalytics(companyIdParam: string, storeId: string | null | undefined, period: string, empType: string = "all") {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) return { success: false, error: "Unauthorized or requires impersonation" };
+    const companyId = ctx.companyId;
+
     const { startStr, endStr } = getPeriodDates(period);
     const { adminDb } = await import("@/lib/firebase-admin");
 
@@ -1332,8 +1370,12 @@ export async function getStaffAnalytics(companyId: string, storeId: string | nul
   }
 }
 
-export async function getStoreComparisonAnalytics(companyId: string, period: string) {
+export async function getStoreComparisonAnalytics(companyIdParam: string, period: string) {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) return { success: false, error: "Unauthorized or requires impersonation" };
+    const companyId = ctx.companyId;
+
     const { startStr, endStr } = getPeriodDates(period);
     const { adminDb } = await import("@/lib/firebase-admin");
 
@@ -1371,8 +1413,12 @@ export async function getStoreComparisonAnalytics(companyId: string, period: str
   }
 }
 
-export async function getReferralAnalytics(companyId: string, storeId: string | null | undefined, period: string) {
+export async function getReferralAnalytics(companyIdParam: string, storeId: string | null | undefined, period: string) {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) return { success: false, error: "Unauthorized or requires impersonation" };
+    const companyId = ctx.companyId;
+
     const { startStr, endStr } = getPeriodDates(period);
     const { adminDb } = await import("@/lib/firebase-admin");
 
@@ -1450,8 +1496,12 @@ export async function getReferralAnalytics(companyId: string, storeId: string | 
   }
 }
 
-export async function getChannelAnalytics(companyId: string, storeId: string | null | undefined, period: string) {
+export async function getChannelAnalytics(companyIdParam: string, storeId: string | null | undefined, period: string) {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) return { success: false, error: "Unauthorized or requires impersonation" };
+    const companyId = ctx.companyId;
+
     const { startStr, endStr } = getPeriodDates(period);
     const { adminDb } = await import("@/lib/firebase-admin");
 
@@ -1489,8 +1539,12 @@ export async function getChannelAnalytics(companyId: string, storeId: string | n
   }
 }
 
-export async function getMenuAnalytics(companyId: string, period: string, store: string = "all") {
+export async function getMenuAnalytics(companyIdParam: string, period: string, store: string = "all") {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) return { success: false, error: "Unauthorized or requires impersonation" };
+    const companyId = ctx.companyId;
+
     const now = new Date();
     let startDate: Date;
     let endDate: Date = now;
@@ -1528,7 +1582,7 @@ export async function getMenuAnalytics(companyId: string, period: string, store:
 
     snap.docs.forEach(d => {
       const data = d.data();
-      // companyId isolation: skip if reservation has explicit companyId mismatch
+      // companyId isolation
       if (data.companyId && data.companyId !== companyId) return;
       if (data.status === "cancelled") return;
       if (data.type === "schedule") return;
@@ -1565,8 +1619,12 @@ export async function getMenuAnalytics(companyId: string, period: string, store:
   }
 }
 
-export async function getStoreNames(companyId: string) {
+export async function getStoreNames(companyIdParam: string) {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) return { success: false, error: "Unauthorized or requires impersonation" };
+    const companyId = ctx.companyId;
+
     const colRef = collection(db, "sales");
     const q = query(
       colRef,

@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
@@ -12,7 +12,7 @@ import {
   doc, 
   deleteDoc,
   serverTimestamp
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 import { revalidatePath } from "next/cache";
 import { addAuditLog } from "@/app/audit/actions";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";

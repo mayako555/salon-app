@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
@@ -14,7 +14,7 @@ import {
   serverTimestamp,
   getDoc,
   setDoc
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 import { revalidatePath } from "next/cache";
 import { getAdvancedAnalytics } from "@/app/dashboard/actions";
 import { addAuditLog } from "@/app/audit/actions";

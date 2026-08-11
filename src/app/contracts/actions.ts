@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
@@ -13,7 +13,7 @@ import {
   serverTimestamp,
   getDoc,
   updateDoc
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 
 import { StaffContract } from "./constants";
 import { getStaffList } from "../staff/actions";

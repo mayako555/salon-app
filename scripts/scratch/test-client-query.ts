@@ -13,8 +13,8 @@ admin.initializeApp({
 });
 
 const { initializeApp } = require("firebase/app");
-const { getFirestore, collection, query, getDocs, orderBy } = require("firebase/firestore");
-const { getAuth, signInWithCustomToken } = require("firebase/auth");
+const { getFirestore, collection, query, getDocs, orderBy, connectFirestoreEmulator } = require("firebase/firestore");
+const { getAuth, signInWithCustomToken, connectAuthEmulator } = require("firebase/auth");
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -23,7 +23,9 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+connectFirestoreEmulator(db, '127.0.0.1', 8080);
 const auth = getAuth(app);
+connectAuthEmulator(auth, 'http://127.0.0.1:9099');
 
 async function test() {
   try {

@@ -1,7 +1,7 @@
 import { addTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } from "@/lib/firestore-admin-wrapper";
 
 export async function POST(request: Request) {
   try {

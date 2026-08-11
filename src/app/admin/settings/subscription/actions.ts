@@ -1,7 +1,7 @@
 "use server";
 
-import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, getDocs, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { doc, getDoc, collection, query, where, getDocs, updateDoc } from "@/lib/firestore-admin-wrapper";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc } from "@/lib/tenant-ownership";
 
 

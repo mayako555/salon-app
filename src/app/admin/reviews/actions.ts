@@ -1,6 +1,6 @@
 "use server";
-import { db } from "@/lib/firebase";
-import { collection, writeBatch, doc, getDocs, query, where, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { collection, writeBatch, doc, getDocs, query, where, serverTimestamp } from "@/lib/firestore-admin-wrapper";
 import { addAuditLog } from "@/app/audit/actions";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc } from "@/lib/tenant-ownership";
 

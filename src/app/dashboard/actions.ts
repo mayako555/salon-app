@@ -1,13 +1,13 @@
 "use server";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
   query, 
   where, 
   getCountFromServer 
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 import { format } from "date-fns";
 import { getStoreTargets } from "../stores/actions";
 import { getMonthlyShifts } from "../shifts/actions";

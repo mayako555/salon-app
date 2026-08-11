@@ -6,9 +6,6 @@ import { UserContext } from "./auth-server";
  * SystemOwners (when not impersonating) get unrestricted access.
  */
 export function getTenantCollection(collectionName: string, ctx: UserContext) {
-  if (ctx.role === "systemOwner" && !ctx.isImpersonating) {
-    return adminDb.collection(collectionName);
-  }
   if (!ctx.companyId) throw new Error("Unauthorized: No company ID found");
   return adminDb.collection(collectionName).where("companyId", "==", ctx.companyId);
 }
@@ -23,10 +20,6 @@ export async function getTenantDoc(collectionName: string, docId: string, ctx: U
     throw new Error("Document not found");
   }
   const data = snap.data();
-  
-  if (ctx.role === "systemOwner" && !ctx.isImpersonating) {
-    return snap;
-  }
   
   if (data?.companyId !== ctx.companyId && data?.tenant_id !== ctx.companyId) {
     throw new Error(`Unauthorized tenant access: Document belongs to ${data?.companyId || data?.tenant_id}`);

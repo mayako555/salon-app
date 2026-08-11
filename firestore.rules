@@ -34,17 +34,23 @@ service cloud.firestore {
       allow write: if false; 
     }
 
-    // --- All Other Collections ---
-    // Many Server Actions in this app use the Client SDK without authentication.
-    // To prevent breaking these Server Actions, we must allow anonymous read/writes
-    // for all collections except the strictly protected ones (users & staff_profiles).
-    
-    match /{collection}/{docId} {
-      allow read, write: if collection != 'users' && collection != 'staff_profiles';
+    match /companies/{companyId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /sales_master/{docId} {
+      allow read: if isSignedIn();
+      allow write: if false;
     }
     
-    match /{collection}/{docId}/{subcollection}/{subDocId} {
-      allow read, write: if collection != 'users' && collection != 'staff_profiles';
+    // --- All Other Collections ---
+    // By default, ALL direct client access is denied.
+    // The application relies exclusively on Server Actions (Admin SDK) for reads and writes,
+    // which guarantees that tenant isolation and access controls are strictly enforced.
+    
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

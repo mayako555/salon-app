@@ -6,7 +6,7 @@ import { getCurrentUserContext } from "./auth-server";
 export async function assertTenantOwnership(docRef: any) {
   const ctx = await getCurrentUserContext();
   
-  if (ctx.role === "systemOwner") {
+  if (ctx.role === "systemOwner" && !ctx.isImpersonating) {
     return { snap: null, data: null, ctx };
   }
 
@@ -66,27 +66,30 @@ export async function updateStoreOwnedDoc(docRef: any, updateData: any) {
 export async function addTenantOwnedDoc(colRef: any, data: any) {
   const ctx = await getCurrentUserContext();
   const dataWithCompany = { ...data };
-  if (ctx.role !== "systemOwner") {
-    if (!ctx.companyId) throw new Error("Unauthorized");
-    dataWithCompany.companyId = ctx.companyId;
+  if (ctx.role === "systemOwner" && !ctx.isImpersonating) {
+    return adminDb.collection(colRef.path).add(dataWithCompany);
   }
+  if (!ctx.companyId) throw new Error("Unauthorized");
+  dataWithCompany.companyId = ctx.companyId;
   return adminDb.collection(colRef.path).add(dataWithCompany);
 }
 
 export async function setTenantOwnedDoc(docRef: any, data: any, options?: { merge: boolean }) {
   const ctx = await getCurrentUserContext();
   const dataWithCompany = { ...data };
-  if (ctx.role !== "systemOwner") {
-    if (!ctx.companyId) throw new Error("Unauthorized");
-    dataWithCompany.companyId = ctx.companyId;
-    
-    // Check existing
-    const snap = await adminDb.doc(docRef.path).get();
-    if (snap.exists) {
-      const existingData = snap.data();
-      if (existingData?.companyId !== ctx.companyId && existingData?.tenant_id !== ctx.companyId) {
-        throw new Error("Unauthorized: Document belongs to a different tenant");
-      }
+  if (ctx.role === "systemOwner" && !ctx.isImpersonating) {
+    return adminDb.doc(docRef.path).set(dataWithCompany, { merge: options?.merge ?? false });
+  }
+  
+  if (!ctx.companyId) throw new Error("Unauthorized");
+  dataWithCompany.companyId = ctx.companyId;
+  
+  // Check existing
+  const snap = await adminDb.doc(docRef.path).get();
+  if (snap.exists) {
+    const existingData = snap.data();
+    if (existingData?.companyId !== ctx.companyId && existingData?.tenant_id !== ctx.companyId) {
+      throw new Error("Unauthorized: Document belongs to a different tenant");
     }
   }
   return adminDb.doc(docRef.path).set(dataWithCompany, { merge: options?.merge ?? false });

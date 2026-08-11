@@ -1,17 +1,17 @@
 "use server";
 import { addTenantOwnedDoc } from "@/lib/tenant-ownership";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
+  getDocsUnfiltered, 
+  addDocUnfiltered, 
+  updateDocUnfiltered, 
   doc, 
   serverTimestamp,
   query,
   orderBy
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 import { revalidatePath } from "next/cache";
 import { generateDefaultFeatures } from "@/types/master";
 import { addAuditLog } from "@/app/audit/actions";
@@ -39,7 +39,7 @@ export async function getTenants() {
   try {
     const colRef = collection(db, COMPANIES_COLLECTION);
     const q = query(colRef, orderBy("createdAt", "desc"));
-    const snap = await getDocs(q);
+    const snap = await getDocsUnfiltered(q);
     
     const { adminDb } = require("@/lib/firebase-admin");
     const profilesSnap = await adminDb.collection("staff_profiles").where("role", "==", "companyOwner").get();
@@ -60,9 +60,9 @@ export async function getTenants() {
   } catch (error) {
     console.error("Error fetching tenants:", error);
     // If collection doesn't exist or index missing, might fail. 
-    // Fallback to simple getDocs
+    // Fallback to simple getDocsUnfiltered
     try {
-      const snap = await getDocs(collection(db, COMPANIES_COLLECTION));
+      const snap = await getDocsUnfiltered(collection(db, COMPANIES_COLLECTION));
       return snap.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
@@ -109,7 +109,7 @@ export async function addTenant(payload: Omit<CompanyTenant, "id" | "createdAt" 
 export async function updateTenant(id: string, payload: Partial<Omit<CompanyTenant, "id" | "createdAt" | "updatedAt">>) {
   try {
     const docRef = doc(db, COMPANIES_COLLECTION, id);
-    await updateDoc(docRef, {
+    await updateDocUnfiltered(docRef, {
       ...payload,
       updatedAt: serverTimestamp()
     });

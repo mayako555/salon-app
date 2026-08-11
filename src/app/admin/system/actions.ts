@@ -1,7 +1,7 @@
 "use server";
 
-import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { collection, getDocsUnfiltered } from "@/lib/firestore-admin-wrapper";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { AdoptionProgress, defaultAdoptionProgress } from "@/app/setup/types";
 
@@ -35,7 +35,7 @@ export async function getSystemAdoptionStats() {
     }
 
     const companiesCol = collection(db, "companies");
-    const snap = await getDocs(companiesCol);
+    const snap = await getDocsUnfiltered(companiesCol);
 
     const stats: CompanyAdoptionStats[] = [];
     let totalStores = 0;

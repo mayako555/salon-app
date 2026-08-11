@@ -1,7 +1,7 @@
 "use server";
 
-import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { collection, getDocs, query, where } from "@/lib/firestore-admin-wrapper";
 import { getCurrentUserContext } from "@/lib/auth-server";
 
 export interface AreaStats {
@@ -57,14 +57,21 @@ export async function getTradeAreaStats() {
     const isTenantAdmin = ctx.role === "systemOwner" || ctx.role === "admin" || ctx.role === "companyOwner";
     const allowedStores = isTenantAdmin ? [] : (ctx.salonIds || []);
     
+    if (!ctx.companyId && ctx.role !== "systemOwner") return { success: false, error: "Unauthorized" };
+
     // Fetch Customers
     const customersCol = collection(db, "customers");
-    const customersSnap = await getDocs(customersCol);
+    const qCust = ctx.role === "systemOwner" && !ctx.isImpersonating 
+      ? query(customersCol) 
+      : query(customersCol, where("companyId", "==", ctx.companyId));
+    const customersSnap = await getDocs(qCust);
     
     // Fetch Sales
     const salesCol = collection(db, "sales");
-    // Ideally we should filter by companyId/store, but using memory filter for now to avoid missing index errors
-    const salesSnap = await getDocs(salesCol);
+    const qSales = ctx.role === "systemOwner" && !ctx.isImpersonating 
+      ? query(salesCol) 
+      : query(salesCol, where("companyId", "==", ctx.companyId));
+    const salesSnap = await getDocs(qSales);
     
     const customerSales: Record<string, { sales: number; visits: number }> = {};
     

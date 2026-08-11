@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
@@ -13,7 +13,7 @@ import {
   addDoc,
   deleteDoc,
   writeBatch
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 import { SalesMasterItem } from "@/types/master";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { addAuditLog } from "../audit/actions";

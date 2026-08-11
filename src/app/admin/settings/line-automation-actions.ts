@@ -1,8 +1,8 @@
 "use server";
 import { setTenantOwnedDoc } from "@/lib/tenant-ownership";
 
-import { db } from "@/lib/firebase";
-import { collection, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { collection, doc, getDoc, setDoc, serverTimestamp } from "@/lib/firestore-admin-wrapper";
 
 export interface LineAutomationSettings {
   id?: string;

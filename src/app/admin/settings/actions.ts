@@ -1,8 +1,8 @@
 "use server";
 import { setTenantOwnedDoc } from "@/lib/tenant-ownership";
 
-import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc, collection, query, getDocs, where, deleteDoc } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { doc, getDoc, setDoc, collection, query, getDocs, where, deleteDoc } from "@/lib/firestore-admin-wrapper";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserContext } from "@/lib/auth-server";
 

@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
@@ -12,7 +12,7 @@ import {
   doc, 
   serverTimestamp,
   limit
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 import { generateSNSContent as generateAI } from "@/lib/gemini";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserContext } from "@/lib/auth-server";

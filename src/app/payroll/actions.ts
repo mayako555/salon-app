@@ -2,7 +2,7 @@
 
 import { Decimal, applyRounding, calculateByRate } from "@/lib/decimal-utils";
 import { resolveAttendanceTimes } from "@/lib/attendance-utils";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
@@ -15,7 +15,7 @@ import {
   writeBatch,
   serverTimestamp,
   deleteDoc
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 import { getContractsList } from "@/app/contracts/actions";
 import { getMonthlySales } from "@/app/sales/actions";
 import { getMonthlyAllowances } from "@/app/allowances/actions";

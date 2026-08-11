@@ -1,7 +1,7 @@
 "use server";
 
-import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { collection, getDocsUnfiltered, query, where, orderBy } from "@/lib/firestore-admin-wrapper";
 
 const COMPANIES_COLLECTION = "companies";
 const FEEDBACK_COLLECTION = "test_feedbacks";
@@ -10,14 +10,14 @@ export async function getTestTenantsData() {
   try {
     // 1. Get tenants with plan "Test" or "Beta"
     const colRef = collection(db, COMPANIES_COLLECTION);
-    const snap = await getDocs(colRef);
+    const snap = await getDocsUnfiltered(colRef);
     const tenants = snap.docs
       .map(doc => ({ id: doc.id, ...doc.data() } as any))
       .filter(t => t.plan === "Test" || t.plan === "Beta");
       
     // 2. Get feedbacks for these tenants
     const feedbackRef = collection(db, FEEDBACK_COLLECTION);
-    const feedbackSnap = await getDocs(query(feedbackRef, orderBy("timestamp", "desc")));
+    const feedbackSnap = await getDocsUnfiltered(query(feedbackRef, orderBy("timestamp", "desc")));
     const feedbacks = feedbackSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
 
     return { success: true, tenants, feedbacks };

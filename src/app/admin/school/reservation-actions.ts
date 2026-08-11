@@ -1,7 +1,7 @@
 "use server";
 
-import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc, query, where, serverTimestamp, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc, query, where, serverTimestamp, orderBy } from "@/lib/firestore-admin-wrapper";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserContext, UserContext } from "@/lib/auth-server";
 import { SchoolReservation, SchoolPayment, SchoolSalesRecord, SchoolReservationStatus, SchoolPaymentStatus } from "./types";

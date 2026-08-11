@@ -1,7 +1,7 @@
 "use server";
 import { setTenantOwnedDoc } from "@/lib/tenant-ownership";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
@@ -11,7 +11,7 @@ import {
   setDoc, 
   getDoc,
   serverTimestamp 
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 import { revalidatePath } from "next/cache";
 
 const STORE_TARGETS_COLLECTION = "monthly_store_targets";

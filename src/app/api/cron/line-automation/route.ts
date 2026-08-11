@@ -1,7 +1,7 @@
 import { setTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
-import { collection, query, getDocs, doc, setDoc, where, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { collection, query, getDocs, doc, setDoc, where, getDoc } from "@/lib/firestore-admin-wrapper";
 import { sendLineMessage } from "@/lib/line";
 import { LineAutomationSettings } from "@/app/admin/settings/line-automation-actions";
 import { replaceLineTemplate, validateLineTemplate } from "@/lib/lineTemplate";

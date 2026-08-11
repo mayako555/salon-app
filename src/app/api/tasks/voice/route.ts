@@ -1,8 +1,8 @@
 import { addTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { NextResponse } from "next/server";
 import { parseTasksFromText } from "@/lib/ai-task-parser";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firestore-admin-wrapper";
+import { collection, addDoc, serverTimestamp } from "@/lib/firestore-admin-wrapper";
 import crypto from "crypto";
 
 // Helper to safely compare tokens (timing attack safe)

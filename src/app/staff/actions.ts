@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
@@ -13,7 +13,7 @@ import {
   orderBy, 
   writeBatch,
   serverTimestamp
-} from "firebase/firestore";
+} from "@/lib/firestore-admin-wrapper";
 import { addAuditLog } from "../audit/actions";
 import { revalidatePath } from "next/cache";
 import { syncUserDoc, deleteUserDoc } from "@/lib/user-sync";
@@ -60,6 +60,7 @@ const STAFF_COLLECTION = "staff_profiles";
 
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { getTenantCollection, getTenantDoc } from "@/lib/tenant-utils";
+import { addTenantOwnedDoc, updateTenantOwnedDoc, deleteTenantOwnedDoc, getTenantOwnedDoc } from "@/lib/tenant-ownership";
 
 export async function getStaffList(options?: { includeResigned?: boolean }): Promise<StaffProfile[]> {
   try {
@@ -146,7 +147,7 @@ export async function getStaffList(options?: { includeResigned?: boolean }): Pro
 }
 
 import { adminAuth } from "@/lib/firebase-admin";
-import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+
 
 
 export async function addStaff(formData: FormData) {
@@ -316,10 +317,10 @@ export async function editStaff(id: string, formData: FormData) {
     }
 
     // Get current profile to check uid
-    const snap = await getDocs(query(collection(db, STAFF_COLLECTION), where("__name__", "==", id)));
+    const snap = await getTenantOwnedDoc(doc(db, STAFF_COLLECTION, id));
     let currentUid = "";
-    if (!snap.empty) {
-      currentUid = snap.docs[0].data().uid;
+    if (snap.exists) {
+      currentUid = snap.data()?.uid || "";
     }
 
     // Sync passcode and status to Firebase Auth using admin SDK
@@ -499,11 +500,11 @@ export async function updateStaffPasscode(staffId: string, passcode: string) {
 
     const docRef = doc(db, STAFF_COLLECTION, staffId);
     
-    // Retrieve current profile to get uid
-    const snap = await getDocs(query(collection(db, STAFF_COLLECTION), where("__name__", "==", staffId)));
+    // Retrieve current profile
+    const snap = await getTenantOwnedDoc(doc(db, STAFF_COLLECTION, staffId));
     let currentUid = "";
-    if (!snap.empty) {
-      currentUid = snap.docs[0].data().uid;
+    if (snap.exists) {
+      currentUid = snap.data()?.uid || "";
     }
 
     // Sync passcode to Firebase Auth password under the hood using admin SDK
