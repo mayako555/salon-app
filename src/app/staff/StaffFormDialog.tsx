@@ -193,21 +193,23 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
             <p className="text-[10px] text-slate-400 mt-1">※ チェックした店舗の売上やシフトなどの情報にアクセスできます。一つも選択しない場合、すべての店舗にアクセス可能になります。</p>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1 font-bold text-indigo-700">評価テンプレート（役職）</label>
-            <select 
-              name="evaluation_role" 
-              defaultValue={staff?.evaluation_role || "general"}
-              className="w-full h-10 px-3 border-2 border-indigo-100 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white font-bold"
-            >
-              <option value="general">一般スタッフ</option>
-              <option value="educator">教育担当</option>
-              <option value="sub_manager">副店長</option>
-              <option value="manager">店長</option>
-              <option value="area_manager">エリアマネージャー</option>
-            </select>
-            <p className="text-[10px] text-slate-400 mt-1">※ 評価時の自動計算・項目の出し分けに使用されます</p>
-          </div>
+          {isSystemOwnerCompany && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1 font-bold text-indigo-700">評価テンプレート（役職）</label>
+              <select 
+                name="evaluation_role" 
+                defaultValue={staff?.evaluation_role || "general"}
+                className="w-full h-10 px-3 border-2 border-indigo-100 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white font-bold"
+              >
+                <option value="general">一般スタッフ</option>
+                <option value="educator">教育担当</option>
+                <option value="sub_manager">副店長</option>
+                <option value="manager">店長</option>
+                <option value="area_manager">エリアマネージャー</option>
+              </select>
+              <p className="text-[10px] text-slate-400 mt-1">※ 評価時の自動計算・項目の出し分けに使用されます</p>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1 font-bold text-emerald-700">月間売上目標 (¥)</label>

@@ -52,22 +52,32 @@ export async function getTenants() {
       }
     });
 
-    return snap.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      adminEmails: emailsByCompany[doc.id] || []
-    })) as unknown as CompanyTenant[];
+    return snap.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+        updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt,
+        adminEmails: emailsByCompany[doc.id] || []
+      };
+    }) as unknown as CompanyTenant[];
   } catch (error) {
     console.error("Error fetching tenants:", error);
     // If collection doesn't exist or index missing, might fail. 
     // Fallback to simple getDocsUnfiltered
     try {
       const snap = await getDocsUnfiltered(collection(db, COMPANIES_COLLECTION));
-      return snap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        adminEmails: []
-      })) as unknown as CompanyTenant[];
+      return snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt,
+          adminEmails: []
+        };
+      }) as unknown as CompanyTenant[];
     } catch (e) {
       console.error("Fallback error:", e);
       return [];

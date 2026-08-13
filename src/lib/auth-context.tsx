@@ -160,22 +160,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const companyDoc = await getDoc(doc(db, "companies", companyIdToUse));
                 const companyData = companyDoc.exists() ? companyDoc.data() : {};
                 
-                const isSystemOwner = companyData.companyType === "system_owner";
+                const isSystemOwnerContext = companyData.companyType === "system_owner" || companyIdToUse === "company_default";
                 
                 currentPlan = companyData.plan || "Standard";
-                currentSchoolEnabled = isSystemOwner || data.role === "systemOwner" ? true : !!companyData.schoolEnabled;
+                currentSchoolEnabled = isSystemOwnerContext || data.role === "systemOwner" ? true : !!companyData.schoolEnabled;
                 currentSchoolName = companyData.schoolName || "";
                 
 
-                setIsSystemOwnerCompany(isSystemOwner);
+                setIsSystemOwnerCompany(isSystemOwnerContext);
                 setAttendancePolicy(companyData.attendancePolicy || (
-                  isSystemOwner 
+                  isSystemOwnerContext 
+
                     ? { roundingEnabled: true, roundingIntervalMinutes: 30, linkWithShifts: true }
                     : { roundingEnabled: false, roundingIntervalMinutes: 0, linkWithShifts: false }
                 ));
 
                 // Load features or apply defaults
-                const safeFeatures = ensureFeatureDefaults(companyData.features, isSystemOwner);
+                const safeFeatures = ensureFeatureDefaults(companyData.features, isSystemOwnerContext);
                 setFeatures(safeFeatures);
 
                 setTenantPlan(currentPlan);
