@@ -1,20 +1,20 @@
 "use server";
 
-import { db } from "./firebase";
+import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
-  addDoc, 
+  getDoc,
+  doc, 
   query, 
   where, 
-  orderBy, 
-  doc, 
-  getDoc,
+  orderBy,
   serverTimestamp,
-  Timestamp 
-} from "firebase/firestore";
-import { getCurrentUserContext } from "./auth-server";
-import { updateTenantOwnedDoc, deleteTenantOwnedDoc } from "@/lib/tenant-ownership";
+  addDoc,
+  deleteDoc,
+  writeBatch
+} from "@/lib/firestore-admin-wrapper";
+import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
 
 
 export type Customer = {
@@ -76,6 +76,7 @@ const CUSTOMERS_COLLECTION = "customers";
 
 export async function getAllCustomers(): Promise<Customer[]> {
   try {
+    const { getCurrentUserContext } = await import("./auth-server");
     const ctx = await getCurrentUserContext();
     const colRef = collection(db, CUSTOMERS_COLLECTION);
     const q = query(colRef, orderBy("name_kana", "asc"));
@@ -119,6 +120,7 @@ export async function getCustomerById(id: string): Promise<Customer | null> {
 
 export async function addCustomer(data: Omit<Customer, 'id' | 'created_at' | 'updated_at'>) {
   try {
+    const { getCurrentUserContext } = await import("./auth-server");
     const ctx = await getCurrentUserContext();
     if (!ctx.companyId) throw new Error("会社IDが指定されていません");
 
@@ -144,7 +146,6 @@ export async function addCustomer(data: Omit<Customer, 'id' | 'created_at' | 'up
 
 export async function updateCustomer(id: string, data: Partial<Customer>) {
   try {
-    const { doc, updateDoc } = await import("firebase/firestore");
     const docRef = doc(db, CUSTOMERS_COLLECTION, id);
     
     // Filter out undefined values to prevent Firestore errors
@@ -165,7 +166,6 @@ export async function updateCustomer(id: string, data: Partial<Customer>) {
 
 export async function deleteCustomer(id: string) {
   try {
-    const { doc, deleteDoc } = await import("firebase/firestore");
     const docRef = doc(db, CUSTOMERS_COLLECTION, id);
     await deleteTenantOwnedDoc(docRef);
     return { success: true };
@@ -177,7 +177,6 @@ export async function deleteCustomer(id: string) {
 
 export async function bulkDeleteCustomers(ids: string[]) {
   try {
-    const { writeBatch, doc } = await import("firebase/firestore");
     const batch = writeBatch(db);
     ids.forEach(id => {
       const docRef = doc(db, CUSTOMERS_COLLECTION, id);
@@ -193,7 +192,6 @@ export async function bulkDeleteCustomers(ids: string[]) {
 
 export async function mergeCustomers(masterId: string, duplicateIds: string[], mergedData?: Partial<Customer>) {
   try {
-    const { writeBatch, doc, collection, query, where, getDocs, updateDoc } = await import("firebase/firestore");
     const batch = writeBatch(db);
     
     // 0. Update Master Data if provided

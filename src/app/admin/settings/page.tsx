@@ -24,24 +24,32 @@ export default function SystemSettingsPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (!profile?.companyId) return;
+    const companyId = profile.companyId;
     async function load() {
-      const [data, lineData, compData, kioskData, lineAutomationData] = await Promise.all([
-        getReservationSettings(),
-        getLineSettings(),
-        getCompanySettings(profile?.companyId!),
-        getKioskSettings(profile?.companyId!),
-        getLineAutomationSettings(profile?.companyId!)
-      ]);
-      setSettings(data);
-      setLineSettings(lineData);
-      setAttendancePolicy(compData.attendancePolicy || { roundingEnabled: false, roundingIntervalMinutes: 0 });
-      setProductRules(compData.productCommissionRules || []);
-      setKioskSettings(kioskData || {});
-      setLineAutomationSettings(lineAutomationData);
-      setLoading(false);
+      try {
+        const [data, lineData, compData, kioskData, lineAutomationData] = await Promise.all([
+          getReservationSettings(),
+          getLineSettings(),
+          getCompanySettings(companyId),
+          getKioskSettings(companyId),
+          getLineAutomationSettings(companyId)
+        ]);
+        setSettings(data);
+        setLineSettings(lineData);
+        setAttendancePolicy(compData.attendancePolicy || { roundingEnabled: false, roundingIntervalMinutes: 0 });
+        setProductRules(compData.productCommissionRules || []);
+        setKioskSettings(kioskData || {});
+        setLineAutomationSettings(lineAutomationData);
+      } catch (error) {
+        console.error("Failed to load system settings:", error);
+        toast.error("設定の読み込みに失敗しました");
+      } finally {
+        setLoading(false);
+      }
     }
     load();
-  }, []);
+  }, [profile?.companyId]);
 
   if (!isAdmin) {
     return <div className="p-12 text-center text-slate-400 font-bold">アクセス権限がありません</div>;
@@ -106,8 +114,13 @@ export default function SystemSettingsPage() {
       return saveKioskSettings(profile?.companyId!, store, data.token, data.enabled);
     });
     
-    // Save Attendance Policy
-    await saveCompanyAttendancePolicy(profile?.companyId!, attendancePolicy, profile?.id!);
+    // Attendance rules are exclusive to the system-owner company.
+    if (isSystemOwnerCompany && profile?.companyId) {
+      const attendanceRes = await saveCompanyAttendancePolicy(profile.companyId, attendancePolicy, profile.id);
+      if (!attendanceRes.success) {
+        toast.error(`勤怠ルールの保存に失敗: ${attendanceRes.error}`);
+      }
+    }
 
     // Save Line Automation Settings
     if (lineAutomationSettings) {
@@ -210,6 +223,7 @@ export default function SystemSettingsPage() {
         <LineAutomationSettingsPanel 
           settings={lineAutomationSettings} 
           onChange={setLineAutomationSettings} 
+          availableStores={availableStores.filter(store => store !== "共通" && store !== "全店舗")}
         />
       )}
 

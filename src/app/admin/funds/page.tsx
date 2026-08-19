@@ -36,11 +36,6 @@ export default function FundsDashboardPage() {
   }, [isCompanyOwner, isSystemOwner]);
 
   async function loadData() {
-    if (!isCompanyOwner && !isSystemOwner) {
-      setLoading(false);
-      return;
-    }
-    
     setLoading(true);
     const res = await getFundsDashboardData();
     if (res.success && res.data) {

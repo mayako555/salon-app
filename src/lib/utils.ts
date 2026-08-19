@@ -8,3 +8,10 @@ export function cn(...inputs: ClassValue[]) {
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' }).format(amount || 0);
 }
+
+export function getTenantStores(companyId?: string | null): string[] {
+  if (companyId === "nQOSGbsgzhUG2BTLKACU") {
+    return ["Salon表参道店", "Salon渋谷店", "Salon難波店", "Salon梅田店"];
+  }
+  return ["六甲", "元町", "神戸"];
+}

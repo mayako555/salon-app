@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { X, CheckCircle2, MessageSquare, Edit3, Megaphone, HelpCircle, Trash2, Loader2 } from "lucide-react";
 import { AllowanceTaskStatus, saveStaffAllowanceTask, markAllowanceChecked, AllowanceType, deleteAllowance } from "./actions";
+import { useAuth } from "@/lib/auth-context";
+import { getTenantStores } from "@/lib/utils";
 
 type AllowanceTaskDialogProps = {
   task: AllowanceTaskStatus;
@@ -15,10 +17,11 @@ type AllowanceTaskDialogProps = {
 };
 
 export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, onOpenDetail, onOpenTreatmentDetail }: AllowanceTaskDialogProps) {
+  const { companyId } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  const STORES = ["六甲", "元町", "神戸"];
+  const STORES = getTenantStores(companyId);
 
   // Pre-fill store breakdown counts for Reviews and Nominations
   const initialReviewCounts: Record<string, string> = {};

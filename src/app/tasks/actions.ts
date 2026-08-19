@@ -17,6 +17,7 @@ import { sendLineMessage } from "@/lib/line";
 import { getCustomerById } from "@/lib/customers";
 import { GoogleGenAI } from "@google/genai";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+import { getCurrentUserContext } from "@/lib/auth-server";
 
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
@@ -102,7 +103,8 @@ export async function sendReplyAndCompleteTask(taskId: string, customerId: strin
     }
 
     // 2. Send LINE message
-    const lineRes = await sendLineMessage(customer.line_user_id, replyMessage);
+    const ctx = await getCurrentUserContext();
+    const lineRes = await sendLineMessage(customer.line_user_id, replyMessage, customer.store_name || "メイン店舗", ctx.companyId);
     if (!lineRes.success) {
       return { success: false, error: `LINE送信に失敗しました: ${lineRes.error}` };
     }

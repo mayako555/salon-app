@@ -13,6 +13,7 @@ import AuthGuard from "@/components/AuthGuard";
 import AttendanceCSVButton from "./AttendanceCSVButton";
 import { updateAttendanceRecord, deleteAttendanceRecords } from "./actions";
 import { toast } from "sonner";
+import { getTenantStores } from "@/lib/utils";
 import { 
   Dialog, 
   DialogContent, 
@@ -25,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import Papa from "papaparse";
 
 export default function AttendancePage() {
-  const { profile, isAdmin, isManager, availableStoreObjects, attendancePolicy } = useAuth();
+  const { profile, isAdmin, isManager, availableStoreObjects, attendancePolicy, companyId } = useAuth();
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [shifts, setShifts] = useState<ShiftRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -870,11 +871,12 @@ export default function AttendancePage() {
       </div>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-2 border-b border-slate-100">
             <DialogTitle className="text-xl font-black">{editingRecord?.staff_name} さんの勤怠編集</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleUpdate} className="space-y-6 py-4">
+          <form onSubmit={handleUpdate} className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
             <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 mb-4">
               <p className="text-xs text-blue-700 font-medium leading-relaxed">
                 打刻実績にかかわらず、給与計算に使用される「有効時間」を直接上書きできます。
@@ -971,7 +973,7 @@ export default function AttendancePage() {
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase ml-1">出勤店舗</label>
                 <div className="flex gap-2">
-                  {["元町", "神戸", "六甲"].map(store => {
+                  {getTenantStores(companyId).map(store => {
                     const isSelected = editingRecord?.store?.includes(store);
                     return (
                       <button
@@ -1016,12 +1018,24 @@ export default function AttendancePage() {
                               if (!confirm(`この打刻データ（${inT} - ${outT}）を削除しますか？`)) return;
                               const res = await deleteAttendanceRecords([r.id]);
                               if (res.success) {
-                                toast.success("削除しました");
-                                setEditingGroup(prev => prev.filter(p => p.id !== r.id));
-                                loadData();
-                              } else {
-                                toast.error("削除に失敗しました");
-                              }
+                                 toast.success("削除しました");
+                                 const updatedGroup = editingGroup.filter(p => p.id !== r.id);
+                                 setEditingGroup(updatedGroup);
+                                 if (updatedGroup.length > 0) {
+                                   const latestRecord = updatedGroup[updatedGroup.length - 1];
+                                   setEditingRecord({
+                                     ...latestRecord,
+                                     effective_clock_in: latestRecord.effective_clock_in || latestRecord.clock_in,
+                                     effective_clock_out: latestRecord.effective_clock_out || latestRecord.clock_out,
+                                     break_minutes: latestRecord.break_minutes
+                                   });
+                                 } else {
+                                   setIsEditDialogOpen(false);
+                                 }
+                                 loadData();
+                               } else {
+                                 toast.error("削除に失敗しました");
+                               }
                            }}
                          >
                            <Trash2 size={14} className="mr-1" />
@@ -1034,7 +1048,8 @@ export default function AttendancePage() {
               </div>
             )}
 
-            <DialogFooter className="pt-4">
+            </div>
+            <DialogFooter className="p-6 pt-2 border-t border-slate-100 bg-slate-50 flex gap-2 justify-end">
               <Button type="button" variant="ghost" onClick={() => setIsEditDialogOpen(false)}>キャンセル</Button>
               <Button type="submit" className="bg-slate-900 text-white font-black px-8">修正を保存</Button>
             </DialogFooter>

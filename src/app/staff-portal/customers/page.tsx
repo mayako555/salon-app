@@ -334,6 +334,12 @@ export default function StaffCustomersPage() {
                           <AlertCircle size={10} /> アレルギー
                         </span>
                       )}
+                      {customer.line_user_id && (
+                        <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0 border border-emerald-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          LINE連携済
+                        </span>
+                      )}
                     </div>
                     <div className="text-[10px] text-slate-400 mb-1">{customer.name_kana}</div>
                     <div className="flex items-center gap-3 text-xs text-slate-500">

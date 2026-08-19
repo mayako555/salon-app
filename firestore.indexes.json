@@ -98,7 +98,7 @@
       ]
     },
     {
-      "collectionGroup": "contracts",
+      "collectionGroup": "staff_contracts",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "companyId", "order": "ASCENDING" },

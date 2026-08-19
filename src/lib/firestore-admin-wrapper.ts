@@ -84,14 +84,41 @@ export async function getDocs(q: any): Promise<QuerySnapshot> {
     throw new Error("Unauthorized");
   } else {
     try {
-      snap = await q.where("companyId", "==", ctx.companyId).get();
+      // Check if this is a companies collection query
+      const isCompaniesQuery = q._queryOptions?.collectionId === "companies" || (q.path && q.path.split('/').pop() === "companies");
+      if (isCompaniesQuery) {
+        // Filter by document ID (since companyId is the doc ID in companies)
+        const docRef = q.doc(ctx.companyId);
+        const docSnap = await docRef.get();
+        if (docSnap.exists) {
+          snap = {
+            docs: [docSnap],
+            empty: false,
+            size: 1
+          };
+        } else {
+          snap = { docs: [], empty: true, size: 0 };
+        }
+      } else {
+        snap = await q.where("companyId", "==", ctx.companyId).get();
+      }
     } catch (e) {
       console.warn("Could not append companyId to query", e);
       const rawSnap = await q.get();
+      const isCompaniesQuery = q._queryOptions?.collectionId === "companies" || (q.path && q.path.split('/').pop() === "companies");
+      
+      const filterFunc = (d: any) => {
+        if (isCompaniesQuery) {
+          return d.id === ctx.companyId;
+        }
+        return d.data().companyId === ctx.companyId;
+      };
+      
+      const filteredDocs = rawSnap.docs.filter(filterFunc);
       snap = {
-        docs: rawSnap.docs.filter((d: any) => d.data().companyId === ctx.companyId),
-        empty: rawSnap.docs.filter((d: any) => d.data().companyId === ctx.companyId).length === 0,
-        size: rawSnap.docs.filter((d: any) => d.data().companyId === ctx.companyId).length
+        docs: filteredDocs,
+        empty: filteredDocs.length === 0,
+        size: filteredDocs.length
       };
     }
   }

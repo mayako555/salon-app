@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { Reservation } from "@/app/reservations/actions";
 import { StaffProfile } from "@/app/staff/actions";
@@ -9,6 +9,7 @@ import { ReservationSettings } from "@/app/admin/settings/actions";
 import ReservationDetailDialog from "./ReservationDetailDialog";
 import ReservationFormDialog from "./ReservationFormDialog";
 import DraggableReservation from "./DraggableReservation";
+import { useAuth } from "@/lib/auth-context";
 
 type Props = {
   reservations: Reservation[];
@@ -19,16 +20,26 @@ type Props = {
   settings?: ReservationSettings;
   onRefresh?: () => void; // Add refresh callback
   onOptimisticUpdate?: (updated: Reservation) => void;
+  createRequestKey?: number;
 };
 
 export const HOUR_WIDTH = 120; // 120px per hour
 export const ROW_HEIGHT = 48; // h-12 = 48px
 
-export default function ReservationTimeline({ reservations, staffList, shifts = [], date, storeName = "", settings, onRefresh, onOptimisticUpdate }: Props) {
+export default function ReservationTimeline({ reservations, staffList, shifts = [], date, storeName = "", settings, onRefresh, onOptimisticUpdate, createRequestKey = 0 }: Props) {
   const [selectedRes, setSelectedRes] = useState<Reservation | null>(null);
   const [editRes, setEditRes] = useState<Reservation | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [clickData, setClickData] = useState({ staff: "", time: "" });
+  const { availableStoreObjects } = useAuth();
+
+  useEffect(() => {
+    if (createRequestKey > 0) {
+      setEditRes(null);
+      setClickData({ staff: "", time: "" });
+      setFormOpen(true);
+    }
+  }, [createRequestKey]);
   
   if (!storeName) {
     return (
@@ -76,6 +87,26 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
       staffWithRes.add(matchedName);
       return { ...r, _matchedName: matchedName };
     });
+
+    // 1. 店舗の表示名/略称から店舗ID（Firestore doc.id）を逆引きするマップを作成
+    const storeNameToIdMap = new Map<string, string>();
+    availableStoreObjects.forEach(s => {
+      if (s.id && s.name) {
+        storeNameToIdMap.set(s.id, s.id);
+        storeNameToIdMap.set(s.name, s.id);
+        storeNameToIdMap.set(s.name.replace(/店$/, ""), s.id);
+        // "Jasmine Lash 六甲道" -> "六甲", "六甲道" のように部分的な略称もマッピング
+        const shortName = s.name.replace(/店$/, "").replace(/^Jasmine\s*Lash\s*/i, "");
+        storeNameToIdMap.set(shortName, s.id);
+        // "六甲道" -> "六甲"
+        if (shortName.endsWith("道")) {
+          storeNameToIdMap.set(shortName.slice(0, -1), s.id);
+        }
+      }
+    });
+
+    const currentStoreObj = availableStoreObjects.find(s => s.name === storeName);
+    const currentStoreId = currentStoreObj?.id || storeName;
     
     // Calculate display status for all staff
     const displayStaff = staffList.map(s => {
@@ -84,13 +115,11 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
       
       const shift = shifts?.find(sh => sh.staff_id === s.id);
       
-      // 2. 「全店舗」なら全員がWorkingHere扱い
-      // storeNameは「六甲店」のように「店」がつく場合があるが、shiftのstoreは「六甲」のような形式のため正規化する
-      const normalizedStoreName = storeName.replace(/店$/, "");
+      // 2. 店舗IDで完全一致判定する
       const isWorkingHere = storeName === "全店舗" || 
         (shift?.type === "work" && shift.segments?.some(seg => {
-           const normalizedSegStore = seg.store.replace(/店$/, "");
-           return normalizedSegStore === normalizedStoreName;
+           const shiftStoreId = storeNameToIdMap.get(seg.store) || storeNameToIdMap.get(seg.store.replace(/店$/, "")) || seg.store;
+           return shiftStoreId === currentStoreId;
         }));
       const hasReservation = staffWithRes.has(s.name);
       
@@ -122,7 +151,7 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
     });
 
     return { grouped: map, sortedStaff: displayStaff };
-  }, [reservations, staffList, shifts, storeName]);
+  }, [reservations, staffList, shifts, storeName, availableStoreObjects]);
 
   const activeStaffList = [
     ...sortedStaff.map(s => ({ id: s.id, name: s.name })),

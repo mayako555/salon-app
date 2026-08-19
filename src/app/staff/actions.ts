@@ -161,7 +161,6 @@ export async function addStaff(formData: FormData) {
     const nameKana = (lastNameKana + " " + firstNameKana).trim();
 
     const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
     const employment_type = formData.get("employment_type") as "employee" | "outsourcing" | "part_time";
     const is_invoice_registered = formData.get("is_invoice_registered") === "true";
     const max_holiday_requests = parseFloat(formData.get("max_holiday_requests") as string || "3");
@@ -186,7 +185,7 @@ export async function addStaff(formData: FormData) {
 
     const is_trainee = formData.get("is_trainee") === "true";
 
-    // 1. Create Firebase Auth User (Optional)
+    // 1. Create Firebase Auth User. Do not create a profile that cannot log in.
     let uid: string | undefined;
     try {
       const userRecord = await adminAuth.createUser({
@@ -196,9 +195,13 @@ export async function addStaff(formData: FormData) {
       });
       uid = userRecord.uid;
     } catch (authError: any) {
-      console.warn("Auth creation skipped or failed:", authError);
-      // We do not fail the whole process. The staff will be saved to Firestore,
-      // but they won't be able to log in until an Auth account is manually created.
+      console.error("Auth user creation failed:", authError);
+      const message = authError?.code === "auth/email-already-exists"
+        ? "このメールアドレスは既に登録されています"
+        : authError?.code === "auth/invalid-password"
+          ? "パスワードは6文字以上で設定してください"
+          : "ログインアカウントを作成できませんでした";
+      return { success: false, error: message };
     }
 
     const ctx = await getCurrentUserContext();

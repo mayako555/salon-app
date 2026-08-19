@@ -16,7 +16,7 @@ import { addAuditLog } from "@/app/audit/actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { getTenantCollection, getTenantDoc } from "@/lib/tenant-utils";
 
-export type AttendanceStatus = "normal" | "leave" | "absence";
+export type AttendanceStatus = "normal" | "leave" | "half_leave" | "absence";
 
 export type AttendanceRecord = {
   id: string;
@@ -610,13 +610,15 @@ export async function verifyStaffPassword(staffId: string, password: string): Pr
       return { success: false, error: "メールアドレスが設定されていません" };
     }
 
-    const apiKey = "AIzaSyBox-c3ZDIe0TNoAR3wDNlypyP-HA1tF98";
-    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
+    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+    if (!apiKey) return { success: false, error: "認証設定が不足しています" };
+    const verify = (candidate: string) => fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, returnSecureToken: true }),
+      body: JSON.stringify({ email, password: candidate, returnSecureToken: true }),
     });
-
+    let res = await verify(password + "_salon");
+    if (!res.ok) res = await verify(password);
     if (!res.ok) {
       return { success: false, error: "パスワードが正しくありません" };
     }

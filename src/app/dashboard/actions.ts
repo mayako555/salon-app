@@ -280,8 +280,7 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
           totalTreatmentMinutes += data.treatment_minutes || 60; // 実際の施術時間がない場合は後方互換で60分とする
         }
         
-        const rawStoreKey = data.store_name || "不明";
-        const storeKey = rawStoreKey.endsWith("店") ? rawStoreKey.slice(0, -1) : rawStoreKey;
+        const storeKey = data.store_name || "不明";
         
         if (!storeSales[storeKey]) {
           storeSales[storeKey] = { total: 0, minimo: 0, nextBookings: 0, nextBookingVisits: 0, count: 0, minimoVisits: 0, regularVisits: 0, regularNewVisits: 0, minimoNewVisits: 0, routes: {} };

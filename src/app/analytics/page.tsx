@@ -16,7 +16,9 @@ import ChannelAnalysis from "./ChannelAnalysis";
 import MenuAnalysis from "./MenuAnalysis";
 
 export default function AnalyticsPage() {
-  const { profile, isSystemOwner } = useAuth();
+  const { profile, isSystemOwner, impersonatingCompanyId } = useAuth();
+  const currentCompanyId = impersonatingCompanyId || profile?.companyId;
+  const showAdvancedStats = isSystemOwner && currentCompanyId !== "nQOSGbsgzhUG2BTLKACU";
 
   return (
     <AuthGuard requireRole="manager">
@@ -75,7 +77,7 @@ export default function AnalyticsPage() {
                 メニュー分析
               </TabsTrigger>
               
-              {isSystemOwner && (
+              {showAdvancedStats && (
                 <>
                   <TabsTrigger 
                     value="regression"
@@ -135,7 +137,7 @@ export default function AnalyticsPage() {
             <MenuAnalysis />
           </TabsContent>
           
-          {isSystemOwner && (
+          {showAdvancedStats && (
             <>
               <TabsContent value="regression" className="mt-6">
                 <RegressionAnalysis />

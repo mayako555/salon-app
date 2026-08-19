@@ -1,5 +1,4 @@
-import { db } from "./firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { adminDb } from "./firebase-admin";
 
 export interface LineIntegrationConfig {
   storeName: string;
@@ -8,13 +7,13 @@ export interface LineIntegrationConfig {
   companyId?: string;
 }
 
-export async function getLineConfig(storeName: string): Promise<LineIntegrationConfig | null> {
+export async function getLineConfig(storeName: string, companyId: string): Promise<LineIntegrationConfig | null> {
   try {
-    const q = query(
-      collection(db, "line_integrations"),
-      where("storeName", "==", storeName)
-    );
-    const snap = await getDocs(q);
+    const snap = await adminDb.collection("line_integrations")
+      .where("companyId", "==", companyId)
+      .where("storeName", "==", storeName)
+      .limit(1)
+      .get();
     
     if (snap.empty) {
       return null;

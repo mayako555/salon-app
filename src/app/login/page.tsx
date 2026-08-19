@@ -27,12 +27,11 @@ export default function LoginPage() {
 
     try {
       try {
-        // スタッフがマネージャー権限で入る場合は _salon が付与されている可能性が高いので先に試す
         await signInWithEmailAndPassword(auth, email, password + "_salon");
         router.push("/dashboard");
       } catch (firstErr: any) {
         if (firstErr.code === "auth/invalid-credential" || firstErr.code === "auth/wrong-password" || firstErr.code === "auth/user-not-found") {
-          // Firebase Console等で手動作成されたシステム管理者の場合は _salon なしで試す
+          // パスワード再設定済み・管理者アカウントは入力値をそのまま試す
           await signInWithEmailAndPassword(auth, email, password);
           router.push("/dashboard");
         } else {

@@ -1,12 +1,9 @@
-import { setTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firestore-admin-wrapper";
-import { collection, query, getDocs, doc, setDoc, where, getDoc } from "@/lib/firestore-admin-wrapper";
+import { adminDb } from "@/lib/firebase-admin";
 import { sendLineMessage } from "@/lib/line";
 import { LineAutomationSettings } from "@/app/admin/settings/line-automation-actions";
-import { replaceLineTemplate, validateLineTemplate } from "@/lib/lineTemplate";
+import { replaceLineTemplate } from "@/lib/lineTemplate";
 import { requireFeature } from "@/lib/feature-utils";
-import { format, addDays, subDays, startOfDay, endOfDay, parseISO } from "date-fns";
 // Removed date-fns-tz import as it is unused
 
 // Simplified date string formatter for Asia/Tokyo
@@ -31,15 +28,13 @@ export async function GET(request: Request) {
     }
 
     const now = new Date();
-    const todayStr = getTokyoDateString(now);
-
-    const settingsSnap = await getDocs(collection(db, "line_automation_settings"));
+    const settingsSnap = await adminDb.collection("line_automation_settings").get();
     const allSettings: LineAutomationSettings[] = [];
     for (const doc of settingsSnap.docs) {
       const data = doc.data() as LineAutomationSettings;
       if (data.automationEnabled) {
         try {
-          await requireFeature(doc.id, "line_automation");
+          await requireFeature(data.tenantId, "line_automation");
           allSettings.push({ ...data, id: doc.id });
         } catch (e) {
           // Feature disabled for this tenant, skip
@@ -64,14 +59,12 @@ export async function GET(request: Request) {
 
     // Helper to fetch reservations for a specific date
     const fetchReservationsByDate = async (dateStr: string, tenantId: string) => {
-      const q = query(
-        collection(db, "reservations"),
-        where("date", "==", dateStr),
-        where("companyId", "==", tenantId)
-      );
-      const snap = await getDocs(q);
+      const snap = await adminDb.collection("reservations")
+        .where("date", "==", dateStr)
+        .where("companyId", "==", tenantId)
+        .get();
       const reservations: any[] = [];
-      snap.forEach(d => reservations.push({ id: d.id, ...d.data() }));
+      snap.forEach((d: any) => reservations.push({ id: d.id, ...d.data() }));
       return reservations;
     };
 
@@ -88,10 +81,10 @@ export async function GET(request: Request) {
 
       // Check uniqueKey
       const uniqueKey = `${setting.tenantId}_${res.store_name}_${res.id}_${type}_${targetDateStr}`;
-      const logDocRef = doc(db, "line_message_logs", uniqueKey);
-      const existingLogSnap = await getDoc(logDocRef);
-      if (existingLogSnap.exists()) {
-        const status = existingLogSnap.data().status;
+      const logDocRef = adminDb.collection("line_message_logs").doc(uniqueKey);
+      const existingLogSnap = await logDocRef.get();
+      if (existingLogSnap.exists) {
+        const status = existingLogSnap.data()?.status;
         if (status === "processing" || status === "sent") {
           stats[type].skipped++;
           return;
@@ -99,12 +92,16 @@ export async function GET(request: Request) {
       }
 
       // Fetch customer for line_user_id
-      const customerDoc = await getDoc(doc(db, "customers", res.customer_id));
-      if (!customerDoc.exists()) {
+      const customerDoc = await adminDb.collection("customers").doc(res.customer_id).get();
+      if (!customerDoc.exists) {
         stats[type].skipped++;
         return;
       }
       const customer = customerDoc.data();
+      if (customer?.companyId !== setting.tenantId) {
+        stats[type].skipped++;
+        return;
+      }
       if (!customer.line_user_id) {
         stats[type].skipped++;
         return;
@@ -134,7 +131,8 @@ export async function GET(request: Request) {
       const message = replaceLineTemplate(template, templateData);
 
       // Create Processing Log
-      await setTenantOwnedDoc(logDocRef, {
+      await logDocRef.set({
+        companyId: setting.tenantId,
         tenantId: setting.tenantId,
         storeId: setting.storeId || res.store_name,
         reservationId: res.id,
@@ -151,10 +149,10 @@ export async function GET(request: Request) {
       });
 
       // Send Message
-      const sendResult = await sendLineMessage(customer.line_user_id, message, res.store_name);
+      const sendResult = await sendLineMessage(customer.line_user_id, message, res.store_name, setting.tenantId);
 
       // Update Log
-      await setTenantOwnedDoc(logDocRef, {
+      await logDocRef.set({
         status: sendResult.success ? "sent" : "failed",
         sentAt: sendResult.success ? new Date() : null,
         errorMessage: sendResult.error || null,

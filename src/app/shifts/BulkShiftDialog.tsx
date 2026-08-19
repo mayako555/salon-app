@@ -44,24 +44,25 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList, targetMont
     }
   }, [isOpen, targetMonth]);
   const [type, setType] = useState<ShiftType>("work");
-  const { availableStores } = useAuth();
-  const defaultStore = availableStores.length > 0 ? availableStores[0] : "メイン店舗";
+  const { availableStoreObjects } = useAuth();
+  const defaultStore = availableStoreObjects.length > 0 ? availableStoreObjects[0].id : "main-store";
 
   const [segments, setSegments] = useState<ShiftSegment[]>([
-    { start_time: "10:00", end_time: "19:00", store: defaultStore as StoreLocation }
+    { start_time: "10:00", end_time: "19:00", store: defaultStore as any }
   ]);
   const [activeDaysOfWeek, setActiveDaysOfWeek] = useState<number[]>([1, 2, 3, 4, 5]); // Default Mon-Fri
 
   useEffect(() => {
-    if (availableStores.length > 0) {
+    if (availableStoreObjects.length > 0) {
+      const allowedIds = availableStoreObjects.map(s => s.id);
       setSegments(prev => prev.map(seg => {
-        if (!availableStores.includes(seg.store as string)) {
-          return { ...seg, store: availableStores[0] as StoreLocation };
+        if (!allowedIds.includes(seg.store as string)) {
+          return { ...seg, store: allowedIds[0] as any };
         }
         return seg;
       }));
     }
-  }, [availableStores]);
+  }, [availableStoreObjects]);
 
   const toggleDayOfWeek = (day: number) => {
     setActiveDaysOfWeek(prev => 
@@ -306,10 +307,10 @@ export default function BulkShiftDialog({ isOpen, onClose, staffList, targetMont
                       <select 
                         className="w-full h-8 px-2 rounded-md border border-slate-200 bg-white text-sm"
                         value={seg.store}
-                        onChange={(e) => updateSegment(idx, "store", e.target.value as StoreLocation)}
+                        onChange={(e) => updateSegment(idx, "store", e.target.value as any)}
                       >
-                        {availableStores.map(store => (
-                          <option key={store} value={store}>{store}</option>
+                        {availableStoreObjects.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                       </select>
                     </div>

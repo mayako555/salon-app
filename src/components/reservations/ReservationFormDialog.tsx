@@ -8,6 +8,7 @@ import { StaffProfile } from "@/app/staff/actions";
 import { Button } from "@/components/ui/button";
 import { Search, UserPlus, FileText, CheckCircle, SearchX, AlertCircle } from "lucide-react";
 import { getStoreMasterData } from "@/app/sales/actions";
+import { useAuth } from "@/lib/auth-context";
 
 type Props = {
   isOpen: boolean;
@@ -24,6 +25,7 @@ type Props = {
 export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defaultStaff, defaultTime, defaultDate, storeName, initialData, staffList }: Props) {
   const [loading, setLoading] = useState(false);
   const [isNewCustomer, setIsNewCustomer] = useState(false);
+  const { availableStoreObjects } = useAuth();
   
   // Calculate initial duration
   const initDuration = (() => {
@@ -101,14 +103,23 @@ export default function ReservationFormDialog({ isOpen, onClose, onSuccess, defa
     }
 
     if (isOpen && storeName) {
-      getStoreMasterData(storeName).then(data => {
+      const normStoreQuery = storeName.replace(/店$/, "");
+      const storeObj = availableStoreObjects.find(s => 
+        s.id === storeName || 
+        s.name === storeName || 
+        s.name.replace(/店$/, "").includes(normStoreQuery) || 
+        normStoreQuery.includes(s.name.replace(/店$/, ""))
+      );
+      const normalizedStoreName = storeObj ? storeObj.name : storeName;
+
+      getStoreMasterData(normalizedStoreName).then(data => {
         const routeMaster = data.filter(m => m.itemType === 'reservationRoute' && m.isActive !== false);
         if (routeMaster.length > 0) {
           setRoutes(routeMaster.sort((a,b) => (a.sortOrder||999)-(b.sortOrder||999)).map(m => m.name));
         }
       }).catch(console.error);
     }
-  }, [isOpen, initialData, storeName]);
+  }, [isOpen, initialData, storeName, availableStoreObjects]);
 
   const handleSearchMode = async () => {
     setIsNewCustomer(false);

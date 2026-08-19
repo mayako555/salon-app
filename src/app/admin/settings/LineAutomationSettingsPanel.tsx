@@ -11,13 +11,16 @@ import { LINE_TEMPLATE_VARIABLES, validateLineTemplate, replaceLineTemplate } fr
 export default function LineAutomationSettingsPanel({
   settings,
   onChange,
+  availableStores,
 }: {
   settings: LineAutomationSettings;
   onChange: (newSettings: LineAutomationSettings) => void;
+  availableStores: string[];
 }) {
-  const [activeTab, setActiveTab] = useState<"reminder" | "thanks">("reminder");
+  const [activeTab, setActiveTab] = useState<"reminder" | "thanks" | "next_booking">("reminder");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [testLineUserId, setTestLineUserId] = useState("");
+  const [testStoreName, setTestStoreName] = useState(availableStores[0] || "");
 
   const handleToggleAutomation = () => {
     onChange({ ...settings, automationEnabled: !settings.automationEnabled });
@@ -27,37 +30,56 @@ export default function LineAutomationSettingsPanel({
     onChange({ ...settings, [field]: value });
   };
 
-  const getDummyData = () => ({
+  const getDummyData = (storeName: string = testStoreName || availableStores[0] || "店舗") => ({
     customer_name: "山田 花子",
-    store_name: "Jasmine Lash 六甲店",
+    store_name: storeName,
     date: "2026年7月20日",
     time: "10:00",
     menu_name: "まつげパーマ",
     staff_name: "岡田",
     reservation_url: "https://example.com/reservation",
     store_phone: "078-000-0000",
+    next_reservation_date: "2026年8月20日",
+    next_reservation_time: "14:00",
   });
 
   const handleTestSend = async () => {
-    if (!testLineUserId) {
-      toast.error("テスト送信先のLINEユーザーIDを入力してください");
+    const normalizedLineUserId = testLineUserId.trim();
+    if (!normalizedLineUserId) {
+      toast.error("テスト送信先のLINEユーザーIDを入力してください（Uから始まる33文字）");
       return;
     }
-    const template = activeTab === "reminder" ? settings.reminderTemplate : settings.thanksTemplate;
+    if (!/^U[0-9a-f]{32}$/i.test(normalizedLineUserId)) {
+      toast.error("LINEユーザーIDの形式が正しくありません。表示名やLINE IDではなく、Uから始まる33文字のIDを入力してください");
+      return;
+    }
+    const template = activeTab === "reminder" 
+      ? settings.reminderTemplate 
+      : activeTab === "thanks" 
+        ? settings.thanksTemplate 
+        : settings.nextBookingTemplate;
+    if (!template.trim()) {
+      toast.error("メッセージテンプレートを入力してください");
+      return;
+    }
+    if (!testStoreName) {
+      toast.error("テスト送信に使用する店舗を選択してください");
+      return;
+    }
     const { isValid, invalidVariables } = validateLineTemplate(template);
     if (!isValid) {
-      toast.error(`無効な変数が含まれています: ${invalidVariables.join(", ")}`);
+      toast.error(`利用できない変数が含まれています: ${invalidVariables.join(", ")}`);
       return;
     }
 
-    const message = replaceLineTemplate(template, getDummyData());
+    const message = replaceLineTemplate(template, getDummyData(testStoreName));
     
     // Call test API (will be implemented later)
     try {
       const res = await fetch("/api/cron/line-automation/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lineUserId: testLineUserId, message, storeName: getDummyData().store_name })
+        body: JSON.stringify({ lineUserId: normalizedLineUserId, message, storeName: testStoreName })
       });
       const data = await res.json();
       if (data.success) {
@@ -122,6 +144,15 @@ export default function LineAutomationSettingsPanel({
             type="button"
           >
             サンクス・来店後
+          </button>
+          <button
+            className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${
+              activeTab === "next_booking" ? "border-emerald-500 text-emerald-600" : "border-transparent text-slate-500 hover:text-slate-700"
+            }`}
+            onClick={() => setActiveTab("next_booking")}
+            type="button"
+          >
+            次回予約の案内
           </button>
         </div>
 
@@ -267,11 +298,74 @@ export default function LineAutomationSettingsPanel({
           </div>
         )}
 
+        {activeTab === "next_booking" && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div>
+                <h3 className="font-bold text-slate-800">次回予約確定時メッセージ</h3>
+                <p className="text-xs text-slate-500 mt-1">次回予約を登録した瞬間に、ご案内メッセージを即時送信します</p>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  checked={settings.nextBookingEnabled}
+                  onChange={(e) => handleReminderChange("nextBookingEnabled", e.target.checked)}
+                />
+                <span className="text-sm font-bold text-slate-700">有効にする</span>
+              </label>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-bold text-slate-700">メッセージテンプレート</label>
+                <Button variant="ghost" size="sm" className="text-xs h-7 text-emerald-600" onClick={() => setPreviewOpen(!previewOpen)}>
+                  <Eye className="w-3 h-3 mr-1" /> プレビュー
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Textarea
+                  value={settings.nextBookingTemplate}
+                  onChange={(e) => handleReminderChange("nextBookingTemplate", e.target.value)}
+                  placeholder="{customer_name}様&#10;次回予約が確定いたしました。..."
+                  className="h-64 font-mono text-sm leading-relaxed"
+                />
+                {previewOpen && (
+                  <div className="bg-emerald-50/50 p-4 rounded-lg border border-emerald-100 h-64 overflow-y-auto whitespace-pre-wrap text-sm text-slate-800 font-medium">
+                    {replaceLineTemplate(settings.nextBookingTemplate, getDummyData())}
+                  </div>
+                )}
+              </div>
+              <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded border border-slate-100">
+                <p className="font-bold mb-2">利用可能な変数（クリックでコピー）:</p>
+                <div className="flex flex-wrap gap-2">
+                  {LINE_TEMPLATE_VARIABLES.map(v => (
+                    <span
+                      key={v}
+                      className="px-2 py-1 bg-white border border-slate-200 rounded cursor-pointer hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 transition-colors"
+                      onClick={() => navigator.clipboard.writeText(v)}
+                    >
+                      {v}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="mt-8 pt-6 border-t border-slate-200">
           <h4 className="font-bold text-sm text-slate-800 mb-3 flex items-center gap-2">
             <PlayCircle className="w-4 h-4 text-slate-400" /> テスト送信
           </h4>
           <div className="flex items-center gap-3">
+            <select
+              value={testStoreName}
+              onChange={(e) => setTestStoreName(e.target.value)}
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
+            >
+              {availableStores.map(store => <option key={store} value={store}>{store}店</option>)}
+            </select>
             <Input 
               placeholder="テスト送信先のLINEユーザーID (Uxxxxxxxxxxx)" 
               value={testLineUserId}
@@ -282,6 +376,9 @@ export default function LineAutomationSettingsPanel({
               テスト送信実行
             </Button>
           </div>
+          <p className="mt-2 text-xs text-slate-500">
+            LINEの表示名や検索用IDでは送信できません。顧客カルテのLINE連携後に取得される、Uから始まる33文字のユーザーIDを使用してください。
+          </p>
         </div>
       </CardContent>
     </Card>

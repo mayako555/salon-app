@@ -153,22 +153,22 @@ export async function getCompanySettings(companyId: string) {
 
 export async function saveCompanyAttendancePolicy(companyId: string, policy: { roundingEnabled: boolean, roundingIntervalMinutes: number, linkWithShifts?: boolean }, callerId: string) {
   try {
-    const callerRef = doc(db, "staff", callerId);
-    const callerSnap = await getDoc(callerRef);
-    if (!callerSnap.exists()) throw new Error("Caller not found");
-    const callerData = callerSnap.data();
-    
-    if (callerData.role !== "systemOwner") {
+    const ctx = await getCurrentUserContext();
+    if (ctx.role !== "systemOwner" || !ctx.companyId || ctx.companyId !== companyId) {
       throw new Error("Permission denied: Only system owners can modify attendance policies.");
     }
 
-    const docRef = doc(db, "companies", companyId);
-    const companySnap = await getDoc(docRef);
-    if (companySnap.exists() && companySnap.data().companyType !== "system_owner") {
+    const { adminDb } = await import("@/lib/firebase-admin");
+    const companyRef = adminDb.collection("companies").doc(companyId);
+    const companySnap = await companyRef.get();
+    const isSystemOwnerCompany = companySnap.exists && (
+      companySnap.data()?.companyType === "system_owner" || companyId === "company_default"
+    );
+    if (!isSystemOwnerCompany) {
       throw new Error("Permission denied: Cannot set custom attendance policy for general franchise.");
     }
 
-    await setTenantOwnedDoc(docRef, { attendancePolicy: policy }, { merge: true });
+    await companyRef.set({ attendancePolicy: policy }, { merge: true });
     return { success: true };
   } catch (error: any) {
     console.error("Failed to save attendance policy:", error);

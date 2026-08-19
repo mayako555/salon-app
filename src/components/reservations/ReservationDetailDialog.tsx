@@ -132,7 +132,8 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
               accountingId: accountingId,
               lineUserId: customer.line_user_id,
               messageType: "next_reservation_confirm",
-              messageBody: previewLineText
+              messageBody: previewLineText,
+              storeName: reservation.store_name
             });
           }
         }

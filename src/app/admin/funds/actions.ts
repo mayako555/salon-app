@@ -55,10 +55,12 @@ export async function addBankAccounts(names: string[]) {
   try {
     const auth = await checkFundsPermission();
     if (!auth) return { success: false, error: "Permission denied" };
+    if (!auth.companyId) return { success: false, error: "Company ID not found" };
 
     const batch = adminDb.batch();
     names.forEach(name => {
       if (!name.trim()) return;
+      // Use adminDb.collection directly so companyId is set correctly for tenant filtering
       const ref = adminDb.collection("bank_accounts").doc();
       batch.set(ref, {
         companyId: auth.companyId,
@@ -99,7 +101,8 @@ export async function saveBankBalances(balanceDate: string, balances: { account_
           updated_at: FieldValue.serverTimestamp()
         });
       } else {
-        // Insert
+        // Insert — must set companyId so getTenantCollection can filter it
+        if (!auth.companyId) continue;
         const ref = adminDb.collection("bank_balances").doc();
         batch.set(ref, {
           companyId: auth.companyId,

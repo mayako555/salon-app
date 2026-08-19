@@ -37,7 +37,8 @@ import {
   Tag,
   Copy,
   Store,
-  CreditCard
+  CreditCard,
+  HelpCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -243,6 +244,7 @@ export default function MasterManagementPage() {
   const [editingItem, setEditingItem] = useState<Partial<SalesMasterItem> | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [bulkText, setBulkText] = useState("");
   
@@ -802,7 +804,17 @@ export default function MasterManagementPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">LINE OA ID (公式LINE ID)</label>
+                  <div className="flex items-center gap-1.5 ml-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">LINE OA ID (公式LINE ID)</label>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsHelpOpen(true)}
+                      className="text-slate-300 hover:text-blue-500 transition-colors"
+                      title="LINE連携設定マニュアルを開く"
+                    >
+                      <HelpCircle size={12} />
+                    </button>
+                  </div>
                   <Input 
                     value={editingItem?.lineOaId || ""} 
                     onChange={(e) => setEditingItem({ ...editingItem!, lineOaId: e.target.value })}
@@ -811,7 +823,17 @@ export default function MasterManagementPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">LIFF ID</label>
+                  <div className="flex items-center gap-1.5 ml-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">LIFF ID</label>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsHelpOpen(true)}
+                      className="text-slate-300 hover:text-blue-500 transition-colors"
+                      title="LIFF ID取得マニュアルを開く"
+                    >
+                      <HelpCircle size={12} />
+                    </button>
+                  </div>
                   <Input 
                     value={editingItem?.liffId || ""} 
                     onChange={(e) => setEditingItem({ ...editingItem!, liffId: e.target.value })}

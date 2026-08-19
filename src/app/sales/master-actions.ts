@@ -86,7 +86,7 @@ export async function upsertMasterItem(data: Partial<SalesMasterItem>) {
     
     const payload = {
       companyId: effectiveCompanyId, // Force the injected companyId
-      store: data.store,
+      store: data.itemType === 'store' ? data.name : data.store,
       itemType: data.itemType,
       category: data.category || "",
       name: data.name,

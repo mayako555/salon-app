@@ -10,6 +10,7 @@ import { SalesMasterItem, AttendancePolicy, FeatureKey, FeatureSettings, ensureF
 interface AuthContextType {
   user: User | null;
   profile: StaffProfile | null;
+  companyId?: string;
   loading: boolean;
   isAdmin: boolean;
   isSystemOwner: boolean;
@@ -34,6 +35,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
+  companyId: undefined,
   loading: true,
   isAdmin: false,
   isSystemOwner: false,
@@ -240,6 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = {
     user,
     profile,
+    companyId: impersonatingCompanyId || profile?.companyId,
     loading,
     isAdmin: profile?.role === "admin" || profile?.role === "systemOwner" || profile?.role === "companyOwner",
     isSystemOwner: profile?.role === "systemOwner",

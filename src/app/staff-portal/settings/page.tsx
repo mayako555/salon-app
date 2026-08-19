@@ -64,12 +64,8 @@ export default function ProfileSettingsPage() {
       // Admin/Owner users might have standard password, staff might have _salon appended.
       // We will save it without _salon if they want, but the login page appends _salon automatically.
       // To be consistent, if they re-authenticated with _salon, we should probably set new password with _salon.
-      const isSalonStaff = profile?.role === "staff" || profile?.role === "manager" || profile?.role === "storeManager";
-      
-      // Let's just set what they typed. But wait, if login adds `_salon`, then we should add `_salon` here if they are a standard staff?
-      // Actually, if we just set what they typed, they can login with it because login tries `password + "_salon"` FIRST, then `password` SECOND.
-      // So setting exactly what they typed is perfectly fine!
-      await updatePassword(user, newPassword);
+      const usesSalonPassword = profile?.role === "staff" || profile?.role === "manager" || profile?.role === "storeManager";
+      await updatePassword(user, usesSalonPassword ? newPassword + "_salon" : newPassword);
       
       setSuccess("パスワードを更新しました。");
       setCurrentPassword("");

@@ -117,7 +117,28 @@ export async function getReservations(store: string, dateStr: string): Promise<R
     }
 
     if (store !== "全店舗") {
-      return results.filter(r => r.store_name === store).sort((a, b) => a.start_time.localeCompare(b.start_time));
+      const masterCol = collection(db, "sales_master");
+      const masterSnap = await getDocs(query(masterCol, where("itemType", "==", "store"), where("isActive", "==", true)));
+      const storeObjects = masterSnap.docs.map(doc => ({ id: doc.id, name: doc.data().name || "" }));
+
+      const storeNameToIdMap = new Map<string, string>();
+      storeObjects.forEach(s => {
+        storeNameToIdMap.set(s.id, s.id);
+        storeNameToIdMap.set(s.name, s.id);
+        storeNameToIdMap.set(s.name.replace(/店$/, ""), s.id);
+        const shortName = s.name.replace(/店$/, "").replace(/^Jasmine\s*Lash\s*/i, "");
+        storeNameToIdMap.set(shortName, s.id);
+        if (shortName.endsWith("道")) {
+          storeNameToIdMap.set(shortName.slice(0, -1), s.id);
+        }
+      });
+
+      const targetStoreId = storeNameToIdMap.get(store) || storeNameToIdMap.get(store.replace(/店$/, "")) || store;
+
+      return results.filter(r => {
+        const rStoreId = storeNameToIdMap.get(r.store_name) || storeNameToIdMap.get(r.store_name.replace(/店$/, "")) || r.store_name;
+        return rStoreId === targetStoreId;
+      }).sort((a, b) => a.start_time.localeCompare(b.start_time));
     }
     return results.sort((a, b) => a.start_time.localeCompare(b.start_time));
   } catch (error) {
@@ -154,6 +175,54 @@ export async function addReservation(data: Omit<Reservation, "id" | "created_at"
       new_data: { date: data.date, customer_name: data.customer_name, staff_name: data.staff_name },
       actor: "System"
     });
+
+    // 次回予約確定時の即時LINE自動送信トリガー
+    if (data.customer_id && data.type !== "schedule") {
+      try {
+        const customerDoc = await getDoc(doc(db, "customers", data.customer_id));
+        const customerData = customerDoc.exists() ? customerDoc.data() : null;
+        const lineUserId = customerData?.line_user_id;
+
+        if (lineUserId) {
+          const settingsDoc = await getDoc(doc(db, "line_automation_settings", ctx.companyId));
+          const settingsData = settingsDoc.exists() ? settingsDoc.data() : null;
+
+          if (settingsData?.nextBookingEnabled && settingsData?.nextBookingTemplate) {
+            const { replaceLineTemplate } = await import("@/lib/lineTemplate");
+            const { sendAndLogLineMessage } = await import("@/lib/line");
+
+            const nextReservationDate = new Date(data.date);
+            const dayOfWeek = ["日", "月", "火", "水", "木", "金", "土"][nextReservationDate.getDay()];
+            const formattedDate = `${nextReservationDate.getMonth() + 1}月${nextReservationDate.getDate()}日(${dayOfWeek})`;
+
+            const message = replaceLineTemplate(settingsData.nextBookingTemplate, {
+              customer_name: data.customer_name || "",
+              store_name: data.store_name,
+              date: data.date,
+              time: data.start_time,
+              menu_name: data.menu_name || "",
+              staff_name: data.staff_name || "",
+              reservation_url: `https://bshare.jp/link-line/`,
+              store_phone: "",
+              next_reservation_date: formattedDate,
+              next_reservation_time: data.start_time
+            });
+
+            await sendAndLogLineMessage({
+              customerId: data.customer_id,
+              accountingId: "",
+              lineUserId: lineUserId,
+              messageType: "next_booking",
+              messageBody: message,
+              storeName: data.store_name,
+              companyId: ctx.companyId
+            });
+          }
+        }
+      } catch (lineError) {
+        console.error("Failed to process automatic LINE next booking message:", lineError);
+      }
+    }
 
     return { success: true, id: newDoc.id };
   } catch (error: any) {

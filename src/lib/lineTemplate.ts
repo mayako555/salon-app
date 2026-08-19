@@ -7,6 +7,8 @@ export const LINE_TEMPLATE_VARIABLES = [
   "{staff_name}",
   "{reservation_url}",
   "{store_phone}",
+  "{next_reservation_date}",
+  "{next_reservation_time}",
 ] as const;
 
 export type LineTemplateVariable = typeof LINE_TEMPLATE_VARIABLES[number];
@@ -43,6 +45,8 @@ export interface LineTemplateData {
   staff_name: string;
   reservation_url: string;
   store_phone: string;
+  next_reservation_date?: string;
+  next_reservation_time?: string;
 }
 
 export function replaceLineTemplate(template: string, data: LineTemplateData): string {

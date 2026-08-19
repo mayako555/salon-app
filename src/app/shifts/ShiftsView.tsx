@@ -36,16 +36,16 @@ export default function ShiftsView({
   const [selectedShift, setSelectedShift] = useState<ShiftRecord | undefined>(undefined);
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
 
-  const { profile, availableStores } = useAuth();
+  const { profile, availableStores, availableStoreObjects } = useAuth();
   const isReadOnly = !["systemOwner", "companyOwner", "admin", "manager", "storeManager"].includes(profile?.role || "");
 
-  const getStoreBadgeClasses = (store: string) => {
-    switch (store) {
-      case "六甲": return "bg-blue-100 text-blue-800 border-blue-200";
-      case "元町": return "bg-purple-100 text-purple-800 border-purple-200";
-      case "神戸": return "bg-orange-100 text-orange-800 border-orange-200";
-      default: return "bg-slate-100 text-slate-800 border-slate-200";
-    }
+  const getStoreBadgeClasses = (storeVal: string) => {
+    const storeObj = availableStoreObjects.find(s => s.id === storeVal || s.name === storeVal);
+    const storeName = storeObj ? storeObj.name : storeVal;
+    if (storeName.includes("六甲")) return "bg-blue-100 text-blue-800 border-blue-200";
+    if (storeName.includes("元町")) return "bg-purple-100 text-purple-800 border-purple-200";
+    if (storeName.includes("神戸")) return "bg-orange-100 text-orange-800 border-orange-200";
+    return "bg-slate-100 text-slate-800 border-slate-200";
   };
 
   const getShiftsForDate = (date: string) => {
@@ -138,11 +138,15 @@ export default function ShiftsView({
         ) : shift.type === 'requested_paid_leave' ? (
           <div className="text-emerald-600 font-bold bg-emerald-50 p-1 rounded h-full flex flex-col justify-center repeating-stripes">有給申請</div>
         ) : (
-          shift.segments?.map((seg: any, idx: number) => (
-            <div key={idx} className={`p-0.5 rounded border text-[10px] leading-tight ${getStoreBadgeClasses(seg.store)}`}>
-              {seg.start_time} - {seg.end_time}<br/><span className="font-bold">{seg.store}</span>
-            </div>
-          ))
+          shift.segments?.map((seg: any, idx: number) => {
+            const storeObj = availableStoreObjects.find(s => s.id === seg.store || s.name === seg.store);
+            const storeDisplayName = storeObj ? storeObj.name : seg.store;
+            return (
+              <div key={idx} className={`p-0.5 rounded border text-[10px] leading-tight ${getStoreBadgeClasses(seg.store)}`}>
+                {seg.start_time} - {seg.end_time}<br/><span className="font-bold">{storeDisplayName}</span>
+              </div>
+            );
+          })
         )}
       </div>
     );
@@ -423,7 +427,11 @@ export default function ShiftsView({
                     const dayShifts = getShiftsForDate(dateStr);
                     const storeShifts = dayShifts.filter(shift => 
                       shift.type === "work" && 
-                      shift.segments?.some(seg => seg.store === store)
+                      shift.segments?.some(seg => {
+                        const storeObj = availableStoreObjects.find(s => s.id === seg.store || s.name === seg.store);
+                        const storeName = storeObj ? storeObj.name : seg.store;
+                        return storeName === store;
+                      })
                     );
                     
                     totalAllVisits += storeShifts.length;

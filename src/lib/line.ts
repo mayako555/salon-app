@@ -1,7 +1,7 @@
 "use server";
 
-import { db } from "./firebase";
-import { doc, getDoc, collection, addDoc } from "firebase/firestore";
+import { adminDb } from "./firebase-admin";
+import { getCurrentUserContext } from "./auth-server";
 import { getLineConfig } from "./lineConfig";
 
 const FALLBACK_LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -9,15 +9,19 @@ const FALLBACK_LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN
 /**
  * 送信メッセージを生成する
  */
-export async function sendLineMessage(lineUserId: string, message: string, storeName?: string) {
-  let token = FALLBACK_LINE_CHANNEL_ACCESS_TOKEN;
+export async function sendLineMessage(lineUserId: string, message: string, storeName?: string, companyId?: string) {
+  let token: string | undefined;
   
-  if (storeName) {
-    const config = await getLineConfig(storeName);
+  if (storeName && companyId) {
+    const config = await getLineConfig(storeName, companyId);
     if (config && config.channelAccessToken) {
       token = config.channelAccessToken;
     }
   }
+
+  // The global token is retained only for legacy single-tenant calls. A tenant-aware
+  // call must never silently send from another company's LINE account.
+  if (!companyId) token = FALLBACK_LINE_CHANNEL_ACCESS_TOKEN;
 
   if (!token) {
     console.warn("LINE_CHANNEL_ACCESS_TOKEN is not set for store: ", storeName, ". Skipping LINE message.");
@@ -64,7 +68,8 @@ export async function sendAndLogLineMessage({
   lineUserId,
   messageType,
   messageBody,
-  storeName
+  storeName,
+  companyId
 }: {
   customerId: string;
   accountingId: string;
@@ -72,11 +77,16 @@ export async function sendAndLogLineMessage({
   messageType: string;
   messageBody: string;
   storeName?: string;
+  companyId?: string;
 }) {
-  const sendResult = await sendLineMessage(lineUserId, messageBody, storeName);
+  const ctx = companyId ? null : await getCurrentUserContext();
+  const effectiveCompanyId = companyId || ctx?.companyId;
+  if (!effectiveCompanyId) return { success: false, error: "会社IDが取得できません" };
+  const sendResult = await sendLineMessage(lineUserId, messageBody, storeName, effectiveCompanyId);
   
   try {
-    await addDoc(collection(db, "line_message_logs"), {
+    await adminDb.collection("line_message_logs").add({
+      companyId: effectiveCompanyId,
       customer_id: customerId,
       accounting_id: accountingId || "", 
       line_user_id: lineUserId,
@@ -124,9 +134,9 @@ ${storeName}店
 /**
  * 次回予約確定メッセージを送信する（レガシー互換用・ログ保存なし）
  */
-export async function sendBookingConfirmation(customerName: string, lineUserId: string, date: string, time: string, storeName: string = "メイン店舗") {
+export async function sendBookingConfirmation(customerName: string, lineUserId: string, date: string, time: string, storeName: string = "メイン店舗", companyId?: string) {
   const message = await generateBookingConfirmationText(date, time, storeName);
-  return await sendLineMessage(lineUserId, message, storeName);
+  return await sendLineMessage(lineUserId, message, storeName, companyId);
 }
 
 /**

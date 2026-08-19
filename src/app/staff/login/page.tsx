@@ -23,11 +23,10 @@ export default function StaffLoginPage() {
     try {
       let userCredential;
       try {
-        // スタッフ用にまず `_salon` 付きでログインを試す
         userCredential = await signInWithEmailAndPassword(auth, email, password + "_salon");
       } catch (firstErr: any) {
         if (firstErr.code === "auth/invalid-credential" || firstErr.code === "auth/wrong-password" || firstErr.code === "auth/user-not-found") {
-          // Firebase Console等で作成されたシステム管理者の場合は `_salon` なしで試す
+          // パスワード再設定済みのアカウントは入力値をそのまま試す
           userCredential = await signInWithEmailAndPassword(auth, email, password);
         } else {
           throw firstErr;

@@ -33,15 +33,15 @@ export default function ShiftEditDialog({
 }: ShiftEditDialogProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const { availableStores } = useAuth();
-  const defaultStore = availableStores.length > 0 ? availableStores[0] : "メイン店舗";
+  const { availableStoreObjects } = useAuth();
+  const defaultStore = availableStoreObjects.length > 0 ? availableStoreObjects[0].id : "main-store";
 
   const [formData, setFormData] = useState<Omit<ShiftRecord, "id"> & { id?: string }>({
     staff_id: "",
     staff_name: "",
     date: initialDate || new Date().toISOString().split("T")[0],
     type: "work",
-    segments: [{ start_time: "10:00", end_time: "19:00", store: defaultStore as StoreLocation }]
+    segments: [{ start_time: "10:00", end_time: "19:00", store: defaultStore as any }]
   });
 
   useEffect(() => {
@@ -61,24 +61,25 @@ export default function ShiftEditDialog({
         staff_name: "",
         date: initialDate || new Date().toISOString().split("T")[0],
         type: "work",
-        segments: [{ start_time: "10:00", end_time: "19:00", store: defaultStore as StoreLocation }]
+        segments: [{ start_time: "10:00", end_time: "19:00", store: defaultStore as any }]
       });
     }
   }, [shift, initialDate, defaultStore]);
 
   useEffect(() => {
-    if (!shift && availableStores.length > 0) {
+    if (!shift && availableStoreObjects.length > 0) {
+      const allowedIds = availableStoreObjects.map(s => s.id);
       setFormData(prev => {
         const newSegments = prev.segments?.map(seg => {
-          if (!availableStores.includes(seg.store as string)) {
-            return { ...seg, store: availableStores[0] as StoreLocation };
+          if (!allowedIds.includes(seg.store as string)) {
+            return { ...seg, store: allowedIds[0] as any };
           }
           return seg;
         }) || [];
         return { ...prev, segments: newSegments };
       });
     }
-  }, [availableStores, shift]);
+  }, [availableStoreObjects, shift]);
 
   const handleStaffChange = (staffId: string) => {
     const staff = staffList.find(s => s.id === staffId);
@@ -289,14 +290,14 @@ export default function ShiftEditDialog({
                       <select 
                         className="w-full h-8 px-2 rounded-md border border-slate-200 bg-white text-xs mb-2"
                         value={seg.store}
-                        onChange={(e) => updateSegment(idx, "store", e.target.value as StoreLocation)}
+                        onChange={(e) => updateSegment(idx, "store", e.target.value as any)}
                       >
-                        {availableStores.map(store => (
-                          <option key={store} value={store}>{store}</option>
+                        {availableStoreObjects.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                       </select>
                       
-                      {seg.store === '六甲' && (
+                      {(seg.store === '六甲' || seg.store.includes('六甲') || availableStoreObjects.find(s => s.id === seg.store)?.name.includes('六甲')) && (
                         <div className="flex gap-2">
                           <button 
                             type="button" 

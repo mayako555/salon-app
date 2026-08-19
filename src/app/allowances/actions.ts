@@ -19,6 +19,7 @@ import { getStaffList } from "@/app/staff/actions";
 import { getMonthlySales, SalesRecord } from "@/app/sales/actions";
 import { getMonthlyReviews } from "@/app/admin/reviews/actions";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc, setTenantOwnedDoc } from "@/lib/tenant-ownership";
+import { getCurrentUserContext } from "@/lib/auth-server";
 
 
 export type AllowanceType = "review" | "blog" | "sns" | "treatment" | "transport" | "nomination" | "other";
@@ -326,6 +327,11 @@ export async function saveStaffAllowanceTask(data: {
   allowances: { type: AllowanceType, amount: number, store_name: string, target_details?: any }[];
 }) {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) {
+      return { success: false, error: "Unauthorized" };
+    }
+    
     const batch = writeBatch(db);
     let addedCount = 0;
     
@@ -334,6 +340,7 @@ export async function saveStaffAllowanceTask(data: {
        if (item.amount > 0) {
          const docRef = doc(collection(db, ALLOWANCES_COLLECTION));
           batch.set(docRef, {
+            companyId: ctx.companyId,
             staff_id: data.staff_id,
             staff_name: data.staff_name,
             target_month: data.target_month,
@@ -351,6 +358,7 @@ export async function saveStaffAllowanceTask(data: {
     const checkId = `${data.staff_id}_${data.target_month}`;
     const checkRef = doc(db, ALLOWANCE_CHECKS_COLLECTION, checkId);
     batch.set(checkRef, {
+      companyId: ctx.companyId,
       staff_id: data.staff_id,
       target_month: data.target_month,
       updated_at: serverTimestamp()

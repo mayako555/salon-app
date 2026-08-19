@@ -20,8 +20,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, PieChart, Activity, Loader2, Sparkles, Users } from "lucide-react";
 import { getAdvancedAnalytics } from "./actions";
+import { useAuth } from "@/lib/auth-context";
 
 export default function AdvancedCharts() {
+  const { profile, impersonatingCompanyId } = useAuth();
+  const currentCompanyId = impersonatingCompanyId || profile?.companyId;
+  const isJasmineLash = currentCompanyId === "company_default";
+
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -76,7 +81,8 @@ export default function AdvancedCharts() {
         totalVisits: (vals.regularVisits || 0) + (vals.nextBookingVisits || 0) + (vals.minimoVisits || 0),
         avgRegular: vals.avgRegular || 0,
         avgMinimo: vals.avgMinimo || 0,
-        count: vals.count || 0
+        count: vals.count || 0,
+        routes: vals.routes || {}
       };
     });
     return { ...d, stores, regularSales: (d.total || 0) - (d.minimo || 0) };
@@ -177,97 +183,188 @@ export default function AdvancedCharts() {
                   tick={{ fontSize: 10, fill: '#94a3b8' }}
                   tickFormatter={(value) => `¥${(value / 10000).toLocaleString()}万`}
                 />
-                <Tooltip 
+                 <Tooltip 
                   cursor={{ fill: '#f8fafc' }}
                   content={({ active, payload, label }) => {
                     if (active && payload && payload.length) {
                       const stores = availableStores;
-                      const groupedData: Record<string, { regular: number, minimo: number, colors: { regular: string, minimo: string } }> = {};
                       
-                      stores.forEach(store => {
-                        groupedData[store] = { regular: 0, minimo: 0, colors: { regular: "", minimo: "" } };
-                      });
+                      if (isJasmineLash) {
+                        const groupedData: Record<string, { regular: number, minimo: number, colors: { regular: string, minimo: string } }> = {};
+                        stores.forEach(store => {
+                          groupedData[store] = { regular: 0, minimo: 0, colors: { regular: "", minimo: "" } };
+                        });
 
-                      payload.forEach((entry: any) => {
-                        const [store, type] = entry.name.split(':');
-                        if (stores.includes(store)) {
-                          if (type === "通常") {
-                            groupedData[store].regular = entry.value;
-                            groupedData[store].colors.regular = entry.color;
-                          } else if (type === "ミニモ") {
-                            groupedData[store].minimo = entry.value;
-                            groupedData[store].colors.minimo = entry.color;
+                        payload.forEach((entry: any) => {
+                          if (!entry.name || !entry.name.includes(':')) return;
+                          const [store, type] = entry.name.split(':');
+                          if (stores.includes(store)) {
+                            if (type === "通常") {
+                              groupedData[store].regular = entry.value;
+                              groupedData[store].colors.regular = entry.color;
+                            } else if (type === "ミニモ") {
+                              groupedData[store].minimo = entry.value;
+                              groupedData[store].colors.minimo = entry.color;
+                            }
                           }
-                        }
-                      });
+                        });
 
-                      return (
-                        <div className="bg-white p-3 border border-slate-100 rounded-xl shadow-xl min-w-[160px]">
-                          <p className="font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2">{label}</p>
-                          <div className="space-y-3">
-                            {stores.map(store => {
-                              const data = groupedData[store];
-                              if (!data) return null;
-                              const total = data.regular + data.minimo;
-                              if (total === 0) return null; // skip if no data
+                        return (
+                          <div className="bg-white p-3 border border-slate-100 rounded-xl shadow-xl min-w-[160px]">
+                            <p className="font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2">{label}</p>
+                            <div className="space-y-3">
+                              {stores.map(store => {
+                                const data = groupedData[store];
+                                if (!data) return null;
+                                const total = data.regular + data.minimo;
+                                if (total === 0) return null;
 
-                              return (
-                                <div key={store} className="space-y-1">
-                                  <div className="flex items-center justify-between font-black text-slate-700 text-sm">
-                                    <span>{store}</span>
-                                    <span>¥{total.toLocaleString()}</span>
-                                  </div>
-                                  <div className="pl-2 space-y-0.5 border-l-2 border-slate-100 ml-1">
-                                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 gap-4">
-                                      <div className="flex items-center gap-1.5">
-                                        <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: data.colors.regular || '#ccc' }} />
-                                        <span>通常</span>
-                                      </div>
-                                      <span>¥{data.regular.toLocaleString()}</span>
+                                return (
+                                  <div key={store} className="space-y-1">
+                                    <div className="flex items-center justify-between font-black text-slate-700 text-sm">
+                                      <span>{store}</span>
+                                      <span>¥{total.toLocaleString()}</span>
                                     </div>
-                                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 gap-4">
-                                      <div className="flex items-center gap-1.5">
-                                        <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: data.colors.minimo || '#ccc' }} />
-                                        <span>ミニモ</span>
+                                    <div className="pl-2 space-y-0.5 border-l-2 border-slate-100 ml-1">
+                                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 gap-4">
+                                        <div className="flex items-center gap-1.5">
+                                          <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: data.colors.regular || '#ccc' }} />
+                                          <span>通常</span>
+                                        </div>
+                                        <span>¥{data.regular.toLocaleString()}</span>
                                       </div>
-                                      <span>¥{data.minimo.toLocaleString()}</span>
+                                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 gap-4">
+                                        <div className="flex items-center gap-1.5">
+                                          <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: data.colors.minimo || '#ccc' }} />
+                                          <span>ミニモ</span>
+                                        </div>
+                                        <span>¥{data.minimo.toLocaleString()}</span>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      );
+                        );
+                      } else {
+                        // Dynamic routing version for non-Jasmine Lash
+                        const groupedData: Record<string, { total: number, routes: Record<string, { sales: number, color: string }> }> = {};
+                        stores.forEach(store => {
+                          groupedData[store] = { total: 0, routes: {} };
+                        });
+
+                        payload.forEach((entry: any) => {
+                          if (!entry.name || !entry.name.includes(':')) return;
+                          const [store, routeName] = entry.name.split(':');
+                          if (stores.includes(store)) {
+                            if (!groupedData[store].routes[routeName]) {
+                              groupedData[store].routes[routeName] = { sales: 0, color: "" };
+                            }
+                            groupedData[store].routes[routeName].sales = entry.value;
+                            groupedData[store].routes[routeName].color = entry.color;
+                            groupedData[store].total += entry.value;
+                          }
+                        });
+
+                        return (
+                          <div className="bg-white p-3 border border-slate-100 rounded-xl shadow-xl min-w-[180px] max-w-[280px]">
+                            <p className="font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2">{label}</p>
+                            <div className="space-y-4 max-h-[300px] overflow-y-auto no-scrollbar">
+                              {stores.map(store => {
+                                const storeData = groupedData[store];
+                                if (!storeData || storeData.total === 0) return null;
+
+                                return (
+                                  <div key={store} className="space-y-1.5">
+                                    <div className="flex items-center justify-between font-black text-slate-800 text-sm">
+                                      <span>{store}</span>
+                                      <span>¥{storeData.total.toLocaleString()}</span>
+                                    </div>
+                                    <div className="pl-2 space-y-1 border-l-2 border-slate-100 ml-1">
+                                      {Object.entries(storeData.routes).map(([routeName, rVal]) => {
+                                        if (rVal.sales === 0) return null;
+                                        return (
+                                          <div key={routeName} className="flex items-center justify-between text-[10px] font-bold text-slate-500 gap-4">
+                                            <div className="flex items-center gap-1.5">
+                                              <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: rVal.color || '#ccc' }} />
+                                              <span>{routeName}</span>
+                                            </div>
+                                            <span>¥{rVal.sales.toLocaleString()}</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      }
                     }
                     return null;
                   }}
                 />
-                <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '20px' }} />
+                <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '9px', fontWeight: 'bold', paddingBottom: '20px' }} />
                 
-                {/* グラフの積み上げ順序: 最初が下、最後が上 */}
-                {/* 上から六甲、神戸、元町にするには、一番下が元町、真ん中が神戸、一番上が六甲 */}
-                
-                {/* 動的店舗レンダリング */}
-                {availableStores.map((store, idx) => (
-                  <Bar key={`${store}-regular`} name={`${store}:通常`} dataKey={`stores.${store}.regular`} stackId="total" fill={storeColors[idx % storeColors.length].regular} />
-                ))}
-                {availableStores.map((store, idx) => {
-                  const isLast = idx === availableStores.length - 1;
-                  return (
-                    <Bar key={`${store}-minimo`} name={`${store}:ミニモ`} dataKey={`stores.${store}.minimo`} stackId="total" fill={storeColors[idx % storeColors.length].minimo} radius={isLast ? [4, 4, 0, 0] : [0,0,0,0]}>
-                      {isLast && (
-                        <LabelList 
-                          dataKey="total" 
-                          position="top" 
-                          offset={10}
-                          formatter={(val: any) => val ? `¥${(val / 10000).toFixed(1)}万` : ""}
-                          style={{ fontSize: '10px', fontWeight: 'bold', fill: '#475569' }}
-                        />
-                      )}
-                    </Bar>
-                  );
-                })}
+                {/* 積み上げ棒レンダリング (Jasmine Lash かどうかで分岐) */}
+                {isJasmineLash ? (
+                  // Jasmine Lash: 通常/ミニモ の固定表示
+                  <>
+                    {availableStores.map((store, idx) => (
+                      <Bar key={`${store}-regular`} name={`${store}:通常`} dataKey={`stores.${store}.regular`} stackId="total" fill={storeColors[idx % storeColors.length].regular} />
+                    ))}
+                    {availableStores.map((store, idx) => {
+                      const isLast = idx === availableStores.length - 1;
+                      return (
+                        <Bar key={`${store}-minimo`} name={`${store}:ミニモ`} dataKey={`stores.${store}.minimo`} stackId="total" fill={storeColors[idx % storeColors.length].minimo} radius={isLast ? [4, 4, 0, 0] : [0,0,0,0]}>
+                          {isLast && (
+                            <LabelList 
+                              dataKey="total" 
+                              position="top" 
+                              offset={10}
+                              formatter={(val: any) => val ? `¥${(val / 10000).toFixed(1)}万` : ""}
+                              style={{ fontSize: '10px', fontWeight: 'bold', fill: '#475569' }}
+                            />
+                          )}
+                        </Bar>
+                      );
+                    })}
+                  </>
+                ) : (
+                  // 一般加盟店/デモアカウント: 登録媒体別 (availableRoutes) の動的積み上げ
+                  <>
+                    {availableStores.map((store, sIdx) => 
+                      availableRoutes.map((route, rIdx) => {
+                        const colorIndex = (sIdx * availableRoutes.length + rIdx) % routeColors.length;
+                        const color = routeColors[colorIndex];
+                        const isLast = sIdx === availableStores.length - 1 && rIdx === availableRoutes.length - 1;
+                        
+                        return (
+                          <Bar 
+                            key={`${store}-${route}`} 
+                            name={`${store}:${route}`} 
+                            dataKey={`stores.${store}.routes.${route}.sales`} 
+                            stackId="total" 
+                            fill={color} 
+                            radius={isLast ? [4, 4, 0, 0] : [0,0,0,0]}
+                          >
+                            {isLast && (
+                              <LabelList 
+                                dataKey="total" 
+                                position="top" 
+                                offset={10}
+                                formatter={(val: any) => val ? `¥${(val / 10000).toFixed(1)}万` : ""}
+                                style={{ fontSize: '10px', fontWeight: 'bold', fill: '#475569' }}
+                              />
+                            )}
+                          </Bar>
+                        );
+                      })
+                    )}
+                  </>
+                )}
               </BarChart>
             </ResponsiveContainer>
             </div>

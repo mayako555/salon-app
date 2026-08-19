@@ -24,6 +24,7 @@ export default function ReservationsPage() {
   const [settings, setSettings] = useState<ReservationSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
+  const [createRequestKey, setCreateRequestKey] = useState(0);
 
   const dateStr = format(date, "yyyy-MM-dd");
 
@@ -182,7 +183,7 @@ export default function ReservationsPage() {
             </div>
           </div>
 
-          <Button variant="default" size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 font-bold px-4">
+          <Button variant="default" size="sm" onClick={() => setCreateRequestKey(key => key + 1)} className="h-8 bg-blue-600 hover:bg-blue-700 font-bold px-4">
             <Plus className="w-4 h-4 mr-1" /> 予約追加
           </Button>
           
@@ -214,6 +215,7 @@ export default function ReservationsPage() {
               settings={settings || undefined}
               onRefresh={loadDateData}
               onOptimisticUpdate={(updated) => setReservations(prev => prev.map(r => r.id === updated.id ? updated : r))}
+              createRequestKey={createRequestKey}
             />
           </div>
         )}

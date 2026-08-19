@@ -217,7 +217,7 @@ export async function duplicateSalesMasterItem(id: string) {
 export async function getSaleByReservationId(resId: string): Promise<SalesRecord | null> {
   try {
     const ctx = await getCurrentUserContext();
-  if (ctx.companyId) await requireFeature(ctx.companyId, "sales");
+    if (ctx.companyId) await requireFeature(ctx.companyId, "sales");
     const q = query(
       collection(db, SALES_COLLECTION),
       where("source_reservation_id", "==", resId),
@@ -231,7 +231,19 @@ export async function getSaleByReservationId(resId: string): Promise<SalesRecord
     if (!ctx.companyId) return null;
     if (data.companyId !== ctx.companyId) return null;
     
-    return data;
+    // Serialize Firestore Timestamps
+    const serializedData: any = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value && typeof (value as any).toMillis === 'function') {
+        serializedData[key] = (value as any).toMillis();
+      } else if (value instanceof Date) {
+        serializedData[key] = value.getTime();
+      } else {
+        serializedData[key] = value;
+      }
+    }
+    
+    return serializedData as SalesRecord;
   } catch (error) {
     console.error("Error fetching sale by res id:", error);
     return null;

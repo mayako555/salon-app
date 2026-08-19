@@ -136,13 +136,18 @@ export async function getShiftsForDate(dateStr: string): Promise<ShiftRecord[]> 
 
 export async function saveShift(data: Omit<ShiftRecord, "id"> & { id?: string }) {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
     const colRef = collection(db, SHIFTS_COLLECTION);
     let recordId = data.id;
 
-    // 1. Konsolidate: Find all existing records for this staff and date
-    // This cleans up duplicates that might have been created by multiple bulk saves
+    // 1. Konsolidate: Find all existing records for this staff, date and company
     const q = query(
       colRef, 
+      where("companyId", "==", ctx.companyId),
       where("staff_id", "==", data.staff_id),
       where("date", "==", data.date)
     );
@@ -161,6 +166,7 @@ export async function saveShift(data: Omit<ShiftRecord, "id"> & { id?: string })
       const docRef = doc(db, SHIFTS_COLLECTION, recordId);
       batch.update(docRef, {
         ...cleanedData,
+        companyId: ctx.companyId,
         updated_at: serverTimestamp()
       });
 
@@ -177,6 +183,7 @@ export async function saveShift(data: Omit<ShiftRecord, "id"> & { id?: string })
         recordId = firstDoc.id;
         batch.update(firstDoc.ref, {
           ...cleanedData,
+          companyId: ctx.companyId,
           updated_at: serverTimestamp()
         });
         
@@ -190,6 +197,7 @@ export async function saveShift(data: Omit<ShiftRecord, "id"> & { id?: string })
         recordId = newDocRef.id;
         batch.set(newDocRef, {
           ...cleanedData,
+          companyId: ctx.companyId,
           created_at: serverTimestamp(),
           updated_at: serverTimestamp()
         });
@@ -268,6 +276,11 @@ export async function bulkSaveShifts(params: {
   activeDaysOfWeek: number[];
 }) {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
     const { staffIds, dateRange, type, segments, activeDaysOfWeek } = params;
     const start = new Date(dateRange.start);
     const end = new Date(dateRange.end);
@@ -289,6 +302,7 @@ export async function bulkSaveShifts(params: {
     // 既存の同日シフトを取得して削除対象にする
     const qExisting = query(
       colRef,
+      where("companyId", "==", ctx.companyId),
       where("date", ">=", dateRange.start),
       where("date", "<=", dateRange.end)
     );
@@ -321,14 +335,9 @@ export async function bulkSaveShifts(params: {
 
     // 既存シフトを削除
     for (const d of existingDocsToDelete) {
-      const data = d.data();
       currentBatch.delete(d.ref);
       operationCount++;
       await commitBatchIfNeeded();
-
-      // If we are deleting a paid leave without replacing it with a new one in this loop, we would refund.
-      // But existingDocsToDelete explicitly EXCLUDES paid leaves (isHoliday check).
-      // So oldType here is only 'work'. Nothing to refund.
     }
 
     // 新規シフトを追加
@@ -343,6 +352,7 @@ export async function bulkSaveShifts(params: {
         
         const newDocRef = doc(colRef);
         currentBatch.set(newDocRef, {
+          companyId: ctx.companyId,
           staff_id: staffId,
           staff_name: staffName,
           date,

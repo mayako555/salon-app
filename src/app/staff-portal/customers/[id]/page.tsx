@@ -226,7 +226,7 @@ export default function CustomerDetailPage() {
     
     // Import the action dynamically to avoid circular dependencies if any
     const { testSendLineMessage } = await import("./actions");
-    const res = await testSendLineMessage(customer.name, customer.line_user_id, dateStr, "10:00");
+    const res = await testSendLineMessage(customer.name, customer.line_user_id, dateStr, "10:00", customer.store_name || "メイン店舗");
     
     if (res.success) {
       toast.success("テストメッセージを送信しました");
