@@ -82,7 +82,25 @@ export function useSalesData({
       const staffVisits = staffVisitIds.size;
 
       stores.forEach((store) => {
-        const storeRecords = staffSales.filter((s) => s.store_name === store);
+        const storeNameToIdMap: Record<string, string> = {
+          "Jasmine Lash 六甲店": "MXynEaKUTyUvERaaLEFJ",
+          "Jasmine Lash 六甲道": "MXynEaKUTyUvERaaLEFJ",
+          "Jasmine Lash 神戸店": "3HeFmaWpi3knEpIDX8o3",
+          "Jasmine Lash 神戸": "3HeFmaWpi3knEpIDX8o3",
+          "BROW GYM 元町店": "x2ebzlDkPYdbLXaNSwsD",
+          "BROW GYM 元町": "x2ebzlDkPYdbLXaNSwsD",
+          "Lefite 岡本": "YwGWhymuR3fwRXiSJmh1",
+          "Salon表参道店": "demo-store-1",
+          "Salon渋谷店": "demo-store-2",
+          "Salon難波店": "demo-store-3",
+          "Salon梅田店": "demo-store-4",
+          "Lefite": "jH2BKR5pNo8df7U4KfDA"
+        };
+        const targetStoreId = storeNameToIdMap[store] || store;
+        const storeRecords = staffSales.filter((s) => {
+          if (s.store_id) return s.store_id === targetStoreId;
+          return s.store_name === store;
+        });
         const storeVisitIds = new Set(storeRecords.map(getVisitId));
         
         const sTech = storeRecords.reduce((sum, s) => sum + (s.tech_sales || 0), 0);
@@ -188,7 +206,25 @@ export function useSalesData({
         prevMonthTotal,
       },
       ...stores.map((store) => {
-        const prevStoreSales = comparablePrevMonthSales.filter((s) => s.store_name === store);
+        const storeNameToIdMap: Record<string, string> = {
+          "Jasmine Lash 六甲店": "MXynEaKUTyUvERaaLEFJ",
+          "Jasmine Lash 六甲道": "MXynEaKUTyUvERaaLEFJ",
+          "Jasmine Lash 神戸店": "3HeFmaWpi3knEpIDX8o3",
+          "Jasmine Lash 神戸": "3HeFmaWpi3knEpIDX8o3",
+          "BROW GYM 元町店": "x2ebzlDkPYdbLXaNSwsD",
+          "BROW GYM 元町": "x2ebzlDkPYdbLXaNSwsD",
+          "Lefite 岡本": "YwGWhymuR3fwRXiSJmh1",
+          "Salon表参道店": "demo-store-1",
+          "Salon渋谷店": "demo-store-2",
+          "Salon難波店": "demo-store-3",
+          "Salon梅田店": "demo-store-4",
+          "Lefite": "jH2BKR5pNo8df7U4KfDA"
+        };
+        const targetStoreId = storeNameToIdMap[store] || store;
+        const prevStoreSales = comparablePrevMonthSales.filter((s) => {
+          if (s.store_id) return s.store_id === targetStoreId;
+          return s.store_name === store;
+        });
         const prevStoreTotal = prevStoreSales.reduce(
           (sum, s) => sum + s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0),
           0

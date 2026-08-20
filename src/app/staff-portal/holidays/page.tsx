@@ -6,7 +6,8 @@ import { CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Info } from "luc
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, addMonths } from "date-fns";
 import { ja } from "date-fns/locale";
 import { useAuth } from "@/lib/auth-context";
-import { submitHolidayRequest } from "@/app/shifts/actions";
+import { submitHolidayRequest, getStaffHolidayRequests } from "@/app/shifts/actions";
+import { useEffect } from "react";
 
 export default function StaffPortalHolidaysPage() {
   const [currentDate] = useState(new Date());
@@ -21,6 +22,25 @@ export default function StaffPortalHolidaysPage() {
   const [paidLeaveDays, setPaidLeaveDays] = useState<Record<string, number>>({});
   const [requestMode, setRequestMode] = useState<"regular" | "pto">("regular");
   const [submitted, setSubmitted] = useState(false);
+  const [history, setHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const loadHistory = async () => {
+    if (!profile?.id) return;
+    setLoadingHistory(true);
+    try {
+      const data = await getStaffHolidayRequests(profile.id);
+      setHistory(data);
+    } catch (e) {
+      console.error("Failed to load holiday requests history:", e);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    loadHistory();
+  }, [profile?.id]);
 
   const monthStart = startOfMonth(targetMonthDate);
   const monthEnd = endOfMonth(monthStart);
@@ -118,6 +138,7 @@ export default function StaffPortalHolidaysPage() {
       alert("希望休を提出しました！");
       setRequestedDays({});
       setPaidLeaveDays({});
+      await loadHistory();
     } catch (error) {
       alert("エラーが発生しました。もう一度やり直してください。");
     } finally {
@@ -221,6 +242,43 @@ export default function StaffPortalHolidaysPage() {
                 </button>
               );
             })}
+          </div>
+
+          <div className="bg-slate-50 p-4 border-t border-slate-200">
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">提出済みの申請・状況</h3>
+            {loadingHistory ? (
+              <p className="text-xs text-slate-400">履歴を読み込み中...</p>
+            ) : history.length === 0 ? (
+              <p className="text-xs text-slate-400">提出済みの希望休申請はありません。</p>
+            ) : (
+              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                {history.map((req) => (
+                  <div key={req.id} className="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold text-slate-800">{req.date}</span>
+                      <span className="text-[10px] text-slate-400">
+                        {req.reason === "有給休暇" ? "有給休暇" : `希望公休 (${req.amount || 1}日)`}
+                      </span>
+                    </div>
+                    <div>
+                      {req.status === "pending" ? (
+                        <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded-full font-black">
+                          申請中（未承認）
+                        </span>
+                      ) : req.status === "approved" ? (
+                        <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-full font-black">
+                          承認済み
+                        </span>
+                      ) : (
+                        <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 px-2 py-1 rounded-full font-black">
+                          却下
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

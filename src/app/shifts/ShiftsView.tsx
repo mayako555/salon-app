@@ -39,9 +39,19 @@ export default function ShiftsView({
   const { profile, availableStores, availableStoreObjects } = useAuth();
   const isReadOnly = !["systemOwner", "companyOwner", "admin", "manager", "storeManager"].includes(profile?.role || "");
 
-  const getStoreBadgeClasses = (storeVal: string) => {
+  const getStoreDisplayName = (storeVal: string) => {
+    const hardcodedStoreMap: Record<string, string> = {
+      "MXynEaKUTyUvERaaLEFJ": "Jasmine Lash 六甲道",
+      "3HeFmaWpi3knEpIDX8o3": "Jasmine Lash 神戸",
+      "x2ebzlDkPYdbLXaNSwsD": "BROW GYM 元町"
+    };
     const storeObj = availableStoreObjects.find(s => s.id === storeVal || s.name === storeVal);
-    const storeName = storeObj ? storeObj.name : storeVal;
+    if (storeObj) return storeObj.name;
+    return hardcodedStoreMap[storeVal] || storeVal;
+  };
+
+  const getStoreBadgeClasses = (storeVal: string) => {
+    const storeName = getStoreDisplayName(storeVal);
     if (storeName.includes("六甲")) return "bg-blue-100 text-blue-800 border-blue-200";
     if (storeName.includes("元町")) return "bg-purple-100 text-purple-800 border-purple-200";
     if (storeName.includes("神戸")) return "bg-orange-100 text-orange-800 border-orange-200";
@@ -137,10 +147,13 @@ export default function ShiftsView({
           <div className="text-blue-600 font-bold bg-blue-50 p-1 rounded h-full flex flex-col justify-center repeating-stripes">希望休</div>
         ) : shift.type === 'requested_paid_leave' ? (
           <div className="text-emerald-600 font-bold bg-emerald-50 p-1 rounded h-full flex flex-col justify-center repeating-stripes">有給申請</div>
+        ) : shift.type === 'custom_event' ? (
+          <div className="text-amber-900 font-bold bg-amber-100 border border-amber-200 p-1 rounded h-full flex flex-col justify-center">
+            {shift.custom_title || "予定あり"}
+          </div>
         ) : (
           shift.segments?.map((seg: any, idx: number) => {
-            const storeObj = availableStoreObjects.find(s => s.id === seg.store || s.name === seg.store);
-            const storeDisplayName = storeObj ? storeObj.name : seg.store;
+            const storeDisplayName = getStoreDisplayName(seg.store);
             return (
               <div key={idx} className={`p-0.5 rounded border text-[10px] leading-tight ${getStoreBadgeClasses(seg.store)}`}>
                 {seg.start_time} - {seg.end_time}<br/><span className="font-bold">{storeDisplayName}</span>
@@ -302,6 +315,7 @@ export default function ShiftsView({
                               shift.type === 'paid_leave' || shift.type === 'half_paid_leave' ? (shift.request_id ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-700') : 
                               shift.type === 'requested_holiday' ? 'bg-blue-100 border-blue-400 text-blue-900 shadow-md ring-2 ring-blue-200' :
                               shift.type === 'requested_paid_leave' ? 'bg-emerald-100 border-emerald-400 text-emerald-900 shadow-md ring-2 ring-emerald-200' :
+                              shift.type === 'custom_event' ? 'bg-amber-50 border-amber-200 text-amber-900' :
                               'bg-white border-slate-200 text-slate-700'}`}
                         >
                           <div className={`px-1.5 py-1.5 flex justify-between font-bold ${shift.type === 'work' ? 'bg-slate-50 border-b border-slate-100' : ''}`}>
@@ -310,17 +324,21 @@ export default function ShiftsView({
                              {(shift.type === 'paid_leave' || shift.type === 'half_paid_leave') && <span className={`opacity-70 flex-shrink-0 text-[9px] mt-0.5 ${shift.request_id ? 'text-emerald-700' : 'text-amber-600'}`}>{shift.request_id ? (shift.type === 'half_paid_leave' ? '半休(希望)' : '有休(希望)') : (shift.type === 'half_paid_leave' ? '半休' : '有休')}</span>}
                              {shift.type === 'requested_holiday' && <span className="bg-blue-500 text-white px-1 py-0.5 rounded text-[8px] flex-shrink-0 mt-0.5 font-bold shadow-sm">★希望休</span>}
                              {shift.type === 'requested_paid_leave' && <span className="bg-emerald-500 text-white px-1 py-0.5 rounded text-[8px] flex-shrink-0 mt-0.5 font-bold shadow-sm">★有給申請</span>}
+                             {shift.type === 'custom_event' && <span className="bg-amber-100 text-amber-800 border border-amber-200 px-1 py-0.5 rounded text-[8px] flex-shrink-0 mt-0.5 font-bold truncate max-w-[80px] shadow-sm">{shift.custom_title || '予定あり'}</span>}
                           </div>
-                          {shift.type === 'work' && shift.segments && shift.segments.map((seg, idx) => (
-                            <div key={idx} className="px-1.5 py-1 border-t border-dashed border-slate-100 first:border-t-0 flex flex-col gap-1">
-                              <div className="flex justify-between items-center text-[9px]">
-                                 <span className="font-mono text-slate-500">{seg.start_time}-{seg.end_time}</span>
-                                 <span className={`px-1.5 py-0.5 rounded border ${getStoreBadgeClasses(seg.store)}`}>
-                                   {seg.store}
-                                 </span>
+                          {shift.type === 'work' && shift.segments && shift.segments.map((seg, idx) => {
+                            const storeDisplayName = getStoreDisplayName(seg.store);
+                            return (
+                              <div key={idx} className="px-1.5 py-1 border-t border-dashed border-slate-100 first:border-t-0 flex flex-col gap-1">
+                                <div className="flex justify-between items-center text-[9px]">
+                                   <span className="font-mono text-slate-500">{seg.start_time}-{seg.end_time}</span>
+                                   <span className={`px-1.5 py-0.5 rounded border ${getStoreBadgeClasses(seg.store)}`}>
+                                     {storeDisplayName}
+                                   </span>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ))}
                     </div>
@@ -428,8 +446,7 @@ export default function ShiftsView({
                     const storeShifts = dayShifts.filter(shift => 
                       shift.type === "work" && 
                       shift.segments?.some(seg => {
-                        const storeObj = availableStoreObjects.find(s => s.id === seg.store || s.name === seg.store);
-                        const storeName = storeObj ? storeObj.name : seg.store;
+                        const storeName = getStoreDisplayName(seg.store);
                         return storeName === store;
                       })
                     );
@@ -469,7 +486,10 @@ export default function ShiftsView({
                         const dayShifts = getShiftsForDate(dateStr);
                         const storeShifts = dayShifts.filter(shift => 
                           shift.type === "work" && 
-                          shift.segments?.some(seg => seg.store === store)
+                          shift.segments?.some(seg => {
+                            const storeName = getStoreDisplayName(seg.store);
+                            return storeName === store;
+                          })
                         );
 
                         return (
@@ -479,7 +499,10 @@ export default function ShiftsView({
                           >
                             <div className="h-full min-h-[50px] flex flex-col gap-1 p-0.5">
                               {storeShifts.map(shift => {
-                                const segments = shift.segments?.filter(seg => seg.store === store) || [];
+                                const segments = shift.segments?.filter(seg => {
+                                  const storeName = getStoreDisplayName(seg.store);
+                                  return storeName === store;
+                                }) || [];
                                 const isTrainee = staffList.find(sl => sl.id === shift.staff_id)?.is_trainee;
                                 
                                 return (

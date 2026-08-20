@@ -41,6 +41,7 @@ export default function ShiftEditDialog({
     staff_name: "",
     date: initialDate || new Date().toISOString().split("T")[0],
     type: "work",
+    custom_title: "",
     segments: [{ start_time: "10:00", end_time: "19:00", store: defaultStore as any }]
   });
 
@@ -52,6 +53,7 @@ export default function ShiftEditDialog({
         staff_name: shift.staff_name,
         date: shift.date,
         type: shift.type,
+        custom_title: shift.custom_title || "",
         segments: shift.segments || [],
         request_id: shift.request_id
       });
@@ -61,6 +63,7 @@ export default function ShiftEditDialog({
         staff_name: "",
         date: initialDate || new Date().toISOString().split("T")[0],
         type: "work",
+        custom_title: "",
         segments: [{ start_time: "10:00", end_time: "19:00", store: defaultStore as any }]
       });
     }
@@ -219,7 +222,7 @@ export default function ShiftEditDialog({
           <div className="space-y-2">
             <label className="text-sm font-medium">種類</label>
             <div className="flex flex-wrap gap-2">
-              {(["work", "holiday", "paid_leave", "half_paid_leave", "requested_holiday", "requested_paid_leave"] as ShiftType[]).map((type) => (
+              {(["work", "holiday", "paid_leave", "half_paid_leave", "requested_holiday", "requested_paid_leave", "custom_event"] as ShiftType[]).map((type) => (
                 <button
                   key={type}
                   type="button"
@@ -230,11 +233,24 @@ export default function ShiftEditDialog({
                       : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
                   }`}
                 >
-                  {type === 'work' ? '勤務' : type === 'holiday' ? '公休' : type === 'paid_leave' ? '有休' : type === 'half_paid_leave' ? '半休' : type === 'requested_holiday' ? '希望休' : '有給申請'}
+                  {type === 'work' ? '勤務' : type === 'holiday' ? '公休' : type === 'paid_leave' ? '有休' : type === 'half_paid_leave' ? '半休' : type === 'requested_holiday' ? '希望休' : type === 'requested_paid_leave' ? '有給申請' : '予定あり'}
                 </button>
               ))}
             </div>
           </div>
+
+          {formData.type === "custom_event" && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">予定名（自由記入）</label>
+              <Input 
+                type="text" 
+                value={formData.custom_title || ""}
+                onChange={(e) => setFormData(prev => ({ ...prev, custom_title: e.target.value }))}
+                placeholder="例：研修、会議、面談など"
+                required
+              />
+            </div>
+          )}
 
           {formData.type === "work" && (
             <div className="space-y-3">

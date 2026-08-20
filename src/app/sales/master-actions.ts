@@ -305,3 +305,161 @@ export async function duplicateMasterItem(id: string) {
     return { success: false, error: error.message };
   }
 }
+
+export async function migrateStoreNames(isDryRun: boolean = true) {
+  try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) {
+      return { success: false, error: "会社IDが指定されていません" };
+    }
+    // 画面・サーバー両面での管理者権限検証
+    if (!["systemOwner", "companyOwner", "admin"].includes(ctx.role)) {
+      return { success: false, error: "管理者権限がありません" };
+    }
+
+    // 1. 店舗マスタから対象店舗の存在と ID を動的特定
+    const masterCol = collection(db, "sales_master");
+    const masterSnap = await getDocs(query(masterCol, where("itemType", "==", "store")));
+    const storeDocs = masterSnap.docs
+      .map(d => ({ id: d.id, ...d.data() } as any))
+      .filter(d => d.companyId === ctx.companyId);
+
+    // 目的の3店舗を特定
+    const targetRokko = storeDocs.filter(d => d.name === "Jasmine Lash 六甲道");
+    const targetKobe = storeDocs.filter(d => d.name === "Jasmine Lash 神戸");
+    const targetMotomachi = storeDocs.filter(d => d.name === "BROW GYM 元町");
+
+    // バリデーション：一意に特定できること
+    if (targetRokko.length === 0 || targetKobe.length === 0 || targetMotomachi.length === 0) {
+      return { 
+        success: false, 
+        error: `移行対象の店舗がマスタに見つかりません。 (六甲: ${targetRokko.length}件, 神戸: ${targetKobe.length}件, 元町: ${targetMotomachi.length}件)` 
+      };
+    }
+    if (targetRokko.length > 1 || targetKobe.length > 1 || targetMotomachi.length > 1) {
+      return { 
+        success: false, 
+        error: `移行対象の店舗名がマスタ内に重複して登録されています。一意に特定できません。 (六甲: ${targetRokko.length}件, 神戸: ${targetKobe.length}件, 元町: ${targetMotomachi.length}件)` 
+      };
+    }
+
+    const rokkoId = targetRokko[0].id;
+    const kobeId = targetKobe[0].id;
+    const motomachiId = targetMotomachi[0].id;
+
+    // 特定した store_id 対応表
+    const idMapReport = {
+      "Jasmine Lash 六甲道": rokkoId,
+      "Jasmine Lash 神戸": kobeId,
+      "BROW GYM 元町": motomachiId
+    };
+
+    // 表記揺れから store_id への固定マッピング定義
+    const mapRules: Record<string, string> = {
+      "六甲": rokkoId,
+      "六甲店": rokkoId,
+      "六甲道": rokkoId,
+      "六甲道店": rokkoId,
+      "Jasmine Lash 六甲道": rokkoId,
+      "Jasmine Lash 六甲店": rokkoId,
+      "神戸": kobeId,
+      "神戸店": kobeId,
+      "Jasmine Lash 神戸店": kobeId,
+      "Jasmine Lash 神戸": kobeId,
+      "元町": motomachiId,
+      "元町店": motomachiId,
+      "BROWGYM元町": motomachiId,
+      "BROW GYM 元町店": motomachiId,
+      "BROW GYM 元町": motomachiId
+    };
+
+    // 集計レポート初期化
+    let totalProcessed = 0;
+    let updatedCount = 0;
+    let skippedCount = 0; // すでに store_id を持っている
+    let unconvertedCount = 0; // マップに該当しない
+    const unconvertedValuesSet = new Set<string>();
+
+    const updateOperations: { ref: any, updateData: any }[] = [];
+
+    // ヘルパー：ドキュメント移行判定
+    const queueMigration = (docSnap: any) => {
+      const data = docSnap.data();
+      if (data.companyId !== ctx.companyId) return;
+
+      totalProcessed++;
+      
+      // 既存の異なる store_id は自動上書きしない (冪等性の担保)
+      if (data.store_id) {
+        skippedCount++;
+        return;
+      }
+
+      const storeNameField = data.store_name || data.storeName;
+      if (!storeNameField) {
+        unconvertedCount++;
+        unconvertedValuesSet.add("(空欄)");
+        return;
+      }
+
+      const targetId = mapRules[storeNameField.trim()];
+      if (targetId) {
+        updateOperations.push({
+          ref: docSnap.ref,
+          updateData: { store_id: targetId } // store_name はスナップショットとしてそのまま残す
+        });
+        updatedCount++;
+      } else {
+        unconvertedCount++;
+        unconvertedValuesSet.add(storeNameField);
+      }
+    };
+
+    // 1. sales コレクション
+    const salesSnap = await getDocs(collection(db, "sales"));
+    salesSnap.docs.forEach(queueMigration);
+
+    // 2. customers コレクション
+    const custSnap = await getDocs(collection(db, "customers"));
+    custSnap.docs.forEach(queueMigration);
+
+    // 3. reservations コレクション
+    const resSnap = await getDocs(collection(db, "reservations"));
+    resSnap.docs.forEach(queueMigration);
+
+    // 本番実行モードの場合のみ、バッチに分割して書き込みコミットを実行 (最大200件ごと)
+    if (!isDryRun && updateOperations.length > 0) {
+      let batch = writeBatch(db);
+      let count = 0;
+      for (const op of updateOperations) {
+        batch.update(op.ref, op.updateData);
+        count++;
+        if (count >= 200) {
+          await batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
+      }
+      if (count > 0) {
+        await batch.commit();
+      }
+    }
+
+    return {
+      success: true,
+      isDryRun,
+      idMapReport,
+      report: {
+        totalProcessed,
+        updatedCount,
+        skippedCount,
+        unconvertedCount,
+        unconvertedValues: Array.from(unconvertedValuesSet)
+      }
+    };
+  } catch (error: any) {
+    console.error("Migration Error:", error);
+    return { success: false, error: error.message };
+  }
+}
+

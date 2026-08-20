@@ -160,7 +160,27 @@ export default function SalesPage({
     }
     
     if (selectedStores.size > 0) {
-      if (!selectedStores.has(s.store_name)) return false;
+      const storeNameToIdMap: Record<string, string> = {
+        "Jasmine Lash 六甲店": "MXynEaKUTyUvERaaLEFJ",
+        "Jasmine Lash 六甲道": "MXynEaKUTyUvERaaLEFJ",
+        "Jasmine Lash 神戸店": "3HeFmaWpi3knEpIDX8o3",
+        "Jasmine Lash 神戸": "3HeFmaWpi3knEpIDX8o3",
+        "BROW GYM 元町店": "x2ebzlDkPYdbLXaNSwsD",
+        "BROW GYM 元町": "x2ebzlDkPYdbLXaNSwsD",
+        "Lefite 岡本": "YwGWhymuR3fwRXiSJmh1",
+        "Salon表参道店": "demo-store-1",
+        "Salon渋谷店": "demo-store-2",
+        "Salon難波店": "demo-store-3",
+        "Salon梅田店": "demo-store-4",
+        "Lefite": "jH2BKR5pNo8df7U4KfDA"
+      };
+      
+      const hasMatch = Array.from(selectedStores).some(storeName => {
+        const targetStoreId = storeNameToIdMap[storeName] || storeName;
+        if (s.store_id) return s.store_id === targetStoreId;
+        return s.store_name === storeName;
+      });
+      if (!hasMatch) return false;
     }
 
     if (searchQuery) {

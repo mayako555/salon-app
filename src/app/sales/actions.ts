@@ -126,6 +126,7 @@ export type SalesRecord = {
   merge_status?: "CSV_ONLY" | "MERGED_PRIMARY" | "MANUAL_ONLY" | "MERGED_SOURCE" | "DELETED";
   merged_into_id?: string;
   companyId?: string; // Tenant isolation
+  store_id?: string;
   created_at: any; // Firestore Timestamp
 };
 

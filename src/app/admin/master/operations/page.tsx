@@ -8,7 +8,8 @@ import {
   toggleItemStatus,
   updateMasterItemOrder,
   updateMasterItemOrders,
-  duplicateMasterItem
+  duplicateMasterItem,
+  migrateStoreNames
 } from "@/app/sales/master-actions";
 import { resetSalesMasterData } from "@/app/sales/actions";
 import { SalesMasterItem } from "@/types/master";
@@ -247,9 +248,34 @@ export default function MasterManagementPage() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [bulkText, setBulkText] = useState("");
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationResult, setMigrationResult] = useState<any | null>(null);
+  const [isMigrationDialogOpen, setIsMigrationDialogOpen] = useState(false);
   
   const [hasPendingOrderChanges, setHasPendingOrderChanges] = useState(false);
   const [pendingOrders, setPendingOrders] = useState<Record<string, number>>({});
+
+  const handleMigrate = async (isDryRun: boolean = true) => {
+    setIsMigrating(true);
+    try {
+      const res = await migrateStoreNames(isDryRun);
+      if (res.success) {
+        setMigrationResult(res);
+        setIsMigrationDialogOpen(true);
+        if (!isDryRun) {
+          toast.success("店舗名データの本番移行が完了しました！");
+        } else {
+          toast.success("データ移行シミュレーション（ドライラン）が完了しました。結果を確認してください。");
+        }
+      } else {
+        toast.error("店舗名の移行に失敗しました: " + res.error);
+      }
+    } catch (error: any) {
+      toast.error("エラーが発生しました: " + error.message);
+    } finally {
+      setIsMigrating(false);
+    }
+  };
 
   useEffect(() => {
     loadItems();
@@ -496,6 +522,88 @@ export default function MasterManagementPage() {
             </Dialog>
           )}
 
+          {isMigrationDialogOpen && migrationResult && (
+            <Dialog open={isMigrationDialogOpen} onOpenChange={setIsMigrationDialogOpen}>
+              <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto rounded-3xl bg-white border border-slate-200">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 text-slate-800 font-black">
+                    <Database className="w-5 h-5 text-indigo-500" />
+                    店舗名データ移行 {migrationResult.isDryRun ? "シミュレーション" : "実行結果"}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div className={`p-4 rounded-xl border text-sm font-bold ${migrationResult.isDryRun ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`}>
+                    <p>
+                      {migrationResult.isDryRun 
+                        ? "⚠️ これはシミュレーション（ドライラン）です。データベースはまだ書き換えられていません。" 
+                        : "🎉 データベースの移行更新が正常に完了しました！"}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">特定した正式 store_id 対応表</h4>
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs font-mono space-y-1">
+                      {Object.entries(migrationResult.idMapReport || {}).map(([name, id]: any) => (
+                        <div key={id} className="flex justify-between">
+                          <span className="text-slate-600 font-bold">{name}</span>
+                          <span className="text-indigo-600 font-bold">{id}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-center">
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <span className="text-[10px] font-black text-slate-400 block uppercase">処理対象レコード総数</span>
+                      <span className="text-lg font-black text-slate-800">{migrationResult.report.totalProcessed} 件</span>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <span className="text-[10px] font-black text-slate-400 block uppercase">{migrationResult.isDryRun ? "変換対象レコード数" : "更新完了レコード数"}</span>
+                      <span className="text-lg font-black text-emerald-600">{migrationResult.report.updatedCount} 件</span>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <span className="text-[10px] font-black text-slate-400 block uppercase">スキップ件数 (ID設定済)</span>
+                      <span className="text-lg font-black text-slate-500">{migrationResult.report.skippedCount} 件</span>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <span className="text-[10px] font-black text-slate-400 block uppercase">未変換件数 (名寄せ対象外)</span>
+                      <span className="text-lg font-black text-rose-600">{migrationResult.report.unconvertedCount} 件</span>
+                    </div>
+                  </div>
+
+                  {migrationResult.report.unconvertedValues && migrationResult.report.unconvertedValues.length > 0 && (
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black text-slate-400 block uppercase">未変換の店舗名（名寄せ漏れ、空欄）のリスト</span>
+                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-rose-700 max-h-32 overflow-y-auto font-mono">
+                        {migrationResult.report.unconvertedValues.map((v: string, idx: number) => (
+                          <div key={idx}>・{v}</div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <DialogFooter className="gap-2 pt-2 border-t border-slate-100">
+                  <Button variant="ghost" onClick={() => setIsMigrationDialogOpen(false)} className="rounded-xl font-bold">
+                    閉じる
+                  </Button>
+                  {migrationResult.isDryRun && (
+                    <Button 
+                      onClick={async () => {
+                        if (confirm("シミュレーション結果に問題はありませんか？\n本番のデータ移行を開始し、既存の売上・顧客・予約データに店舗IDを付与します。")) {
+                          setIsMigrationDialogOpen(false);
+                          await handleMigrate(false); // 本番移行を実行
+                        }
+                      }}
+                      className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black px-6 shadow-md"
+                    >
+                      本番データ移行を実行
+                    </Button>
+                  )}
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="rounded-xl border-slate-200 hover:bg-slate-100 shadow-sm font-bold text-slate-600">
@@ -563,6 +671,14 @@ export default function MasterManagementPage() {
               setIsDialogOpen(true);
             }} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 shadow-md font-black text-white px-4 h-11">
               <Store size={16} className="mr-1" /> 店舗追加
+            </Button>
+            <Button 
+              onClick={() => handleMigrate(true)} 
+              disabled={isMigrating}
+              className="rounded-xl bg-slate-800 hover:bg-slate-700 shadow-md font-black text-white px-4 h-11"
+              title="旧店舗名（六甲、神戸、元町等）で登録された売上・顧客・予約データの、新店舗名IDへの統一移行シミュレーションを実行します"
+            >
+              {isMigrating ? "シミュレーション中..." : "店舗名データ移行（シミュレーション）"}
             </Button>
           </div>
         </div>

@@ -24,7 +24,7 @@ import { updateTenantOwnedDoc, deleteTenantOwnedDoc } from "@/lib/tenant-ownersh
 
 
 export type StoreLocation = "六甲" | "元町" | "神戸";
-export type ShiftType = "work" | "holiday" | "paid_leave" | "half_paid_leave" | "requested_holiday" | "requested_paid_leave";
+export type ShiftType = "work" | "holiday" | "paid_leave" | "half_paid_leave" | "requested_holiday" | "requested_paid_leave" | "custom_event";
 
 export type ShiftSegment = {
   start_time: string;
@@ -40,6 +40,8 @@ export type ShiftRecord = {
   type: ShiftType;
   segments?: ShiftSegment[];
   request_id?: string; // Link to holiday_request if any
+  custom_title?: string; // 自由記入の予定タイトル
+  companyId?: string; // Tenant isolation
   created_at?: any;
   updated_at?: any;
 };
@@ -410,12 +412,18 @@ const HOLIDAY_REQUESTS_COLLECTION = "holiday_requests";
 
 export async function submitHolidayRequest(data: Omit<HolidayRequest, "id" | "status" | "created_at">) {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) {
+      return { success: false, error: "会社IDが指定されていません" };
+    }
+
     const batch = writeBatch(db);
     // 1. Create the holiday request record first to get its ID
     const holidayColRef = collection(db, HOLIDAY_REQUESTS_COLLECTION);
     const holidayDocRef = doc(holidayColRef);
     const holidayPayload = {
       ...data,
+      companyId: ctx.companyId,
       status: "pending",
       created_at: serverTimestamp()
     };
@@ -429,7 +437,8 @@ export async function submitHolidayRequest(data: Omit<HolidayRequest, "id" | "st
       date: data.date,
       type: data.reason === "有給休暇" ? "requested_paid_leave" : "requested_holiday",
       segments: [],
-      request_id: holidayDocRef.id // Store the link to the request
+      request_id: holidayDocRef.id, // Store the link to the request
+      companyId: ctx.companyId
     };
     
     batch.set(newShiftRef, {
@@ -444,6 +453,33 @@ export async function submitHolidayRequest(data: Omit<HolidayRequest, "id" | "st
     });
     
     await batch.commit();
+
+    // 4. マネージャー・オーナー向けに承認通知タスクを自動起票
+    try {
+      const { addTenantOwnedDoc } = await import("@/lib/tenant-ownership");
+      const taskColRef = collection(db, "tasks");
+      const isPaidLeave = data.reason === "有給休暇";
+      await addTenantOwnedDoc(taskColRef, {
+        companyId: ctx.companyId,
+        title: `【希望休承認待ち】${data.staff_name}さんから希望休申請`,
+        description: `${data.staff_name}さんから、${data.date}の希望休（${isPaidLeave ? "有給休暇" : "希望公休"}）の申請が届きました。店舗・シフト設定にて承認または却下の処理を行ってください。`,
+        category: "人事",
+        priority: 4, // 優先度高
+        status: "未着手",
+        assignee: "unassigned",
+        dueDate: data.date,
+        dueTime: "10:00",
+        notificationRules: [],
+        tags: ["希望休申請", data.staff_name],
+        attachments: [],
+        createdBy: data.staff_name,
+        updatedBy: "System",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    } catch (taskErr) {
+      console.error("Failed to create auto holiday task notification:", taskErr);
+    }
 
     await addAuditLog({
       table_name: HOLIDAY_REQUESTS_COLLECTION,
