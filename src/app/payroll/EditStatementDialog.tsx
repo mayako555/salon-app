@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import AllowanceFields, { AllowanceValues } from "./AllowanceFields";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Edit3, 
   Clock, 
@@ -17,10 +19,10 @@ import {
   User,
   MessageSquare
 } from "lucide-react";
-import { MonthlyStatement, updateManualStatement } from "./actions";
+import { MonthlyStatement, getStaffPayrollDefaultValues, updateManualStatement } from "./actions";
 import { getMonthlySales, SalesRecord } from "../sales/actions";
 import { toast } from "sonner";
-import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { calculatePayrollTaxes } from "@/lib/tax-calculator";
 
@@ -41,20 +43,10 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   // @ts-ignore
   const [blogAllowance, setBlogAllowance] = useState((stmt.details.blog_allowance || 0).toString());
   
-  const allocated = 
-    (stmt.details.transport_fee || 0) + 
-    (stmt.details.nomination_reward || 0) + 
-    // @ts-ignore
-    (stmt.details.review_allowance || 0) + 
-    // @ts-ignore
-    (stmt.details.blog_allowance || 0) + 
-    // @ts-ignore
-    (stmt.details.executive_allowance || 0);
-  const unallocated = (stmt.total_allowances || 0) - allocated;
-  const initialExecutive = (stmt.details.executive_allowance || 0) + (unallocated > 0 ? unallocated : 0);
-
-  // @ts-ignore
-  const [executiveAllowance, setExecutiveAllowance] = useState(initialExecutive.toString());
+  const [executiveAllowance, setExecutiveAllowance] = useState((stmt.details.executive_allowance || 0).toString());
+  const [businessAllowance, setBusinessAllowance] = useState((stmt.details.business_allowance || 0).toString());
+  const [attendanceAllowance, setAttendanceAllowance] = useState((stmt.details.attendance_allowance || 0).toString());
+  const [separateAllowanceDisplay, setSeparateAllowanceDisplay] = useState(stmt.allowance_display_mode === "separate");
   const [taxAddition, setTaxAddition] = useState((stmt.details.tax_addition || 0).toString());
 
   // Deductions State (Salary only)
@@ -71,6 +63,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   // Metrics State
   const [workedDays, setWorkedDays] = useState(stmt.details.metrics?.worked_days?.toString() || "");
   const [workedHours, setWorkedHours] = useState(stmt.details.metrics?.worked_hours?.toString() || "0");
+  const [paidLeaves, setPaidLeaves] = useState(stmt.details.metrics?.paid_leaves?.toString() || "0");
   const [hourlyWage, setHourlyWage] = useState(stmt.details.hourly_wage?.toString() || "0");
   const [workLocation, setWorkLocation] = useState(stmt.work_location || "");
   const [note, setNote] = useState(stmt.note || "");
@@ -81,6 +74,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const [productSalesRecords, setProductSalesRecords] = useState<SalesRecord[]>([]);
   const [allSalesRecords, setAllSalesRecords] = useState<SalesRecord[]>([]);
   const [showProductSales, setShowProductSales] = useState(false);
+  const [payrollBreakdown, setPayrollBreakdown] = useState<any>(null);
 
   // Prefill hourly wage from staff profile and fetch contract type on open
   useEffect(() => {
@@ -104,13 +98,6 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
             }
           }
 
-          // Fetch contract type
-          const contractsSnap = await getDocs(query(collection(db, "staff_contracts"), where("staff_id", "==", stmt.staff_id)));
-          if (!contractsSnap.empty) {
-            const contractDataDb = contractsSnap.docs[0].data();
-            setContractType(contractDataDb.contract_type || "");
-            setContractData(contractDataDb);
-          }
         } catch (err) {
           console.error("Error fetching staff wage or contract:", err);
         }
@@ -119,6 +106,25 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
 
       const [year, month] = stmt.target_month.split('-');
       if (year && month) {
+        getStaffPayrollDefaultValues(stmt.staff_id, Number(year), Number(month)).then(res => {
+          if (res.success && res.data) {
+            const defaults = res.data;
+            setPayrollBreakdown(defaults);
+            setContractType(defaults.contract_type || "");
+            setContractData(defaults.contract || null);
+            if (defaults.contract_type === "monthly" || defaults.contract_type === "tier_monthly") {
+              setManualMonthlyBase((defaults.contract?.monthly_base_salary || 0).toString());
+            } else {
+              setHourlyBasePay((stmt.base_amount - (stmt.details.base_tech_salary || 0) - (stmt.details.base_product_salary || 0)).toString());
+            }
+            if (stmt.details.business_allowance === undefined) {
+              setBusinessAllowance((defaults.businessAllowance || 0).toString());
+            }
+            if (stmt.details.attendance_allowance === undefined) {
+              setAttendanceAllowance((defaults.attendanceAllowance || 0).toString());
+            }
+          }
+        });
         getMonthlySales(Number(year), Number(month)).then(sales => {
           const matchedSales = sales.filter(s => 
             (s.staff_id === stmt.staff_id || s.staff_name === stmt.staff_name)
@@ -128,13 +134,6 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
         });
       }
 
-      // Initialize hourlyBasePay after contractType is determined
-      if (stmt.type === "salary" && contractType !== "monthly" && contractType !== "tier_monthly") {
-         setHourlyBasePay((stmt.base_amount - (stmt.details.base_tech_salary || 0) - (stmt.details.base_product_salary || 0)).toString());
-      } else {
-         const baseVal = (contractData?.monthly_base_salary ?? (stmt.base_amount - (stmt.details.base_tech_salary || 0) - (stmt.details.base_product_salary || 0)));
-         setManualMonthlyBase(baseVal.toString());
-      }
     }
   }, [isOpen, stmt.staff_id, stmt.staff_name, stmt.target_month]);
 
@@ -142,9 +141,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const handleRecalculateTaxes = () => {
     const baseVal = (Number(techSalary) || 0) + (Number(productSalary) || 0);
     const transportVal = Number(transportAllowance) || 0;
-    const fixedAllowances = (contractType === "monthly" || contractType === "tier_monthly")
-      ? ((contractData?.business_allowance || 0) + (contractData?.attendance_allowance || 0))
-      : 0;
+    const fixedAllowances = (Number(businessAllowance) || 0) + (Number(attendanceAllowance) || 0);
 
     const otherAllowances = (Number(nominationAllowance) || 0) + 
                             (Number(reviewAllowance) || 0) + 
@@ -182,12 +179,14 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const numReview = Number(reviewAllowance) || 0;
   const numBlog = Number(blogAllowance) || 0;
   const numExecutive = Number(executiveAllowance) || 0;
-  const fixedAllowances = (contractType === "monthly" || contractType === "tier_monthly")
-    ? ((contractData?.business_allowance || 0) + (contractData?.attendance_allowance || 0))
-    : 0;
+  const numBusiness = Number(businessAllowance) || 0;
+  const numAttendance = Number(attendanceAllowance) || 0;
+  const fixedAllowances = numBusiness + numAttendance;
   const numAllowance = numTransport + numNomination + numReview + numBlog + numExecutive + fixedAllowances;
 
-  const numTaxAdd = Number(taxAddition) || 0;
+  // 消費税加算は業務委託報酬だけに適用する。給与明細に過去の値が
+  // 保存されていても、画面表示・再保存時には必ず 0 とする。
+  const numTaxAdd = stmt.type === "reward" ? (Number(taxAddition) || 0) : 0;
 
   const numHealth = stmt.type === "salary" ? (Number(health) || 0) : 0;
   const numPension = stmt.type === "salary" ? (Number(pension) || 0) : 0;
@@ -228,6 +227,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
         work_location: workLocation,
         note: note,
         status: status,
+        allowance_display_mode: separateAllowanceDisplay ? "separate" as const : "combined" as const,
         adjustments: {
           ...stmt.adjustments,
           transport_fee_override: numTransport,
@@ -252,6 +252,8 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
           blog_allowance: numBlog,
           // @ts-ignore
           executive_allowance: numExecutive,
+          business_allowance: numBusiness,
+          attendance_allowance: numAttendance,
           tax_addition: numTaxAdd,
           hourly_wage: Number(hourlyWage) || 0,
           social_insurance: stmt.type === "salary" ? {
@@ -265,7 +267,8 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
           metrics: {
             ...stmt.details.metrics,
             worked_days: Number(workedDays) || undefined,
-            worked_hours: Number(workedHours) || undefined
+            worked_hours: Number(workedHours) || undefined,
+            paid_leaves: Number(paidLeaves) || 0
           }
         }
       };
@@ -306,20 +309,29 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
               onClick={async () => {
                 const toastId = toast.loading("最新のデータを取得中...");
                 const [year, month] = stmt.target_month.split('-');
-                const { getStaffPayrollDefaultValues } = await import('./actions');
                 const res = await getStaffPayrollDefaultValues(stmt.staff_id, Number(year), Number(month));
                 if (res.success && res.data) {
                   const d = res.data as any;
+                  setPayrollBreakdown(d);
                   setTransportAllowance((d.transportAllowance || 0).toString());
                   setNominationAllowance((d.nominationAllowance || 0).toString());
                   setReviewAllowance((d.reviewAllowance || 0).toString());
                   setBlogAllowance((d.blogAllowance || 0).toString());
                   setExecutiveAllowance((d.executiveAllowance || 0).toString());
-                  setTechSalary((d.base_amount - (d.details?.base_product_salary || d.baseProductSalary || 0)).toString());
-                  setProductSalary((d.details?.base_product_salary || d.baseProductSalary || 0).toString());
+                  setBusinessAllowance((d.businessAllowance || 0).toString());
+                  setAttendanceAllowance((d.attendanceAllowance || 0).toString());
+                  const contractBase = d.contract?.monthly_base_salary || 0;
+                  if (d.contract_type === "monthly" || d.contract_type === "tier_monthly") {
+                    setManualMonthlyBase(contractBase.toString());
+                    setTechSalary((d.techIncentive || 0).toString());
+                  } else {
+                    setTechSalary((d.techIncentive || d.base_amount || 0).toString());
+                  }
+                  setProductSalary((d.productCommission || 0).toString());
                   setTaxAddition((d.taxAddition || 0).toString());
                   setWorkedDays((d.workedDays || "").toString());
                   setWorkedHours((d.workedHours || "0").toString());
+                  setPaidLeaves((d.paidLeaves || 0).toString());
                   setHourlyWage((d.hourly_wage || 0).toString());
                   if (d.health !== undefined) setHealth((d.health || 0).toString());
                   if (d.pension !== undefined) setPension((d.pension || 0).toString());
@@ -434,11 +446,11 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold text-slate-500 block">固定手当 合計</span>
                   <div className="h-9 flex items-center justify-start px-3 bg-white border border-slate-200 rounded-lg text-xs font-extrabold text-slate-700 tabular-nums">
-                    ¥{((contractData?.business_allowance || 0) + (contractData?.attendance_allowance || 0)).toLocaleString()}
+                    ¥{((Number(businessAllowance) || 0) + (Number(attendanceAllowance) || 0)).toLocaleString()}
                   </div>
-                  {((contractData?.business_allowance || 0) > 0 || (contractData?.attendance_allowance || 0) > 0) && (
+                  {((Number(businessAllowance) || 0) > 0 || (Number(attendanceAllowance) || 0) > 0) && (
                     <span className="text-[9px] text-slate-400 block mt-0.5">
-                      (業務手当: ¥{(contractData?.business_allowance || 0).toLocaleString()} / 皆勤手当: ¥{(contractData?.attendance_allowance || 0).toLocaleString()})
+                      (業務手当: ¥{(Number(businessAllowance) || 0).toLocaleString()} / 皆勤手当: ¥{(Number(attendanceAllowance) || 0).toLocaleString()})
                     </span>
                   )}
                 </div>
@@ -489,6 +501,51 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                   className="h-10 text-xs rounded-lg font-bold border-slate-200 focus:ring-blue-500"
                   placeholder="0"
                 />
+                {payrollBreakdown && (
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-[10px] text-slate-600 space-y-2">
+                    <p className="font-extrabold text-slate-700 border-b border-slate-200 pb-1">売上・インセンティブ計算内訳</p>
+                    <div className="space-y-0.5">
+                      <p>当月総技術売上（税抜）: <strong>¥{Math.floor((Object.values(payrollBreakdown.storeSalesBreakdown || {}) as any[]).reduce((sum, store) => sum + (store.techSales || 0), 0) / 1.1).toLocaleString()}</strong></p>
+                      <p>当月総商品売上（税込）: <strong>¥{(Object.values(payrollBreakdown.storeSalesBreakdown || {}) as any[]).reduce((sum, store) => sum + (store.productSales || 0), 0).toLocaleString()}</strong></p>
+                      <p>技術インセンティブ: <strong className="text-blue-700">¥{(payrollBreakdown.techIncentive || 0).toLocaleString()}</strong></p>
+                    </div>
+                    {(payrollBreakdown.productSalesBreakdownItems || []).length > 0 && (
+                      <div className="border-t border-slate-200 pt-1.5 space-y-1">
+                        <p className="font-bold text-slate-700">商品別売上明細（店販手当）</p>
+                        {payrollBreakdown.productSalesBreakdownItems.map((item: any, idx: number) => {
+                          const base = item.commissionBase ?? Math.floor(item.price / 1.1);
+                          const commission = item.commission ?? Math.floor(base * 0.1);
+                          return (
+                            <div key={idx} className="flex justify-between items-center gap-2 border-b border-slate-100 pb-0.5 group/item">
+                              <span className="truncate">・{item.name}（{item.store}）</span>
+                              <div className="flex items-center gap-1.5 shrink-0 tabular-nums">
+                                <span>¥{item.price.toLocaleString()}（税抜 ¥{base.toLocaleString()}）→ <strong className="text-emerald-700">¥{commission.toLocaleString()}</strong></span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!confirm(`「${item.name}」を店販手当の対象から外しますか？`)) return;
+                                    const updated = payrollBreakdown.productSalesBreakdownItems.filter((_: any, itemIndex: number) => itemIndex !== idx);
+                                    const updatedCommission = updated.reduce((sum: number, current: any) => {
+                                      const currentBase = current.commissionBase ?? Math.floor(current.price / 1.1);
+                                      return sum + (current.commission ?? Math.floor(currentBase * 0.1));
+                                    }, 0);
+                                    setPayrollBreakdown({ ...payrollBreakdown, productSalesBreakdownItems: updated, productCommission: updatedCommission });
+                                    setProductSalary(updatedCommission.toString());
+                                  }}
+                                  className="text-rose-500 hover:text-rose-700 font-bold px-1 hover:bg-rose-50 rounded"
+                                  title="店販手当から除外する"
+                                  aria-label={`${item.name}を店販手当から除外`}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {stmt.type === "reward" && (() => {
                   const defaultRatio = contractData?.tech_sales_ratio || 0;
                   const menuSpecificRates = contractData?.menu_specific_rates || [];
@@ -581,7 +638,14 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                 })()}
               </div>
 
-              <div className="space-y-1">
+              <AllowanceFields
+                isSalary={stmt.type === "salary"}
+                values={{ transport: transportAllowance, nomination: nominationAllowance, review: reviewAllowance, blog: blogAllowance, executive: executiveAllowance, business: businessAllowance, attendance: attendanceAllowance }}
+                onChange={(key: keyof AllowanceValues, value) => ({ transport: setTransportAllowance, nomination: setNominationAllowance, review: setReviewAllowance, blog: setBlogAllowance, executive: setExecutiveAllowance, business: setBusinessAllowance, attendance: setAttendanceAllowance })[key](value)}
+                separateDisplay={separateAllowanceDisplay}
+                onSeparateDisplayChange={setSeparateAllowanceDisplay}
+              />
+              {false && <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 block mb-1">手当の内訳 (円)</label>
                 <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
                   <div className="space-y-1">
@@ -624,7 +688,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                       className="h-8 text-xs rounded font-bold border-slate-200"
                     />
                   </div>
-                  <div className="space-y-1 col-span-2">
+                  <div className="space-y-1">
                     <span className="text-[9px] text-slate-400 font-bold block">役職・その他</span>
                     <Input 
                       type="number" 
@@ -634,8 +698,41 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                       className="h-8 text-xs rounded font-bold border-slate-200"
                     />
                   </div>
+                  <div className="space-y-1">
+                    <span className="text-[9px] text-slate-400 font-bold block">業務手当</span>
+                    <Input
+                      type="number"
+                      placeholder="業務手当"
+                      value={businessAllowance}
+                      onChange={(e) => setBusinessAllowance(e.target.value)}
+                      className="h-8 text-xs rounded font-bold border-slate-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[9px] text-slate-400 font-bold block">皆勤手当</span>
+                    <Input
+                      type="number"
+                      placeholder="皆勤手当"
+                      value={attendanceAllowance}
+                      onChange={(e) => setAttendanceAllowance(e.target.value)}
+                      className="h-8 text-xs rounded font-bold border-slate-200"
+                    />
+                  </div>
+                  {stmt.type === "salary" && (
+                    <label className="col-span-2 flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50/70 p-2.5 cursor-pointer">
+                      <Checkbox
+                        checked={separateAllowanceDisplay}
+                        onCheckedChange={(checked) => setSeparateAllowanceDisplay(checked === true)}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        <span className="block text-[10px] font-bold text-slate-700">給与明細で固定給の内訳を個別表示する</span>
+                        <span className="block text-[9px] text-slate-500 mt-0.5">ベース給・皆勤手当・業務手当を別々の行で表示します</span>
+                      </span>
+                    </label>
+                  )}
                 </div>
-              </div>
+              </div>}
 
               {stmt.type === "reward" ? (
                 <div className="space-y-1">
@@ -650,7 +747,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
               ) : (
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 block">出勤実績（任意入力）</label>
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <Input 
                       type="number" 
                       placeholder="日数"
@@ -665,7 +762,18 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                       onChange={(e) => setWorkedHours(e.target.value)}
                       className="h-10 text-xs rounded-lg text-center"
                     />
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      placeholder="有給日数"
+                      value={paidLeaves}
+                      onChange={(e) => setPaidLeaves(e.target.value)}
+                      className="h-10 text-xs rounded-lg text-center"
+                      aria-label="有給取得日数"
+                    />
                   </div>
+                  <p className="text-[9px] text-slate-400">出勤日数 / 勤務時間 / 有給取得日数（シフトの「有給」から自動反映・手入力可）</p>
                 </div>
               )}
             </div>

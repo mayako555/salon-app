@@ -101,6 +101,17 @@ export async function upsertContract(data: Partial<StaffContract>, saveMode: "ad
     const upsertPromise = async () => {
       if (data.id) {
         if (saveMode === "add_history") {
+          const currentDocRef = doc(db, CONTRACTS_COLLECTION, data.id);
+          const currentSnapshot = await getDoc(currentDocRef);
+          const currentContract = currentSnapshot.exists() ? currentSnapshot.data() : null;
+
+          // 適用開始日が同じ変更は新しい履歴ではなく、現在の契約を更新する。
+          // 同日契約の重複と、valid_to が開始日前日になる矛盾を防止する。
+          if (currentContract?.valid_from === contractData.valid_from) {
+            actionType = "UPDATE";
+            recordId = data.id;
+            await updateTenantOwnedDoc(currentDocRef, contractData);
+          } else {
           // 1. Calculate the day before the new valid_from date
           const newValidFromDate = new Date(contractData.valid_from);
           newValidFromDate.setDate(newValidFromDate.getDate() - 1);
@@ -117,6 +128,7 @@ export async function upsertContract(data: Partial<StaffContract>, saveMode: "ad
             created_at: serverTimestamp()
           });
           recordId = newDocRef.id;
+          }
         } else {
           // Overwrite mode
           actionType = "UPDATE";

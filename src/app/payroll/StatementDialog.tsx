@@ -257,22 +257,38 @@ export default function StatementDialog({ stmt }: { stmt: MonthlyStatement }) {
                        // @ts-ignore
                        (stmt.details.blog_allowance || 0) + 
                        // @ts-ignore
-                       (stmt.details.executive_allowance || 0);
+                       (stmt.details.executive_allowance || 0) +
+                       (stmt.details.business_allowance || 0) +
+                       (stmt.details.attendance_allowance || 0);
                      
                      const unallocated = Math.max(0, stmt.total_allowances - allocated);
                      const baseSalaryOnly = stmt.base_amount - (stmt.details.base_tech_salary || 0) - (stmt.details.base_product_salary || 0);
                      // @ts-ignore
-                     const bundledBasicSalary = baseSalaryOnly + unallocated;
+                     const businessAllowance = stmt.details.business_allowance || 0;
+                     const attendanceAllowance = stmt.details.attendance_allowance || 0;
+                     const bundledBasicSalary = baseSalaryOnly + businessAllowance + attendanceAllowance + unallocated;
+                     const showSeparateAllowances = stmt.allowance_display_mode === "separate";
 
                      return (
                        <>
-                         {stmt.type === "salary" && (
+                         {stmt.type === "salary" && !showSeparateAllowances && (
                            <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-2">
                              <div className="text-xs">
                                <div className="font-bold">基本給</div>
                                <div className="text-[10px] text-slate-500 scale-90 origin-left">(ベース給＋皆勤手当＋業務手当)</div>
                              </div>
                              <span>{bundledBasicSalary.toLocaleString()}</span>
+                           </div>
+                         )}
+                         {stmt.type === "salary" && showSeparateAllowances && (
+                           <div className="border-b border-slate-100 pb-2 mb-2 space-y-1">
+                             <div className="text-xs font-bold mb-1">基本給</div>
+                             <div className="flex justify-between text-xs font-normal"><span>ベース給</span><span>{baseSalaryOnly.toLocaleString()}</span></div>
+                             <div className="flex justify-between text-xs font-normal"><span>皆勤手当</span><span>{attendanceAllowance.toLocaleString()}</span></div>
+                             <div className="flex justify-between text-xs font-normal"><span>業務手当</span><span>{businessAllowance.toLocaleString()}</span></div>
+                             {unallocated > 0 && (
+                               <div className="flex justify-between text-xs font-normal"><span>その他手当</span><span>{unallocated.toLocaleString()}</span></div>
+                             )}
                            </div>
                          )}
                          {stmt.details.base_tech_salary > 0 && (

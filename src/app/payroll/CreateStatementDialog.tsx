@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import AllowanceFields, { AllowanceValues } from "./AllowanceFields";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Calculator, Calendar, User, ShieldAlert, BadgeCheck, Clock } from "lucide-react";
 import { createManualStatement, getStaffPayrollDefaultValues } from "./actions";
@@ -49,6 +51,7 @@ export default function CreateStatementDialog({
   const [executiveAllowance, setExecutiveAllowance] = useState("");
   const [businessAllowance, setBusinessAllowance] = useState("");
   const [attendanceAllowance, setAttendanceAllowance] = useState("");
+  const [separateAllowanceDisplay, setSeparateAllowanceDisplay] = useState(false);
   const [techIncentive, setTechIncentive] = useState("");
   const [productCommission, setProductCommission] = useState("");
   const [taxAddition, setTaxAddition] = useState("");
@@ -67,6 +70,7 @@ export default function CreateStatementDialog({
   // Metrics State
   const [workedDays, setWorkedDays] = useState("");
   const [workedHours, setWorkedHours] = useState("");
+  const [paidLeaves, setPaidLeaves] = useState("");
   const [hourlyWage, setHourlyWage] = useState("");
   const [workLocation, setWorkLocation] = useState("");
   const [note, setNote] = useState("");
@@ -82,7 +86,7 @@ export default function CreateStatementDialog({
   const [contractType, setContractType] = useState<string>("");
   const [contractData, setContractData] = useState<any>(null);
 
-  const [productSalesItems, setProductSalesItems] = useState<{ name: string, price: number, store: string }[]>([]);
+  const [productSalesItems, setProductSalesItems] = useState<{ name: string, price: number, store: string, commissionBase?: number, commission?: number }[]>([]);
 
   // Reward Assistant State
   const [techSales, setTechSales] = useState("");
@@ -224,6 +228,7 @@ export default function CreateStatementDialog({
           
           setWorkedDays(d.workedDays.toString());
           setWorkedHours(d.workedHours.toString());
+          setPaidLeaves((d.paidLeaves || 0).toString());
           setHourlyWage(d.hourly_wage ? d.hourly_wage.toString() : "0");
           setWorkLocation(d.work_location || "");
 
@@ -313,6 +318,10 @@ export default function CreateStatementDialog({
       setChildcare("0");
       return;
     }
+
+    // Consumption-tax additions apply to contractor rewards only.
+    // Clear any value left behind when switching the form to salary/part-time payroll.
+    setTaxAddition("0");
 
     const baseVal = Number(baseAmount) || 0;
     const transportVal = Number(transportAllowance) || 0;
@@ -434,6 +443,7 @@ export default function CreateStatementDialog({
         total_allowances: numAllowance,
         total_deductions: totalDeductions,
         final_paid_amount: finalPaidAmount,
+        allowance_display_mode: separateAllowanceDisplay ? "separate" as const : "combined" as const,
         status: "draft",
         adjustments: {
           transport_fee_override: numTransport,
@@ -473,7 +483,8 @@ export default function CreateStatementDialog({
             nomination_count: 0,
             cashless_sales_total: (Number(techCashless) || 0) + (Number(productCashless) || 0),
             worked_days: Number(workedDays) || undefined,
-            worked_hours: Number(workedHours) || undefined
+            worked_hours: Number(workedHours) || undefined,
+            paid_leaves: Number(paidLeaves) || 0
           }
         }
       };
@@ -503,6 +514,7 @@ export default function CreateStatementDialog({
         setChildcare("");
         setWorkedDays("");
         setWorkedHours("");
+        setPaidLeaves("");
         setWorkLocation("");
         setNote("");
         setAlreadyPaidAmount("");
@@ -818,7 +830,7 @@ export default function CreateStatementDialog({
                   />
                 </div>
 
-                {type === "salary" && (contractType === "monthly" || contractType === "tier_monthly") && (
+                {type === "salary" && (
                   <div className="space-y-2">
                     <div className="grid grid-cols-2 gap-2 bg-rose-50/30 p-2 rounded-lg border border-rose-100/50">
                       <div className="space-y-1">
@@ -905,20 +917,8 @@ export default function CreateStatementDialog({
                               <div className="space-y-1 mb-2">
                                 <p className="text-[9.5px] font-extrabold text-slate-700 border-b border-slate-100 pb-0.5">商品別売上明細 (10%手当対象):</p>
                                 {productSalesItems.map((item, idx) => {
-                                  let netPrice = Math.floor(item.price / 1.1);
-                                  let comm = Math.floor(netPrice * 0.1);
-                                   
-                                   // Jasminash/Jasmine Lash custom products calculations: coating (1500 -> 150) and lilju (4300 -> 430)
-                                   const isJasmineLash = (item.store || "").toLowerCase().includes("jasmine") || (item.store || "").toLowerCase().includes("jasminash");
-                                   if (isJasmineLash) {
-                                     if (item.name.includes("コーティング")) {
-                                       netPrice = 1500;
-                                       comm = 150;
-                                     } else if (item.name.includes("リルジュ")) {
-                                       netPrice = 4300;
-                                       comm = 430;
-                                     }
-                                   }
+                                  const netPrice = item.commissionBase ?? Math.floor(item.price / 1.1);
+                                  const comm = item.commission ?? Math.floor(netPrice * 0.1);
                                   return (
                                     <div key={idx} className="flex justify-between items-center text-[9px] border-b border-slate-50 pb-0.5 group/item">
                                       <span className="truncate max-w-[180px] text-slate-600 font-bold">・{item.name} ({item.store})</span>
@@ -934,7 +934,10 @@ export default function CreateStatementDialog({
                                               setProductSalesItems(updated);
                                               // Recalculate total sales and commission
                                               const newTotalSales = updated.reduce((sum, current) => sum + current.price, 0);
-                                              const newComm = updated.reduce((sum, current) => sum + Math.floor(Math.floor(current.price / 1.1) * 0.1), 0);
+                                              const newComm = updated.reduce((sum, current) => {
+                                                const base = current.commissionBase ?? Math.floor(current.price / 1.1);
+                                                return sum + (current.commission ?? Math.floor(base * 0.1));
+                                              }, 0);
                                               
                                               setProductSales(newTotalSales > 0 ? newTotalSales.toString() : "0");
                                               setProductCommission(newComm.toString());
@@ -991,7 +994,14 @@ export default function CreateStatementDialog({
                 )}
               </div>
 
-              <div className="space-y-1">
+              <AllowanceFields
+                isSalary={type === "salary"}
+                values={{ transport: transportAllowance, nomination: nominationAllowance, review: reviewAllowance, blog: blogAllowance, executive: executiveAllowance, business: businessAllowance, attendance: attendanceAllowance }}
+                onChange={(key: keyof AllowanceValues, value) => ({ transport: setTransportAllowance, nomination: setNominationAllowance, review: setReviewAllowance, blog: setBlogAllowance, executive: setExecutiveAllowance, business: setBusinessAllowance, attendance: setAttendanceAllowance })[key](value)}
+                separateDisplay={separateAllowanceDisplay}
+                onSeparateDisplayChange={setSeparateAllowanceDisplay}
+              />
+              {false && <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 block mb-1">手当の内訳 (円)</label>
                 <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
                   <div className="space-y-1">
@@ -1066,10 +1076,21 @@ export default function CreateStatementDialog({
                           className="h-8 text-xs rounded font-bold border-slate-200"
                         />
                       </div>
+                      <label className="col-span-2 flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50/70 p-2.5 cursor-pointer">
+                        <Checkbox
+                          checked={separateAllowanceDisplay}
+                          onCheckedChange={(checked) => setSeparateAllowanceDisplay(checked === true)}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className="block text-[10px] font-bold text-slate-700">給与明細で固定給の内訳を個別表示する</span>
+                          <span className="block text-[9px] text-slate-500 mt-0.5">ベース給・皆勤手当・業務手当を別々の行で表示します</span>
+                        </span>
+                      </label>
                     </>
                   )}
                 </div>
-              </div>
+              </div>}
 
               {type === "reward" ? (
                 <div className="space-y-1">
@@ -1085,7 +1106,7 @@ export default function CreateStatementDialog({
               ) : (
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 block">出勤実績（任意入力）</label>
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <Input 
                       type="number" 
                       placeholder="日数"
@@ -1100,7 +1121,18 @@ export default function CreateStatementDialog({
                       onChange={(e) => setWorkedHours(e.target.value)}
                       className="h-10 text-xs rounded-lg text-center"
                     />
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      placeholder="有給日数"
+                      value={paidLeaves}
+                      onChange={(e) => setPaidLeaves(e.target.value)}
+                      className="h-10 text-xs rounded-lg text-center"
+                      aria-label="有給取得日数"
+                    />
                   </div>
+                  <p className="text-[9px] text-slate-400">出勤日数 / 勤務時間 / 有給取得日数（シフトの「有給」から自動反映・手入力可）</p>
                 </div>
               )}
             </div>

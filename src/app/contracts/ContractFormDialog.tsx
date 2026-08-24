@@ -22,7 +22,9 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
   const [contractType, setContractType] = useState<StaffContract["contract_type"]>(
     contract?.contract_type || "outsourcing"
   );
-  const [saveMode, setSaveMode] = useState<"add_history" | "overwrite">("add_history");
+  // 編集時の通常操作は既存契約の更新とする。同じ適用開始日の履歴が
+  // 重複すると、一覧や給与計算が古い契約を選ぶ原因になるため。
+  const [saveMode, setSaveMode] = useState<"add_history" | "overwrite">(contract ? "overwrite" : "add_history");
   const [staffId, setStaffId] = useState(contract?.staff_id || "");
 
   // Auto-fill states
@@ -355,20 +357,20 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
                 </>
               )}
 
-              {(contractType === "outsourcing" || contractType === "tier_monthly") && (
+              {(contractType === "outsourcing" || contractType === "monthly" || contractType === "tier_monthly") && (
                 <>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">技術売上還元率（％）</label>
                     <input type="number" step="0.1" value={techSalesRatio} onChange={(e) => setTechSalesRatio(Number(e.target.value))} className="w-full h-10 px-3 border border-slate-300 rounded-md outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">還元発生しきい値（円）</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">技術歩合の到達値（税込・円）</label>
                     <input type="number" value={techSalesThreshold} onChange={(e) => setTechSalesThreshold(Number(e.target.value))} placeholder="500,000" className="w-full h-10 px-3 border border-slate-300 rounded-md outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
                   </div>
                 </>
               )}
               
-              {(contractType === "outsourcing" || contractType === "tier_monthly") && (
+              {(contractType === "outsourcing" || contractType === "monthly" || contractType === "tier_monthly") && (
                 <div className="col-span-2 space-y-3 mt-2">
                   <div className="flex justify-between items-center">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">メニュー別特別歩合設定 (例外ルール)</label>

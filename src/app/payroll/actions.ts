@@ -24,6 +24,7 @@ import { getMonthlyShifts, ShiftRecord } from "@/app/shifts/actions";
 import { addAuditLog } from "@/app/audit/actions";
 import { calculatePayrollTaxes } from "@/lib/tax-calculator";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+import { getCurrentUserContext } from "@/lib/auth-server";
 
 
 function normalizeStaffName(name: string) {
@@ -78,6 +79,7 @@ export type MonthlyStatement = {
   is_transferred?: boolean;
   work_location?: string;
   note?: string;
+  allowance_display_mode?: "combined" | "separate";
   adjustments?: {
     tech_cashless_sales_override?: number;
     retail_cashless_sales_override?: number;
@@ -102,6 +104,8 @@ export type MonthlyStatement = {
     review_allowance?: number;
     blog_allowance?: number;
     executive_allowance?: number;
+    business_allowance?: number;
+    attendance_allowance?: number;
     social_insurance?: {
       employment: number;
       health: number;
@@ -118,6 +122,7 @@ export type MonthlyStatement = {
       cashless_sales_total: number;
       worked_days?: number;
       worked_hours?: number;
+      paid_leaves?: number;
     };
   };
   created_at: any;
@@ -178,15 +183,26 @@ export async function getAllStatements(): Promise<MonthlyStatement[]> {
   }
 }
 
-function calculateProductCommission(sales: any[], contract: any, cashlessRetail: number, rules: any[] = []) {
+function getJasmineProductCommission(name: string, price: number, companyId?: string) {
+  if (companyId !== "company_default") return null;
+
+  const normalizedName = (name || "").replace(/[\s　]+/g, "");
+  // Some imported sales only retain the price and a generic product label.
+  if (normalizedName.includes("コーティング") || price === 1760 || price === 1650) {
+    return { baseAmount: 1500, commission: 150 };
+  }
+  if (normalizedName.includes("リルジュ") || price === 4840 || price === 4730) {
+    return { baseAmount: 4300, commission: 430 };
+  }
+  return null;
+}
+
+function calculateProductCommission(sales: any[], contract: any, cashlessRetail: number, rules: any[] = [], companyId?: string) {
   let customCommission = 0;
   let customOriginalSum = 0;
 
   for (const sale of sales) {
     if (sale.product_sales > 0) {
-      const storeStr = (sale.store_name || sale.store || "").toLowerCase();
-      const isJasmineLash = storeStr.includes("jasmine") || storeStr.includes("jasminash");
-      
       // Parse product_details JSON if available
       let detailsParsed = false;
       if (sale.product_details) {
@@ -198,9 +214,16 @@ function calculateProductCommission(sales: any[], contract: any, cashlessRetail:
               const name = item.name || "";
               const price = item.price || 0;
               let matched = false;
+
+              const jasmineRule = getJasmineProductCommission(name, price, companyId);
+              if (jasmineRule) {
+                customOriginalSum += price;
+                customCommission += jasmineRule.commission;
+                matched = true;
+              }
               
               // Custom rules
-              for (const rule of rules) {
+              for (const rule of matched ? [] : rules) {
                 if (rule.keyword && name.includes(rule.keyword)) {
                   const rulePrice = rule.salesPrice || 0;
                   const baseAmt = rule.baseAmount || rulePrice;
@@ -212,17 +235,6 @@ function calculateProductCommission(sales: any[], contract: any, cashlessRetail:
                 }
               }
               
-              if (!matched) {
-                if (isJasmineLash) {
-                  if (name.includes("コーティング")) {
-                    customCommission += 150;
-                    customOriginalSum += price;
-                  } else if (name.includes("リルジュ")) {
-                    customCommission += 430;
-                    customOriginalSum += price;
-                  }
-                }
-              }
             }
           }
         } catch (e) {
@@ -230,31 +242,25 @@ function calculateProductCommission(sales: any[], contract: any, cashlessRetail:
         }
       }
       
-      // Fallback to menu_course split matching if details not parsed
-      if (!detailsParsed && sale.menu_course) {
-        const menus = sale.menu_course.split(/ \+ |\, /);
-        for (const m of menus) {
-          let matched = false;
-          for (const rule of rules) {
-            if (rule.keyword && m.includes(rule.keyword)) {
+      // Imported sales often have no product_details. Apply at most one product rule
+      // per sales record; menu_course can contain several service names for one product sale.
+      if (!detailsParsed) {
+        const menuCourse = sale.menu_course || "";
+        const jasmineRule = getJasmineProductCommission(menuCourse, sale.product_sales, companyId);
+        if (jasmineRule) {
+          customOriginalSum += sale.product_sales;
+          customCommission += jasmineRule.commission;
+        } else if (menuCourse) {
+          const menus = menuCourse.split(/ \+ |\, /);
+          for (const m of menus) {
+            const rule = rules.find((candidate: any) => candidate.keyword && m.includes(candidate.keyword));
+            if (rule) {
               const price = rule.salesPrice || 0;
               const baseAmt = rule.baseAmount || price;
               const rate = rule.commissionRate || 0;
               customOriginalSum += price;
               customCommission += Math.floor(baseAmt * (rate / 100));
-              matched = true;
               break;
-            }
-          }
-          if (!matched) {
-            if (isJasmineLash) {
-              if (m.includes("コーティング")) {
-                customCommission += 150;
-                customOriginalSum += sale.product_sales;
-              } else if (m.includes("リルジュ")) {
-                customCommission += 430;
-                customOriginalSum += sale.product_sales;
-              }
             }
           }
         }
@@ -284,6 +290,11 @@ function calculateProductCommission(sales: any[], contract: any, cashlessRetail:
 
 export async function generateStatements(year: number, month: number) {
   const targetMonth = `${year}-${String(month).padStart(2, '0')}`;
+  const ctx = await getCurrentUserContext();
+  if (!ctx.companyId) {
+    return { success: false, error: "会社を選択してから給与計算を実行してください。" };
+  }
+  const companyId = ctx.companyId;
   
   // 1. Check if closed
   const colRef = collection(db, STATEMENTS_COLLECTION);
@@ -449,7 +460,7 @@ export async function generateStatements(year: number, month: number) {
         }
       }
       const effectiveCashlessRetail = preservedAdjusts?.retail_cashless_sales_override ?? cashlessProductSales;
-      const productCommission = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules);
+      const productCommission = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules, companyId);
 
       const transportFee = preservedAdjusts?.transport_fee_override ?? transportAllowanceDb;
       const allowanceTotal = transportFee + nominationAllowanceDb + reviewAllowanceDb + blogAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
@@ -460,6 +471,7 @@ export async function generateStatements(year: number, month: number) {
       const finalPaidAmount = intermediatePaidAmount + taxAddition;
 
       const statementPayload = {
+        companyId,
         staff_id: contract.staff_id,
         staff_name: contract.staff_name || "不明",
         target_month: targetMonth,
@@ -529,13 +541,13 @@ export async function generateStatements(year: number, month: number) {
       const techSalesTaxFree = Math.floor(totalTechSales / 1.1);
       const productSalesTaxFree = Math.floor(totalProductSales / 1.1);
       
-      const quota = contract.tech_sales_quota || 0;
+      const quota = contract.tech_sales_threshold || contract.tech_sales_quota || 0;
       let techCommission = 0;
-      if (techSalesTaxFree > quota) {
-         techCommission = Math.floor((techSalesTaxFree - quota) * (contract.tech_sales_ratio / 100));
+      if (totalTechSales > quota) {
+         techCommission = Math.floor((totalTechSales - quota) * (contract.tech_sales_ratio / 100));
       }
       
-      const productCommission = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules);
+      const productCommission = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules, companyId);
       const nominationReward = nominationCount * contract.nomination_fee;
       
       const baseMonthlySalary = contract.monthly_base_salary || 0;
@@ -565,6 +577,7 @@ export async function generateStatements(year: number, month: number) {
       const final_paid = base_amount + allowanceTotal + customAdjustTotal - totalDeductions;
 
       const statementPayload = {
+        companyId,
         staff_id: contract.staff_id,
         staff_name: contract.staff_name || "不明",
         target_month: targetMonth,
@@ -628,7 +641,7 @@ export async function generateStatements(year: number, month: number) {
         }
       }
       
-      const productCommission = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules);
+      const productCommission = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules, companyId);
       
       const nominationReward = nominationCount * contract.nomination_fee;
       const transportFee = preservedAdjusts?.transport_fee_override ?? (transportAllowanceDb > 0 ? transportAllowanceDb : 17950);
@@ -656,6 +669,7 @@ export async function generateStatements(year: number, month: number) {
       const finalPaidAmount = base_amount + allowanceTotal + customAdjustTotal - totalDeductions;
 
       const statementPayload = {
+        companyId,
         staff_id: contract.staff_id,
         staff_name: contract.staff_name || "不明",
         target_month: targetMonth,
@@ -706,7 +720,7 @@ export async function generateStatements(year: number, month: number) {
     const baseTechSalary = Math.floor(commissionableTechSales * (contract.tech_sales_ratio / 100));
     const productCashlessFee = contract.deduction_cashless_ratio > 0 ? Math.floor(effectiveCashlessRetail * (contract.deduction_cashless_ratio / 100)) : 0;
     
-    const baseProductSalary = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules);
+    const baseProductSalary = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules, companyId);
     
     const nominationReward = nominationCount * contract.nomination_fee;
     let baseAmount = baseTechSalary + baseProductSalary + nominationReward;
@@ -733,6 +747,7 @@ export async function generateStatements(year: number, month: number) {
     const finalPaidAmount = taxableSubtotal + taxAddition + afterTaxAllowances + customAdjustTotal;
 
     const statementPayload = {
+      companyId,
       staff_id: contract.staff_id,
       staff_name: contract.staff_name || "不明",
       target_month: targetMonth,
@@ -871,13 +886,29 @@ export async function createManualStatement(data: {
   final_paid_amount: number;
   work_location?: string;
   note?: string;
+  allowance_display_mode?: "combined" | "separate";
   adjustments?: MonthlyStatement["adjustments"];
   details: MonthlyStatement["details"];
 }) {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) {
+      return { success: false, error: "会社を選択してから給与明細を作成してください。" };
+    }
+
     const colRef = collection(db, STATEMENTS_COLLECTION);
+    const existing = await getDocs(query(
+      colRef,
+      where("target_month", "==", data.target_month),
+      where("staff_id", "==", data.staff_id)
+    ));
+    if (!existing.empty) {
+      return { success: false, error: "このスタッフの対象月の明細はすでに作成されています。既存の明細を編集してください。" };
+    }
+
     const docRef = await addTenantOwnedDoc(colRef, {
       ...data,
+      companyId: ctx.companyId,
       status: "draft",
       created_at: serverTimestamp(),
     });
@@ -899,7 +930,8 @@ export async function createManualStatement(data: {
 export async function getStaffPayrollDefaultValues(staffId: string, year: number, month: number) {
   try {
     const { adminDb } = await import("@/lib/firebase-admin");
-    const { getCurrentUserContext } = await import("@/lib/auth-server");
+    const ctx = await getCurrentUserContext();
+    const companyId = ctx.companyId;
 
     // 1. まず getContractsList 経由でテナントフィルタ込みで取得を試みる
     let contracts = await getContractsList();
@@ -907,8 +939,6 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
     // 2. 空の場合 (テナント認証失敗など) は Admin SDK で直接取得するフォールバック
     if (!contracts || contracts.length === 0) {
       try {
-        const ctx = await getCurrentUserContext();
-        const companyId = ctx.companyId;
         let snap: any;
         if (companyId) {
           snap = await adminDb
@@ -970,11 +1000,13 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
     const sales = await getMonthlySales(year, month);
     const allowances = await getMonthlyAllowances(year, month);
     const attendances = await getMonthlyAttendance(year, month);
+    const shifts = await getMonthlyShifts(year, month);
     
     const staffNameNormal = normalizeStaffName(contract.staff_name);
     const staffSales = sales.filter((s: any) => s.staff_name && normalizeStaffName(s.staff_name) === staffNameNormal);
     const staffAllowances = allowances.filter((a: any) => a.staff_name && normalizeStaffName(a.staff_name) === staffNameNormal);
     const staffAttendances = attendances.filter((a: any) => (a.staff_id && contract.staff_id && a.staff_id === contract.staff_id) || (a.staff_name && normalizeStaffName(a.staff_name) === staffNameNormal));
+    const paidLeaves = shifts.filter((s: ShiftRecord) => s.staff_id === contract.staff_id && s.type === "paid_leave").length;
 
     const storesWorkedSet = new Set<string>();
     staffAttendances.forEach((att: any) => {
@@ -992,7 +1024,7 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
       productCashless: number;
     }> = {};
 
-    const productSalesBreakdownItems: { name: string, price: number, store: string }[] = [];
+    const productSalesBreakdownItems: { name: string, price: number, store: string, commissionBase?: number, commission?: number }[] = [];
 
     for (const sale of staffSales) {
       const storeName = sale.store_name || "不明";
@@ -1014,25 +1046,35 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
             const parsed = JSON.parse(sale.product_details);
             if (Array.isArray(parsed)) {
               parsed.forEach((p: any) => {
+                const price = p.price || 0;
+                const jasmineRule = getJasmineProductCommission(p.name || "", price, companyId);
                 productSalesBreakdownItems.push({
                   name: p.name || "店販商品",
-                  price: p.price || 0,
-                  store: storeName
+                  price,
+                  store: storeName,
+                  commissionBase: jasmineRule?.baseAmount,
+                  commission: jasmineRule?.commission
                 });
               });
             }
           } catch (e) {
+            const jasmineRule = getJasmineProductCommission("", sale.product_sales, companyId);
             productSalesBreakdownItems.push({
               name: `店販商品 (${sale.customer_name || "フリー"})`,
               price: sale.product_sales,
-              store: storeName
+              store: storeName,
+              commissionBase: jasmineRule?.baseAmount,
+              commission: jasmineRule?.commission
             });
           }
         } else {
+          const jasmineRule = getJasmineProductCommission("", sale.product_sales, companyId);
           productSalesBreakdownItems.push({
             name: `店販商品 (${sale.customer_name || "フリー"})`,
             price: sale.product_sales,
-            store: storeName
+            store: storeName,
+            commissionBase: jasmineRule?.baseAmount,
+            commission: jasmineRule?.commission
           });
         }
       }
@@ -1151,13 +1193,13 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
       const techSalesTaxFree = Math.floor(totalTechSales / 1.1);
       const productSalesTaxFree = Math.floor(totalProductSales / 1.1);
       
-      const quota = contract.tech_sales_quota || 0;
+      const quota = contract.tech_sales_threshold || contract.tech_sales_quota || 0;
       let techCommission = 0;
-      if (techSalesTaxFree > quota) {
-         techCommission = Math.floor((techSalesTaxFree - quota) * (contract.tech_sales_ratio / 100));
+      if (totalTechSales > quota) {
+         techCommission = Math.floor((totalTechSales - quota) * (contract.tech_sales_ratio / 100));
       }
       
-      const prodCommissionVal = calculateProductCommission(staffSales, contract, 0);
+      const prodCommissionVal = calculateProductCommission(staffSales, contract, 0, productCommissionRules, companyId);
       
       base_amount = contract.monthly_base_salary || 0;
       techIncentive = techCommission;
@@ -1212,7 +1254,7 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
       
       base_amount = baseMonthlySalary;
       techIncentive = incentive;
-      productCommission = calculateProductCommission(staffSales, contract, 0); // standard without cashless deduction filter for default estimation
+      productCommission = calculateProductCommission(staffSales, contract, 0, productCommissionRules, companyId); // standard without cashless deduction filter for default estimation
 
       transportAllowance = transportAllowanceDb > 0 ? transportAllowanceDb : 17950; // Standard transport fee if not entered in DB
 
@@ -1254,7 +1296,7 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
 
       const cashlessProductSalesTmp = staffSales.filter(s => s.payment_method !== "現金" && s.payment_method !== "不明").reduce((sum, s) => sum + s.product_sales, 0);
       const effectiveCashlessRetailTmp = cashlessProductSalesTmp;
-      const baseProductSalary = calculateProductCommission(staffSales, contract, effectiveCashlessRetailTmp);
+      const baseProductSalary = calculateProductCommission(staffSales, contract, effectiveCashlessRetailTmp, productCommissionRules, companyId);
       
       base_amount = baseTechSalary + baseProductSalary;
       techIncentive = baseTechSalary;
@@ -1297,6 +1339,7 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
         childcare,
         workedDays: finalWorkedDays,
         workedHours: finalWorkedHours,
+        paidLeaves,
         hourly_wage: finalHourlyWage,
         work_location: storeLocation,
         storeSalesBreakdown,
@@ -1344,6 +1387,7 @@ export async function updateManualStatement(id: string, data: {
   work_location?: string;
   note?: string;
   status?: "draft" | "closed";
+  allowance_display_mode?: "combined" | "separate";
   adjustments?: MonthlyStatement["adjustments"];
   details: MonthlyStatement["details"];
 }) {
@@ -1364,6 +1408,7 @@ export async function updateManualStatement(id: string, data: {
       final_paid_amount: data.final_paid_amount,
       work_location: data.work_location ?? "",
       note: data.note ?? "",
+      allowance_display_mode: data.allowance_display_mode ?? "combined",
       details: data.details,
       updated_at: serverTimestamp()
     };
