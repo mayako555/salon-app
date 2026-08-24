@@ -127,6 +127,7 @@ export type SalesRecord = {
   merged_into_id?: string;
   companyId?: string; // Tenant isolation
   store_id?: string;
+  product_details?: string; // Stringified JSON array of { name: string, price: number }
   created_at: any; // Firestore Timestamp
 };
 
@@ -598,32 +599,38 @@ export async function importHotPepperCsv(formData: FormData) {
         return parseInt(val.toString().replace(/[^\d-]/g, ""), 10) || 0;
       };
 
-      let techSales = 0, prodSales = 0, discount = 0, hpbPoints = 0, nominationFee = 0;
-      let menuCourses: string[] = [], discountReasons: string[] = [], optionsList: string[] = [];
+       let techSales = 0, prodSales = 0, discount = 0, hpbPoints = 0, nominationFee = 0;
+       let menuCourses: string[] = [], discountReasons: string[] = [], optionsList: string[] = [];
+       const productDetailsList: { name: string, price: number }[] = [];
 
-      groupRows.forEach(row => {
-        const category = String(row["区分"] || "");
-        const amount = parseMoney(row["金額"]);
-        const menu = String(row["メニュー・店販・割引・サービス・オプション"] || "");
-        const isCancel = String(row["会計区分"] || "").includes("取り消し");
-        const val = isCancel ? -Math.abs(amount) : amount;
-        
-        if (category.includes("店販")) prodSales += val;
-        else if (category.includes("割引") || val < 0) {
-          discount += isCancel ? -Math.abs(amount) : Math.abs(amount);
-          if (menu && !discountReasons.includes(menu)) discountReasons.push(menu);
-        } else if (category.includes("施術")) techSales += val;
-        else if (menu.includes("指名料")) nominationFee += val;
-        else techSales += val;
+       groupRows.forEach(row => {
+         const category = String(row["区分"] || "");
+         const amount = parseMoney(row["金額"]);
+         const menu = String(row["メニュー・店販・割引・サービス・オプション"] || "");
+         const isCancel = String(row["会計区分"] || "").includes("取り消し");
+         const val = isCancel ? -Math.abs(amount) : amount;
+         
+         if (category.includes("店販")) {
+           prodSales += val;
+           if (menu) {
+             productDetailsList.push({ name: menu, price: val });
+           }
+         }
+         else if (category.includes("割引") || val < 0) {
+           discount += isCancel ? -Math.abs(amount) : Math.abs(amount);
+           if (menu && !discountReasons.includes(menu)) discountReasons.push(menu);
+         } else if (category.includes("施術")) techSales += val;
+         else if (menu.includes("指名料")) nominationFee += val;
+         else techSales += val;
 
-        if (menu && String(row["カテゴリ"] || "").includes("オプション")) {
-          if (!optionsList.includes(menu)) optionsList.push(menu);
-        } else if (menu && !menuCourses.includes(menu) && !menu.includes("割引") && !menu.includes("指名料") && !category.includes("店販")) {
-          menuCourses.push(menu);
-        }
-        
-        hpbPoints += isCancel ? -Math.abs(parseMoney(row["ポイント使用"])) : Math.abs(parseMoney(row["ポイント使用"]));
-      });
+         if (menu && String(row["カテゴリ"] || "").includes("オプション")) {
+           if (!optionsList.includes(menu)) optionsList.push(menu);
+         } else if (menu && !menuCourses.includes(menu) && !menu.includes("割引") && !menu.includes("指名料") && !category.includes("店販")) {
+           menuCourses.push(menu);
+         }
+         
+         hpbPoints += isCancel ? -Math.abs(parseMoney(row["ポイント使用"])) : Math.abs(parseMoney(row["ポイント使用"]));
+       });
 
       if (groupRows.some(r => String(r["会計区分"] || "").includes("取り消し")) && (techSales + prodSales === 0)) continue;
 
@@ -632,19 +639,20 @@ export async function importHotPepperCsv(formData: FormData) {
 
       const csvTotal = techSales + prodSales + nominationFee - discount;
       
-      // Strict architecture: We only check if THIS EXACT CSV RECORD was already imported.
-      const isAlreadyImported = existingCsvRecords.some(r => {
+       const { getNormalizedStoreName } = require("@/lib/store-utils");
+       const isAlreadyImported = existingCsvRecords.some(r => {
          const rTotal = (r.tech_sales || 0) + (r.product_sales || 0) + (r.nomination_fee || 0) - (r.discount || 0);
-         return r.date === dateFormatted && 
+         return getNormalizedStoreName(r.store_name || "") === getNormalizedStoreName(storeName) && 
+                r.date === dateFormatted && 
                 r.time === timeFormatted && 
                 rTotal === csvTotal && 
                 (r.customer_name === customerName || r.staff_name === staffName);
-      });
+       });
 
-      if (isAlreadyImported) {
-        skipCount++;
-        continue; // Skip this duplicate CSV record
-      }
+       if (isAlreadyImported) {
+         skipCount++;
+         continue; // Skip this duplicate CSV record
+       }
 
       const docRef = doc(colRef);
 
@@ -674,6 +682,7 @@ export async function importHotPepperCsv(formData: FormData) {
         status: "closed",
         source: "hotpepper" as SalesSource,
         merge_status: "CSV_ONLY",
+        product_details: JSON.stringify(productDetailsList),
         created_at: serverTimestamp()
       });
 
@@ -811,22 +820,44 @@ export async function deleteSale(id: string, deletedByStaffName?: string) {
   }
 }
 
-export async function clearMonthlyCsvImports(year: number, month: number) {
+export async function clearMonthlyCsvImports(year: number, month: number, storeName?: string) {
   try {
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
     const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
-    const q = query(collection(db, SALES_COLLECTION), where("date", ">=", startDate), where("date", "<=", endDate));
-    const snapshot = await getDocs(q);
+    
+    const { getNormalizedStoreName } = require("@/lib/store-utils");
+    const targetNormStore = storeName ? getNormalizedStoreName(storeName) : undefined;
+
+    // 1. Delete sales records
+    const salesQ = query(collection(db, SALES_COLLECTION), where("date", ">=", startDate), where("date", "<=", endDate));
+    const salesSnapshot = await getDocs(salesQ);
     const batch = writeBatch(db);
     let count = 0;
-    snapshot.docs.forEach(d => {
-      if (d.data().source === "hotpepper") {
-        batch.delete(d.ref);
-        count++;
+    salesSnapshot.docs.forEach(d => {
+      const data = d.data();
+      if (data.source === "hotpepper") {
+        if (!targetNormStore || getNormalizedStoreName(data.store_name || "") === targetNormStore) {
+          batch.delete(d.ref);
+          count++;
+        }
       }
     });
+    
+    // 2. Delete estimated reservations records
+    const resQ = query(collection(db, "reservations"), where("date", ">=", startDate), where("date", "<=", endDate));
+    const resSnapshot = await getDocs(resQ);
+    resSnapshot.docs.forEach(d => {
+      const data = d.data();
+      if (data.source === "csv_estimated") {
+        if (!targetNormStore || getNormalizedStoreName(data.store_name || "") === targetNormStore) {
+          batch.delete(d.ref);
+        }
+      }
+    });
+
     if (count > 0) await batch.commit();
     revalidatePath("/staff-portal/sales");
+    revalidatePath("/staff-portal/reservations");
     return { success: true, count };
   } catch (error: any) {
     return { success: false, error: error.message };

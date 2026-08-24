@@ -23,7 +23,7 @@ import { getAdvancedAnalytics } from "./actions";
 import { useAuth } from "@/lib/auth-context";
 
 export default function AdvancedCharts() {
-  const { profile, impersonatingCompanyId } = useAuth();
+  const { profile, impersonatingCompanyId, availableStores: authAvailableStores } = useAuth();
   const currentCompanyId = impersonatingCompanyId || profile?.companyId;
   const isJasmineLash = currentCompanyId === "company_default";
 
@@ -104,8 +104,18 @@ export default function AdvancedCharts() {
     chartData.forEach(d => {
       Object.keys(d.stores).forEach(s => storeSet.add(s));
     });
-    return Array.from(storeSet).sort();
-  }, [chartData]);
+    const unsortedStores = Array.from(storeSet);
+    
+    // Sort according to authAvailableStores orders
+    return unsortedStores.sort((a, b) => {
+      const idxA = authAvailableStores.indexOf(a);
+      const idxB = authAvailableStores.indexOf(b);
+      if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+      if (idxA === -1) return 1;
+      if (idxB === -1) return -1;
+      return idxA - idxB;
+    });
+  }, [chartData, authAvailableStores]);
   
   const availableRoutes = useMemo(() => {
     const routeSet = new Set<string>();

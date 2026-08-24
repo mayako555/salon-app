@@ -7,6 +7,7 @@ import { collection, getDocs, query, where, orderBy } from "@/lib/firestore-admi
 import { format, subMonths, addMonths, eachDayOfInterval, isWeekend, getDate, getDay, isAfter, isBefore, addDays, subDays, endOfMonth, startOfMonth, startOfYear } from "date-fns";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { getTenantCollection } from "@/lib/tenant-utils";
+import { getNormalizedStoreName } from "@/lib/store-utils";
 
 // Minimal Matrix Math for Multiple Linear Regression
 function invertMatrix(M: number[][]): number[][] {
@@ -271,7 +272,7 @@ export async function performRegressionAnalysis(params: RegressionParams) {
       }
 
       if (!dailyData[dStr]) return;
-      if (store !== "全店舗" && data.store_name !== store.replace("店", "")) return;
+      if (store !== "全店舗" && getNormalizedStoreName(data.store_name || "") !== getNormalizedStoreName(store)) return;
       
       const sales = dailyData[dStr];
       const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
@@ -293,7 +294,7 @@ export async function performRegressionAnalysis(params: RegressionParams) {
       const mStr = dStr.substring(0, 7);
 
       if (!dailyData[dStr]) return;
-      if (store !== "全店舗" && data.store_name !== store.replace("店", "")) return;
+      if (store !== "全店舗" && getNormalizedStoreName(data.store_name || "") !== getNormalizedStoreName(store)) return;
       if (data.type === "work") {
         dailyData[dStr].staffCount++;
         const staffId = data.staff_id || "unknown";
@@ -628,7 +629,7 @@ export async function performSarimaxForecast(params: SarimaxParams) {
       }
 
       if (!dailyData[dStr]) return;
-      if (store !== "全店舗" && data.store_name !== store.replace("店", "")) return;
+      if (store !== "全店舗" && getNormalizedStoreName(data.store_name || "") !== getNormalizedStoreName(store)) return;
       
       const sales = dailyData[dStr];
       const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
@@ -649,7 +650,7 @@ export async function performSarimaxForecast(params: SarimaxParams) {
       const mStr = dStr.substring(0, 7);
 
       if (!dailyData[dStr]) return;
-      if (store !== "全店舗" && data.store_name !== store.replace("店", "")) return;
+      if (store !== "全店舗" && getNormalizedStoreName(data.store_name || "") !== getNormalizedStoreName(store)) return;
       if (data.type === "work") {
         const staffId = data.staff_id || "unknown";
         let isTrainee = false;
@@ -887,7 +888,7 @@ export async function getRepeatAnalysis(params: RepeatAnalysisParams) {
 
     salesSnap.forEach(doc => {
       const data = doc.data();
-      if (store !== "全店舗" && data.store_name !== store.replace("店", "")) return;
+      if (store !== "全店舗" && getNormalizedStoreName(data.store_name || "") !== getNormalizedStoreName(store)) return;
       
       const customerId = data.customer_id || data.customer_name;
       if (!customerId) return;
@@ -1062,7 +1063,7 @@ export async function predictLTVAndRepeaters(params: LTVForecastParams) {
 
     salesSnap.forEach(doc => {
       const data = doc.data();
-      if (store !== "全店舗" && data.store_name !== store.replace("店", "")) return;
+      if (store !== "全店舗" && getNormalizedStoreName(data.store_name || "") !== getNormalizedStoreName(store)) return;
       
       const cid = data.customer_id || data.customer_name;
       if (!cid) return;
@@ -1309,7 +1310,7 @@ export async function getStaffAnalytics(companyIdParam: string, storeId: string 
     const salesSnap = await salesQuery.get();
     salesSnap.docs.forEach((d: any) => {
       const data = d.data();
-      if (storeId && storeId !== "全店舗" && data.store_name !== storeId) return;
+      if (storeId && storeId !== "全店舗" && getNormalizedStoreName(data.store_name || "") !== getNormalizedStoreName(storeId)) return;
       const sId = data.staff_id;
       if (sId && staffMap.has(sId)) {
         const staff = staffMap.get(sId);
@@ -1388,7 +1389,7 @@ export async function getStoreComparisonAnalytics(companyIdParam: string, period
     const storeMap = new Map();
     salesSnap.docs.forEach((d: any) => {
       const data = d.data();
-      const sName = data.store_name || "不明";
+      const sName = getNormalizedStoreName(data.store_name || "");
       if (!storeMap.has(sName)) {
         storeMap.set(sName, { name: sName, sales: 0, customers: 0, newCustomers: 0, repeatCustomers: 0 });
       }
@@ -1432,7 +1433,7 @@ export async function getReferralAnalytics(companyIdParam: string, storeId: stri
     const referralMap = new Map(); // key: referred_by_id
     custSnap.docs.forEach((d: any) => {
       const data = d.data();
-      if (storeId && storeId !== "全店舗" && data.store_name !== storeId) return;
+      if (storeId && storeId !== "全店舗" && getNormalizedStoreName(data.store_name || "") !== getNormalizedStoreName(storeId)) return;
       if (data.referred_by_id) {
         if (!referralMap.has(data.referred_by_id)) {
           referralMap.set(data.referred_by_id, {
@@ -1514,7 +1515,7 @@ export async function getChannelAnalytics(companyIdParam: string, storeId: strin
     const channelMap = new Map();
     salesSnap.docs.forEach((d: any) => {
       const data = d.data();
-      if (storeId && storeId !== "全店舗" && data.store_name !== storeId) return;
+      if (storeId && storeId !== "全店舗" && getNormalizedStoreName(data.store_name || "") !== getNormalizedStoreName(storeId)) return;
       
       const channel = data.reservation_route || "その他";
       if (!channelMap.has(channel)) {
@@ -1588,9 +1589,9 @@ export async function getMenuAnalytics(companyIdParam: string, period: string, s
       if (data.type === "schedule") return;
 
       const rawStore = data.store_name || "不明";
-      const dataStore = rawStore.endsWith("店") ? rawStore.slice(0, -1) : rawStore;
+      const dataStore = getNormalizedStoreName(rawStore);
       
-      if (store !== "all" && dataStore !== store) return;
+      if (store !== "all" && dataStore !== getNormalizedStoreName(store)) return;
 
       const rawMenu = data.menu_name?.trim() || "(メニュー未設定)";
       let menus = rawMenu.split(",").map((m: string) => m.trim()).filter(Boolean);

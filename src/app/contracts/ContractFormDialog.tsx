@@ -37,6 +37,7 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
   const [techSalesRatio, setTechSalesRatio] = useState(contract?.tech_sales_ratio || (contract?.contract_type === 'outsourcing' ? 50 : 0));
   const [customAllowances, setCustomAllowances] = useState<{name: string, amount: number}[]>(contract?.custom_allowances || []);
   const [menuSpecificRates, setMenuSpecificRates] = useState<{menu_name: string, ratio: number}[]>(contract?.menu_specific_rates || []);
+  const [isProbation, setIsProbation] = useState<boolean>(!!contract?.is_probation);
 
   useEffect(() => {
     if (isOpen) {
@@ -135,7 +136,7 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
         deduction_nomination_fee: formData.get("deduction_nomination_fee") === "on",
         valid_from: formData.get("valid_from") as string,
         valid_to: (formData.get("valid_to") as string) || null,
-        is_probation: formData.get("is_probation") === "on",
+        is_probation: isProbation,
         custom_allowances: customAllowances,
         menu_specific_rates: menuSpecificRates,
       };
@@ -216,7 +217,8 @@ export default function ContractFormDialog({ contract, onClose, isOpen }: Contra
               <input 
                 type="checkbox" 
                 name="is_probation" 
-                defaultChecked={contract?.is_probation} 
+                checked={isProbation}
+                onChange={() => setIsProbation(v => !v)}
                 className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 transition-all group-hover:border-emerald-400" 
               />
               <span className="flex items-center gap-1.5">

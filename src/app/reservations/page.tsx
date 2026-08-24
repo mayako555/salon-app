@@ -76,7 +76,19 @@ export default function ReservationsPage() {
     setDate(new Date());
   };
 
-  const currentStoreReservations = reservations.filter(r => selectedStore === "全店舗" || r.store_name === selectedStore);
+  const getNormalizedStoreName = (rawName: string): string => {
+    if (!rawName) return "不明";
+    const name = rawName.trim().replace(/\s+/g, "");
+    if (name.includes("六甲")) return "Jasmine Lash 六甲店";
+    if (name.includes("神戸")) return "Jasmine Lash 神戸店";
+    if (name.includes("元町") || name.includes("BROW")) return "BROW GYM 元町店";
+    return rawName;
+  };
+
+  const currentStoreReservations = reservations.filter(r => {
+    if (selectedStore === "全店舗") return true;
+    return getNormalizedStoreName(r.store_name) === getNormalizedStoreName(selectedStore);
+  });
 
   const isTenantAdmin = profile?.role === "systemOwner" || profile?.role === "admin" || profile?.role === "companyOwner";
   const allowedStores = isTenantAdmin ? availableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : availableStores);
@@ -202,12 +214,11 @@ export default function ReservationsPage() {
             <ReservationTimeline 
               reservations={currentStoreReservations} 
               staffList={staffList.filter(s => {
-                if (selectedStore === "全店舗") {
-                  if (!s.salonIds || s.salonIds.length === 0) return true;
-                  return s.salonIds.some(st => allowedStores.includes(st));
-                }
+                if (selectedStore === "全店舗") return true;
                 if (!s.salonIds || s.salonIds.length === 0) return true;
-                return s.salonIds.includes(selectedStore);
+                
+                const normalizedSelected = getNormalizedStoreName(selectedStore);
+                return s.salonIds.some(id => getNormalizedStoreName(id) === normalizedSelected);
               })} 
               shifts={shifts}
               date={dateStr}

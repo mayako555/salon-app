@@ -13,6 +13,7 @@ import { getStoreTargets } from "../stores/actions";
 import { getMonthlyShifts } from "../shifts/actions";
 import { subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { getCurrentUserContext } from "@/lib/auth-server";
+import { getNormalizedStoreName } from "@/lib/store-utils";
 
 export async function getDashboardStats() {
   try {
@@ -94,7 +95,7 @@ export async function getDashboardStats() {
 
       if (isToday) {
         const rawStore = data.store_name || "不明";
-        const store = rawStore.endsWith("店") ? rawStore.slice(0, -1) : rawStore;
+        const store = getNormalizedStoreName(rawStore);
         if (storeSummary[store] !== undefined) {
           storeSummary[store] += amount;
         } else {
@@ -116,7 +117,7 @@ export async function getDashboardStats() {
       if (!data.date?.startsWith(currentMonthPrefix)) return;
       
       const rawStore = data.store_name || "不明";
-      const store = rawStore.endsWith("店") ? rawStore.slice(0, -1) : rawStore;
+      const store = getNormalizedStoreName(rawStore);
       const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
       monthlyStoreSales[store] = (monthlyStoreSales[store] || 0) + amount;
     });
@@ -144,10 +145,10 @@ export async function getDashboardStats() {
     // Use user's salonIds if available, otherwise fallback to all targets
     const isTenantAdmin = ctx.role === "systemOwner" || ctx.role === "admin" || ctx.role === "companyOwner";
     const availableStores = isTenantAdmin 
-      ? storeTargets.map(t => t.store_name.endsWith("店") ? t.store_name.slice(0, -1) : t.store_name) 
+      ? storeTargets.map(t => getNormalizedStoreName(t.store_name)) 
       : (ctx.salonIds && ctx.salonIds.length > 0 
-          ? ctx.salonIds.map(s => s.endsWith("店") ? s.slice(0, -1) : s) 
-          : storeTargets.map(t => t.store_name.endsWith("店") ? t.store_name.slice(0, -1) : t.store_name));
+          ? ctx.salonIds.map(s => getNormalizedStoreName(s)) 
+          : storeTargets.map(t => getNormalizedStoreName(t.store_name)));
           
     const uniqueStores = Array.from(new Set(availableStores));
     if (ctx.schoolEnabled && ctx.schoolName) {
@@ -280,7 +281,7 @@ export async function getAdvancedAnalytics(): Promise<{ success: boolean; data?:
           totalTreatmentMinutes += data.treatment_minutes || 60; // 実際の施術時間がない場合は後方互換で60分とする
         }
         
-        const storeKey = data.store_name || "不明";
+        const storeKey = getNormalizedStoreName(data.store_name || "");
         
         if (!storeSales[storeKey]) {
           storeSales[storeKey] = { total: 0, minimo: 0, nextBookings: 0, nextBookingVisits: 0, count: 0, minimoVisits: 0, regularVisits: 0, regularNewVisits: 0, minimoNewVisits: 0, routes: {} };

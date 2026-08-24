@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { X, CheckCircle2, MessageSquare, Edit3, Megaphone, HelpCircle, Trash2, Loader2 } from "lucide-react";
-import { AllowanceTaskStatus, saveStaffAllowanceTask, markAllowanceChecked, AllowanceType, deleteAllowance } from "./actions";
+import { AllowanceTaskStatus, saveStaffAllowanceTask, markAllowanceChecked, AllowanceType, deleteAllowance, getAllowanceConfig, AllowanceConfig } from "./actions";
 import { useAuth } from "@/lib/auth-context";
 import { getTenantStores } from "@/lib/utils";
+import { format } from "date-fns";
 
 type AllowanceTaskDialogProps = {
   task: AllowanceTaskStatus;
@@ -40,15 +41,30 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
   const [reviewStoreCounts, setReviewStoreCounts] = useState<Record<string, string>>(initialReviewCounts);
   const [nominationStoreCounts, setNominationStoreCounts] = useState<Record<string, string>>(initialNominationCounts);
 
-  // Other one-off allowances (SNS, Blog, Treatment)
-  const [blogCount, setBlogCount] = useState("");
+  // Dynamic Allowance Configuration from db
+  const [config, setConfig] = useState<AllowanceConfig | null>(null);
+
+  useEffect(() => {
+    async function loadConfig() {
+      const c = await getAllowanceConfig();
+      setConfig(c);
+    }
+    loadConfig();
+  }, []);
+
+  // Pre-fill blog breakdown counts
+  const initialBlogCounts: Record<string, string> = {};
+  STORES.forEach(store => {
+    const hasReg = task.allowances.find(a => a.type === "blog" && a.store_name === store);
+    initialBlogCounts[store] = hasReg ? (hasReg.target_details?.count || "").toString() : "";
+  });
+
+  const [blogStoreCounts, setBlogStoreCounts] = useState<Record<string, string>>(initialBlogCounts);
   const [snsCount, setSnsCount] = useState("");
   const hasRegisteredTreatment = task.allowances.some(a => a.type === "treatment");
   const [treatmentCount, setTreatmentCount] = useState(hasRegisteredTreatment ? "" : (task.treatment_count_auto || "").toString());
   
   const [transportAmount, setTransportAmount] = useState("");
-  
-  const [blogStore, setBlogStore] = useState("六甲");
   const [snsStore, setSnsStore] = useState("六甲");
 
   let defaultTreatmentStore = "六甲";
@@ -58,12 +74,28 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
   }
   const [treatmentStore, setTreatmentStore] = useState(defaultTreatmentStore);
 
+  const getBlogTotalCount = () => {
+    return Object.values(blogStoreCounts).reduce((sum, val) => sum + parseInt(val || "0", 10), 0);
+  };
+
+  const calculateBlogAmount = () => {
+    const total = getBlogTotalCount();
+    const minPosts = config?.blog_min_posts ?? 5;
+    const amount = config?.blog_amount ?? 3000;
+    return total >= minPosts ? amount : 0;
+  };
+
   const calculateAmount = (type: AllowanceType, countStr: string) => {
     const count = parseInt(countStr || "0", 10);
-    if (type === "review" || type === "sns") return count * 500;
-    if (type === "nomination") return count * (task.nomination_fee_unit || 300);
-    if (type === "blog") return count >= 5 ? 3000 : 0;
-    if (type === "treatment") return count >= 10 ? 5000 : 0;
+    if (type === "review") return count * (config?.review_rate ?? 500);
+    if (type === "sns") return count * (config?.sns_rate ?? 500);
+    if (type === "nomination") return count * (task.nomination_fee_unit || config?.nomination_default_rate || 300);
+    if (type === "blog") return calculateBlogAmount();
+    if (type === "treatment") {
+      const minCases = config?.treatment_min_cases ?? 10;
+      const amount = config?.treatment_amount ?? 5000;
+      return count >= minCases ? amount : 0;
+    }
     return 0;
   };
 
@@ -108,8 +140,33 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
       });
 
       // Blog, SNS, Treatment
-      const bAmount = calculateAmount("blog", blogCount);
-      if (bAmount > 0) allowances.push({ type: "blog" as AllowanceType, amount: bAmount, store_name: blogStore, target_details: { count: parseInt(blogCount) } });
+      const bAmount = calculateBlogAmount();
+      if (bAmount > 0) {
+        let targetStore = STORES[0];
+        let maxVal = -1;
+        STORES.forEach(store => {
+          const val = parseInt(blogStoreCounts[store] || "0", 10);
+          if (val > maxVal) {
+            maxVal = val;
+            targetStore = store;
+          }
+        });
+
+        const breakdown: Record<string, number> = {};
+        STORES.forEach(store => {
+          breakdown[store] = parseInt(blogStoreCounts[store] || "0", 10);
+        });
+
+        allowances.push({
+          type: "blog" as AllowanceType,
+          amount: bAmount,
+          store_name: targetStore,
+          target_details: { 
+            count: getBlogTotalCount(),
+            breakdown
+          }
+        });
+      }
       
       const sAmount = calculateAmount("sns", snsCount);
       if (sAmount > 0) allowances.push({ type: "sns" as AllowanceType, amount: sAmount, store_name: snsStore, target_details: { count: parseInt(snsCount) } });
@@ -171,7 +228,8 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
     }
   };
 
-  const hasAnyInput = STORES.some(s => reviewStoreCounts[s] || nominationStoreCounts[s]) || blogCount || snsCount || treatmentCount || transportAmount;
+  const hasAnyBlogInput = STORES.some(s => blogStoreCounts[s]);
+  const hasAnyInput = STORES.some(s => reviewStoreCounts[s] || nominationStoreCounts[s]) || hasAnyBlogInput || snsCount || treatmentCount || transportAmount;
 
   if (!isOpen) return null;
 
@@ -210,6 +268,16 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
                       {a.store_name && (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 ml-1">
                           {a.store_name}
+                        </span>
+                      )}
+                      {(a.start_date || a.end_date) && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100 ml-1">
+                          {a.start_date ? format(new Date(a.start_date), "M/d") : ""}〜{a.end_date ? format(new Date(a.end_date), "M/d") : ""}
+                        </span>
+                      )}
+                      {a.created_at && (
+                        <span className="text-[10px] text-slate-400 font-medium ml-1">
+                          ({format(new Date(a.created_at), "M/d H:mm")} 申請)
                         </span>
                       )}
                     </span>
@@ -342,81 +410,101 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">その他の手当</h4>
 
               {/* SNS */}
-              <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-lg p-3">
-                <div className="flex-1">
-                  <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                    <Megaphone size={16} className="text-cyan-500" />
-                    SNS手当
-                  </label>
-                  <p className="text-xs text-slate-500 mt-0.5">SNS経由予約数 × 500円</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <select value={snsStore} onChange={e => setSnsStore(e.target.value)} className="h-10 px-2 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-emerald-500/20">
-                    {STORES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                  <input type="number" min="0" value={snsCount} onChange={e => setSnsCount(e.target.value)} placeholder="0" className="w-16 h-10 px-2 border border-slate-300 rounded-md text-center font-bold" />
-                  <span className="text-sm font-medium text-slate-600">件</span>
-                </div>
-                <div className="w-20 text-right font-bold text-emerald-600">
-                  ¥{calculateAmount("sns", snsCount).toLocaleString()}
-                </div>
-              </div>
-
-              {/* Blog */}
-              <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-lg p-3">
-                <div className="flex-1">
-                  <label className="flex flex-col gap-1 text-sm font-bold text-slate-700">
-                    <div className="flex items-center gap-2">
-                      <Edit3 size={16} className="text-blue-500" />
-                      ブログ手当
-                    </div>
-                    <div className="flex gap-2 pl-6">
-                      <a href="https://beauty.hotpepper.jp/kr/slnH000391382/blog/" target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-700 underline">六甲</a>
-                      <a href="https://beauty.hotpepper.jp/kr/slnH000650559/blog/" target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-700 underline">神戸</a>
-                      <a href="https://beauty.hotpepper.jp/kr/slnH000799074/blog/" target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-700 underline">元町</a>
-                    </div>
-                  </label>
-                  <p className="text-xs text-slate-500 mt-0.5">5本以上で 3,000円支給</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <select value={blogStore} onChange={e => setBlogStore(e.target.value)} className="h-10 px-2 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-emerald-500/20">
-                    {STORES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                  <input type="number" min="0" value={blogCount} onChange={e => setBlogCount(e.target.value)} placeholder="0" className="w-16 h-10 px-2 border border-slate-300 rounded-md text-center font-bold" />
-                  <span className="text-sm font-medium text-slate-600">本</span>
-                </div>
-                <div className="w-20 text-right font-bold text-emerald-600">
-                  ¥{calculateAmount("blog", blogCount).toLocaleString()}
-                </div>
-              </div>
-
-              {/* Treatment */}
-              <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-lg p-3">
-                <div className="flex-1">
-                  <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                    <HelpCircle size={16} className="text-amber-500" />
-                    トリートメント手当
-                  </label>
-                  <div className="flex items-center justify-between mt-0.5 pr-2">
-                    <p className="text-xs text-slate-500">10件達成で 5,000円支給</p>
-                    {onOpenTreatmentDetail && task.treatment_count_auto > 0 && (
-                      <button type="button" onClick={onOpenTreatmentDetail} className="text-[10px] text-blue-500 hover:text-blue-700 underline">
-                        明細を確認 ({task.treatment_count_auto}件)
-                      </button>
-                    )}
+              {config?.has_sns_allowance !== false && (
+                <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-lg p-3">
+                  <div className="flex-1">
+                    <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                      <Megaphone size={16} className="text-cyan-500" />
+                      SNS手当
+                    </label>
+                    <p className="text-xs text-slate-500 mt-0.5">SNS経由予約数 × {(config?.sns_rate ?? 500)}円</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select value={snsStore} onChange={e => setSnsStore(e.target.value)} className="h-10 px-2 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-emerald-500/20">
+                      {STORES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <input type="number" min="0" value={snsCount} onChange={e => setSnsCount(e.target.value)} placeholder="0" className="w-16 h-10 px-2 border border-slate-300 rounded-md text-center font-bold" />
+                    <span className="text-sm font-medium text-slate-600">件</span>
+                  </div>
+                  <div className="w-20 text-right font-bold text-emerald-600">
+                    ¥{calculateAmount("sns", snsCount).toLocaleString()}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <select value={treatmentStore} onChange={e => setTreatmentStore(e.target.value)} className="h-10 px-2 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-emerald-500/20">
-                    {STORES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                  <input type="number" min="0" value={treatmentCount} onChange={e => setTreatmentCount(e.target.value)} placeholder="0" className="w-16 h-10 px-2 border border-slate-300 rounded-md text-center font-bold" />
-                  <span className="text-sm font-medium text-slate-600">件</span>
+              )}
+
+              {/* Blog */}
+              {config?.has_blog_allowance !== false && (
+                <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <label className="flex flex-col gap-1 text-sm font-bold text-slate-700">
+                      <div className="flex items-center gap-2">
+                        <Edit3 size={16} className="text-blue-500" />
+                        ブログ手当（全店舗合算）
+                      </div>
+                      <div className="flex gap-2 pl-6">
+                        <a href="https://beauty.hotpepper.jp/kr/slnH000391382/blog/" target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-700 underline">六甲</a>
+                        <a href="https://beauty.hotpepper.jp/kr/slnH000650559/blog/" target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-700 underline">神戸</a>
+                        <a href="https://beauty.hotpepper.jp/kr/slnH000799074/blog/" target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-700 underline">元町</a>
+                      </div>
+                    </label>
+                    <div className="w-20 text-right font-bold text-emerald-600">
+                      ¥{calculateBlogAmount().toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 bg-blue-50 p-2 rounded">
+                    <p>※ 各店舗の合計が{(config?.blog_min_posts ?? 5)}本以上で ¥{(config?.blog_amount ?? 3000).toLocaleString()}支給</p>
+                    <p className="font-bold text-slate-700">現在の合計: {getBlogTotalCount()} 本</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {STORES.map(store => (
+                      <div key={store} className="flex flex-col gap-1 bg-slate-50 p-2 rounded border border-slate-100">
+                        <span className="text-[10px] text-slate-500 font-bold">{store}店</span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            value={blogStoreCounts[store] || ""}
+                            onChange={e => setBlogStoreCounts(prev => ({ ...prev, [store]: e.target.value }))}
+                            placeholder="0"
+                            className="w-full h-8 px-1.5 border border-slate-300 rounded text-center font-bold text-xs bg-white"
+                          />
+                          <span className="text-[10px] text-slate-400">本</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="w-20 text-right font-bold text-emerald-600">
-                  ¥{calculateAmount("treatment", treatmentCount).toLocaleString()}
+              )}
+
+              {/* Treatment */}
+              {config?.has_treatment_allowance !== false && (
+                <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-lg p-3">
+                  <div className="flex-1">
+                    <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                      <HelpCircle size={16} className="text-amber-500" />
+                      トリートメント手当
+                    </label>
+                    <div className="flex items-center justify-between mt-0.5 pr-2">
+                      <p className="text-xs text-slate-500">{(config?.treatment_min_cases ?? 10)}件達成で {(config?.treatment_amount ?? 5000).toLocaleString()}円支給</p>
+                      {onOpenTreatmentDetail && task.treatment_count_auto > 0 && (
+                        <button type="button" onClick={onOpenTreatmentDetail} className="text-[10px] text-blue-500 hover:text-blue-700 underline">
+                          明細を確認 ({task.treatment_count_auto}件)
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select value={treatmentStore} onChange={e => setTreatmentStore(e.target.value)} className="h-10 px-2 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-emerald-500/20">
+                      {STORES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <input type="number" min="0" value={treatmentCount} onChange={e => setTreatmentCount(e.target.value)} placeholder="0" className="w-16 h-10 px-2 border border-slate-300 rounded-md text-center font-bold" />
+                    <span className="text-sm font-medium text-slate-600">件</span>
+                  </div>
+                  <div className="w-20 text-right font-bold text-emerald-600">
+                    ¥{calculateAmount("treatment", treatmentCount).toLocaleString()}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Transport */}
               <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-lg p-3">

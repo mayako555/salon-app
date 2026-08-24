@@ -47,6 +47,10 @@ export default function CreateStatementDialog({
   const [reviewAllowance, setReviewAllowance] = useState("");
   const [blogAllowance, setBlogAllowance] = useState("");
   const [executiveAllowance, setExecutiveAllowance] = useState("");
+  const [businessAllowance, setBusinessAllowance] = useState("");
+  const [attendanceAllowance, setAttendanceAllowance] = useState("");
+  const [techIncentive, setTechIncentive] = useState("");
+  const [productCommission, setProductCommission] = useState("");
   const [taxAddition, setTaxAddition] = useState("");
 
   // Deductions State (Salary only)
@@ -56,6 +60,9 @@ export default function CreateStatementDialog({
   const [incomeTax, setIncomeTax] = useState("");
   const [residentTax, setResidentTax] = useState("");
   const [childcare, setChildcare] = useState("");
+
+  const [alreadyPaidAmount, setAlreadyPaidAmount] = useState("");
+  const [advanceDeduction, setAdvanceDeduction] = useState("");
 
   // Metrics State
   const [workedDays, setWorkedDays] = useState("");
@@ -75,13 +82,15 @@ export default function CreateStatementDialog({
   const [contractType, setContractType] = useState<string>("");
   const [contractData, setContractData] = useState<any>(null);
 
+  const [productSalesItems, setProductSalesItems] = useState<{ name: string, price: number, store: string }[]>([]);
+
   // Reward Assistant State
   const [techSales, setTechSales] = useState("");
   const [productSales, setProductSales] = useState("");
   const [techCashless, setTechCashless] = useState("");
   const [productCashless, setProductCashless] = useState("");
-  const [techCommission, setTechCommission] = useState(0);
-  const [productCommission, setProductCommission] = useState(0);
+  const [rewardTechCommission, setRewardTechCommission] = useState(0);
+  const [rewardProductCommission, setRewardProductCommission] = useState(0);
 
   const updateStoreSales = (storeName: string, field: string, value: string) => {
     const current = storeSales[storeName] || {
@@ -142,6 +151,10 @@ export default function CreateStatementDialog({
       setReviewAllowance("");
       setBlogAllowance("");
       setExecutiveAllowance("");
+      setBusinessAllowance("");
+      setAttendanceAllowance("");
+      setTechIncentive("");
+      setProductCommission("");
       setTaxAddition("");
       setHealth("");
       setPension("");
@@ -161,8 +174,9 @@ export default function CreateStatementDialog({
       setTechCashless("");
       setProductCashless("");
       setStoreSales({});
-      setTechCommission(0);
-      setProductCommission(0);
+      setRewardTechCommission(0);
+      setRewardProductCommission(0);
+      setProductSalesItems([]);
     } else if (initialStaffId) {
       setStaffId(initialStaffId);
     }
@@ -195,6 +209,10 @@ export default function CreateStatementDialog({
           setReviewAllowance((d.reviewAllowance || 0).toString());
           setBlogAllowance((d.blogAllowance || 0).toString());
           setExecutiveAllowance((d.executiveAllowance || 0).toString());
+          setBusinessAllowance((d.businessAllowance || 0).toString());
+          setAttendanceAllowance((d.attendanceAllowance || 0).toString());
+          setTechIncentive((d.techIncentive || 0).toString());
+          setProductCommission((d.productCommission || 0).toString());
           setTaxAddition(d.taxAddition.toString());
           
           setHealth(d.health.toString());
@@ -208,6 +226,9 @@ export default function CreateStatementDialog({
           setWorkedHours(d.workedHours.toString());
           setHourlyWage(d.hourly_wage ? d.hourly_wage.toString() : "0");
           setWorkLocation(d.work_location || "");
+
+          setAlreadyPaidAmount("");
+          setAdvanceDeduction("");
 
           // Prefill store-by-store sales
           if (d.storeSalesBreakdown) {
@@ -236,12 +257,14 @@ export default function CreateStatementDialog({
             setTechCashless(totalTechCashless > 0 ? totalTechCashless.toString() : "");
             setProductSales(totalProd > 0 ? totalProd.toString() : "");
             setProductCashless(totalProdCashless > 0 ? totalProdCashless.toString() : "");
+            setProductSalesItems(d.productSalesBreakdownItems || []);
           } else {
             setStoreSales({});
             setTechSales("");
             setProductSales("");
             setTechCashless("");
             setProductCashless("");
+            setProductSalesItems([]);
           }
 
           toast.success("スタッフの当月実績と契約データから初期値を自動入力しました（編集可能です）");
@@ -266,6 +289,8 @@ export default function CreateStatementDialog({
           setHourlyWage("");
           setWorkLocation("");
           setNote("");
+          setAlreadyPaidAmount("");
+          setAdvanceDeduction("");
           setContractData(null);
           setContractWarning("該当スタッフの契約情報が登録されていません。");
         }
@@ -291,20 +316,22 @@ export default function CreateStatementDialog({
 
     const baseVal = Number(baseAmount) || 0;
     const transportVal = Number(transportAllowance) || 0;
-    const fixedAllowances = (contractType === "monthly" || contractType === "tier_monthly")
-      ? ((contractData?.business_allowance || 0) + (contractData?.attendance_allowance || 0))
-      : 0;
+    const numBusiness = Number(businessAllowance) || 0;
+    const numAttendance = Number(attendanceAllowance) || 0;
+    const numTechInc = Number(techIncentive) || 0;
+    const numProdComm = Number(productCommission) || 0;
 
     const otherAllowances = (Number(nominationAllowance) || 0) + 
                             (Number(reviewAllowance) || 0) + 
                             (Number(blogAllowance) || 0) + 
                             (Number(executiveAllowance) || 0) + 
-                            fixedAllowances;
+                            numBusiness +
+                            numAttendance;
 
     if (baseVal <= 0) return; // Don't calculate if no base pay is set yet
 
     const taxes = calculatePayrollTaxes({
-      baseSalary: baseVal,
+      baseSalary: baseVal + numTechInc + numProdComm,
       allowances: otherAllowances,
       transportFee: transportVal,
       dependentsCount: 0
@@ -315,7 +342,7 @@ export default function CreateStatementDialog({
     setEmployment(taxes.employmentInsurance.toString());
     setIncomeTax(taxes.incomeTax.toString());
     setChildcare(taxes.childcareSupport ? taxes.childcareSupport.toString() : "0");
-  }, [baseAmount, transportAllowance, nominationAllowance, reviewAllowance, blogAllowance, executiveAllowance, type]);
+  }, [baseAmount, transportAllowance, nominationAllowance, reviewAllowance, blogAllowance, executiveAllowance, businessAllowance, attendanceAllowance, techIncentive, productCommission, type]);
 
   // Calculations
   const numBase = Number(baseAmount) || 0;
@@ -324,10 +351,11 @@ export default function CreateStatementDialog({
   const numReview = Number(reviewAllowance) || 0;
   const numBlog = Number(blogAllowance) || 0;
   const numExecutive = Number(executiveAllowance) || 0;
-  const fixedAllowances = (contractType === "monthly" || contractType === "tier_monthly")
-    ? ((contractData?.business_allowance || 0) + (contractData?.attendance_allowance || 0))
-    : 0;
-  const numAllowance = numTransport + numNomination + numReview + numBlog + numExecutive + fixedAllowances;
+  const numBusiness = Number(businessAllowance) || 0;
+  const numAttendance = Number(attendanceAllowance) || 0;
+  const numTechInc = Number(techIncentive) || 0;
+  const numProdComm = Number(productCommission) || 0;
+  const numAllowance = numTransport + numNomination + numReview + numBlog + numExecutive + numBusiness + numAttendance;
 
   const numTaxAdd = Number(taxAddition) || 0;
 
@@ -339,7 +367,11 @@ export default function CreateStatementDialog({
   const numChildcare = type === "salary" ? (Number(childcare) || 0) : 0;
 
   const totalDeductions = numHealth + numPension + numEmployment + numIncomeTax + numResidentTax + numChildcare;
-  const finalPaidAmount = numBase + numAllowance + numTaxAdd - totalDeductions;
+  const finalPaidAmount = numBase + numTechInc + numProdComm + numAllowance + numTaxAdd - totalDeductions;
+
+  const numAlreadyPaid = Number(alreadyPaidAmount) || 0;
+  const numAdvanceDeduction = Number(advanceDeduction) || 0;
+  const transferAmount = finalPaidAmount - numAlreadyPaid - numAdvanceDeduction;
 
   const handleHourlyWageChange = (val: string) => {
     setHourlyWage(val);
@@ -376,8 +408,8 @@ export default function CreateStatementDialog({
     const commProd = Math.max(0, prodSalesNum - prodTax - prodCashlessFee);
     const baseProd = Math.floor(commProd * (prodRatio / 100));
 
-    setTechCommission(baseTech);
-    setProductCommission(baseProd);
+    setRewardTechCommission(baseTech);
+    setRewardProductCommission(baseProd);
     setBaseAmount((baseTech + baseProd).toString());
   };
 
@@ -402,16 +434,28 @@ export default function CreateStatementDialog({
         total_allowances: numAllowance,
         total_deductions: totalDeductions,
         final_paid_amount: finalPaidAmount,
-        work_location: workLocation,
-        note: note,
+        status: "draft",
+        adjustments: {
+          transport_fee_override: numTransport,
+          health_insurance_override: numHealth,
+          pension_override: numPension,
+          employment_insurance_override: numEmployment,
+          income_tax_override: numIncomeTax,
+          resident_tax_override: numResidentTax,
+          childcare_support_override: numChildcare,
+          already_paid_amount_override: numAlreadyPaid,
+          advance_deduction_override: numAdvanceDeduction,
+        },
         details: {
-          base_tech_salary: type === "reward" ? techCommission : 0,
-          base_product_salary: type === "reward" ? productCommission : 0,
+          base_tech_salary: type === "reward" ? rewardTechCommission : numTechInc,
+          base_product_salary: type === "reward" ? rewardProductCommission : numProdComm,
           nomination_reward: numNomination,
           transport_fee: numTransport,
           review_allowance: numReview,
           blog_allowance: numBlog,
           executive_allowance: numExecutive,
+          business_allowance: numBusiness,
+          attendance_allowance: numAttendance,
           cashless_deduction: 0,
           tax_addition: numTaxAdd,
           hourly_wage: Number(hourlyWage) || 0,
@@ -446,6 +490,10 @@ export default function CreateStatementDialog({
         setReviewAllowance("");
         setBlogAllowance("");
         setExecutiveAllowance("");
+        setBusinessAllowance("");
+        setAttendanceAllowance("");
+        setTechIncentive("");
+        setProductCommission("");
         setTaxAddition("");
         setHealth("");
         setPension("");
@@ -457,7 +505,12 @@ export default function CreateStatementDialog({
         setWorkedHours("");
         setWorkLocation("");
         setNote("");
-        if (onSuccess) onSuccess();
+        setAlreadyPaidAmount("");
+        setAdvanceDeduction("");
+        
+        if (typeof window !== "undefined") {
+          window.location.reload();
+        }
       } else {
         toast.error(`作成エラー: ${res.error}`);
       }
@@ -689,11 +742,30 @@ export default function CreateStatementDialog({
               </div>
 
               {type === "reward" && contractData && (
-                <div className="bg-emerald-50 text-emerald-800 p-3 rounded-lg flex flex-col md:flex-row md:items-center justify-between text-xs font-bold shadow-sm border border-emerald-100 mt-2">
-                  <div>自動計算の歩合詳細:</div>
-                  <div className="flex flex-wrap gap-4">
-                    <span>技術歩合: <strong>¥{techCommission.toLocaleString()}</strong> ({contractData.tech_sales_ratio || 0}%)</span>
-                    <span>商品売上手当: <strong>¥{productCommission.toLocaleString()}</strong> ({contractData.product_sales_ratio || 0}%)</span>
+                <div className="bg-emerald-50 text-emerald-800 p-3 rounded-lg flex flex-col shadow-sm border border-emerald-100 mt-2 gap-2">
+                  <div className="font-bold border-b border-emerald-100 pb-1 flex justify-between items-center text-xs">
+                    <span>自動計算の歩合詳細:</span>
+                    <span className="text-[10px] text-emerald-600 font-normal">※給与明細の印刷にはこの計算内訳は出力されません</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5 text-[11px] leading-relaxed">
+                    <div>
+                      <span className="font-bold">【技術歩合】</span>
+                      <span>
+                        税抜技術売上 ¥{Math.floor((Number(techSales) || 0) / 1.1).toLocaleString()} から
+                        {contractData.deduction_cashless_ratio > 0 ? ` キャッシュレス決済手数料相当額 ¥${(Math.floor((Number(techCashless) || 0) * (contractData.deduction_cashless_ratio / 100))).toLocaleString()} (${contractData.deduction_cashless_ratio}%) を引いた` : "消費税を引いた"}
+                        金額の {contractData.tech_sales_ratio || 0}% ➔ <strong className="text-emerald-700">¥{rewardTechCommission.toLocaleString()}</strong>
+                      </span>
+                    </div>
+                    {rewardProductCommission > 0 && (
+                      <div>
+                        <span className="font-bold">【商品歩合】</span>
+                        <span>
+                          税抜商品売上 ¥{Math.floor((Number(productSales) || 0) / 1.1).toLocaleString()} から
+                          {contractData.deduction_cashless_ratio > 0 ? ` キャッシュレス決済手数料相当額 ¥${(Math.floor((Number(productCashless) || 0) * (contractData.deduction_cashless_ratio / 100))).toLocaleString()} (${contractData.deduction_cashless_ratio}%) を引いた` : "消費税を引いた"}
+                          金額の {contractData.product_sales_ratio || 0}% ➔ <strong className="text-emerald-700">¥{rewardProductCommission.toLocaleString()}</strong>
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -712,26 +784,211 @@ export default function CreateStatementDialog({
               </div>
               <div className="bg-rose-50 text-rose-700 px-3 py-1 rounded-full text-xs font-black border border-rose-100 flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
                 <span>総支給額 (基本給 + 手当):</span>
-                <span className="text-sm font-black text-rose-800">¥{((Number(baseAmount) || 0) + (Number(transportAllowance) || 0) + (Number(nominationAllowance) || 0) + (Number(reviewAllowance) || 0) + (Number(blogAllowance) || 0) + (Number(executiveAllowance) || 0)).toLocaleString()}</span>
+                <span className="text-sm font-black text-rose-800">¥{(
+                  (Number(baseAmount) || 0) + 
+                  (Number(techIncentive) || 0) + 
+                  (Number(productCommission) || 0) + 
+                  (Number(transportAllowance) || 0) + 
+                  (Number(nominationAllowance) || 0) + 
+                  (Number(reviewAllowance) || 0) + 
+                  (Number(blogAllowance) || 0) + 
+                  (Number(executiveAllowance) || 0) +
+                  (Number(businessAllowance) || 0) +
+                  (Number(attendanceAllowance) || 0)
+                ).toLocaleString()}</span>
               </div>
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 block">
-                  {type === "reward" 
-                    ? "技術歩合報酬ベース (円)" 
-                    : (contractType === "monthly" || contractType === "tier_monthly") 
-                      ? "基本給 (円)" 
-                      : "基本給 (時給ベース) (円)"}
-                </label>
-                <Input 
-                  type="number" 
-                  placeholder="例: 280000"
-                  value={baseAmount} 
-                  onChange={(e) => setBaseAmount(e.target.value)}
-                  className="h-10 text-xs rounded-lg font-bold border-slate-200 focus:ring-rose-500"
-                  required
-                />
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 block">
+                    {type === "reward" 
+                      ? "技術歩合報酬ベース (円)" 
+                      : (contractType === "monthly" || contractType === "tier_monthly") 
+                        ? "基本給 (円)" 
+                        : "基本給 (時給ベース) (円)"}
+                  </label>
+                  <Input 
+                    type="number" 
+                    placeholder="例: 280000"
+                    value={baseAmount} 
+                    onChange={(e) => setBaseAmount(e.target.value)}
+                    className="h-10 text-xs rounded-lg font-bold border-slate-200 focus:ring-rose-500"
+                    required
+                  />
+                </div>
+
+                {type === "salary" && (contractType === "monthly" || contractType === "tier_monthly") && (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2 bg-rose-50/30 p-2 rounded-lg border border-rose-100/50">
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-500 block">技術インセンティブ (円)</span>
+                        <Input 
+                          type="number" 
+                          placeholder="技術インセンティブ"
+                          value={techIncentive} 
+                          onChange={(e) => setTechIncentive(e.target.value)}
+                          className="h-9 text-xs rounded-lg font-bold border-slate-200"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-500 block">商品歩合（店販手当） (円)</span>
+                        <Input 
+                          type="number" 
+                          placeholder="商品歩合"
+                          value={productCommission} 
+                          onChange={(e) => setProductCommission(e.target.value)}
+                          className="h-9 text-xs rounded-lg font-bold border-slate-200"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Calculation Details / Walkthrough */}
+                    <div className="bg-slate-50 border border-slate-200/80 p-2.5 rounded-lg text-[10px] space-y-2 text-slate-600 font-medium">
+                      {/* Tech Incentive Breakdown */}
+                      <div className="space-y-1">
+                        <div className="font-extrabold text-slate-800 flex justify-between border-b pb-0.5 border-slate-200">
+                          <span>【技術インセンティブ計算内訳】</span>
+                          <span className="text-[9px] text-slate-400 font-normal">税抜売上ベース</span>
+                        </div>
+                        {contractType === "tier_monthly" ? (
+                          <div className="leading-relaxed">
+                            <p>・当月総技術売上 (税抜): <strong className="text-slate-700">¥{Math.floor((Number(techSales) || 0) / 1.1).toLocaleString()}</strong> (税込 ¥{(Number(techSales) || 0).toLocaleString()})</p>
+                            <p>・当月総商品売上 (税抜): <strong className="text-slate-700">¥{Math.floor((Number(productSales) || 0) / 1.1).toLocaleString()}</strong> (税込 ¥{(Number(productSales) || 0).toLocaleString()})</p>
+                            <p>・合計個人売上 (税抜): <strong className="text-rose-700">¥{(Math.floor((Number(techSales) || 0) / 1.1) + Math.floor((Number(productSales) || 0) / 1.1)).toLocaleString()}</strong></p>
+                            
+                            {(contractData?.tech_sales_threshold || 0) > 0 ? (
+                              <div className="mt-1.5 pt-1 border-t border-slate-100 font-bold text-slate-700">
+                                <p>・技術売上ノルマ額 (税込): <strong>¥{(contractData.tech_sales_threshold).toLocaleString()}</strong></p>
+                                {(Number(techSales) || 0) > (contractData.tech_sales_threshold) ? (
+                                  <p className="text-rose-700 mt-0.5">
+                                    ※ ノルマ超過分 (¥{((Number(techSales) || 0) - contractData.tech_sales_threshold).toLocaleString()}) 
+                                    の {contractData.tech_sales_ratio || 10}% を支給 (算出インセンティブ: ¥{(Number(techIncentive) || 0).toLocaleString()}円)
+                                  </p>
+                                ) : (
+                                  <p className="text-slate-400 font-normal italic mt-0.5">※ 技術売上がノルマ額に達していないため、インセンティブは ¥0 です。</p>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="mt-1 font-bold text-slate-700">
+                                ※ 40万円以上の売上に対し、5万円ごとに5,000円支給 (算出インセンティブ: ¥{(Number(techIncentive) || 0).toLocaleString()}円)
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="leading-relaxed">
+                            <p>・技術売上 (税抜): <strong className="text-slate-700">¥{Math.floor((Number(techSales) || 0) / 1.1).toLocaleString()}</strong> (税込 ¥{(Number(techSales) || 0).toLocaleString()})</p>
+                            <p>・売上ノルマ額: <strong className="text-slate-700">¥{(contractData?.tech_sales_quota || 0).toLocaleString()}</strong></p>
+                            {Math.floor((Number(techSales) || 0) / 1.1) > (contractData?.tech_sales_quota || 0) ? (
+                              <p className="mt-1">
+                                ノルマ超過分 (¥{(Math.floor((Number(techSales) || 0) / 1.1) - (contractData?.tech_sales_quota || 0)).toLocaleString()}) 
+                                の {contractData?.tech_sales_ratio || 0}% ➔ <strong className="text-rose-700">¥{(Number(techIncentive) || 0).toLocaleString()}</strong>
+                              </p>
+                            ) : (
+                              <p className="mt-0.5 text-slate-400 italic">※技術売上がノルマ額に達していないため、インセンティブは ¥0 です。</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Product Commission Details */}
+                      <div className="space-y-1">
+                        <details className="group">
+                          <summary className="font-extrabold text-slate-800 flex justify-between items-center cursor-pointer border-b pb-0.5 border-slate-200 select-none">
+                            <span>【店販売上・商品歩合の内訳】</span>
+                            <span className="text-[9px] text-rose-500 font-bold group-open:hidden">▼ クリックして明細を表示</span>
+                            <span className="text-[9px] text-slate-400 group-open:inline hidden">▲ 閉じる</span>
+                          </summary>
+                          <div className="mt-1.5 space-y-2 bg-white p-2.5 rounded border border-slate-100 leading-relaxed text-slate-500">
+                            {/* Individual products list */}
+                            {productSalesItems.length > 0 ? (
+                              <div className="space-y-1 mb-2">
+                                <p className="text-[9.5px] font-extrabold text-slate-700 border-b border-slate-100 pb-0.5">商品別売上明細 (10%手当対象):</p>
+                                {productSalesItems.map((item, idx) => {
+                                  let netPrice = Math.floor(item.price / 1.1);
+                                  let comm = Math.floor(netPrice * 0.1);
+                                   
+                                   // Jasminash/Jasmine Lash custom products calculations: coating (1500 -> 150) and lilju (4300 -> 430)
+                                   const isJasmineLash = (item.store || "").toLowerCase().includes("jasmine") || (item.store || "").toLowerCase().includes("jasminash");
+                                   if (isJasmineLash) {
+                                     if (item.name.includes("コーティング")) {
+                                       netPrice = 1500;
+                                       comm = 150;
+                                     } else if (item.name.includes("リルジュ")) {
+                                       netPrice = 4300;
+                                       comm = 430;
+                                     }
+                                   }
+                                  return (
+                                    <div key={idx} className="flex justify-between items-center text-[9px] border-b border-slate-50 pb-0.5 group/item">
+                                      <span className="truncate max-w-[180px] text-slate-600 font-bold">・{item.name} ({item.store})</span>
+                                      <div className="flex items-center gap-1.5 tabular-nums">
+                                        <span>
+                                          ¥{item.price.toLocaleString()} (税抜 ¥{netPrice.toLocaleString()}) ➔ <strong className="text-emerald-700">¥{comm.toLocaleString()}</strong>
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (confirm(`「${item.name}」を除外して商品歩合を再計算しますか？`)) {
+                                              const updated = productSalesItems.filter((_, i) => i !== idx);
+                                              setProductSalesItems(updated);
+                                              // Recalculate total sales and commission
+                                              const newTotalSales = updated.reduce((sum, current) => sum + current.price, 0);
+                                              const newComm = updated.reduce((sum, current) => sum + Math.floor(Math.floor(current.price / 1.1) * 0.1), 0);
+                                              
+                                              setProductSales(newTotalSales > 0 ? newTotalSales.toString() : "0");
+                                              setProductCommission(newComm.toString());
+                                            }
+                                          }}
+                                          className="text-rose-500 hover:text-rose-700 font-bold px-1 hover:bg-rose-50 rounded text-[9px]"
+                                          title="除外する"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-[9px] text-slate-400 italic mb-2">※ 商品別の売上明細はありません。</p>
+                            )}
+
+                            <div className="border-t border-slate-100 pt-1.5 mt-1.5">
+                              {availableStores.map(store => {
+                                const storeData = storeSales[store];
+                                if (!storeData || (!storeData.productSales && !storeData.techSales)) return null;
+                                // Calculate filtered store product sales
+                                const storeFilteredProd = productSalesItems
+                                  .filter(item => item.store === store)
+                                  .reduce((sum, item) => sum + item.price, 0);
+
+                                return (
+                                  <div key={store} className="flex justify-between items-center text-[9px] text-slate-400">
+                                    <span>{store}店 合計:</span>
+                                    <span>
+                                      技術 ¥{(Number(storeData.techSales) || 0).toLocaleString()} / 
+                                      店販 <strong className="text-slate-600">¥{storeFilteredProd.toLocaleString()}</strong>
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            <div className="pt-1.5 text-[9.5px] font-bold text-slate-700 flex justify-between items-center border-t border-slate-100">
+                              <span>商品売上合計 (税抜):</span>
+                              <span>¥{Math.floor((Number(productSales) || 0) / 1.1).toLocaleString()} (税込 ¥{(Number(productSales) || 0).toLocaleString()})</span>
+                            </div>
+                            <p className="mt-1 text-slate-500 text-[9px] leading-relaxed">
+                              ※ 歩合ルール: 商品ごとに10%の手当が店販手当として適用されます。
+                              (算出歩合給: <strong className="text-rose-700">¥{(Number(productCommission) || 0).toLocaleString()}円</strong>)
+                            </p>
+                          </div>
+                        </details>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -787,6 +1044,30 @@ export default function CreateStatementDialog({
                       className="h-8 text-xs rounded font-bold border-slate-200"
                     />
                   </div>
+                  {type === "salary" && (
+                    <>
+                      <div className="space-y-1">
+                        <span className="text-[9px] text-slate-400 font-bold block">業務手当</span>
+                        <Input 
+                          type="number" 
+                          placeholder="業務手当"
+                          value={businessAllowance} 
+                          onChange={(e) => setBusinessAllowance(e.target.value)}
+                          className="h-8 text-xs rounded font-bold border-slate-200"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[9px] text-slate-400 font-bold block">皆勤手当</span>
+                        <Input 
+                          type="number" 
+                          placeholder="皆勤手当"
+                          value={attendanceAllowance} 
+                          onChange={(e) => setAttendanceAllowance(e.target.value)}
+                          className="h-8 text-xs rounded font-bold border-slate-200"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -896,6 +1177,35 @@ export default function CreateStatementDialog({
             </div>
           )}
 
+          {/* Other Adjustments */}
+          <div className="space-y-3 animate-in slide-in-from-top-3 duration-200">
+            <h3 className="text-xs font-bold text-slate-700 flex items-center gap-1 border-b pb-1.5">
+              <span className="w-1.5 h-3.5 bg-emerald-500 rounded-sm"></span> その他の調整 (円)
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-slate-500 block">支払済振込額 (先払い分等)</span>
+                <Input 
+                  type="number" 
+                  value={alreadyPaidAmount} 
+                  onChange={(e) => setAlreadyPaidAmount(e.target.value)}
+                  className="h-10 text-xs rounded-lg font-bold border-slate-200"
+                  placeholder="例: 15000"
+                />
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-slate-500 block">立替金・購入代控除</span>
+                <Input 
+                  type="number" 
+                  value={advanceDeduction} 
+                  onChange={(e) => setAdvanceDeduction(e.target.value)}
+                  className="h-10 text-xs rounded-lg font-bold border-slate-200"
+                  placeholder="例: 5000"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Memo / Notes */}
           <div className="space-y-3 animate-in slide-in-from-top-3 duration-200">
             <h3 className="text-xs font-bold text-slate-700 flex items-center gap-1 border-b pb-1.5">
@@ -937,8 +1247,28 @@ export default function CreateStatementDialog({
 
             <div className="flex justify-between items-center pt-2 border-t border-slate-800">
               <span className="text-sm font-bold text-slate-200">差し引き支給額 (差引支給額)</span>
-              <span className="text-2xl font-black text-emerald-400 font-mono tracking-tight">
+              <span className="text-sm font-black text-slate-200 font-mono tracking-tight">
                 ¥{finalPaidAmount.toLocaleString()}
+              </span>
+            </div>
+
+            {numAlreadyPaid > 0 && (
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">支払済振込額 (控除):</span>
+                <span className="font-bold text-rose-400">-¥{numAlreadyPaid.toLocaleString()}</span>
+              </div>
+            )}
+            {numAdvanceDeduction > 0 && (
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">立替金・購入代控除:</span>
+                <span className="font-bold text-rose-400">-¥{numAdvanceDeduction.toLocaleString()}</span>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center pt-2 border-t border-slate-800">
+              <span className="text-sm font-bold text-slate-200">最終振込支給額</span>
+              <span className="text-2xl font-black text-emerald-400 font-mono tracking-tight">
+                ¥{transferAmount.toLocaleString()}
               </span>
             </div>
           </div>

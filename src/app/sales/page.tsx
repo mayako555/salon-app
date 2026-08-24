@@ -178,7 +178,8 @@ export default function SalesPage({
       const hasMatch = Array.from(selectedStores).some(storeName => {
         const targetStoreId = storeNameToIdMap[storeName] || storeName;
         if (s.store_id) return s.store_id === targetStoreId;
-        return s.store_name === storeName;
+        const { getNormalizedStoreName } = require("@/lib/store-utils");
+        return getNormalizedStoreName(s.store_name || "") === getNormalizedStoreName(storeName);
       });
       if (!hasMatch) return false;
     }
@@ -213,11 +214,44 @@ export default function SalesPage({
   };
 
   const handleClearImports = async () => {
-    if (!confirm(`${year}年${month}月のCSV取り込みデータをすべて削除しますか？`)) return;
-    const res = await clearMonthlyCsvImports(year, month);
+    // Prompt the user for which store's CSV to delete, listing the stores dynamically
+    const storeOptions = stores.join("、");
+    const inputStore = prompt(
+      `${year}年${month}月のCSV取り込みデータを削除します。\n\n【店舗を指定して削除する場合】\n店舗名を入力してください (例: 神戸、六甲道、元町 など)\n\n【すべてのCSVデータを削除する場合】\n空白のままOKを押してください。`,
+      ""
+    );
+
+    if (inputStore === null) return; // Cancelled
+
+    let storeFilter: string | undefined = undefined;
+    let confirmMessage = `${year}年${month}月のすべてのCSV取り込みデータを削除しますか？`;
+
+    if (inputStore.trim().length > 0) {
+      const matchStore = stores.find(s => s.includes(inputStore.trim()));
+      if (!matchStore) {
+        alert(`入力された店舗「${inputStore}」に該当する店舗が見つかりませんでした。\n店舗リスト: ${storeOptions}`);
+        return;
+      }
+      storeFilter = matchStore;
+      confirmMessage = `${year}年${month}月の「${storeFilter}」のCSV取り込みデータのみを削除しますか？`;
+    }
+
+    if (!confirm(confirmMessage)) return;
+
+    setLoading(true);
+    const res = await clearMonthlyCsvImports(year, month, storeFilter);
+    setLoading(false);
+
     if (res.success) {
       alert(`${res.count}件のデータを削除しました。`);
-      setSales(sales.filter(s => s.source !== 'hotpepper'));
+      const { getNormalizedStoreName } = require("@/lib/store-utils");
+      setSales(prev => prev.filter(s => {
+        if (s.source !== 'hotpepper') return true;
+        if (storeFilter && getNormalizedStoreName(s.store_name || "") === getNormalizedStoreName(storeFilter)) return false;
+        return !!storeFilter; // If storeFilter is undefined, we remove all hotpepper source
+      }));
+    } else {
+      alert(`エラーが発生しました: ${res.error}`);
     }
   };
 

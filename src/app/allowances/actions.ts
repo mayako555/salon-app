@@ -3,6 +3,7 @@ import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
   getDocs, 
+  getDoc,
   addDoc, 
   query, 
   where, 
@@ -20,6 +21,7 @@ import { getMonthlySales, SalesRecord } from "@/app/sales/actions";
 import { getMonthlyReviews } from "@/app/admin/reviews/actions";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc, setTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { getCurrentUserContext } from "@/lib/auth-server";
+import { revalidatePath } from "next/cache";
 
 
 export type AllowanceType = "review" | "blog" | "sns" | "treatment" | "transport" | "nomination" | "other";
@@ -89,6 +91,8 @@ export type AllowanceRecord = {
   amount: number;
   store_name?: string;
   target_details?: any; // JSON
+  start_date?: string; // 手当の適用期間（開始） YYYY-MM-DD
+  end_date?: string; // 手当の適用期間（終了） YYYY-MM-DD
   created_at: string;
 };
 
@@ -303,6 +307,7 @@ export async function markAllowanceChecked(staff_id: string, target_month: strin
       updated_at: serverTimestamp()
     }, { merge: true });
 
+    revalidatePath('/allowances');
     return { success: true };
   } catch(error: any) {
     console.error("Error marking checked:", error);
@@ -314,6 +319,7 @@ export async function unmarkAllowanceChecked(staff_id: string, target_month: str
   try {
     const checkId = `${staff_id}_${target_month}`;
     await deleteTenantOwnedDoc(doc(db, ALLOWANCE_CHECKS_COLLECTION, checkId));
+    revalidatePath('/allowances');
     return { success: true };
   } catch(error: any) {
     return { success: false, error: error.message };
@@ -375,6 +381,7 @@ export async function saveStaffAllowanceTask(data: {
       actor: "Admin"
     });
 
+    revalidatePath('/allowances');
     return { success: true };
   } catch (error: any) {
     console.error("Error saving task:", error);
@@ -414,13 +421,15 @@ export async function addAllowance(formData: FormData) {
     const amount = parseInt(formData.get("amount") as string || "0", 10);
     const storeName = formData.get("store_name") as string || "";
     const detailText = formData.get("detail_text") as string || "";
+    const startDate = formData.get("start_date") as string || "";
+    const endDate = formData.get("end_date") as string || "";
 
     if (!staffName || !targetMonth || !type) {
       return { success: false, error: "必須項目が入力されていません。" };
     }
 
     const colRef = collection(db, ALLOWANCES_COLLECTION);
-    const payload = {
+    const payload: any = {
       staff_id: "staff-" + staffName, // Mock UUID or look up from staff profiles if needed
       staff_name: staffName,
       target_month: targetMonth,
@@ -430,6 +439,9 @@ export async function addAllowance(formData: FormData) {
       target_details: { context: detailText },
       created_at: serverTimestamp()
     };
+
+    if (startDate) payload.start_date = startDate;
+    if (endDate) payload.end_date = endDate;
 
     const docRef = await addTenantOwnedDoc(colRef, payload);
 
@@ -477,5 +489,105 @@ export async function toggleTreatmentExclusion(saleId: string, exclude: boolean)
   } catch (err: any) {
     console.error("Error toggling treatment exclusion:", err);
     return { success: false, error: err.message };
+  }
+}
+
+export type AllowanceConfig = {
+  companyId: string;
+  review_rate: number;
+  nomination_default_rate: number;
+  blog_min_posts: number;
+  blog_amount: number;
+  sns_rate: number;
+  treatment_min_cases: number;
+  treatment_amount: number;
+  has_blog_allowance: boolean;
+  has_sns_allowance: boolean;
+  has_treatment_allowance: boolean;
+};
+
+export async function getAllowanceConfig(): Promise<AllowanceConfig> {
+  const ctx = await getCurrentUserContext();
+  const companyId = ctx.companyId || "company_default";
+  
+  const docRef = doc(db, "allowance_configs", companyId);
+  const snap = await getDoc(docRef);
+  
+  const defaultConfig: AllowanceConfig = {
+    companyId,
+    review_rate: 500,
+    nomination_default_rate: 300,
+    blog_min_posts: 5,
+    blog_amount: 3000,
+    sns_rate: 500,
+    treatment_min_cases: 10,
+    treatment_amount: 5000,
+    has_blog_allowance: companyId === "company_default", // 弊社だけの手当とするための初期制御
+    has_sns_allowance: true,
+    has_treatment_allowance: true
+  };
+
+  if (!snap.exists()) {
+    await setDoc(docRef, defaultConfig);
+    return defaultConfig;
+  }
+
+  return {
+    ...defaultConfig,
+    ...snap.data()
+  } as AllowanceConfig;
+}
+
+export async function saveAllowanceConfig(config: Partial<AllowanceConfig>) {
+  try {
+    const ctx = await getCurrentUserContext();
+    const companyId = ctx.companyId || "company_default";
+    const docRef = doc(db, "allowance_configs", companyId);
+    
+    await setDoc(docRef, {
+      ...config,
+      companyId,
+      updated_at: serverTimestamp()
+    }, { merge: true });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error saving allowance config:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getTransportAllowanceHistory(): Promise<AllowanceRecord[]> {
+  try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId) return [];
+
+    const colRef = collection(db, ALLOWANCES_COLLECTION);
+    const q = query(
+      colRef, 
+      where("companyId", "==", ctx.companyId),
+      where("type", "==", "transport")
+    );
+    const snapshot = await getDocs(q);
+    const records = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null)
+      };
+    }) as any[];
+
+    // メモリ上で日付最新順にソート
+    records.sort((a, b) => {
+      if (!a.created_at) return 1;
+      if (!b.created_at) return -1;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    return records as AllowanceRecord[];
+  } catch (error) {
+    console.error("Error fetching transport allowance history:", error);
+    return [];
   }
 }

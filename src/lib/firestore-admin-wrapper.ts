@@ -42,6 +42,11 @@ export function limit(val: number) {
   return { type: 'limit', value: val };
 }
 
+export function documentId() {
+  const admin = require("firebase-admin");
+  return admin.firestore.FieldPath.documentId();
+}
+
 export interface QueryDocumentSnapshot {
   id: string;
   data(): any;

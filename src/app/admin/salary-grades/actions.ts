@@ -37,10 +37,15 @@ export async function getSalaryGrades(): Promise<SalaryGrade[]> {
     const q = query(colRef, orderBy("display_order", "asc"));
     const snapshot = await getDocs(q);
     
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as SalaryGrade[];
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toMillis?.() || data.created_at?.seconds * 1000 || null,
+        updated_at: data.updated_at?.toMillis?.() || data.updated_at?.seconds * 1000 || null,
+      };
+    }) as SalaryGrade[];
   } catch (error) {
     console.error("Error fetching salary grades:", error);
     return [];

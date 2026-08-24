@@ -77,11 +77,10 @@ export async function getReservations(store: string, dateStr: string): Promise<R
     const customerIds = Array.from(new Set(results.map(r => r.customer_id).filter(Boolean))) as string[];
     if (customerIds.length > 0) {
       // Split into chunks of 10 for 'in' queries
-      const { doc, getDoc } = await import('firebase/firestore');
       const counts: Record<string, number> = {};
       const customerInfo: Record<string, { notes: string, allergies: string[] }> = {};
       
-      const { collection, getDocs, query, where, documentId } = await import('firebase/firestore');
+      const { documentId } = await import('@/lib/firestore-admin-wrapper');
       
       // Chunk into 10s for 'in' queries
       const chunkSize = 10;
@@ -126,10 +125,16 @@ export async function getReservations(store: string, dateStr: string): Promise<R
         storeNameToIdMap.set(s.id, s.id);
         storeNameToIdMap.set(s.name, s.id);
         storeNameToIdMap.set(s.name.replace(/店$/, ""), s.id);
-        const shortName = s.name.replace(/店$/, "").replace(/^Jasmine\s*Lash\s*/i, "");
+        const shortName = s.name.replace(/店$/, "").replace(/^Jasmine\s*Lash\s*/i, "").replace(/^BROW\s*GYM\s*/i, "");
         storeNameToIdMap.set(shortName, s.id);
         if (shortName.endsWith("道")) {
           storeNameToIdMap.set(shortName.slice(0, -1), s.id);
+        }
+        if (s.name.includes("元町") || s.name.includes("BROW")) {
+          storeNameToIdMap.set("元町", s.id);
+          storeNameToIdMap.set("元町店", s.id);
+          storeNameToIdMap.set("BROW GYM 元町", s.id);
+          storeNameToIdMap.set("BROW GYM 元町店", s.id);
         }
       });
 

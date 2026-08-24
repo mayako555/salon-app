@@ -68,23 +68,22 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function load() {
-      if (isAdmin || isManager) {
-        const res = await getDashboardStats();
-        if (res.success) {
-          setStats(res.data);
+      try {
+        const res = await fetch(`/api/dashboard/stats?quarter=${currentQuarter}`);
+        const result = await res.json();
+        if (result.success) {
+          setStats(result.stats);
+          setEvalReminders(result.evalReminders);
+          setSetupStatus(result.setupStatus);
+          setTasks(result.tasks);
+        } else {
+          console.error("Failed to load dashboard stats:", result.error);
         }
-        const evalRes = await getEvaluationReminders(currentQuarter);
-        setEvalReminders(evalRes);
-        
-        // Load setup status
-        const setupRes = await getCompanySetupStatus();
-        if (setupRes.success) {
-          setSetupStatus(setupRes.data as any);
-        }
+      } catch (e) {
+        console.error("Dashboard stats fetch error:", e);
+      } finally {
+        setLoading(false);
       }
-      const tRes = await getAllPendingTasks();
-      setTasks(tRes);
-      setLoading(false);
     }
     load();
   }, [isAdmin, isManager, profile?.id, currentQuarter]);

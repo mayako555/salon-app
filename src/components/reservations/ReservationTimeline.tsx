@@ -51,7 +51,16 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
     );
   }
 
-  const storeSettings = settings?.stores[storeName] || settings?.stores["共通"] || { startHour: 8, endHour: 22, slotDuration: 30 };
+  const getNormalizedKey = (name: string): string => {
+    const norm = name.trim().replace(/\s+/g, "");
+    if (norm.includes("六甲")) return "六甲";
+    if (norm.includes("神戸")) return "神戸";
+    if (norm.includes("元町") || norm.includes("BROW")) return "元町";
+    return name;
+  };
+
+  const normKey = getNormalizedKey(storeName);
+  const storeSettings = settings?.stores[storeName] || settings?.stores[normKey] || settings?.stores["共通"] || { startHour: 8, endHour: 22, slotDuration: 30 };
   const START_HOUR = Number(storeSettings.startHour) || 8;
   const END_HOUR = Number(storeSettings.endHour) || 22;
   const TOTAL_HOURS = END_HOUR - START_HOUR;
@@ -96,11 +105,17 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
         storeNameToIdMap.set(s.name, s.id);
         storeNameToIdMap.set(s.name.replace(/店$/, ""), s.id);
         // "Jasmine Lash 六甲道" -> "六甲", "六甲道" のように部分的な略称もマッピング
-        const shortName = s.name.replace(/店$/, "").replace(/^Jasmine\s*Lash\s*/i, "");
+        const shortName = s.name.replace(/店$/, "").replace(/^Jasmine\s*Lash\s*/i, "").replace(/^BROW\s*GYM\s*/i, "");
         storeNameToIdMap.set(shortName, s.id);
         // "六甲道" -> "六甲"
         if (shortName.endsWith("道")) {
           storeNameToIdMap.set(shortName.slice(0, -1), s.id);
+        }
+        if (s.name.includes("元町") || s.name.includes("BROW")) {
+          storeNameToIdMap.set("元町", s.id);
+          storeNameToIdMap.set("元町店", s.id);
+          storeNameToIdMap.set("BROW GYM 元町", s.id);
+          storeNameToIdMap.set("BROW GYM 元町店", s.id);
         }
       }
     });

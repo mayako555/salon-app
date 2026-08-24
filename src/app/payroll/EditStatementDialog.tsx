@@ -76,8 +76,10 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const [note, setNote] = useState(stmt.note || "");
   const [contractType, setContractType] = useState<string>("");
   const [contractData, setContractData] = useState<any>(null);
+  const [manualMonthlyBase, setManualMonthlyBase] = useState<string>("");
 
   const [productSalesRecords, setProductSalesRecords] = useState<SalesRecord[]>([]);
+  const [allSalesRecords, setAllSalesRecords] = useState<SalesRecord[]>([]);
   const [showProductSales, setShowProductSales] = useState(false);
 
   // Prefill hourly wage from staff profile and fetch contract type on open
@@ -118,19 +120,23 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
       const [year, month] = stmt.target_month.split('-');
       if (year && month) {
         getMonthlySales(Number(year), Number(month)).then(sales => {
-          const filtered = sales.filter(s => 
-            (s.staff_id === stmt.staff_id || s.staff_name === stmt.staff_name) && s.product_sales > 0
+          const matchedSales = sales.filter(s => 
+            (s.staff_id === stmt.staff_id || s.staff_name === stmt.staff_name)
           );
-          setProductSalesRecords(filtered);
+          setAllSalesRecords(matchedSales);
+          setProductSalesRecords(matchedSales.filter(s => s.product_sales > 0));
         });
       }
 
       // Initialize hourlyBasePay after contractType is determined
       if (stmt.type === "salary" && contractType !== "monthly" && contractType !== "tier_monthly") {
          setHourlyBasePay((stmt.base_amount - (stmt.details.base_tech_salary || 0) - (stmt.details.base_product_salary || 0)).toString());
+      } else {
+         const baseVal = (contractData?.monthly_base_salary ?? (stmt.base_amount - (stmt.details.base_tech_salary || 0) - (stmt.details.base_product_salary || 0)));
+         setManualMonthlyBase(baseVal.toString());
       }
     }
-  }, [isOpen, stmt.staff_id, stmt.staff_name, stmt.target_month, contractType]);
+  }, [isOpen, stmt.staff_id, stmt.staff_name, stmt.target_month]);
 
   // Manual tax calculation trigger
   const handleRecalculateTaxes = () => {
@@ -168,7 +174,7 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const numTech = Number(techSalary) || 0;
   const numProduct = Number(productSalary) || 0;
   const monthlyBaseSalary = (contractType === "monthly" || contractType === "tier_monthly")
-    ? (contractData?.monthly_base_salary ?? (stmt.base_amount - (stmt.details.base_tech_salary || 0) - (stmt.details.base_product_salary || 0)))
+    ? (manualMonthlyBase !== "" ? (Number(manualMonthlyBase) || 0) : (contractData?.monthly_base_salary ?? (stmt.base_amount - (stmt.details.base_tech_salary || 0) - (stmt.details.base_product_salary || 0))))
     : (isHourly ? Number(hourlyBasePay) : 0);
   const numBase = monthlyBaseSalary + numTech + numProduct;
   const numTransport = Number(transportAllowance) || 0;
@@ -309,9 +315,21 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                   setReviewAllowance((d.reviewAllowance || 0).toString());
                   setBlogAllowance((d.blogAllowance || 0).toString());
                   setExecutiveAllowance((d.executiveAllowance || 0).toString());
+                  setTechSalary((d.base_amount - (d.details?.base_product_salary || d.baseProductSalary || 0)).toString());
+                  setProductSalary((d.details?.base_product_salary || d.baseProductSalary || 0).toString());
+                  setTaxAddition((d.taxAddition || 0).toString());
+                  setWorkedDays((d.workedDays || "").toString());
+                  setWorkedHours((d.workedHours || "0").toString());
+                  setHourlyWage((d.hourly_wage || 0).toString());
+                  if (d.health !== undefined) setHealth((d.health || 0).toString());
+                  if (d.pension !== undefined) setPension((d.pension || 0).toString());
+                  if (d.employment !== undefined) setEmployment((d.employment || 0).toString());
+                  if (d.incomeTax !== undefined) setIncomeTax((d.incomeTax || 0).toString());
+                  if (d.residentTax !== undefined) setResidentTax((d.residentTax || 0).toString());
+                  if (d.childcare !== undefined) setChildcare((d.childcare || 0).toString());
                   toast.success("最新の売上・手当データで数値を上書きしました", { id: toastId });
                 } else {
-                  toast.error("データの取得に失敗しました", { id: toastId });
+                  toast.error(`データの取得に失敗しました: ${(res as any).error || "不明なエラー"}`, { id: toastId });
                 }
               }}
               className="h-8 text-xs font-bold bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
@@ -405,10 +423,13 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-500 block">ベース基本給 (固定)</span>
-                  <div className="h-9 flex items-center justify-start px-3 bg-white border border-slate-200 rounded-lg text-xs font-extrabold text-slate-700 tabular-nums">
-                    ¥{monthlyBaseSalary.toLocaleString()}
-                  </div>
+                  <span className="text-[10px] font-bold text-slate-500 block">ベース基本給 (手打ち編集可)</span>
+                  <Input 
+                    type="number" 
+                    value={manualMonthlyBase} 
+                    onChange={(e) => setManualMonthlyBase(e.target.value)}
+                    className="h-9 text-xs rounded-lg font-bold border-slate-200 bg-white"
+                  />
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold text-slate-500 block">固定手当 合計</span>
@@ -468,24 +489,96 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                   className="h-10 text-xs rounded-lg font-bold border-slate-200 focus:ring-blue-500"
                   placeholder="0"
                 />
-                <div className="text-[9px] text-slate-400 font-bold mt-1 flex items-center justify-between">
-                  <span>基本給合計: ¥{numBase.toLocaleString()}</span>
-                  {productSalesRecords.length > 0 && (
-                    <button type="button" onClick={() => setShowProductSales(!showProductSales)} className="text-blue-500 hover:text-blue-700 underline">
-                      該当の会計({productSalesRecords.length}件)を確認
-                    </button>
-                  )}
-                </div>
-                {showProductSales && productSalesRecords.length > 0 && (
-                   <div className="mt-2 bg-white border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-2">
-                     {productSalesRecords.map(s => (
-                       <div key={s.id} className="text-[10px] border-b border-slate-100 pb-1 last:border-0 last:pb-0">
-                         <div className="font-bold text-slate-700">{s.date} {s.time} - {s.customer_name}</div>
-                         <div className="text-slate-500">{s.menu_course} <span className="font-bold text-blue-600">(店販: ¥{s.product_sales.toLocaleString()})</span></div>
-                       </div>
-                     ))}
-                   </div>
-                )}
+                {stmt.type === "reward" && (() => {
+                  const defaultRatio = contractData?.tech_sales_ratio || 0;
+                  const menuSpecificRates = contractData?.menu_specific_rates || [];
+                  const deductionCashlessRatio = contractData?.deduction_cashless_ratio || 0;
+                  
+                  // Sort and categorize sales records by matched menu specific rates
+                  const breakdown: Record<string, { sales: number; ratio: number; count: number }> = {};
+                  let totalOtherSales = 0;
+                  let totalOtherCount = 0;
+                  let totalCashlessTech = 0;
+
+                  allSalesRecords.forEach(s => {
+                    const netTech = Math.max(0, (s.tech_sales || 0) - (s.discount || 0));
+                    const isCashless = s.payment_method !== "現金" && s.payment_method !== "不明" && s.payment_method !== "";
+                    if (isCashless) {
+                      totalCashlessTech += netTech;
+                    }
+
+                    let matchedRate = defaultRatio;
+                    let matchedName = "通常技術";
+                    if (menuSpecificRates.length > 0 && s.menu_course) {
+                      for (const spec of menuSpecificRates) {
+                        if (spec.menu_name && s.menu_course.includes(spec.menu_name)) {
+                          matchedRate = spec.ratio;
+                          matchedName = spec.menu_name;
+                          break;
+                        }
+                      }
+                    }
+
+                    if (matchedName === "通常技術") {
+                      totalOtherSales += netTech;
+                      totalOtherCount++;
+                    } else {
+                      if (!breakdown[matchedName]) {
+                        breakdown[matchedName] = { sales: 0, ratio: matchedRate, count: 0 };
+                      }
+                      breakdown[matchedName].sales += netTech;
+                      breakdown[matchedName].count++;
+                    }
+                  });
+
+                  return (
+                    <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2 text-xs">
+                      <p className="font-bold text-slate-700 border-b pb-1">業務委託費用 算出計算（参考内訳）</p>
+                      
+                      {/* Tech sales ratio table */}
+                      <table className="w-full text-[10px] text-left border-collapse">
+                        <thead>
+                          <tr className="text-slate-400 font-bold border-b border-slate-200/60">
+                            <th className="pb-1">メニュー区分 (歩合率)</th>
+                            <th className="pb-1 text-right">当月売上額</th>
+                            <th className="pb-1 text-right">歩合報酬</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-bold">
+                          {Object.entries(breakdown).map(([name, val]) => {
+                            const comm = Math.floor(val.sales * 0.9 * (val.ratio / 100)); // 10% tax deduction base
+                            return (
+                              <tr key={name} className="text-slate-600">
+                                <td className="py-1">{name} ({val.ratio}%) <span className="text-[8px] font-normal text-slate-400">({val.count}件)</span></td>
+                                <td className="py-1 text-right">¥{val.sales.toLocaleString()}</td>
+                                <td className="py-1 text-right text-emerald-600">¥{comm.toLocaleString()}</td>
+                              </tr>
+                            );
+                          })}
+                          {totalOtherSales > 0 && (
+                            <tr className="text-slate-600">
+                              <td className="py-1">通常施術 ({defaultRatio}%) <span className="text-[8px] font-normal text-slate-400">({totalOtherCount}件)</span></td>
+                              <td className="py-1 text-right">¥{totalOtherSales.toLocaleString()}</td>
+                              <td className="py-1 text-right text-emerald-600">¥{Math.floor(totalOtherSales * 0.9 * (defaultRatio / 100)).toLocaleString()}</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+
+                      {/* Cashless Fee Deduction display */}
+                      {deductionCashlessRatio > 0 && (
+                        <div className="pt-1.5 border-t border-slate-200 flex justify-between items-center text-[10px] text-slate-500 font-bold">
+                          <span>キャッシュレス決済手数料控除 ({deductionCashlessRatio}%対象):</span>
+                          <span>-¥{Math.floor(totalCashlessTech * (deductionCashlessRatio / 100)).toLocaleString()}</span>
+                        </div>
+                      )}
+                      
+                      <p className="text-[8px] text-slate-400 leading-normal">
+                        ※上記は売上レコード(CSV)から自動計算された目安額です。確定額は左の「技術歩合報酬ベース」に入力してください。
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="space-y-1">

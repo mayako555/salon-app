@@ -83,6 +83,7 @@ export function Sidebar() {
         { name: "高度分析", href: "/analytics", icon: Sparkles, role: "admin" }, // All admins can see the page, but tabs are restricted inside
         { name: "経費・収支管理", href: "/admin/expenses", icon: Wallet, role: "admin", feature: "expenses" },
         { name: "給与・報酬計算", href: "/payroll", icon: Calculator, role: "admin", feature: "payroll" },
+        { name: "手当管理", href: "/allowances", icon: Gift, role: "admin" },
       ]
     },
     {
@@ -112,7 +113,6 @@ export function Sidebar() {
         { name: "システム管理マスタ", href: "/admin/master/system", icon: Settings, role: "systemOwner" },
         { name: "在庫管理", href: "/inventory", icon: Package, role: "manager", feature: "inventory" },
         { name: "雇用・業務委託契約", href: "/contracts", icon: FileText, role: "admin" },
-        { name: "手当管理", href: "/allowances", icon: Gift, role: "admin" },
         { name: "請求書", href: "/admin/settings/subscription", icon: Building2, role: "companyOwner" },
         { name: "システム設定", href: "/admin/settings", icon: Settings, role: "companyOwner" },
         { name: "監査ログ", href: "/audit", icon: Settings, role: "systemOwner" },

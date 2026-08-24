@@ -65,6 +65,9 @@ export default async function PayrollPage({
     return !statements.some((stmt: any) => stmt.staff_id === staff.id);
   });
 
+  // Create reload script/client component to refresh page, or just reload via window.location.reload()
+  const reloadPage = "window.location.reload()";
+
   return (
     <AuthGuard requireRole="admin" requireFeature="payroll">
       <div className="space-y-6 pb-24 animate-in fade-in duration-300">
@@ -108,16 +111,16 @@ export default async function PayrollPage({
           </div>
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
              <div>
-               <p className="text-sm font-medium text-slate-500 mb-1">締めステータス</p>
-               {isClosed ? (
-                 <div className="flex items-center gap-1.5 text-emerald-600 font-bold bg-emerald-50 px-3 py-1 rounded-full w-fit">
-                   <CheckCircle2 size={16} /><span>確定済み</span>
-                 </div>
-               ) : (
-                 <div className="flex items-center gap-1.5 text-amber-600 font-bold bg-amber-50 px-3 py-1 rounded-full w-fit">
-                   <AlertCircle size={16} /><span>未確定 (編集中)</span>
-                 </div>
-               )}
+                <p className="text-sm font-medium text-slate-500 mb-1">締めステータス</p>
+                {isClosed ? (
+                  <div className="flex items-center gap-1.5 text-emerald-600 font-bold bg-emerald-50 px-3 py-1 rounded-full w-fit">
+                    <CheckCircle2 size={16} /><span>確定済み</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-amber-600 font-bold bg-amber-50 px-3 py-1 rounded-full w-fit">
+                    <AlertCircle size={16} /><span>未確定 (編集中)</span>
+                  </div>
+                )}
              </div>
           </div>
         </div>

@@ -183,30 +183,79 @@ function calculateProductCommission(sales: any[], contract: any, cashlessRetail:
   let customOriginalSum = 0;
 
   for (const sale of sales) {
-    if (sale.product_sales > 0 && sale.menu_course) {
-      const menus = sale.menu_course.split(/ \+ |\, /);
-      for (const m of menus) {
-        let matched = false;
-        // First check custom rules
-        for (const rule of rules) {
-          if (rule.keyword && m.includes(rule.keyword)) {
-            const price = rule.salesPrice || 0;
-            const baseAmt = rule.baseAmount || price; // fallback to salesPrice if baseAmount is missing
-            const rate = rule.commissionRate || 0;
-            customOriginalSum += price;
-            customCommission += Math.floor(baseAmt * (rate / 100));
-            matched = true;
-            break;
+    if (sale.product_sales > 0) {
+      const storeStr = (sale.store_name || sale.store || "").toLowerCase();
+      const isJasmineLash = storeStr.includes("jasmine") || storeStr.includes("jasminash");
+      
+      // Parse product_details JSON if available
+      let detailsParsed = false;
+      if (sale.product_details) {
+        try {
+          const items = JSON.parse(sale.product_details);
+          if (Array.isArray(items)) {
+            detailsParsed = true;
+            for (const item of items) {
+              const name = item.name || "";
+              const price = item.price || 0;
+              let matched = false;
+              
+              // Custom rules
+              for (const rule of rules) {
+                if (rule.keyword && name.includes(rule.keyword)) {
+                  const rulePrice = rule.salesPrice || 0;
+                  const baseAmt = rule.baseAmount || rulePrice;
+                  const rate = rule.commissionRate || 0;
+                  customOriginalSum += price; // subtract actual price
+                  customCommission += Math.floor(baseAmt * (rate / 100));
+                  matched = true;
+                  break;
+                }
+              }
+              
+              if (!matched) {
+                if (isJasmineLash) {
+                  if (name.includes("コーティング")) {
+                    customCommission += 150;
+                    customOriginalSum += price;
+                  } else if (name.includes("リルジュ")) {
+                    customCommission += 430;
+                    customOriginalSum += price;
+                  }
+                }
+              }
+            }
           }
+        } catch (e) {
+          // parse failed, fallback below
         }
-        // Fallback to legacy hardcoded if no rules match or no rules defined
-        if (!matched && rules.length === 0) {
-          if (m.includes("コーティング")) {
-            customCommission += 150;
-            customOriginalSum += 1760;
-          } else if (m.includes("リルジュ")) {
-            customCommission += 430;
-            customOriginalSum += 4840;
+      }
+      
+      // Fallback to menu_course split matching if details not parsed
+      if (!detailsParsed && sale.menu_course) {
+        const menus = sale.menu_course.split(/ \+ |\, /);
+        for (const m of menus) {
+          let matched = false;
+          for (const rule of rules) {
+            if (rule.keyword && m.includes(rule.keyword)) {
+              const price = rule.salesPrice || 0;
+              const baseAmt = rule.baseAmount || price;
+              const rate = rule.commissionRate || 0;
+              customOriginalSum += price;
+              customCommission += Math.floor(baseAmt * (rate / 100));
+              matched = true;
+              break;
+            }
+          }
+          if (!matched) {
+            if (isJasmineLash) {
+              if (m.includes("コーティング")) {
+                customCommission += 150;
+                customOriginalSum += sale.product_sales;
+              } else if (m.includes("リルジュ")) {
+                customCommission += 430;
+                customOriginalSum += sale.product_sales;
+              }
+            }
           }
         }
       }
@@ -565,8 +614,18 @@ export async function generateStatements(year: number, month: number) {
       const baseMonthlySalary = contract.monthly_base_salary || 280000;
       
       let incentive = 0;
-      if (personalTaxFreeSales >= 400000) {
+      const threshold = contract.tech_sales_threshold || 0;
+      if (threshold > 0) {
+        // Calculate based on tech_sales_threshold (tax-included) and tech_sales_ratio
+        if (totalTechSales > threshold) {
+          const ratio = contract.tech_sales_ratio || 10;
+          incentive = Math.floor((totalTechSales - threshold) * (ratio / 100));
+        }
+      } else {
+        // Fallback to legacy rule
+        if (personalTaxFreeSales >= 400000) {
           incentive = Math.floor(personalTaxFreeSales / 50000) * 5000 - 35000;
+        }
       }
       
       const productCommission = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules);
@@ -576,28 +635,48 @@ export async function generateStatements(year: number, month: number) {
       const allowanceTotal = transportFee + nominationAllowanceDb + reviewAllowanceDb + blogAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
       const customAdjustTotal = (preservedAdjusts?.custom_adjustments || []).reduce((acc, curr) => acc + curr.amount, 0);
 
-      const intermediatePaidAmount = baseMonthlySalary + incentive + productCommission + nominationReward + allowanceTotal + customAdjustTotal;
-      const finalPaidAmount = intermediatePaidAmount;
+      const base_amount = baseMonthlySalary + incentive + productCommission + nominationReward;
+
+      // Calculate deductions/taxes for tier_monthly since it is a salary type
+      const taxes = calculatePayrollTaxes({
+        baseSalary: base_amount,
+        allowances: allowanceTotal - transportFee + customAdjustTotal,
+        transportFee: transportFee,
+        dependentsCount: 0
+      });
+
+      const health = preservedAdjusts?.health_insurance_override ?? taxes.healthInsurance;
+      const pension = preservedAdjusts?.pension_override ?? taxes.pension;
+      const employment = preservedAdjusts?.employment_insurance_override ?? taxes.employmentInsurance;
+      const incomeTax = preservedAdjusts?.income_tax_override ?? taxes.incomeTax;
+      const residentTax = preservedAdjusts?.resident_tax_override ?? taxes.residentTax;
+      const childcare = preservedAdjusts?.childcare_support_override ?? (taxes.childcareSupport || 0);
+
+      const totalDeductions = health + pension + employment + incomeTax + residentTax + childcare;
+      const finalPaidAmount = base_amount + allowanceTotal + customAdjustTotal - totalDeductions;
 
       const statementPayload = {
         staff_id: contract.staff_id,
         staff_name: contract.staff_name || "不明",
         target_month: targetMonth,
         type: "salary", 
-        base_amount: baseMonthlySalary + incentive + productCommission,
+        base_amount: base_amount,
         total_allowances: allowanceTotal,
-        total_deductions: 0,
+        total_deductions: totalDeductions,
         final_paid_amount: finalPaidAmount,
         status: "draft",
         adjustments: preservedAdjusts,
         work_location: storeLocation,
         details: {
-          base_tech_salary: incentive + productCommission,
-          base_product_salary: 0,
+          base_tech_salary: incentive,
+          base_product_salary: productCommission,
           nomination_reward: nominationReward,
           transport_fee: transportFee,
           cashless_deduction: 0,
           tax_addition: 0,
+          social_insurance: {
+             employment, health, pension, income_tax: incomeTax, resident_tax: residentTax, childcare
+          },
           review_allowance: reviewAllowanceDb,
           blog_allowance: blogAllowanceDb,
           executive_allowance: otherAllowanceDb + contractCustomAllowanceTotal,
@@ -792,6 +871,7 @@ export async function createManualStatement(data: {
   final_paid_amount: number;
   work_location?: string;
   note?: string;
+  adjustments?: MonthlyStatement["adjustments"];
   details: MonthlyStatement["details"];
 }) {
   try {
@@ -799,18 +879,16 @@ export async function createManualStatement(data: {
     const docRef = await addTenantOwnedDoc(colRef, {
       ...data,
       status: "draft",
-      created_at: serverTimestamp()
+      created_at: serverTimestamp(),
     });
-
     await addAuditLog({
       table_name: "monthly_statements",
       record_id: docRef.id,
       action: "INSERT",
       old_data: null,
       new_data: { staff_name: data.staff_name, target_month: data.target_month },
-      actor: "管理者"
+      actor: "管理者",
     });
-
     return { success: true, id: docRef.id };
   } catch (error: any) {
     console.error("Error creating manual statement:", error);
@@ -820,14 +898,65 @@ export async function createManualStatement(data: {
 
 export async function getStaffPayrollDefaultValues(staffId: string, year: number, month: number) {
   try {
-    const contracts = await getContractsList();
+    const { adminDb } = await import("@/lib/firebase-admin");
+    const { getCurrentUserContext } = await import("@/lib/auth-server");
+
+    // 1. まず getContractsList 経由でテナントフィルタ込みで取得を試みる
+    let contracts = await getContractsList();
+
+    // 2. 空の場合 (テナント認証失敗など) は Admin SDK で直接取得するフォールバック
+    if (!contracts || contracts.length === 0) {
+      try {
+        const ctx = await getCurrentUserContext();
+        const companyId = ctx.companyId;
+        let snap: any;
+        if (companyId) {
+          snap = await adminDb
+            .collection("staff_contracts")
+            .where("companyId", "==", companyId)
+            .where("deleted", "!=", true)
+            .orderBy("valid_from", "desc")
+            .get();
+        } else {
+          // systemOwner (非インパーソネート)
+          snap = await adminDb
+            .collection("staff_contracts")
+            .where("deleted", "!=", true)
+            .orderBy("valid_from", "desc")
+            .get();
+        }
+        const staffSnap2 = await adminDb.collection("staff_profiles").get();
+        const staffMap2 = new Map<string, string>();
+        staffSnap2.docs.forEach((d: any) => staffMap2.set(d.id, d.data().name));
+        contracts = snap.docs.map((d: any) => ({
+          ...d.data(),
+          id: d.id,
+          staff_name: staffMap2.get(d.data().staff_id) || "不明",
+        }));
+      } catch (fbErr: any) {
+        console.error("Fallback contract fetch failed:", fbErr);
+      }
+    }
+
     const companySnap = await getDocs(query(collection(db, "companies")));
     const companyData = !companySnap.empty ? companySnap.docs[0].data() : {};
     const productCommissionRules = companyData.productCommissionRules || [];
     const activeContracts = getActiveContractsForMonth(contracts, year, month);
-    const contract = activeContracts.find(c => c.staff_id === staffId);
+    let contract = activeContracts.find(c => c.staff_id === staffId);
+
+    // 3. 指定月のアクティブ契約がない場合は、そのスタッフの最新の契約にフォールバック
     if (!contract) {
-      return { success: false, error: "該当スタッフの契約情報が登録されていません。" };
+      const staffContracts = contracts
+        .filter((c: any) => c.staff_id === staffId && c.deleted !== true)
+        .sort((a: any, b: any) => b.valid_from.localeCompare(a.valid_from));
+      if (staffContracts.length > 0) {
+        contract = staffContracts[0];
+        console.warn(`No active contract for staff ${staffId} in ${year}-${month}. Using latest contract: valid_from=${contract.valid_from}`);
+      }
+    }
+
+    if (!contract) {
+      return { success: false, error: `該当スタッフの契約情報が登録されていません。(staffId: ${staffId}, ${year}-${month})` };
     }
 
     // Retrieve staff profile to get fallback hourly_wage
@@ -863,6 +992,8 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
       productCashless: number;
     }> = {};
 
+    const productSalesBreakdownItems: { name: string, price: number, store: string }[] = [];
+
     for (const sale of staffSales) {
       const storeName = sale.store_name || "不明";
       if (!storeSalesBreakdown[storeName]) {
@@ -874,6 +1005,36 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
       if (sale.payment_method !== "現金" && sale.payment_method !== "不明") {
         storeSalesBreakdown[storeName].techCashless += netTechSales;
         storeSalesBreakdown[storeName].productCashless += sale.product_sales;
+      }
+
+      // Collect product details
+      if (sale.product_sales > 0) {
+        if (sale.product_details) {
+          try {
+            const parsed = JSON.parse(sale.product_details);
+            if (Array.isArray(parsed)) {
+              parsed.forEach((p: any) => {
+                productSalesBreakdownItems.push({
+                  name: p.name || "店販商品",
+                  price: p.price || 0,
+                  store: storeName
+                });
+              });
+            }
+          } catch (e) {
+            productSalesBreakdownItems.push({
+              name: `店販商品 (${sale.customer_name || "フリー"})`,
+              price: sale.product_sales,
+              store: storeName
+            });
+          }
+        } else {
+          productSalesBreakdownItems.push({
+            name: `店販商品 (${sale.customer_name || "フリー"})`,
+            price: sale.product_sales,
+            store: storeName
+          });
+        }
       }
     }
 
@@ -923,6 +1084,8 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
     const type: "salary" | "reward" = contract.contract_type === "outsourcing" ? "reward" : "salary";
     let base_amount = 0;
     let taxAddition = 0;
+    let techIncentive = 0;
+    let productCommission = 0;
     
     let health = 0;
     let pension = 0;
@@ -994,14 +1157,21 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
          techCommission = Math.floor((techSalesTaxFree - quota) * (contract.tech_sales_ratio / 100));
       }
       
-      const productCommission = calculateProductCommission(staffSales, contract, 0);
+      const prodCommissionVal = calculateProductCommission(staffSales, contract, 0);
       
-      base_amount = (contract.monthly_base_salary || 0) + techCommission + productCommission;
+      base_amount = contract.monthly_base_salary || 0;
+      techIncentive = techCommission;
+      productCommission = prodCommissionVal;
+      
+      // Separate contract allowances to prevent merging them into base_amount
+      const contractBusinessAllowance = contract.business_allowance || 0;
+      const contractAttendanceAllowance = contract.attendance_allowance || 0;
+
       transportAllowance = transportAllowanceDb > 0 ? transportAllowanceDb : 17950; // Standard transport fee for monthly contracts if not entered in DB
 
-      const totalAllowancesTmp = transportAllowance + nominationAllowance + reviewAllowance + blogAllowance + executiveAllowance;
+      const totalAllowancesTmp = transportAllowance + nominationAllowance + reviewAllowance + blogAllowance + executiveAllowance + contractBusinessAllowance + contractAttendanceAllowance;
       const taxes = calculatePayrollTaxes({
-        baseSalary: base_amount,
+        baseSalary: base_amount + techCommission + prodCommissionVal,
         allowances: totalAllowancesTmp - transportAllowance,
         transportFee: transportAllowance,
         dependentsCount: 0
@@ -1028,16 +1198,27 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
       const baseMonthlySalary = contract.monthly_base_salary || 280000;
       
       let incentive = 0;
-      if (personalTaxFreeSales >= 400000) {
+      const threshold = contract.tech_sales_threshold || 0;
+      if (threshold > 0) {
+        if (totalTechSales > threshold) {
+          const ratio = contract.tech_sales_ratio || 10;
+          incentive = Math.floor((totalTechSales - threshold) * (ratio / 100));
+        }
+      } else {
+        if (personalTaxFreeSales >= 400000) {
           incentive = Math.floor(personalTaxFreeSales / 50000) * 5000 - 35000;
+        }
       }
       
-      base_amount = baseMonthlySalary + incentive;
+      base_amount = baseMonthlySalary;
+      techIncentive = incentive;
+      productCommission = calculateProductCommission(staffSales, contract, 0); // standard without cashless deduction filter for default estimation
+
       transportAllowance = transportAllowanceDb > 0 ? transportAllowanceDb : 17950; // Standard transport fee if not entered in DB
 
-      const totalAllowancesTmp = transportAllowance + nominationAllowance + reviewAllowance + blogAllowance + executiveAllowance;
+      const totalAllowancesTmp = transportAllowance + nominationAllowance + reviewAllowance + blogAllowance + executiveAllowance + (contract.business_allowance || 0) + (contract.attendance_allowance || 0);
       const taxes = calculatePayrollTaxes({
-        baseSalary: base_amount,
+        baseSalary: base_amount + incentive,
         allowances: totalAllowancesTmp - transportAllowance,
         transportFee: transportAllowance,
         dependentsCount: 0
@@ -1076,15 +1257,19 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
       const baseProductSalary = calculateProductCommission(staffSales, contract, effectiveCashlessRetailTmp);
       
       base_amount = baseTechSalary + baseProductSalary;
+      techIncentive = baseTechSalary;
+      productCommission = baseProductSalary;
 
-      const totalAllowancesTmp = transportAllowance + nominationAllowance + reviewAllowance + blogAllowance + executiveAllowance;
+      const totalAllowancesTmp = transportAllowance + nominationAllowance + reviewAllowance + blogAllowance + executiveAllowance + (contract.business_allowance || 0) + (contract.attendance_allowance || 0);
       const intermediatePaidAmount = base_amount + totalAllowancesTmp;
       if (!contract.deduction_consumption_tax) {
          taxAddition = Math.floor(intermediatePaidAmount * 0.1); 
       }
     }
 
-    const total_allowances = transportAllowance + nominationAllowance + reviewAllowance + blogAllowance + executiveAllowance;
+    const businessAllowance = contract.business_allowance || 0;
+    const attendanceAllowance = contract.attendance_allowance || 0;
+    const total_allowances = transportAllowance + nominationAllowance + reviewAllowance + blogAllowance + executiveAllowance + businessAllowance + attendanceAllowance;
 
     return {
       success: true,
@@ -1093,12 +1278,16 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
         contract_type: contract.contract_type,
         contract,
         base_amount,
+        techIncentive,
+        productCommission,
         total_allowances,
         transportAllowance,
         nominationAllowance,
         reviewAllowance,
         blogAllowance,
         executiveAllowance,
+        businessAllowance,
+        attendanceAllowance,
         taxAddition,
         health,
         pension,
@@ -1110,7 +1299,8 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
         workedHours: finalWorkedHours,
         hourly_wage: finalHourlyWage,
         work_location: storeLocation,
-        storeSalesBreakdown
+        storeSalesBreakdown,
+        productSalesBreakdownItems
       }
     };
   } catch (error: any) {

@@ -224,8 +224,8 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
   return (
     <>
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden bg-slate-50">
-        <DialogHeader className="p-4 bg-white border-b border-slate-100 flex flex-row items-start justify-between">
+      <DialogContent className="sm:max-w-[450px] max-h-[92vh] flex flex-col p-0 overflow-hidden bg-slate-50">
+        <DialogHeader className="p-4 bg-white border-b border-slate-100 flex flex-row items-start justify-between shrink-0">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
@@ -266,7 +266,7 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
           )}
         </DialogHeader>
 
-        <div className="p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Schedule Info */}
           <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm space-y-3 text-sm">
             <div className="flex items-start gap-3">

@@ -1,21 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, X } from "lucide-react";
-import { addAllowance } from "./actions";
+import { addAllowance, getAllowanceConfig, AllowanceConfig } from "./actions";
 
 export default function AllowanceFormDialog({ staffList }: { staffList: string[] }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [type, setType] = useState("review");
   const [countInput, setCountInput] = useState("");
+  const [config, setConfig] = useState<AllowanceConfig | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      async function loadConfig() {
+        const c = await getAllowanceConfig();
+        setConfig(c);
+      }
+      loadConfig();
+    }
+  }, [isOpen]);
 
   let calculatedAmount = 0;
   const count = parseInt(countInput || "0", 10);
-  if (type === "review" || type === "sns") calculatedAmount = count * 500;
-  if (type === "blog") calculatedAmount = count >= 5 ? 3000 : 0;
-  if (type === "treatment") calculatedAmount = count >= 10 ? 5000 : 0;
+  if (type === "review") calculatedAmount = count * (config?.review_rate ?? 500);
+  if (type === "sns") calculatedAmount = count * (config?.sns_rate ?? 500);
+  if (type === "blog") {
+    const minPosts = config?.blog_min_posts ?? 5;
+    const amount = config?.blog_amount ?? 3000;
+    calculatedAmount = count >= minPosts ? amount : 0;
+  }
+  if (type === "treatment") {
+    const minCases = config?.treatment_min_cases ?? 10;
+    const amount = config?.treatment_amount ?? 5000;
+    calculatedAmount = count >= minCases ? amount : 0;
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -77,6 +97,22 @@ export default function AllowanceFormDialog({ staffList }: { staffList: string[]
                 </div>
               </div>
 
+              {/* 期間設定 (開始日・終了日) */}
+              <div className="space-y-1.5 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">対象期間（任意）</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] text-slate-600 mb-0.5">開始日</label>
+                    <input type="date" name="start_date" className="w-full h-9 px-2 border border-slate-300 rounded bg-white text-xs" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-600 mb-0.5">終了日</label>
+                    <input type="date" name="end_date" className="w-full h-9 px-2 border border-slate-300 rounded bg-white text-xs" />
+                  </div>
+                </div>
+                <p className="text-[9px] text-slate-400 mt-1">※ 交通費や日割手当などで特定の期間を指定したい場合に入力します。</p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">手当種別</label>
                 <select required name="type" value={type} onChange={e => { setType(e.target.value); setCountInput(""); }} className="w-full h-10 px-3 border border-slate-300 rounded-md text-sm bg-white">
@@ -100,10 +136,10 @@ export default function AllowanceFormDialog({ staffList }: { staffList: string[]
                   <div className="flex items-center gap-3">
                     <input required min="0" type="number" name="dynamic_count" value={countInput} onChange={e => setCountInput(e.target.value)} placeholder="0" className="w-24 h-10 px-3 border border-slate-300 rounded-md text-sm" />
                     <span className="text-sm font-medium text-slate-600 flex-1">
-                      {type === "review" && "件 × 500円"}
-                      {type === "sns" && "件 × 500円"}
-                      {type === "blog" && "※ 5本以上で 3,000円支給"}
-                      {type === "treatment" && "※ 10件達成で 5,000円支給"}
+                    {type === "review" && `件 × ${(config?.review_rate ?? 500)}円`}
+                    {type === "sns" && `件 × ${(config?.sns_rate ?? 500)}円`}
+                    {type === "blog" && `※ ${(config?.blog_min_posts ?? 5)}本以上で ${(config?.blog_amount ?? 3000).toLocaleString()}円支給`}
+                    {type === "treatment" && `※ ${(config?.treatment_min_cases ?? 10)}件達成で ${(config?.treatment_amount ?? 5000).toLocaleString()}円支給`}
                     </span>
                   </div>
                   {countInput && parseInt(countInput) > 0 && (

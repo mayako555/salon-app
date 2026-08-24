@@ -99,7 +99,8 @@ export function useSalesData({
         const targetStoreId = storeNameToIdMap[store] || store;
         const storeRecords = staffSales.filter((s) => {
           if (s.store_id) return s.store_id === targetStoreId;
-          return s.store_name === store;
+          const { getNormalizedStoreName } = require("@/lib/store-utils");
+          return getNormalizedStoreName(s.store_name || "") === getNormalizedStoreName(store);
         });
         const storeVisitIds = new Set(storeRecords.map(getVisitId));
         
@@ -223,7 +224,8 @@ export function useSalesData({
         const targetStoreId = storeNameToIdMap[store] || store;
         const prevStoreSales = comparablePrevMonthSales.filter((s) => {
           if (s.store_id) return s.store_id === targetStoreId;
-          return s.store_name === store;
+          const { getNormalizedStoreName } = require("@/lib/store-utils");
+          return getNormalizedStoreName(s.store_name || "") === getNormalizedStoreName(store);
         });
         const prevStoreTotal = prevStoreSales.reduce(
           (sum, s) => sum + s.tech_sales + s.product_sales + (s.nomination_fee || 0) - (s.discount || 0),

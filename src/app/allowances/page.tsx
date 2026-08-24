@@ -6,11 +6,13 @@ import { getMonthlyAllowances, AllowanceType, AllowanceRecord } from "./actions"
 import { getStaffList } from "@/app/staff/actions";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Download, ChevronLeft, ChevronRight, MessageSquare, Edit3, Megaphone, HelpCircle, Train, CheckCircle2 } from "lucide-react";
+import { Plus, Download, ChevronLeft, ChevronRight, MessageSquare, Edit3, Megaphone, HelpCircle, Train, CheckCircle2, Settings } from "lucide-react";
 import { format } from "date-fns";
 import AllowanceTaskDialog from "./AllowanceTaskDialog";
 import NominationDetailDialog from "./NominationDetailDialog";
 import TreatmentDetailDialog from "./TreatmentDetailDialog";
+import AllowanceConfigDialog from "./AllowanceConfigDialog";
+import TransportHistoryDialog from "./TransportHistoryDialog";
 import AuthGuard from "@/components/AuthGuard";
 import { AllowanceTaskStatus, getMonthlyAllowanceTasks, unmarkAllowanceChecked } from "./actions";
 import { UserCheck } from "lucide-react";
@@ -34,13 +36,20 @@ function AllowancesPageContent() {
   const [selectedTask, setSelectedTask] = useState<AllowanceTaskStatus | null>(null);
   const [detailStaff, setDetailStaff] = useState<AllowanceTaskStatus | null>(null);
   const [detailTreatmentStaff, setDetailTreatmentStaff] = useState<AllowanceTaskStatus | null>(null);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isTransportHistoryOpen, setIsTransportHistoryOpen] = useState(false);
 
   const loadTasks = async () => {
     try {
       setLoading(true);
       setErrorMsg("");
-      const data = await getMonthlyAllowanceTasks(year, month);
-      setTasks(data);
+      const res = await fetch(`/api/allowances?year=${year}&month=${month}`, { cache: 'no-store' });
+      const result = await res.json();
+      if (result.success) {
+        setTasks(result.data);
+      } else {
+        setErrorMsg(result.error || "データの取得に失敗しました。");
+      }
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || String(err));
@@ -95,6 +104,22 @@ function AllowancesPageContent() {
             <span className="text-sm font-bold text-slate-500 mr-2">当月手当合計</span>
             <span className="text-xl font-black text-slate-800">¥{totalAmount.toLocaleString()}</span>
           </div>
+          <Button 
+            variant="outline" 
+            className="flex items-center gap-2 border-blue-200 text-blue-700 hover:text-blue-800 hover:bg-blue-50/50"
+            onClick={() => setIsTransportHistoryOpen(true)}
+          >
+            <Train size={16} />
+            交通費申請の履歴
+          </Button>
+          <Button 
+            variant="outline" 
+            className="flex items-center gap-2"
+            onClick={() => setIsConfigOpen(true)}
+          >
+            <Settings size={16} />
+            手当ルール設定
+          </Button>
         </div>
       </div>
 
@@ -272,6 +297,21 @@ function AllowancesPageContent() {
           treatments={detailTreatmentStaff.treatments}
           isOpen={true}
           onClose={() => setDetailTreatmentStaff(null)}
+        />
+      )}
+
+      {isConfigOpen && (
+        <AllowanceConfigDialog
+          isOpen={isConfigOpen}
+          onClose={() => setIsConfigOpen(false)}
+          onSuccess={() => loadTasks()}
+        />
+      )}
+
+      {isTransportHistoryOpen && (
+        <TransportHistoryDialog
+          isOpen={isTransportHistoryOpen}
+          onClose={() => setIsTransportHistoryOpen(false)}
         />
       )}
     </div>
