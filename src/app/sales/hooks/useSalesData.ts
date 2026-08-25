@@ -31,7 +31,22 @@ export function useSalesData({
   selectedStore,
 }: UseSalesDataProps) {
   return useMemo(() => {
-    const stores = availableStores && availableStores.length > 0 ? availableStores : ["メイン店舗"];
+    let stores = availableStores && availableStores.length > 0 ? availableStores : [];
+    
+    // Fallback: extract unique stores from actual sales data if none provided by master
+    if (stores.length === 0) {
+      const uniqueStores = new Set<string>();
+      const { getNormalizedStoreName } = require("@/lib/store-utils");
+      sales.forEach(s => {
+        if (s.store_name) {
+          uniqueStores.add(getNormalizedStoreName(s.store_name));
+        }
+      });
+      stores = Array.from(uniqueStores);
+      if (stores.length === 0) {
+        stores = ["メイン店舗"];
+      }
+    }
 
     // 1. Sort staff profiles and extract unique names
     const sortedProfiles = [...staffProfiles].sort((a, b) => {

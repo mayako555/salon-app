@@ -77,7 +77,7 @@ export default React.memo(function SalesFilterBar({
                 onClick={() => onStoreChange(store)}
                 className={`h-8 px-4 text-xs font-bold rounded-md ${selectedStore === store ? "bg-white shadow-sm text-blue-600" : "text-slate-500 hover:text-slate-700"}`}
               >
-                {store}店
+                {store.endsWith('店') ? store : `${store}店`}
               </Button>
             ))}
           </div>
