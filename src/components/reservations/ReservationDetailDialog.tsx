@@ -56,7 +56,7 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
     try {
       let salesData;
       if (reservation.status === "completed") {
-        const existing = await getSaleByReservationId(reservation.id);
+        const existing = await getSaleByReservationId(reservation.id, reservation.source_sales_id);
         if (existing) {
           salesData = { ...existing, payment_method: paymentMethod };
         } else {
@@ -188,7 +188,7 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
       }).catch(console.error);
 
       if (reservation.status === 'completed') {
-        getSaleByReservationId(reservation.id).then(existing => {
+        getSaleByReservationId(reservation.id, reservation.source_sales_id).then(existing => {
           if (existing) {
             setPaymentMethod(existing.payment_method || "未入力");
           }

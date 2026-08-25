@@ -216,10 +216,21 @@ export async function duplicateSalesMasterItem(id: string) {
   }
 }
 
-export async function getSaleByReservationId(resId: string): Promise<SalesRecord | null> {
+export async function getSaleByReservationId(resId: string, sourceSalesId?: string): Promise<SalesRecord | null> {
   try {
     const ctx = await getCurrentUserContext();
     if (ctx.companyId) await requireFeature(ctx.companyId, "sales");
+    // CSVから復元した予約は、元売上IDを予約側に保持している。
+    // これを最優先で取得し、会計時に重複売上を作らない。
+    if (sourceSalesId) {
+      const sourceSnap = await getDoc(doc(db, SALES_COLLECTION, sourceSalesId));
+      if (sourceSnap.exists()) {
+        const sourceData = { id: sourceSnap.id, ...sourceSnap.data() } as SalesRecord;
+        if (ctx.companyId && sourceData.companyId === ctx.companyId) {
+          return JSON.parse(JSON.stringify(sourceData));
+        }
+      }
+    }
     const q = query(
       collection(db, SALES_COLLECTION),
       where("source_reservation_id", "==", resId),
@@ -227,8 +238,8 @@ export async function getSaleByReservationId(resId: string): Promise<SalesRecord
     );
     const snap = await getDocs(q);
     if (snap.empty) return null;
-    const doc = snap.docs[0];
-    const data = { id: doc.id, ...doc.data() } as SalesRecord;
+    const saleDoc = snap.docs[0];
+    const data = { id: saleDoc.id, ...saleDoc.data() } as SalesRecord;
     
     if (!ctx.companyId) return null;
     if (data.companyId !== ctx.companyId) return null;
