@@ -131,6 +131,23 @@ export type MonthlyStatement = {
 
 const STATEMENTS_COLLECTION = "monthly_statements";
 
+function serializeStatement(docSnapshot: any): MonthlyStatement {
+  const data = docSnapshot.data();
+  const toSerializableDate = (value: any) => {
+    if (!value) return value;
+    if (typeof value.toDate === "function") return value.toDate().toISOString();
+    if (value instanceof Date) return value.toISOString();
+    return value;
+  };
+
+  return {
+    id: docSnapshot.id,
+    ...data,
+    created_at: toSerializableDate(data.created_at),
+    updated_at: toSerializableDate(data.updated_at),
+  } as MonthlyStatement;
+}
+
 export async function getMonthlyStatements(year: number, month: number, staffId?: string): Promise<MonthlyStatement[]> {
   const targetMonth = `${year}-${String(month).padStart(2, '0')}`;
   try {
@@ -143,14 +160,27 @@ export async function getMonthlyStatements(year: number, month: number, staffId?
     
     const snapshot = await getDocs(q);
     
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as MonthlyStatement[];
+    return snapshot.docs.map(serializeStatement);
   } catch (error) {
     console.error("Error fetching monthly statements:", error);
     return [];
   }
+}
+
+/** スタッフポータル用：ログイン本人の確定済み明細だけを返す。 */
+export async function getMyMonthlyStatements(year: number, month: number): Promise<MonthlyStatement[]> {
+  const ctx = await getCurrentUserContext();
+  if (!ctx.profileId) throw new Error("スタッフ情報を確認できませんでした");
+
+  const targetMonth = `${year}-${String(month).padStart(2, "0")}`;
+  const snapshot = await getDocs(query(
+    collection(db, STATEMENTS_COLLECTION),
+    where("target_month", "==", targetMonth),
+    where("staff_id", "==", ctx.profileId),
+    where("status", "==", "closed")
+  ));
+
+  return snapshot.docs.map(serializeStatement);
 }
 
 export async function toggleTransferStatus(id: string, currentStatus: boolean): Promise<{success: boolean, error?: string}> {
@@ -173,10 +203,7 @@ export async function getAllStatements(): Promise<MonthlyStatement[]> {
     const q = query(colRef, orderBy("target_month", "desc"));
     const snapshot = await getDocs(q);
     
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as MonthlyStatement[];
+    return snapshot.docs.map(serializeStatement);
   } catch (error) {
     console.error("Error fetching all statements:", error);
     return [];

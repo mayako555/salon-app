@@ -8,6 +8,7 @@ export type UserRole = "systemOwner" | "companyOwner" | "manager" | "storeManage
 
 export interface UserContext {
   uid: string;
+  profileId?: string;
   role: UserRole;
   companyId?: string;
   salonIds: string[];
@@ -94,6 +95,7 @@ export async function getCurrentUserContext(): Promise<UserContext> {
 
     return {
       uid,
+      profileId: snapshot.docs[0]?.id,
       role,
       companyId,
       salonIds: userData?.salonIds || [],

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { getMonthlyStatements, MonthlyStatement } from "@/app/payroll/actions";
+import { getMyMonthlyStatements, MonthlyStatement } from "@/app/payroll/actions";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,7 @@ export default function StaffPayrollPage() {
   const { profile, loading: authLoading } = useAuth();
   const [statements, setStatements] = useState<MonthlyStatement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [currentDate, setCurrentDate] = useState<Date>(getInitialDate());
 
   const year = currentDate.getFullYear();
@@ -62,15 +63,26 @@ export default function StaffPayrollPage() {
   useEffect(() => {
     if (!authLoading && profile) {
       loadData();
+    } else if (!authLoading && !profile) {
+      setLoadError("スタッフ情報を確認できませんでした。再ログインしてください。");
+      setIsLoading(false);
     }
   }, [profile, authLoading, currentDate]);
 
   const loadData = async () => {
     if (!profile) return;
     setIsLoading(true);
-    const data = await getMonthlyStatements(year, month, profile.id);
-    setStatements(data);
-    setIsLoading(false);
+    setLoadError("");
+    try {
+      const data = await getMyMonthlyStatements(year, month);
+      setStatements(data);
+    } catch (error) {
+      console.error("給与明細の読み込みに失敗しました", error);
+      setStatements([]);
+      setLoadError("給与明細を読み込めませんでした。再読み込みしてください。");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const changeMonth = (offset: number) => {
@@ -116,6 +128,11 @@ export default function StaffPayrollPage() {
           <div className="p-4 sm:p-6">
             {isLoading ? (
               <div className="py-20 text-center text-slate-400">読み込み中...</div>
+            ) : loadError ? (
+              <div className="py-20 text-center flex flex-col items-center gap-4">
+                <p className="text-red-600 font-medium">{loadError}</p>
+                <Button variant="outline" onClick={loadData}>再読み込み</Button>
+              </div>
             ) : !isAvailable ? (
               <div className="py-20 text-center flex flex-col items-center gap-3">
                 <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
