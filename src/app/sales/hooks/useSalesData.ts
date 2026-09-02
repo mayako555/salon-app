@@ -3,6 +3,7 @@ import { SalesRecord } from "../actions";
 import { StaffProfile } from "@/app/staff/actions";
 import { StaffSalesData, StoreSalesData } from "../components/SalesRow";
 import { SalesSummaryData } from "../components/SalesSummaryCards";
+import { getNormalizedStoreName } from "@/lib/store-utils";
 
 type UseSalesDataProps = {
   sales: SalesRecord[];
@@ -36,7 +37,6 @@ export function useSalesData({
     // Fallback: extract unique stores from actual sales data if none provided by master
     if (stores.length === 0) {
       const uniqueStores = new Set<string>();
-      const { getNormalizedStoreName } = require("@/lib/store-utils");
       sales.forEach(s => {
         if (s.store_name) {
           uniqueStores.add(getNormalizedStoreName(s.store_name));
@@ -114,7 +114,6 @@ export function useSalesData({
         const targetStoreId = storeNameToIdMap[store] || store;
         const storeRecords = staffSales.filter((s) => {
           if (s.store_id) return s.store_id === targetStoreId;
-          const { getNormalizedStoreName } = require("@/lib/store-utils");
           return getNormalizedStoreName(s.store_name || "") === getNormalizedStoreName(store);
         });
         const storeVisitIds = new Set(storeRecords.map(getVisitId));
@@ -239,7 +238,6 @@ export function useSalesData({
         const targetStoreId = storeNameToIdMap[store] || store;
         const prevStoreSales = comparablePrevMonthSales.filter((s) => {
           if (s.store_id) return s.store_id === targetStoreId;
-          const { getNormalizedStoreName } = require("@/lib/store-utils");
           return getNormalizedStoreName(s.store_name || "") === getNormalizedStoreName(store);
         });
         const prevStoreTotal = prevStoreSales.reduce(

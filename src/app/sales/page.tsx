@@ -27,6 +27,7 @@ import { StaffSalesData, StoreSalesData } from "./components/SalesRow";
 import { exportSalesToCsv, exportSalesToExcel } from "./exportUtils";
 import { getCompanyGoalsForMonth } from "../goals/actions";
 import { useSalesData } from "./hooks/useSalesData";
+import { getNormalizedStoreName } from "@/lib/store-utils";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -178,7 +179,6 @@ export default function SalesPage({
       const hasMatch = Array.from(selectedStores).some(storeName => {
         const targetStoreId = storeNameToIdMap[storeName] || storeName;
         if (s.store_id) return s.store_id === targetStoreId;
-        const { getNormalizedStoreName } = require("@/lib/store-utils");
         return getNormalizedStoreName(s.store_name || "") === getNormalizedStoreName(storeName);
       });
       if (!hasMatch) return false;
