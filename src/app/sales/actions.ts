@@ -306,10 +306,9 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
       throw new Error("会社IDが指定されていません");
     }
     
-    // Strict CSV-driven: only hotpepper source records are used for aggregation.
+    // Include all sales (both CSV hotpepper and manual checkouts)
     filteredSales = sales.filter(s => 
       s.companyId === ctx.companyId && 
-      s.source === "hotpepper" &&
       s.merge_status !== "DELETED"
     );
 
