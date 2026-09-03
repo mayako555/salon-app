@@ -50,6 +50,14 @@ export default function ShiftsView({
     return hardcodedStoreMap[storeVal] || storeVal;
   };
 
+  const isStoreMatch = (name1: string, name2: string) => {
+    if (!name1 || !name2) return false;
+    if (name1 === name2) return true;
+    const n1 = name1.replace(/\s+/g, "").replace("店", "").replace("道", "");
+    const n2 = name2.replace(/\s+/g, "").replace("店", "").replace("道", "");
+    return n1.includes(n2) || n2.includes(n1);
+  };
+
   const getStoreBadgeClasses = (storeVal: string) => {
     const storeName = getStoreDisplayName(storeVal);
     if (storeName.includes("六甲")) return "bg-blue-100 text-blue-800 border-blue-200";
@@ -434,7 +442,9 @@ export default function ShiftsView({
                 </tr>
               </thead>
               <tbody>
-                {availableStores.map((store) => {
+                {availableStoreObjects.map((storeObj) => {
+                  const store = storeObj.name;
+                  const storeId = storeObj.id;
                   // Calculate Averages for this store
                   let totalAllVisits = 0;
                   let totalDebutedVisits = 0;
@@ -447,7 +457,7 @@ export default function ShiftsView({
                       shift.type === "work" && 
                       shift.segments?.some(seg => {
                         const storeName = getStoreDisplayName(seg.store);
-                        return storeName === store;
+                        return seg.store === storeId || isStoreMatch(storeName, store);
                       })
                     );
                     
@@ -488,7 +498,7 @@ export default function ShiftsView({
                           shift.type === "work" && 
                           shift.segments?.some(seg => {
                             const storeName = getStoreDisplayName(seg.store);
-                            return storeName === store;
+                            return seg.store === storeId || isStoreMatch(storeName, store);
                           })
                         );
 
@@ -501,7 +511,7 @@ export default function ShiftsView({
                               {storeShifts.map(shift => {
                                 const segments = shift.segments?.filter(seg => {
                                   const storeName = getStoreDisplayName(seg.store);
-                                  return storeName === store;
+                                  return seg.store === storeId || isStoreMatch(storeName, store);
                                 }) || [];
                                 const isTrainee = staffList.find(sl => sl.id === shift.staff_id)?.is_trainee;
                                 
