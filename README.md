@@ -25,10 +25,11 @@ npm run dev
 ```bash
 npm run typecheck
 npm run lint
+npm test
 npm run build
 ```
 
-まとめて型チェックとlintを行う場合は`npm run check`を使用します。
+まとめて型チェック、lint、単体テストを行う場合は`npm run check`を使用します。テストを監視モードで実行する場合は`npm run test:watch`を使用します。
 
 既存コードには段階的に解消するlint警告があります。通常の`lint`は実行時エラーにつながる違反を失敗として扱い、`lint:strict`は警告も含めて失敗させます。変更したファイルでは警告を増やさず、可能な範囲で減らしてください。
 

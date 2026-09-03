@@ -12,7 +12,9 @@
     "lint": "eslint src",
     "lint:strict": "eslint src --max-warnings=0",
     "typecheck": "tsc --noEmit --incremental false",
-    "check": "npm run typecheck && npm run lint",
+    "test": "tsx --test src/lib/__tests__/*.test.ts",
+    "test:watch": "tsx --test --watch src/lib/__tests__/*.test.ts",
+    "check": "npm run typecheck && npm run lint && npm test",
     "test:tenant-isolation": "tsx scripts/test-tenant-isolation.ts"
   },
   "dependencies": {
