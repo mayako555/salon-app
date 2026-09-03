@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Salon Manager
 
-## Getting Started
+サロン運営に必要な予約、顧客、売上、勤怠、シフト、給与、在庫、分析を管理するマルチテナント型の業務アプリです。
 
-First, run the development server:
+## 必要環境
+
+- Node.js 20.18.1（`.nvmrc`で固定）
+- npm
+- Firebase／Supabase等の接続情報を設定した`.env.local`
+
+環境変数の実値はリポジトリへコミットしないでください。
+
+## セットアップ
 
 ```bash
+nvm use
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+開発サーバーは <http://localhost:3005> で起動します。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 品質チェック
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run typecheck
+npm run lint
+npm run build
+```
 
-## Learn More
+まとめて型チェックとlintを行う場合は`npm run check`を使用します。
 
-To learn more about Next.js, take a look at the following resources:
+既存コードには段階的に解消するlint警告があります。通常の`lint`は実行時エラーにつながる違反を失敗として扱い、`lint:strict`は警告も含めて失敗させます。変更したファイルでは警告を増やさず、可能な範囲で減らしてください。
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## データと権限
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Firebase Admin SDKを使う処理では、認証済みユーザーの`companyId`によるテナント分離が必須です。
+- 本番データへ接続する調査・移行スクリプトは、対象プロジェクトと会社IDを確認してから実行してください。
+- `.env*`、サービスアカウント、顧客データ、診断ログはコミットしないでください。
 
-## Deploy on Vercel
+## CI
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Pull Requestと`main`へのpushで、Node.jsの固定バージョンを使って型チェック、ESLint、プロダクションビルドを実行します。

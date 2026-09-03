@@ -41,16 +41,6 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
     }
   }, [createRequestKey]);
   
-  if (!storeName) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2 p-10">
-        <AlertTriangle className="w-8 h-8 text-amber-500" />
-        <p className="font-bold text-sm">店舗情報を取得できません</p>
-        <p className="text-xs">店舗マスターが未設定か、権限が不足している可能性があります。</p>
-      </div>
-    );
-  }
-
   const getNormalizedKey = (name: string): string => {
     const norm = name.trim().replace(/\s+/g, "");
     if (norm.includes("六甲")) return "六甲";
@@ -167,6 +157,16 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
 
     return { grouped: map, sortedStaff: displayStaff };
   }, [reservations, staffList, shifts, storeName, availableStoreObjects]);
+
+  if (!storeName) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2 p-10">
+        <AlertTriangle className="w-8 h-8 text-amber-500" />
+        <p className="font-bold text-sm">店舗情報を取得できません</p>
+        <p className="text-xs">店舗マスターが未設定か、権限が不足している可能性があります。</p>
+      </div>
+    );
+  }
 
   const activeStaffList = [
     ...sortedStaff.map(s => ({ id: s.id, name: s.name })),

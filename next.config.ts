@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const nextConfig: NextConfig = {
   experimental: {
@@ -8,6 +9,7 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ['canvas'],
   turbopack: {
+    root: path.resolve(__dirname),
     resolveAlias: {
       canvas: './empty-module.js',
     },

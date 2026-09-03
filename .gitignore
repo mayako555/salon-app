@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local diagnostics and one-off refactoring artifacts
+/.dev_*
+/audit-log.json
+/build*.log
+/vercel_deploy*.log
+/*.patch
+/scratch/
+/scripts/scratch/
