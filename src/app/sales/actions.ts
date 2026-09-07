@@ -28,6 +28,11 @@ import { getCurrentUserContext } from "@/lib/auth-server";
 import { requireFeature } from "@/lib/feature-utils";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { deduplicateSales } from "@/lib/sales-deduplication";
+import {
+  normalizeSalesDate,
+  parseSalesAmount,
+  parseTreatmentDuration,
+} from "@/lib/sales-import-normalization";
 
 
 export async function mapReservationToSalesRecord(res: any): Promise<SalesRecord> {
@@ -450,41 +455,8 @@ export async function importHotPepperCsv(formData: FormData) {
     const { getMasterItems } = await import("./master-actions");
     const masterItems = await getMasterItems("all");
     
-    // Helper to parse duration string (e.g. "90分", "1.5h", "1時間30分") to minutes
-    const parseDurationToMinutes = (durationStr: string | undefined): number => {
-      if (!durationStr) return 60;
-      let totalMinutes = 0;
-      const hoursMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*(?:時間|h)/i);
-      const minutesMatch = durationStr.match(/(\d+)\s*分/);
-      
-      if (hoursMatch) totalMinutes += parseFloat(hoursMatch[1]) * 60;
-      if (minutesMatch) totalMinutes += parseInt(minutesMatch[1], 10);
-      
-      if (totalMinutes === 0) {
-        const justNumber = parseInt(durationStr, 10);
-        if (!isNaN(justNumber)) return justNumber;
-        return 60; // Default
-      }
-      return totalMinutes;
-    };
-    
     const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, dynamicTyping: true });
     const rows = parsed.data as any[];
-
-    // Helper for date formatting
-    const formatDate = (rawDate: string) => {
-      let dateFormatted = rawDate;
-      if (rawDate.includes("/")) {
-        const parts = rawDate.split("/");
-        dateFormatted = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-      } else if (rawDate.includes("-")) {
-        const parts = rawDate.split("-");
-        dateFormatted = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-      } else if (rawDate.length === 8) {
-        dateFormatted = `${rawDate.substring(0, 4)}-${rawDate.substring(4, 6)}-${rawDate.substring(6, 8)}`;
-      }
-      return dateFormatted;
-    };
 
     // Step 1: Group rows by Accounting ID and collect min/max dates
     const groups: Record<string, any[]> = {};
@@ -512,7 +484,7 @@ export async function importHotPepperCsv(formData: FormData) {
       if (!groups[groupId]) groups[groupId] = [];
       groups[groupId].push(row);
 
-      const fDate = formatDate(rawDate);
+      const fDate = normalizeSalesDate(rawDate);
       if (fDate && fDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
         if (fDate < minDate) minDate = fDate;
         if (fDate > maxDate) maxDate = fDate;
@@ -606,18 +578,13 @@ export async function importHotPepperCsv(formData: FormData) {
         "HotPepper経由"
       ).trim();
       
-      const parseMoney = (val: any) => {
-        if (val === undefined || val === null) return 0;
-        return parseInt(val.toString().replace(/[^\d-]/g, ""), 10) || 0;
-      };
-
        let techSales = 0, prodSales = 0, discount = 0, hpbPoints = 0, nominationFee = 0;
        let menuCourses: string[] = [], discountReasons: string[] = [], optionsList: string[] = [];
        const productDetailsList: { name: string, price: number }[] = [];
 
        groupRows.forEach(row => {
          const category = String(row["区分"] || "");
-         const amount = parseMoney(row["金額"]);
+         const amount = parseSalesAmount(row["金額"]);
          const menu = String(row["メニュー・店販・割引・サービス・オプション"] || "");
          const isCancel = String(row["会計区分"] || "").includes("取り消し");
          const val = isCancel ? -Math.abs(amount) : amount;
@@ -641,12 +608,12 @@ export async function importHotPepperCsv(formData: FormData) {
            menuCourses.push(menu);
          }
          
-         hpbPoints += isCancel ? -Math.abs(parseMoney(row["ポイント使用"])) : Math.abs(parseMoney(row["ポイント使用"]));
+         hpbPoints += isCancel ? -Math.abs(parseSalesAmount(row["ポイント使用"])) : Math.abs(parseSalesAmount(row["ポイント使用"]));
        });
 
       if (groupRows.some(r => String(r["会計区分"] || "").includes("取り消し")) && (techSales + prodSales === 0)) continue;
 
-      const dateFormatted = formatDate(rawDate);
+      const dateFormatted = normalizeSalesDate(rawDate);
       let timeFormatted = rawTime.includes(":") ? rawTime : `${rawTime.padStart(4, '0').substring(0, 2)}:${rawTime.padStart(4, '0').substring(2, 4)}`;
 
       const csvTotal = techSales + prodSales + nominationFee - discount;
@@ -721,7 +688,7 @@ export async function importHotPepperCsv(formData: FormData) {
           for (const menu of menuCourses) {
             const matchedItem = masterItems.find(mi => mi.name === menu || mi.hpbName === menu);
             if (matchedItem && matchedItem.duration) {
-              durationMinutes += parseDurationToMinutes(matchedItem.duration);
+              durationMinutes += parseTreatmentDuration(matchedItem.duration);
               matchedAny = true;
             }
           }
