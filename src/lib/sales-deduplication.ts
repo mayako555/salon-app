@@ -4,12 +4,19 @@ export type DeduplicatableSale = {
   id: string;
   customer_id?: string;
   customer_name?: string;
+  staff_id?: string;
+  staff_name?: string;
   date?: string;
   time?: string;
   store_id?: string;
   store_name?: string;
   source?: string;
   source_reservation_id?: string;
+  tech_sales?: number;
+  product_sales?: number;
+  nomination_fee?: number;
+  discount?: number;
+  treatment_minutes?: number;
   created_at?: unknown;
   updated_at?: unknown;
 };
@@ -37,19 +44,65 @@ function isSameStore(a: DeduplicatableSale, b: DeduplicatableSale): boolean {
   return Boolean(aName && bName && aName === bName);
 }
 
+function isImported(sale: DeduplicatableSale): boolean {
+  return sale.source === "hotpepper" || sale.source === "csv_estimated";
+}
+
+function saleAmount(sale: DeduplicatableSale): number {
+  return Number(sale.tech_sales || 0) +
+    Number(sale.product_sales || 0) +
+    Number(sale.nomination_fee || 0) -
+    Number(sale.discount || 0);
+}
+
+function isSameStaff(a: DeduplicatableSale, b: DeduplicatableSale): boolean {
+  if (a.staff_id && b.staff_id && a.staff_id === b.staff_id) return true;
+  const aName = normalizeCustomerName(a.staff_name);
+  const bName = normalizeCustomerName(b.staff_name);
+  return Boolean(aName && bName && aName === bName);
+}
+
+function minutesSinceMidnight(time?: string): number | null {
+  const normalized = normalizeTime(time);
+  if (!normalized) return null;
+  const [hours, minutes] = normalized.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function matchesCheckoutStartAndImportedEnd(a: DeduplicatableSale, b: DeduplicatableSale): boolean {
+  if (isImported(a) === isImported(b)) return false;
+
+  const imported = isImported(a) ? a : b;
+  const checkout = isImported(a) ? b : a;
+  const checkoutStart = minutesSinceMidnight(checkout.time);
+  const importedEnd = minutesSinceMidnight(imported.time);
+  const duration = Number(checkout.treatment_minutes || 0);
+
+  if (checkoutStart === null || importedEnd === null || duration <= 0) return false;
+  const endMatchesDuration = checkoutStart + duration === importedEnd ||
+    (checkoutStart + duration) % (24 * 60) === importedEnd;
+
+  return endMatchesDuration &&
+    saleAmount(checkout) === saleAmount(imported) &&
+    isSameStaff(checkout, imported);
+}
+
 function isSameVisit(a: DeduplicatableSale, b: DeduplicatableSale): boolean {
   if (a.source_reservation_id && b.source_reservation_id) {
-    return a.source_reservation_id === b.source_reservation_id;
+    if (a.source_reservation_id === b.source_reservation_id) return true;
   }
 
   if (!a.date || a.date !== b.date || !isSameStore(a, b)) return false;
-  if (!normalizeTime(a.time) || normalizeTime(a.time) !== normalizeTime(b.time)) return false;
-
-  if (a.customer_id && b.customer_id) return a.customer_id === b.customer_id;
-
   const aName = normalizeCustomerName(a.customer_name);
   const bName = normalizeCustomerName(b.customer_name);
-  return Boolean(aName && bName && aName === bName);
+  if (a.customer_id && b.customer_id) {
+    if (a.customer_id !== b.customer_id) return false;
+  } else if (!aName || aName !== bName) {
+    return false;
+  }
+
+  const sameRecordedTime = Boolean(normalizeTime(a.time) && normalizeTime(a.time) === normalizeTime(b.time));
+  return sameRecordedTime || matchesCheckoutStartAndImportedEnd(a, b);
 }
 
 function sourcePriority(source?: string): number {
