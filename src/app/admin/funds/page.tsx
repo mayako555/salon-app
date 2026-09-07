@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { TrendingUp, TrendingDown, Wallet, Plus, Calendar, Save, Trash2, ArrowRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, Plus, Calendar, Save, Trash2, Pencil } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { format, parseISO, subMonths } from "date-fns";
 import { toast } from "sonner";
@@ -30,6 +30,7 @@ export default function FundsDashboardPage() {
   const [inputDate, setInputDate] = useState("");
   const [inputBalances, setInputBalances] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isEditingBalance, setIsEditingBalance] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -98,6 +99,21 @@ export default function FundsDashboardPage() {
       });
     }
     setInputBalances(prefill);
+    setIsEditingBalance(false);
+    setShowInputModal(true);
+  };
+
+  const openEditModal = () => {
+    if (!data?.latestDate) return;
+
+    const existingBalances: Record<string, number> = {};
+    data.accounts.forEach((acc: BankAccount) => {
+      existingBalances[acc.id!] = Number(data.latestDetails[acc.id!] || 0);
+    });
+
+    setInputDate(data.latestDate);
+    setInputBalances(existingBalances);
+    setIsEditingBalance(true);
     setShowInputModal(true);
   };
 
@@ -115,7 +131,7 @@ export default function FundsDashboardPage() {
     setIsSaving(true);
     const res = await saveBankBalances(inputDate, payload);
     if (res.success) {
-      toast.success("残高を保存しました");
+      toast.success(isEditingBalance ? "残高を更新しました" : "残高を保存しました");
       setShowInputModal(false);
       await loadData();
     } else {
@@ -174,9 +190,21 @@ export default function FundsDashboardPage() {
                 <Wallet className="w-32 h-32" />
               </div>
               <CardHeader className="pb-2 relative z-10">
-                <CardTitle className="text-indigo-100 font-medium text-sm flex items-center gap-2">
-                  現在の現預金合計
-                </CardTitle>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="text-indigo-100 font-medium text-sm flex items-center gap-2">
+                    現在の現預金合計
+                  </CardTitle>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={openEditModal}
+                    className="border-white/40 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                  >
+                    <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                    編集
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="relative z-10 space-y-2">
                 <div className="text-4xl md:text-5xl font-black tracking-tight">
@@ -319,9 +347,11 @@ export default function FundsDashboardPage() {
       <Dialog open={showInputModal} onOpenChange={setShowInputModal}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>残高の入力</DialogTitle>
+            <DialogTitle>{isEditingBalance ? "残高の編集" : "残高の入力"}</DialogTitle>
             <DialogDescription>
-              対象となる残高の基準日（いつ時点の残高か）と、各口座の金額を入力してください。
+              {isEditingBalance
+                ? "登録済みの各口座残高を修正してください。"
+                : "対象となる残高の基準日（いつ時点の残高か）と、各口座の金額を入力してください。"}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -331,6 +361,7 @@ export default function FundsDashboardPage() {
                 type="date" 
                 value={inputDate} 
                 onChange={e => setInputDate(e.target.value)}
+                disabled={isEditingBalance}
               />
             </div>
             
@@ -357,7 +388,7 @@ export default function FundsDashboardPage() {
             <Button variant="outline" onClick={() => setShowInputModal(false)}>キャンセル</Button>
             <Button disabled={isSaving} onClick={handleSaveBalances} className="bg-indigo-600 hover:bg-indigo-700">
               <Save size={16} className="mr-2" />
-              保存する
+              {isEditingBalance ? "更新する" : "保存する"}
             </Button>
           </DialogFooter>
         </DialogContent>
