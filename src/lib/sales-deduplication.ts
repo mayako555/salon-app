@@ -149,3 +149,25 @@ export function deduplicateSales<T extends DeduplicatableSale>(sales: readonly T
 
   return result;
 }
+
+/**
+ * Reconciles one month's sales for reporting.
+ *
+ * A SalonBoard import is the finalized register ledger for its store. Once a
+ * store has imported rows, matched POS rows remain as the editable primary
+ * record, while unmatched POS rows are excluded from that month's report.
+ * Stores without imported rows continue to report their POS/manual sales.
+ */
+export function reconcileMonthlySales<T extends DeduplicatableSale>(sales: readonly T[]): T[] {
+  const importedSales = sales.filter(isImported);
+  const deduplicated = deduplicateSales(sales);
+
+  return deduplicated.filter((sale) => {
+    if (isImported(sale)) return true;
+
+    const storeImports = importedSales.filter((importedSale) => isSameStore(importedSale, sale));
+    if (storeImports.length === 0) return true;
+
+    return storeImports.some((importedSale) => isSameVisit(importedSale, sale));
+  });
+}

@@ -4,6 +4,10 @@ import { StaffProfile } from "@/app/staff/actions";
 import { StaffSalesData, StoreSalesData } from "../components/SalesRow";
 import { SalesSummaryData } from "../components/SalesSummaryCards";
 import { getNormalizedStoreName } from "@/lib/store-utils";
+import {
+  deduplicateSalesStaffNames,
+  normalizeSalesStaffName,
+} from "@/lib/sales-staff-names";
 
 type UseSalesDataProps = {
   sales: SalesRecord[];
@@ -16,10 +20,7 @@ type UseSalesDataProps = {
   selectedStore: string;
 };
 
-export const normalizeName = (name: string | null) => {
-  if (!name) return "";
-  return name.replace(/\s+/g, "").replace(/[凛凜]/g, "凛");
-};
+export const normalizeName = normalizeSalesStaffName;
 
 export function useSalesData({
   sales,
@@ -56,7 +57,9 @@ export function useSalesData({
       return a.name.localeCompare(b.name, "ja");
     });
 
-    const staffNames = sortedProfiles.map((p) => p.name);
+    // SYSTEMOWNER can receive profiles from multiple companies. Avoid counting
+    // the same staff name more than once when building company/store totals.
+    const staffNames = deduplicateSalesStaffNames(sortedProfiles.map((p) => p.name));
     const salesStaffNames = Array.from(new Set(sales.map((s) => s.staff_name)));
     salesStaffNames.forEach((name) => {
       if (!name) return;

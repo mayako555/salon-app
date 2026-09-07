@@ -27,7 +27,7 @@ import { syncInventoryFromSale } from "../inventory/inventory-actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { requireFeature } from "@/lib/feature-utils";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
-import { deduplicateSales } from "@/lib/sales-deduplication";
+import { reconcileMonthlySales } from "@/lib/sales-deduplication";
 import {
   normalizeSalesDate,
   parseSalesAmount,
@@ -331,7 +331,7 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
       return sale;
     });
 
-    return deduplicateSales(filteredSales);
+    return reconcileMonthlySales(filteredSales);
   } catch (error: any) {
     console.error("Error fetching sales from Firestore:", error);
     return [];

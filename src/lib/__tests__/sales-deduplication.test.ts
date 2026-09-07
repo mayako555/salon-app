@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { deduplicateSales, type DeduplicatableSale } from "@/lib/sales-deduplication";
+import {
+  deduplicateSales,
+  reconcileMonthlySales,
+  type DeduplicatableSale,
+} from "@/lib/sales-deduplication";
 
 function sale(overrides: Partial<DeduplicatableSale> = {}): DeduplicatableSale {
   return {
@@ -155,5 +159,34 @@ describe("deduplicateSales", () => {
     const newer = sale({ id: "newer", source: "manual", updated_at: 200 });
 
     assert.deepEqual(deduplicateSales([older, newer]), [newer]);
+  });
+});
+
+describe("reconcileMonthlySales", () => {
+  it("uses an imported store ledger as authoritative and excludes unmatched POS rows", () => {
+    const imported = sale({ id: "csv", source: "hotpepper", time: "11:00" });
+    const unmatchedPos = sale({
+      id: "unmatched-pos",
+      source: "checkout",
+      customer_id: "customer-2",
+      customer_name: "別のお客様",
+      time: "15:00",
+    });
+
+    assert.deepEqual(reconcileMonthlySales([imported, unmatchedPos]), [imported]);
+  });
+
+  it("retains a matched POS row as the editable primary record", () => {
+    const imported = sale({ id: "csv", source: "hotpepper", time: "11:00" });
+    const matchedPos = sale({ id: "pos", source: "checkout", time: "10:00", treatment_minutes: 60 });
+
+    assert.deepEqual(reconcileMonthlySales([imported, matchedPos]), [matchedPos]);
+  });
+
+  it("retains POS rows for stores without an imported ledger", () => {
+    const imported = sale({ id: "csv", source: "hotpepper", store_id: "store-1" });
+    const pos = sale({ id: "pos", source: "checkout", store_id: "store-2" });
+
+    assert.deepEqual(reconcileMonthlySales([imported, pos]), [imported, pos]);
   });
 });
