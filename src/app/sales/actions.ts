@@ -27,6 +27,7 @@ import { syncInventoryFromSale } from "../inventory/inventory-actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { requireFeature } from "@/lib/feature-utils";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+import { deduplicateSales } from "@/lib/sales-deduplication";
 
 
 export async function mapReservationToSalesRecord(res: any): Promise<SalesRecord> {
@@ -79,7 +80,7 @@ export async function mapReservationToSalesRecord(res: any): Promise<SalesRecord
   };
 }
 
-export type SalesSource = "checkout" | "hotpepper" | "manual";
+export type SalesSource = "checkout" | "hotpepper" | "manual" | "csv_estimated";
 
 export type SalesRecord = {
   id: string;
@@ -129,6 +130,7 @@ export type SalesRecord = {
   store_id?: string;
   product_details?: string; // Stringified JSON array of { name: string, price: number }
   created_at: any; // Firestore Timestamp
+  updated_at?: any; // Firestore Timestamp or serialized milliseconds
 };
 
 const SALES_COLLECTION = "sales";
@@ -324,7 +326,7 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
       return sale;
     });
 
-    return filteredSales;
+    return deduplicateSales(filteredSales);
   } catch (error: any) {
     console.error("Error fetching sales from Firestore:", error);
     return [];
