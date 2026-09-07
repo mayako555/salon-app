@@ -48,3 +48,9 @@ next-env.d.ts
 /*.patch
 /scratch/
 /scripts/scratch/
+
+# accidental TypeScript compiler output (the .ts files are canonical)
+/src/lib/auth-server.js
+/src/lib/firebase-admin.js
+/src/lib/feature-utils.js
+/src/lib/tenant-utils.js
