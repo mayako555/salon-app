@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getDebugSales } from "./actions";
-import { SalesRecord } from "@/app/sales/actions";
+import type { SalesRecord } from "@/types/sales";
 import { Button } from "@/components/ui/button";
 
 export default function SalesDebugPage() {

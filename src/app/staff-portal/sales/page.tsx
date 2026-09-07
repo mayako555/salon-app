@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getMonthlySales, SalesRecord, mapReservationToSalesRecord } from "@/app/sales/actions";
+import { getMonthlySales, mapReservationToSalesRecord } from "@/app/sales/actions";
+import type { SalesRecord } from "@/types/sales";
 import { getReservationById, Reservation, updateReservationStatus } from "@/app/reservations/actions";
 import PaymentEditDialog from "@/app/sales/PaymentEditDialog";
 import { format } from "date-fns";

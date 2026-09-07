@@ -17,7 +17,8 @@ import {
 } from "@/lib/firestore-admin-wrapper";
 import { addAuditLog } from "@/app/audit/actions";
 import { getStaffList } from "@/app/staff/actions";
-import { getMonthlySales, SalesRecord } from "@/app/sales/actions";
+import { getMonthlySales } from "@/app/sales/actions";
+import type { SalesRecord } from "@/types/sales";
 import { getMonthlyReviews } from "@/app/admin/reviews/actions";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc, setTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { getCurrentUserContext } from "@/lib/auth-server";

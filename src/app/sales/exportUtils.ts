@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
-import { SalesRecord } from "./actions";
+import type { SalesRecord } from "@/types/sales";
 import { StaffSalesData } from "./components/SalesRow";
 import { SalesSummaryData } from "./components/SalesSummaryCards";
 

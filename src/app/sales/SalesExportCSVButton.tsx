@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, Calendar, X } from "lucide-react";
-import { SalesRecord } from "./actions";
+import type { SalesRecord } from "@/types/sales";
 
 export default function SalesExportCSVButton({ sales }: { sales: SalesRecord[] }) {
   const [isOpen, setIsOpen] = useState(false);

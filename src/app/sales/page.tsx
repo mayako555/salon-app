@@ -2,7 +2,8 @@
 
 import { useState, useEffect, use } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { getMonthlySales, SalesRecord, deleteSale, clearMonthlyCsvImports } from "./actions";
+import { getMonthlySales, deleteSale, clearMonthlyCsvImports } from "./actions";
+import type { SalesRecord } from "@/types/sales";
 import { getStaffList, StaffProfile } from "../staff/actions";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";

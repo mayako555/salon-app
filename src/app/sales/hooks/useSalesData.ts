@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { SalesRecord } from "../actions";
+import type { SalesRecord } from "@/types/sales";
 import { StaffProfile } from "@/app/staff/actions";
 import { StaffSalesData, StoreSalesData } from "../components/SalesRow";
 import { SalesSummaryData } from "../components/SalesSummaryCards";

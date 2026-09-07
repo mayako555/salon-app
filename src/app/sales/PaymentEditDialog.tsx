@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { X, CreditCard, Plus, Trash2 } from "lucide-react";
-import { updatePaymentInfo, checkoutReservation, SalesRecord } from "./actions";
+import { updatePaymentInfo, checkoutReservation } from "./actions";
+import type { SalesRecord } from "@/types/sales";
 import { getMasterItems } from "./master-actions";
 
 export default function PaymentEditDialog({ 

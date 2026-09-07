@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { X, HelpCircle, Calendar, Info, Ban } from "lucide-react";
-import { SalesRecord } from "@/app/sales/actions";
+import type { SalesRecord } from "@/types/sales";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 import { toggleTreatmentExclusion } from "./actions";

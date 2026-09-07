@@ -33,6 +33,7 @@ import {
   parseSalesAmount,
   parseTreatmentDuration,
 } from "@/lib/sales-import-normalization";
+import type { SalesRecord, SalesSource } from "@/types/sales";
 
 
 export async function mapReservationToSalesRecord(res: any): Promise<SalesRecord> {
@@ -84,59 +85,6 @@ export async function mapReservationToSalesRecord(res: any): Promise<SalesRecord
     created_at: Date.now()
   };
 }
-
-export type SalesSource = "checkout" | "hotpepper" | "manual" | "csv_estimated";
-
-export type SalesRecord = {
-  id: string;
-  staff_id: string;
-  staff_name: string;
-  store_name: string;
-  date: string; // YYYY-MM-DD
-  time: string; // HH:MM
-  customer_name: string;
-  last_name?: string;
-  first_name?: string;
-  last_name_kana?: string;
-  first_name_kana?: string;
-  customer_type: "新規" | "リピ" | "不明";
-  menu_course: string;
-  tech_sales: number;
-  product_sales: number;
-  is_nominated: boolean;
-  nomination_fee: number;
-  discount: number;
-  discount_reason: string;
-  portal_fee: number;
-  hpb_points: number; 
-  reservation_route: string;
-  payment_method: string;
-  payment_status?: string;
-  split_payments?: { method: string, amount: number }[];
-  note?: string;
-  hair_material: string;
-  options: string;
-  cancel_fee: number;
-  status: "draft" | "closed";
-  source: SalesSource;
-  source_reservation_id?: string; // Links back to the original reservation
-  next_booking_date?: string; // 次回予約日
-  treatment_excluded?: boolean; // 除外トリートメントフラグ
-  next_booking_time?: string; // 次回予約時間
-  next_booking_staff_name?: string; // 次回予約担当者
-  next_booking_nominated?: boolean; // 次回予約指名
-  next_booking_line_reminder?: boolean; // 2日前のリマインダー送付
-  customer_id?: string;
-  is_minimo?: boolean;
-  treatment_minutes?: number; // 稼働率計算用
-  merge_status?: "CSV_ONLY" | "MERGED_PRIMARY" | "MANUAL_ONLY" | "MERGED_SOURCE" | "DELETED";
-  merged_into_id?: string;
-  companyId?: string; // Tenant isolation
-  store_id?: string;
-  product_details?: string; // Stringified JSON array of { name: string, price: number }
-  created_at: any; // Firestore Timestamp
-  updated_at?: any; // Firestore Timestamp or serialized milliseconds
-};
 
 const SALES_COLLECTION = "sales";
 

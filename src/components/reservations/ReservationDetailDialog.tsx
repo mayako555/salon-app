@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { deleteReservation, Reservation, updateReservationStatus } from "@/app/reservations/actions";
 
-import { getSaleByReservationId, mapReservationToSalesRecord, SalesRecord } from "@/app/sales/actions";
+import { getSaleByReservationId, mapReservationToSalesRecord } from "@/app/sales/actions";
+import type { SalesRecord } from "@/types/sales";
 import { updateReservation } from "@/app/reservations/actions";
 import { getStaffList, StaffProfile } from "@/app/staff/actions";
 import { getMasterItems } from "@/app/sales/master-actions";

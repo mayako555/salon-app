@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Lock, X, Plus, Minus, Info, Calculator, CheckCircle2, AlertTriangle } from "lucide-react";
-import { closeDailySales, getMonthlySales, SalesRecord } from "./actions";
+import { closeDailySales, getMonthlySales } from "./actions";
+import type { SalesRecord } from "@/types/sales";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 import { clsx, type ClassValue } from "clsx";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { SalesRecord } from "./actions";
+import type { SalesRecord } from "@/types/sales";
 import { format, addMinutes, parse, isWithinInterval, startOfDay } from "date-fns";
 import { ja } from "date-fns/locale";
 import { clsx, type ClassValue } from "clsx";

@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/firestore-admin-wrapper";
 import { getCurrentUserContext } from "@/lib/auth-server";
-import { SalesRecord } from "@/app/sales/actions";
+import type { SalesRecord } from "@/types/sales";
 
 export async function getDebugSales(year: number, month: number): Promise<SalesRecord[]> {
   try {

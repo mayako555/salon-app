@@ -20,7 +20,8 @@ import {
   MessageSquare
 } from "lucide-react";
 import { MonthlyStatement, getStaffPayrollDefaultValues, updateManualStatement } from "./actions";
-import { getMonthlySales, SalesRecord } from "../sales/actions";
+import { getMonthlySales } from "../sales/actions";
+import type { SalesRecord } from "@/types/sales";
 import { toast } from "sonner";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
