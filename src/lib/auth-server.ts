@@ -3,20 +3,10 @@ import { redirect } from "next/navigation";
 import { adminAuth, adminDb } from "./firebase-admin";
 import { requireFeature } from "./feature-utils";
 import { FeatureKey } from "@/types/master";
+import type { UserContext, UserRole } from "./authorization";
 
-export type UserRole = "systemOwner" | "companyOwner" | "manager" | "storeManager" | "staff" | "admin" | "accountant" | "guest";
-
-export interface UserContext {
-  uid: string;
-  profileId?: string;
-  role: UserRole;
-  companyId?: string;
-  salonIds: string[];
-  schoolEnabled?: boolean;
-  schoolName?: string;
-  isImpersonating?: boolean;
-  originalSystemOwnerUid?: string;
-}
+export type { UserContext, UserRole } from "./authorization";
+export { verifyPermission } from "./authorization";
 
 /**
  * すべてのサーバーアクションの先頭で呼び出し、現在のユーザーコンテキストを取得する
@@ -116,29 +106,4 @@ export async function getCurrentUserContext(): Promise<UserContext> {
     }
     throw new Error(`認証エラー: ${error.message || String(error)}`);
   }
-}
-
-/**
- * 権限チェックユーティリティ
- * 各アクションで companyId 等のアクセス制御を共通化
- */
-export function verifyPermission(
-  ctx: UserContext,
-  targetCompanyId?: string,
-  targetUserId?: string
-) {
-  // 1. systemOwner は全て許可
-  if (ctx.role === "systemOwner") return true;
-
-  // 2. targetCompanyId が指定されている場合、自社かどうかチェック
-  if (targetCompanyId && targetCompanyId !== ctx.companyId) {
-    throw new Error("権限がありません");
-  }
-
-  // 3. staff権限の場合は自分のデータしか見られない (要求があれば)
-  if (ctx.role === "staff" && targetUserId && targetUserId !== ctx.uid) {
-    throw new Error("権限がありません");
-  }
-
-  return true;
 }
