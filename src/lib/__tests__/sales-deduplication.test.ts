@@ -176,11 +176,24 @@ describe("reconcileMonthlySales", () => {
     assert.deepEqual(reconcileMonthlySales([imported, unmatchedPos]), [imported]);
   });
 
-  it("retains a matched POS row as the editable primary record", () => {
-    const imported = sale({ id: "csv", source: "hotpepper", time: "11:00" });
-    const matchedPos = sale({ id: "pos", source: "checkout", time: "10:00", treatment_minutes: 60 });
+  it("keeps CSV amounts while carrying over payment details from a matched checkout", () => {
+    const imported = sale({ id: "csv", source: "hotpepper", time: "11:00", payment_method: "未入力" });
+    const matchedPos = sale({
+      id: "pos",
+      source: "checkout",
+      time: "10:00",
+      treatment_minutes: 60,
+      payment_method: "クレジットカード",
+      payment_status: "paid",
+      source_reservation_id: "reservation-1",
+    });
 
-    assert.deepEqual(reconcileMonthlySales([imported, matchedPos]), [matchedPos]);
+    assert.deepEqual(reconcileMonthlySales([imported, matchedPos]), [{
+      ...imported,
+      payment_method: "クレジットカード",
+      payment_status: "paid",
+      source_reservation_id: "reservation-1",
+    }]);
   });
 
   it("retains POS rows for stores without an imported ledger", () => {

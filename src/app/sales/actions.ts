@@ -322,7 +322,10 @@ export async function checkoutReservation(reservationId: string, salesData: Part
 
     // Also update reservation status
     const { updateReservationStatus } = await import("@/app/reservations/actions");
-    await updateReservationStatus(reservationId, "completed");
+    const statusResult = await updateReservationStatus(reservationId, "completed");
+    if (!statusResult.success) {
+      throw new Error(statusResult.error || "予約状態の更新に失敗しました");
+    }
 
     revalidatePath("/sales");
     revalidatePath("/staff-portal/sales");
@@ -361,7 +364,10 @@ export async function updatePaymentInfo(id: string, paymentMethod: string, payme
     // Mark the source reservation as completed if it exists
     if (data.source_reservation_id) {
       const { updateReservationStatus } = await import("@/app/reservations/actions");
-      await updateReservationStatus(data.source_reservation_id, "completed");
+      const statusResult = await updateReservationStatus(data.source_reservation_id, "completed");
+      if (!statusResult.success) {
+        throw new Error(statusResult.error || "予約状態の更新に失敗しました");
+      }
     }
 
     await addAuditLog({

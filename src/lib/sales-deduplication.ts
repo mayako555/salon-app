@@ -17,6 +17,10 @@ export type DeduplicatableSale = {
   nomination_fee?: number;
   discount?: number;
   treatment_minutes?: number;
+  payment_method?: string;
+  payment_status?: string;
+  split_payments?: { method: string; amount: number }[];
+  note?: string;
   created_at?: unknown;
   updated_at?: unknown;
 };
@@ -135,6 +139,22 @@ function preferredSale<T extends DeduplicatableSale>(current: T, candidate: T): 
   return candidateTimestamp > currentTimestamp ? candidate : current;
 }
 
+function mergeImportedLedgerWithPayment<T extends DeduplicatableSale>(imported: T, checkout: T): T {
+  const merged: T = {
+    ...imported,
+    payment_method: checkout.payment_method || imported.payment_method,
+    payment_status: checkout.payment_status || imported.payment_status,
+    source_reservation_id: checkout.source_reservation_id || imported.source_reservation_id,
+  };
+  if (checkout.split_payments || imported.split_payments) {
+    merged.split_payments = checkout.split_payments || imported.split_payments;
+  }
+  if (checkout.note || imported.note) {
+    merged.note = checkout.note || imported.note;
+  }
+  return merged;
+}
+
 export function deduplicateSales<T extends DeduplicatableSale>(sales: readonly T[]): T[] {
   const result: T[] = [];
 
@@ -154,20 +174,19 @@ export function deduplicateSales<T extends DeduplicatableSale>(sales: readonly T
  * Reconciles one month's sales for reporting.
  *
  * A SalonBoard import is the finalized register ledger for its store. Once a
- * store has imported rows, matched POS rows remain as the editable primary
- * record, while unmatched POS rows are excluded from that month's report.
+ * store has imported rows, its amounts remain authoritative while payment
+ * details from matched POS rows are overlaid onto it. Unmatched POS rows are
+ * excluded from that month's report.
  * Stores without imported rows continue to report their POS/manual sales.
  */
 export function reconcileMonthlySales<T extends DeduplicatableSale>(sales: readonly T[]): T[] {
   const importedSales = sales.filter(isImported);
-  const deduplicated = deduplicateSales(sales);
-
-  return deduplicated.filter((sale) => {
-    if (isImported(sale)) return true;
-
-    const storeImports = importedSales.filter((importedSale) => isSameStore(importedSale, sale));
-    if (storeImports.length === 0) return true;
-
-    return storeImports.some((importedSale) => isSameVisit(importedSale, sale));
+  const reconciled = sales.map((sale) => {
+    if (!isImported(sale)) return sale;
+    const checkout = sales.find((candidate) => !isImported(candidate) && isSameVisit(sale, candidate));
+    return checkout ? mergeImportedLedgerWithPayment(sale, checkout) : sale;
   });
+  return deduplicateSales(reconciled.filter((sale) =>
+    isImported(sale) || !importedSales.some((importedSale) => isSameStore(importedSale, sale))
+  ));
 }
