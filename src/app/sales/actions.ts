@@ -28,6 +28,7 @@ import { getCurrentUserContext } from "@/lib/auth-server";
 import { requireFeature } from "@/lib/feature-utils";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { reconcileMonthlySales } from "@/lib/sales-deduplication";
+import { serializeFirestoreRecord } from "@/lib/firestore-serialization";
 import {
   normalizeSalesDate,
   parseSalesAmount,
@@ -199,19 +200,7 @@ export async function getSaleByReservationId(resId: string, sourceSalesId?: stri
     if (!ctx.companyId) return null;
     if (data.companyId !== ctx.companyId) return null;
     
-    // Serialize Firestore Timestamps
-    const serializedData: any = {};
-    for (const [key, value] of Object.entries(data)) {
-      if (value && typeof (value as any).toMillis === 'function') {
-        serializedData[key] = (value as any).toMillis();
-      } else if (value instanceof Date) {
-        serializedData[key] = value.getTime();
-      } else {
-        serializedData[key] = value;
-      }
-    }
-    
-    return serializedData as SalesRecord;
+    return serializeFirestoreRecord(data) as SalesRecord;
   } catch (error) {
     console.error("Error fetching sale by res id:", error);
     return null;
@@ -238,21 +227,9 @@ export async function getMonthlySales(year: number, month: number): Promise<Sale
       .get();
     const sales = snapshot.docs.map((d: any) => {
       const data = d.data();
-      // Firestore TimestampやDateオブジェクトなどのシリアライズ不可能なオブジェクトをプレーンな値に変換
-      const serializedData: any = {};
-      for (const [key, value] of Object.entries(data)) {
-        if (value && typeof (value as any).toMillis === 'function') {
-          serializedData[key] = (value as any).toMillis();
-        } else if (value instanceof Date) {
-          serializedData[key] = value.getTime();
-        } else {
-          serializedData[key] = value;
-        }
-      }
-      
       return {
         id: d.id,
-        ...serializedData
+        ...serializeFirestoreRecord(data)
       };
     }) as SalesRecord[];
 
