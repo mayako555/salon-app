@@ -32,7 +32,7 @@ export default function ReservationsPage() {
     const initialLoad = async () => {
       try {
         const [staffData, settingsData] = await Promise.all([
-          getStaffList(),
+          getStaffList({ companyScoped: true }),
           getReservationSettings()
         ]);
         setStaffList(staffData);

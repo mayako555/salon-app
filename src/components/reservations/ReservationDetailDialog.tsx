@@ -175,7 +175,7 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
 
   useEffect(() => {
     if (isOpen) {
-      getStaffList().then(list => setStaffs(list)).catch(console.error);
+      getStaffList({ companyScoped: true }).then(list => setStaffs(list)).catch(console.error);
       getMasterItems().then(items => {
         const pmItems = items.filter(item => item.itemType === "paymentMethod" && item.isActive !== false);
         if (pmItems.length > 0) {

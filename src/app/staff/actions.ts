@@ -61,8 +61,9 @@ const STAFF_COLLECTION = "staff_profiles";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { getTenantCollection, getTenantDoc } from "@/lib/tenant-utils";
 import { addTenantOwnedDoc, updateTenantOwnedDoc, deleteTenantOwnedDoc, getTenantOwnedDoc } from "@/lib/tenant-ownership";
+import { filterStaffByCompany } from "@/lib/staff-filtering";
 
-export async function getStaffList(options?: { includeResigned?: boolean }): Promise<StaffProfile[]> {
+export async function getStaffList(options?: { includeResigned?: boolean; companyScoped?: boolean }): Promise<StaffProfile[]> {
   try {
     const ctx = await getCurrentUserContext();
     const { adminDb } = await import("@/lib/firebase-admin");
@@ -103,7 +104,9 @@ export async function getStaffList(options?: { includeResigned?: boolean }): Pro
       throw new Error("会社IDが指定されていません");
     }
 
-    const filteredStaff = staff;
+    const filteredStaff = options?.companyScoped
+      ? filterStaffByCompany(staff, ctx.companyId)
+      : staff;
 
     if (filteredStaff.length === 0) {
       return [{
