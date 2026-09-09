@@ -116,6 +116,13 @@ export function normalizeSalesDate(rawDate: string): string {
   return rawDate;
 }
 
+export function normalizeSalesTime(rawTime: string): string {
+  if (rawTime.includes(":")) return rawTime;
+
+  const paddedTime = rawTime.padStart(4, "0");
+  return `${paddedTime.substring(0, 2)}:${paddedTime.substring(2, 4)}`;
+}
+
 export function parseSalesAmount(value: unknown): number {
   if (value === undefined || value === null) return 0;
   return Number.parseInt(String(value).replace(/[^\d-]/g, ""), 10) || 0;

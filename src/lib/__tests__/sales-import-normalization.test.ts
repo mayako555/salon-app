@@ -4,6 +4,7 @@ import {
   isDuplicateImportedReservation,
   isDuplicateImportedSale,
   normalizeSalesDate,
+  normalizeSalesTime,
   parseSalesAmount,
   parseTreatmentDuration,
 } from "../sales-import-normalization";
@@ -29,6 +30,14 @@ describe("sales import normalization", () => {
 
   it("preserves unknown date formats", () => {
     assert.equal(normalizeSalesDate("9月7日"), "9月7日");
+  });
+
+  it("normalizes compact sales times and preserves colon-separated values", () => {
+    assert.equal(normalizeSalesTime("930"), "09:30");
+    assert.equal(normalizeSalesTime("0930"), "09:30");
+    assert.equal(normalizeSalesTime("09:30"), "09:30");
+    assert.equal(normalizeSalesTime("09:30:00"), "09:30:00");
+    assert.equal(normalizeSalesTime(""), "00:00");
   });
 
   it("parses formatted, negative and empty sales amounts", () => {

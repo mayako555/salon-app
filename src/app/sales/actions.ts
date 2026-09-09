@@ -33,6 +33,7 @@ import {
   isDuplicateImportedReservation,
   isDuplicateImportedSale,
   normalizeSalesDate,
+  normalizeSalesTime,
   parseSalesAmount,
   parseTreatmentDuration,
 } from "@/lib/sales-import-normalization";
@@ -547,7 +548,7 @@ export async function importHotPepperCsv(formData: FormData) {
       if (groupRows.some(r => String(r["会計区分"] || "").includes("取り消し")) && (techSales + prodSales === 0)) continue;
 
       const dateFormatted = normalizeSalesDate(rawDate);
-      let timeFormatted = rawTime.includes(":") ? rawTime : `${rawTime.padStart(4, '0').substring(0, 2)}:${rawTime.padStart(4, '0').substring(2, 4)}`;
+      const timeFormatted = normalizeSalesTime(rawTime);
 
       const csvTotal = techSales + prodSales + nominationFee - discount;
       
