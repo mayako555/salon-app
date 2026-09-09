@@ -30,6 +30,7 @@ import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "
 import { reconcileMonthlySales } from "@/lib/sales-deduplication";
 import { serializeFirestoreRecord } from "@/lib/firestore-serialization";
 import {
+  isDuplicateImportedSale,
   normalizeSalesDate,
   parseSalesAmount,
   parseTreatmentDuration,
@@ -549,14 +550,13 @@ export async function importHotPepperCsv(formData: FormData) {
 
       const csvTotal = techSales + prodSales + nominationFee - discount;
       
-       const { getNormalizedStoreName } = require("@/lib/store-utils");
-       const isAlreadyImported = existingCsvRecords.some(r => {
-         const rTotal = (r.tech_sales || 0) + (r.product_sales || 0) + (r.nomination_fee || 0) - (r.discount || 0);
-         return getNormalizedStoreName(r.store_name || "") === getNormalizedStoreName(storeName) && 
-                r.date === dateFormatted && 
-                r.time === timeFormatted && 
-                rTotal === csvTotal && 
-                (r.customer_name === customerName || r.staff_name === staffName);
+       const isAlreadyImported = isDuplicateImportedSale(existingCsvRecords, {
+         storeName,
+         date: dateFormatted,
+         time: timeFormatted,
+         total: csvTotal,
+         customerName,
+         staffName,
        });
 
        if (isAlreadyImported) {
