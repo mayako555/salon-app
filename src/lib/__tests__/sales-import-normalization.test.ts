@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  extractSalesDateTime,
   isDuplicateImportedReservation,
   isDuplicateImportedSale,
   normalizeSalesDate,
@@ -10,6 +11,34 @@ import {
 } from "../sales-import-normalization";
 
 describe("sales import normalization", () => {
+  it("extracts the explicit accounting date and time before fallback columns", () => {
+    assert.deepEqual(extractSalesDateTime({
+      "会計日": "2026/09/09",
+      "来店日": "2026/09/08",
+      "会計時間": 930,
+      "来店時間": 1000,
+    }), { rawDate: "2026/09/09", rawTime: "930" });
+  });
+
+  it("falls back to visit columns and combined date-time columns", () => {
+    assert.deepEqual(extractSalesDateTime({
+      "来店日": "2026/09/08",
+      "来店時間": "10:00",
+    }), { rawDate: "2026/09/08", rawTime: "10:00" });
+
+    assert.deepEqual(extractSalesDateTime({
+      "来店日時": "2026/09/07 11:30",
+    }), { rawDate: "2026/09/07", rawTime: "11:30" });
+
+    assert.deepEqual(extractSalesDateTime({
+      "予約日時": "2026/09/06",
+    }), { rawDate: "2026/09/06", rawTime: "" });
+  });
+
+  it("returns empty values when no supported date or time columns exist", () => {
+    assert.deepEqual(extractSalesDateTime({}), { rawDate: "", rawTime: "" });
+  });
+
   it("parses supported treatment duration formats", () => {
     assert.equal(parseTreatmentDuration("90分"), 90);
     assert.equal(parseTreatmentDuration("1.5h"), 90);

@@ -30,6 +30,7 @@ import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "
 import { reconcileMonthlySales } from "@/lib/sales-deduplication";
 import { serializeFirestoreRecord } from "@/lib/firestore-serialization";
 import {
+  extractSalesDateTime,
   isDuplicateImportedReservation,
   isDuplicateImportedSale,
   normalizeSalesDate,
@@ -400,19 +401,7 @@ export async function importHotPepperCsv(formData: FormData) {
     rows.forEach(row => {
       const accountingId = row["会計ID"] || row["予約ID"] || "";
       const customerName = String(row["お客様名"] || row["顧客名"] || row["顧客氏名"] || row["customer"] || "不明").trim();
-      let rawDate = String(row["会計日"] || row["来店日"] || "");
-      let rawTime = String(row["会計時間"] || row["来店時間"] || "");
-      
-      if (!rawDate) {
-        const dateTime = String(row["来店日時"] || row["予約日時"] || row["日時"] || "");
-        if (dateTime.includes(" ")) {
-          const parts = dateTime.split(" ");
-          rawDate = parts[0];
-          rawTime = parts[1];
-        } else if (dateTime) {
-          rawDate = dateTime;
-        }
-      }
+      const { rawDate, rawTime } = extractSalesDateTime(row);
       
       const groupId = accountingId || `${customerName}_${rawDate}_${rawTime}`;
       if (!groups[groupId]) groups[groupId] = [];
@@ -483,19 +472,7 @@ export async function importHotPepperCsv(formData: FormData) {
       const staffMatch = staffs.find(s => s.name.replace(/\s+/g, "") === staffName);
       const staffId = staffMatch ? staffMatch.id : "unknown";
 
-      let rawDate = String(firstRow["会計日"] || firstRow["来店日"] || "");
-      let rawTime = String(firstRow["会計時間"] || firstRow["来店時間"] || "");
-      
-      if (!rawDate) {
-        const dateTime = String(firstRow["来店日時"] || firstRow["予約日時"] || firstRow["日時"] || "");
-        if (dateTime.includes(" ")) {
-          const parts = dateTime.split(" ");
-          rawDate = parts[0];
-          rawTime = parts[1];
-        } else if (dateTime) {
-          rawDate = dateTime;
-        }
-      }
+      const { rawDate, rawTime } = extractSalesDateTime(firstRow);
       
       const customerName = String(
         firstRow["お客様名"] || 

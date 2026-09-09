@@ -2,6 +2,26 @@ import { getNormalizedStoreName } from "@/lib/store-utils";
 
 const DEFAULT_TREATMENT_MINUTES = 60;
 
+export type CsvSalesRow = Record<string, unknown>;
+
+export function extractSalesDateTime(row: CsvSalesRow): { rawDate: string; rawTime: string } {
+  let rawDate = String(row["会計日"] || row["来店日"] || "");
+  let rawTime = String(row["会計時間"] || row["来店時間"] || "");
+
+  if (!rawDate) {
+    const dateTime = String(row["来店日時"] || row["予約日時"] || row["日時"] || "");
+    if (dateTime.includes(" ")) {
+      const parts = dateTime.split(" ");
+      rawDate = parts[0];
+      rawTime = parts[1];
+    } else if (dateTime) {
+      rawDate = dateTime;
+    }
+  }
+
+  return { rawDate, rawTime };
+}
+
 export type ExistingImportedSale = {
   store_name?: string;
   date?: string;
