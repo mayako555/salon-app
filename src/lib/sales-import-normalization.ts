@@ -23,6 +23,28 @@ export type ImportedSaleIdentity = {
   total: number;
 };
 
+export type ExistingImportedReservation = {
+  source_sales_id?: string;
+  companyId?: string;
+  store_name?: string;
+  staff_name?: string;
+  customer_name?: string;
+  date?: string;
+  end_time?: string;
+  expected_price?: number;
+};
+
+export type ImportedReservationIdentity = {
+  sourceSalesId: string;
+  companyId: string;
+  storeName: string;
+  staffName: string;
+  customerName: string;
+  date: string;
+  endTime: string;
+  expectedPrice: number;
+};
+
 export function isDuplicateImportedSale(
   existingSales: readonly ExistingImportedSale[],
   candidate: ImportedSaleIdentity
@@ -38,6 +60,25 @@ export function isDuplicateImportedSale(
       sale.time === candidate.time &&
       existingTotal === candidate.total &&
       (sale.customer_name === candidate.customerName || sale.staff_name === candidate.staffName);
+  });
+}
+
+export function isDuplicateImportedReservation(
+  existingReservations: readonly ExistingImportedReservation[],
+  candidate: ImportedReservationIdentity
+): boolean {
+  return existingReservations.some((reservation) => {
+    if (reservation.source_sales_id && reservation.source_sales_id === candidate.sourceSalesId) {
+      return true;
+    }
+
+    return reservation.companyId === candidate.companyId &&
+      reservation.store_name === candidate.storeName &&
+      reservation.staff_name === candidate.staffName &&
+      reservation.customer_name === candidate.customerName &&
+      reservation.date === candidate.date &&
+      reservation.end_time === candidate.endTime &&
+      Number(reservation.expected_price || 0) === candidate.expectedPrice;
   });
 }
 

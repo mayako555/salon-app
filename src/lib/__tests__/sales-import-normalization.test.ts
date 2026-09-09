@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  isDuplicateImportedReservation,
   isDuplicateImportedSale,
   normalizeSalesDate,
   parseSalesAmount,
@@ -88,5 +89,55 @@ describe("sales import normalization", () => {
       customerName: "別のお客様",
       staffName: "別担当",
     }), false);
+  });
+
+  const existingReservation = {
+    source_sales_id: "sale-1",
+    companyId: "company-1",
+    store_name: "Jasmine Lash 六甲道店",
+    staff_name: "佐藤",
+    customer_name: "山田 花子",
+    date: "2026-08-10",
+    end_time: "11:00",
+    expected_price: 9_000,
+  };
+
+  const reservationCandidate = {
+    sourceSalesId: "sale-2",
+    companyId: "company-1",
+    storeName: "Jasmine Lash 六甲道店",
+    staffName: "佐藤",
+    customerName: "山田 花子",
+    date: "2026-08-10",
+    endTime: "11:00",
+    expectedPrice: 9_000,
+  };
+
+  it("detects an imported reservation by source sale ID or the existing exact fields", () => {
+    assert.equal(isDuplicateImportedReservation([existingReservation], {
+      ...reservationCandidate,
+      sourceSalesId: "sale-1",
+      customerName: "別のお客様",
+    }), true);
+    assert.equal(isDuplicateImportedReservation([existingReservation], reservationCandidate), true);
+  });
+
+  it("requires every existing reservation field when source sale IDs differ", () => {
+    const differences = [
+      { companyId: "company-2" },
+      { storeName: "Jasmine Lash 神戸店" },
+      { staffName: "別担当" },
+      { customerName: "別のお客様" },
+      { date: "2026-08-11" },
+      { endTime: "12:00" },
+      { expectedPrice: 8_999 },
+    ];
+
+    for (const difference of differences) {
+      assert.equal(isDuplicateImportedReservation(
+        [existingReservation],
+        { ...reservationCandidate, ...difference }
+      ), false);
+    }
   });
 });

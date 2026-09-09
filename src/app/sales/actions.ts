@@ -30,6 +30,7 @@ import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "
 import { reconcileMonthlySales } from "@/lib/sales-deduplication";
 import { serializeFirestoreRecord } from "@/lib/firestore-serialization";
 import {
+  isDuplicateImportedReservation,
   isDuplicateImportedSale,
   normalizeSalesDate,
   parseSalesAmount,
@@ -598,15 +599,15 @@ export async function importHotPepperCsv(formData: FormData) {
 
       // --- 予約自動生成 (CSV推定予約) ---
       // バッチ処理等を見据えた推定予約の重複チェック
-      const isResAlreadyImported = existingReservations.some(r => {
-        if (r.source_sales_id && r.source_sales_id === docRef.id) return true;
-        return r.companyId === (companyId || "company_default") &&
-               r.store_name === storeName &&
-               r.staff_name === staffName &&
-               r.customer_name === customerName &&
-               r.date === dateFormatted &&
-               r.end_time === timeFormatted &&
-               (r.expected_price || 0) === csvTotal;
+      const isResAlreadyImported = isDuplicateImportedReservation(existingReservations, {
+        sourceSalesId: docRef.id,
+        companyId: companyId || "company_default",
+        storeName,
+        staffName,
+        customerName,
+        date: dateFormatted,
+        endTime: timeFormatted,
+        expectedPrice: csvTotal,
       });
 
       if (!isResAlreadyImported) {
