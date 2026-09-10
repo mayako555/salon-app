@@ -329,33 +329,6 @@ export async function editStaff(id: string, formData: FormData) {
       currentUid = snap.data()?.uid || "";
     }
 
-    // Sync passcode and status to Firebase Auth using admin SDK
-    if (currentUid) {
-      try {
-        const updateData: any = {
-          disabled: employment_status === "retired"
-        };
-        if (passcode) {
-          updateData.password = passcode + "_salon";
-        }
-        await adminAuth.updateUser(currentUid, updateData);
-      } catch (authError) {
-        console.warn("Failed to sync Firebase Auth user:", authError);
-      }
-    } else if (passcode) {
-      try {
-        const userRecord = await adminAuth.createUser({
-          email,
-          password: passcode + "_salon",
-          displayName: name,
-          disabled: employment_status === "retired"
-        });
-        currentUid = userRecord.uid;
-      } catch (createError) {
-        console.warn("Failed to create Firebase Auth user during edit:", createError);
-      }
-    }
-
     const colRef = doc(db, STAFF_COLLECTION, id);
     const staffData = {
       name,
@@ -413,6 +386,35 @@ export async function editStaff(id: string, formData: FormData) {
     });
 
     revalidatePath("/staff");
+
+    // Changing the signed-in user's password revokes the current session.
+    // Run this last so the remaining tenant-scoped writes can finish first.
+    if (currentUid) {
+      try {
+        const updateData: any = {
+          disabled: employment_status === "retired"
+        };
+        if (passcode) {
+          updateData.password = passcode + "_salon";
+        }
+        await adminAuth.updateUser(currentUid, updateData);
+      } catch (authError) {
+        console.warn("Failed to sync Firebase Auth user:", authError);
+      }
+    } else if (passcode) {
+      try {
+        const userRecord = await adminAuth.createUser({
+          email,
+          password: passcode + "_salon",
+          displayName: name,
+          disabled: employment_status === "retired"
+        });
+        currentUid = userRecord.uid;
+      } catch (createError) {
+        console.warn("Failed to create Firebase Auth user during edit:", createError);
+      }
+    }
+
     return { success: true };
   } catch (error: any) {
     console.error("Error in editStaff:", error);
