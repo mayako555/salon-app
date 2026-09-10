@@ -181,7 +181,7 @@ export default function StaffPage() {
 
   async function loadStaff() {
     setLoading(true);
-    const data = await getStaffList({ includeResigned: true });
+    const data = await getStaffList({ includeResigned: true, companyScoped: true });
     setStaffList(data);
     setLoading(false);
   }
