@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  calculateReservationStartTime,
   extractSalesDateTime,
   isDuplicateImportedReservation,
   isDuplicateImportedSale,
@@ -49,6 +50,12 @@ describe("sales import normalization", () => {
   it("uses 60 minutes when treatment duration is missing or invalid", () => {
     assert.equal(parseTreatmentDuration(undefined), 60);
     assert.equal(parseTreatmentDuration("不明"), 60);
+  });
+
+  it("calculates generated reservation start times without changing the existing rules", () => {
+    assert.equal(calculateReservationStartTime("11:30", 90), "10:00");
+    assert.equal(calculateReservationStartTime("00:30", 60), "23:30");
+    assert.equal(calculateReservationStartTime("13:00", 60), "12:00");
   });
 
   it("normalizes supported sales date formats", () => {

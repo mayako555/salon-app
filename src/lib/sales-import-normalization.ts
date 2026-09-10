@@ -118,6 +118,17 @@ export function parseTreatmentDuration(duration: string | undefined): number {
   return Number.isNaN(minutes) ? DEFAULT_TREATMENT_MINUTES : minutes;
 }
 
+export function calculateReservationStartTime(endTime: string, durationMinutes: number): string {
+  const [endHours, endMinutes] = endTime.split(":").map(Number);
+  let totalMinutes = (endHours || 0) * 60 + (endMinutes || 0) - durationMinutes;
+
+  if (totalMinutes < 0) totalMinutes += 24 * 60;
+
+  const startHours = Math.floor(totalMinutes / 60);
+  const startMinutes = totalMinutes % 60;
+  return `${String(startHours).padStart(2, "0")}:${String(startMinutes).padStart(2, "0")}`;
+}
+
 export function normalizeSalesDate(rawDate: string): string {
   if (rawDate.includes("/")) {
     const parts = rawDate.split("/");

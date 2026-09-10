@@ -30,6 +30,7 @@ import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "
 import { reconcileMonthlySales } from "@/lib/sales-deduplication";
 import { serializeFirestoreRecord } from "@/lib/firestore-serialization";
 import {
+  calculateReservationStartTime,
   extractSalesDateTime,
   isDuplicateImportedReservation,
   isDuplicateImportedSale,
@@ -607,13 +608,7 @@ export async function importHotPepperCsv(formData: FormData) {
           durationMinutes = 60;
         }
 
-        // Calculate start time
-        const [endH, endM] = timeFormatted.split(":").map(Number);
-        let totalM = (endH || 0) * 60 + (endM || 0) - durationMinutes;
-        if (totalM < 0) totalM += 24 * 60;
-        const startH = Math.floor(totalM / 60);
-        const startM = totalM % 60;
-        const startTimeFormatted = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
+        const startTimeFormatted = calculateReservationStartTime(timeFormatted, durationMinutes);
 
         currentBatch.set(resDocRef, {
           companyId: companyId || "company_default",
