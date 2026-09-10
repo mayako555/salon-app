@@ -30,7 +30,7 @@ export default async function ShiftsPage({
   // Fetch shifts and staff list
   const [shifts, staffList] = await Promise.all([
     getMonthlyShifts(year, month),
-    getStaffList()
+    getStaffList({ companyScoped: true })
   ]);
   
   console.log(`[DEBUG ShiftsPage] Fetched ${shifts.length} shifts and ${staffList.length} staff for ${year}-${month}`);

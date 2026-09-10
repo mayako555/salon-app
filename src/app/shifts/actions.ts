@@ -97,7 +97,7 @@ export async function getMonthlyShifts(year: number, month: number): Promise<Shi
     
     if (!ctx.companyId) throw new Error("会社IDが指定されていません");
 
-    const staffList = await getStaffList(); // Already strictly filtered by companyId
+    const staffList = await getStaffList({ companyScoped: true });
     const allowedStaffIds = new Set(staffList.map(s => s.id));
     
     return shifts.filter(s => allowedStaffIds.has(s.staff_id));
@@ -127,7 +127,7 @@ export async function getShiftsForDate(dateStr: string): Promise<ShiftRecord[]> 
 
     if (!ctx.companyId) throw new Error("会社IDが指定されていません");
     
-    const staffList = await getStaffList();
+    const staffList = await getStaffList({ companyScoped: true });
     const allowedStaffIds = new Set(staffList.map(s => s.id));
     return shifts.filter(s => allowedStaffIds.has(s.staff_id));
   } catch (error) {
@@ -287,7 +287,7 @@ export async function bulkSaveShifts(params: {
     const start = new Date(dateRange.start);
     const end = new Date(dateRange.end);
     const colRef = collection(db, SHIFTS_COLLECTION);
-    const staffList = await getStaffList();
+    const staffList = await getStaffList({ companyScoped: true });
 
     const dates: string[] = [];
     let curr = new Date(start);
@@ -539,7 +539,7 @@ export async function getAllHolidayRequests(year: number, month: number): Promis
     }) as HolidayRequest[];
     if (!ctx.companyId) throw new Error("会社IDが指定されていません");
     
-    const staffList = await getStaffList();
+    const staffList = await getStaffList({ companyScoped: true });
     const allowedStaffIds = new Set(staffList.map(s => s.id));
     return requests.filter(r => allowedStaffIds.has(r.staff_id));
   } catch (error) {
