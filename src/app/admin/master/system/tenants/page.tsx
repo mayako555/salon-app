@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Plus, Users, Edit2, ShieldCheck, Check, X, ArrowLeft, Key, Database } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { APP_ROUTES } from "@/lib/app-routes";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { FeatureManagerDialog } from "./FeatureManagerDialog";
@@ -154,7 +155,7 @@ export default function TenantsPage() {
       });
       if (!res.ok) throw new Error('Failed to impersonate');
       toast.success("代理ログインを開始しました");
-      window.location.href = "/admin/dashboard"; // Redirect to dashboard
+      window.location.assign(APP_ROUTES.dashboard);
     } catch (e: any) {
       toast.error(e.message);
     }
