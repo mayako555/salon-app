@@ -1,5 +1,6 @@
 // Firebase Admin Initialization (Safe for Vercel Build)
 // Build fix trigger
+import { requireFirebaseEnv } from "./firebase-config";
 
 // Build phase detection
 const isBuild = process.env.npm_lifecycle_event === "build" || 
@@ -81,7 +82,7 @@ try {
     };
 
     const firebaseAdminConfig = {
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "salonapp-ee4d2",
+      projectId: requireFirebaseEnv("NEXT_PUBLIC_FIREBASE_PROJECT_ID", process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID),
       clientEmail: getClientEmail(),
       privateKey: getPrivateKey(),
     };
@@ -89,7 +90,10 @@ try {
     if (!admin.apps.length) {
       const pk = firebaseAdminConfig.privateKey;
       const hasValidKey = pk && pk.includes("-----BEGIN PRIVATE KEY-----");
-      const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "salonapp-ee4d2.firebasestorage.app";
+      const storageBucket = requireFirebaseEnv(
+        "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
+        process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      );
       
       if (firebaseAdminConfig.clientEmail && hasValidKey) {
         admin.initializeApp({
