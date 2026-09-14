@@ -15,6 +15,7 @@ import {
 import { addAuditLog } from "@/app/audit/actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { getCompanyScopedCollection, getCompanyScopedDoc } from "@/lib/tenant-utils";
+import { shouldApplyJasmineShiftPolicy } from "@/lib/attendance-policy";
 
 export type AttendanceStatus = "normal" | "leave" | "half_leave" | "absence";
 
@@ -146,7 +147,20 @@ async function autoFixMissingClockOuts(records: AttendanceRecord[], adminDb: any
 
 export async function recordClockIn(staffId: string, staffName: string, store?: string) {
   const ctx = await getCurrentUserContext();
-  return _recordClockIn(staffId, staffName, store, ctx);
+  const linkWithShifts = await isJasmineShiftPolicyEnabled(ctx.companyId);
+  return linkWithShifts
+    ? _recordClockIn(staffId, staffName, store, ctx)
+    : _recordFcClockIn(staffId, staffName, store, ctx);
+}
+
+async function isJasmineShiftPolicyEnabled(companyId?: string): Promise<boolean> {
+  if (!companyId) return false;
+  const { adminDb } = await import("@/lib/firebase-admin");
+  const companyDoc = await adminDb.collection("companies").doc(companyId).get();
+  const linkWithShifts = companyDoc.exists
+    ? companyDoc.data()?.attendancePolicy?.linkWithShifts
+    : undefined;
+  return shouldApplyJasmineShiftPolicy(companyId, linkWithShifts);
 }
 
 async function _recordClockIn(staffId: string, staffName: string, store: string | undefined, ctx: any) {
@@ -270,7 +284,8 @@ async function _recordFcClockIn(staffId: string, staffName: string, store: strin
 
 export async function recordClockOut(staffId: string) {
   const ctx = await getCurrentUserContext();
-  return _recordClockOut(staffId, ctx);
+  const linkWithShifts = await isJasmineShiftPolicyEnabled(ctx.companyId);
+  return linkWithShifts ? _recordClockOut(staffId, ctx) : _recordFcClockOut(staffId, ctx);
 }
 
 async function _recordClockOut(staffId: string, ctx: any) {
@@ -658,18 +673,13 @@ export async function recordKioskAction(
   try {
     const { adminDb } = await import("@/lib/firebase-admin");
     
-    let linkWithShifts = false;
+    let configuredLinkWithShifts: boolean | undefined;
     const companyDoc = await adminDb.collection("companies").doc(companyId).get();
     if (companyDoc.exists) {
       const companyData = companyDoc.data();
-      const isSystemOwner = companyData?.companyType === "system_owner";
-      const policy = companyData?.attendancePolicy || (
-        isSystemOwner
-          ? { roundingEnabled: true, roundingIntervalMinutes: 30, linkWithShifts: true }
-          : { roundingEnabled: false, roundingIntervalMinutes: 0, linkWithShifts: false }
-      );
-      linkWithShifts = !!policy.linkWithShifts;
+      configuredLinkWithShifts = companyData?.attendancePolicy?.linkWithShifts;
     }
+    const linkWithShifts = shouldApplyJasmineShiftPolicy(companyId, configuredLinkWithShifts);
 
     const now = new Date();
     // UTC time converted to JST for calculating the correct "today" string
