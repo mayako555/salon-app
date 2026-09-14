@@ -3,16 +3,13 @@ import { setTenantOwnedDoc } from "@/lib/tenant-ownership";
 
 import { db } from "@/lib/firestore-admin-wrapper";
 import { 
-  collection, 
-  getDocs, 
-  query, 
-  where, 
   doc, 
-  setDoc, 
-  getDoc,
   serverTimestamp 
 } from "@/lib/firestore-admin-wrapper";
 import { revalidatePath } from "next/cache";
+import { getCurrentUserContext } from "@/lib/auth-server";
+import { getCompanyScopedCollection } from "@/lib/tenant-utils";
+import { requireCompanyId } from "@/lib/authorization";
 
 const STORE_TARGETS_COLLECTION = "monthly_store_targets";
 
@@ -25,10 +22,11 @@ export type StoreTarget = {
 
 export async function getStoreTargets(month: string): Promise<StoreTarget[]> {
   try {
-    const colRef = collection(db, STORE_TARGETS_COLLECTION);
-    const q = query(colRef, where("month", "==", month));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => {
+    const ctx = await getCurrentUserContext();
+    const snapshot = await getCompanyScopedCollection(STORE_TARGETS_COLLECTION, ctx)
+      .where("month", "==", month)
+      .get();
+    return snapshot.docs.map((doc: any) => {
       const data = doc.data();
       return {
         id: doc.id,
@@ -45,7 +43,9 @@ export async function getStoreTargets(month: string): Promise<StoreTarget[]> {
 
 export async function updateStoreTarget(storeName: string, month: string, target: number) {
   try {
-    const id = `${month}_${storeName}`;
+    const ctx = await getCurrentUserContext();
+    const companyId = requireCompanyId(ctx);
+    const id = `${companyId}_${month}_${storeName}`;
     const docRef = doc(db, STORE_TARGETS_COLLECTION, id);
     await setTenantOwnedDoc(docRef, {
       store_name: storeName,

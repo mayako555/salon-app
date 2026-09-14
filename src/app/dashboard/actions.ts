@@ -14,6 +14,8 @@ import { getMonthlyShifts } from "../shifts/actions";
 import { subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { getNormalizedStoreName } from "@/lib/store-utils";
+import { getMonthlySales } from "@/app/sales/actions";
+import { getSaleGrossAmount } from "@/lib/sales-metrics";
 
 export async function getDashboardStats() {
   try {
@@ -39,10 +41,8 @@ export async function getDashboardStats() {
     const unprocessedAttendanceCount = unprocessedSnap.docs.filter(d => !d.data().clock_out).length;
 
     // 3. Monthly Sales & 4. Today's Sales
-    const salesCol = collection(db, "sales");
-    // Fetch all sales for the company to avoid composite index issues, filter in memory
-    const salesQuery = query(salesCol, where("companyId", "==", ctx.companyId));
-    const salesSnap = await getDocs(salesQuery);
+    // 売上管理画面と同じ取得・重複排除経路を使い、画面間の金額差を防ぐ。
+    const monthlySales = await getMonthlySales(now.getFullYear(), now.getMonth() + 1);
     
     // Fetch School Sales if enabled
     let schoolSalesSnap: any = { docs: [] };
@@ -59,15 +59,12 @@ export async function getDashboardStats() {
     let monthlyRegularVisits = 0;
     const storeSummary: Record<string, number> = {};
     
-    salesSnap.forEach(doc => {
-      const data = doc.data();
-      if (data.source !== "hotpepper" || data.merge_status === "DELETED") return;
-
+    monthlySales.forEach(data => {
       const date = data.date || "";
       const isThisMonth = date.startsWith(currentMonthPrefix);
       const isToday = date === todayStr;
 
-      const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
+      const amount = getSaleGrossAmount(data);
 
       if (isThisMonth) {
         monthlyTotal += amount;
@@ -111,14 +108,12 @@ export async function getDashboardStats() {
     const storeTargets = await getStoreTargets(currentMonthPrefix);
     
     const monthlyStoreSales: Record<string, number> = {};
-    salesSnap.forEach(doc => {
-      const data = doc.data();
-      if (data.source !== "hotpepper" || data.merge_status === "DELETED") return;
+    monthlySales.forEach(data => {
       if (!data.date?.startsWith(currentMonthPrefix)) return;
       
       const rawStore = data.store_name || "不明";
       const store = getNormalizedStoreName(rawStore);
-      const amount = (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
+      const amount = getSaleGrossAmount(data);
       monthlyStoreSales[store] = (monthlyStoreSales[store] || 0) + amount;
     });
 
