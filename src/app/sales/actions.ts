@@ -28,6 +28,7 @@ import { getCurrentUserContext } from "@/lib/auth-server";
 import { requireFeature } from "@/lib/feature-utils";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { reconcileMonthlySales } from "@/lib/sales-deduplication";
+import { resolvePaymentReservationId } from "@/lib/payment-sync";
 import { serializeFirestoreRecord } from "@/lib/firestore-serialization";
 import {
   calculateReservationStartTime,
@@ -319,7 +320,14 @@ export async function checkoutReservation(reservationId: string, salesData: Part
   }
 }
 
-export async function updatePaymentInfo(id: string, paymentMethod: string, paymentStatus: string, note: string, splitPayments?: { method: string, amount: number }[]) {
+export async function updatePaymentInfo(
+  id: string,
+  paymentMethod: string,
+  paymentStatus: string,
+  note: string,
+  splitPayments?: { method: string, amount: number }[],
+  reservationId?: string
+) {
   try {
     const ctx = await getCurrentUserContext();
   if (ctx.companyId) await requireFeature(ctx.companyId, "sales");
@@ -343,10 +351,12 @@ export async function updatePaymentInfo(id: string, paymentMethod: string, payme
 
     await updateTenantOwnedDoc(docRef, updates);
 
-    // Mark the source reservation as completed if it exists
-    if (data.source_reservation_id) {
+    // CSV由来の売上は source_reservation_id を持たず、予約側だけが
+    // source_sales_id を持つ。呼び出し元の予約IDも使って確定状態を同期する。
+    const sourceReservationId = resolvePaymentReservationId(data.source_reservation_id, reservationId);
+    if (sourceReservationId) {
       const { updateReservationStatus } = await import("@/app/reservations/actions");
-      const statusResult = await updateReservationStatus(data.source_reservation_id, "completed");
+      const statusResult = await updateReservationStatus(sourceReservationId, "completed");
       if (!statusResult.success) {
         throw new Error(statusResult.error || "予約状態の更新に失敗しました");
       }

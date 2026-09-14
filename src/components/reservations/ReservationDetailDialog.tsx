@@ -74,9 +74,10 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
         await updatePaymentInfo(
           salesData.id, 
           paymentMethod, 
-          salesData.payment_status || "paid", 
+          "paid",
           salesData.note || "",
-          paymentMethod === "複合決済" ? splitPayments : undefined
+          paymentMethod === "複合決済" ? splitPayments : undefined,
+          reservation.id
         );
       } else {
         const res = await checkoutReservation(reservation.id, {
