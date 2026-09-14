@@ -14,7 +14,7 @@ import {
 } from "@/lib/firestore-admin-wrapper";
 import { addAuditLog } from "@/app/audit/actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
-import { getTenantCollection, getTenantDoc } from "@/lib/tenant-utils";
+import { getCompanyScopedCollection, getCompanyScopedDoc } from "@/lib/tenant-utils";
 
 export type AttendanceStatus = "normal" | "leave" | "half_leave" | "absence";
 
@@ -42,7 +42,7 @@ export async function getDailyAttendance(dateStr: string): Promise<AttendanceRec
   try {
     const ctx = await getCurrentUserContext();
     const { adminDb } = await import("@/lib/firebase-admin");
-    const snapshot = await getTenantCollection(ATTENDANCE_COLLECTION, ctx)
+    const snapshot = await getCompanyScopedCollection(ATTENDANCE_COLLECTION, ctx)
       .where("date", "==", dateStr)
       .get();
     
@@ -69,7 +69,7 @@ export async function getMonthlyAttendance(year: number, month: number): Promise
   try {
     const ctx = await getCurrentUserContext();
     const { adminDb } = await import("@/lib/firebase-admin");
-    const snapshot = await getTenantCollection(ATTENDANCE_COLLECTION, ctx)
+    const snapshot = await getCompanyScopedCollection(ATTENDANCE_COLLECTION, ctx)
       .where("date", ">=", `${targetPrefix}-01`)
       .where("date", "<=", `${targetPrefix}-31`)
       .orderBy("date", "asc")
@@ -99,7 +99,7 @@ async function autoFixMissingClockOuts(records: AttendanceRecord[], adminDb: any
   
   if (needsFix.length === 0) return records;
 
-  const staffSnap = await getTenantCollection("staff_profiles", ctx).get();
+  const staffSnap = await getCompanyScopedCollection("staff_profiles", ctx).get();
   const staffProfiles = staffSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
   
   // Only apply to "employee" (正社員)
@@ -121,7 +121,7 @@ async function autoFixMissingClockOuts(records: AttendanceRecord[], adminDb: any
     const endDate = new Date(clockInTime.getTime() + 7 * 60 * 60 * 1000); // 7 hours after clock in
     const autoOutTime = endDate.toISOString();
     
-    await getTenantDoc(ATTENDANCE_COLLECTION, record.id, ctx);
+    await getCompanyScopedDoc(ATTENDANCE_COLLECTION, record.id, ctx);
     const docRef = adminDb.collection(ATTENDANCE_COLLECTION).doc(record.id);
     
     batch.update(docRef, {
@@ -160,7 +160,7 @@ async function _recordClockIn(staffId: string, staffName: string, store: string 
     let effectiveIn = now.toISOString();
     
     // Fetch shift to calculate effectiveIn
-    const shiftSnap = await getTenantCollection("shifts", ctx)
+    const shiftSnap = await getCompanyScopedCollection("shifts", ctx)
       .where("staff_id", "==", staffId)
       .where("date", "==", dateStr)
       .get();
@@ -282,7 +282,7 @@ async function _recordClockOut(staffId: string, ctx: any) {
     const dateStr = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().split("T")[0];
     
     // Find the active shift (clock_out is null)
-    const snapshot = await getTenantCollection(ATTENDANCE_COLLECTION, ctx)
+    const snapshot = await getCompanyScopedCollection(ATTENDANCE_COLLECTION, ctx)
       .where("staff_id", "==", staffId)
       .where("date", "==", dateStr)
       .where("clock_out", "==", null)
@@ -290,14 +290,14 @@ async function _recordClockOut(staffId: string, ctx: any) {
     
     if (!snapshot.empty) {
       const docId = snapshot.docs[0].id;
-      await getTenantDoc(ATTENDANCE_COLLECTION, docId, ctx);
+      await getCompanyScopedDoc(ATTENDANCE_COLLECTION, docId, ctx);
       
       const clockOutTime = now.toISOString();
       let effectiveIn = snapshot.docs[0].data().effective_clock_in || snapshot.docs[0].data().clock_in;
       let effectiveOut = clockOutTime;
 
       // Fetch shift for this day
-      const shiftSnap = await getTenantCollection("shifts", ctx)
+      const shiftSnap = await getCompanyScopedCollection("shifts", ctx)
         .where("staff_id", "==", staffId)
         .where("date", "==", dateStr)
         .get();
@@ -360,7 +360,7 @@ async function _recordFcClockOut(staffId: string, ctx: any) {
     const dateStr = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().split("T")[0];
     
     // Find the active shift (clock_out is null)
-    const snapshot = await getTenantCollection(ATTENDANCE_COLLECTION, ctx)
+    const snapshot = await getCompanyScopedCollection(ATTENDANCE_COLLECTION, ctx)
       .where("staff_id", "==", staffId)
       .where("date", "==", dateStr)
       .where("clock_out", "==", null)
@@ -368,7 +368,7 @@ async function _recordFcClockOut(staffId: string, ctx: any) {
     
     if (!snapshot.empty) {
       const docId = snapshot.docs[0].id;
-      await getTenantDoc(ATTENDANCE_COLLECTION, docId, ctx);
+      await getCompanyScopedDoc(ATTENDANCE_COLLECTION, docId, ctx);
       
       const clockOutTime = now.toISOString();
       let effectiveIn = snapshot.docs[0].data().effective_clock_in || snapshot.docs[0].data().clock_in;
@@ -408,11 +408,11 @@ export async function handleQRScan(staffId: string, store?: string) {
     const now = new Date();
     const dateStr = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().split("T")[0];
     
-    const staffDoc = await getTenantCollection("staff_profiles", ctx).where("__name__", "==", staffId).get();
+    const staffDoc = await getCompanyScopedCollection("staff_profiles", ctx).where("__name__", "==", staffId).get();
     if (staffDoc.empty) return { success: false, error: "スタッフが見つかりません" };
     const staffName = staffDoc.docs[0].data().name;
 
-    const activeSnapshot = await getTenantCollection(ATTENDANCE_COLLECTION, ctx)
+    const activeSnapshot = await getCompanyScopedCollection(ATTENDANCE_COLLECTION, ctx)
       .where("staff_id", "==", staffId)
       .where("date", "==", dateStr)
       .where("clock_out", "==", null)
@@ -435,7 +435,7 @@ export async function updateAttendanceRecord(id: string, data: Partial<Attendanc
   try {
     const ctx = await getCurrentUserContext();
     const { adminDb } = await import("@/lib/firebase-admin");
-    await getTenantDoc(ATTENDANCE_COLLECTION, id, ctx);
+    await getCompanyScopedDoc(ATTENDANCE_COLLECTION, id, ctx);
     const docRef = adminDb.collection(ATTENDANCE_COLLECTION).doc(id);
     const updatePayload = {
       ...data,
@@ -455,7 +455,7 @@ export async function deleteAttendanceRecords(ids: string[]) {
     const { adminDb } = await import("@/lib/firebase-admin");
     
     for (const id of ids) {
-      await getTenantDoc(ATTENDANCE_COLLECTION, id, ctx);
+      await getCompanyScopedDoc(ATTENDANCE_COLLECTION, id, ctx);
     }
     
     const batch = adminDb.batch();
@@ -477,7 +477,7 @@ export async function getAllStaffProfiles() {
   try {
     const ctx = await getCurrentUserContext();
     const { adminDb } = await import("@/lib/firebase-admin");
-    const snap = await getTenantCollection("staff_profiles", ctx).get();
+    const snap = await getCompanyScopedCollection("staff_profiles", ctx).get();
     return {
       success: true,
       data: snap.docs.map((doc: any) => ({
@@ -565,7 +565,7 @@ export async function bulkImportAttendanceRecords(records: Omit<AttendanceRecord
     const { adminDb } = await import("@/lib/firebase-admin");
     const colRef = adminDb.collection(ATTENDANCE_COLLECTION);
     const batchPromises = records.map(async (r) => {
-      const snap = await getTenantCollection(ATTENDANCE_COLLECTION, ctx)
+      const snap = await getCompanyScopedCollection(ATTENDANCE_COLLECTION, ctx)
         .where("staff_id", "==", r.staff_id)
         .where("date", "==", r.date)
         .get();
@@ -578,7 +578,7 @@ export async function bulkImportAttendanceRecords(records: Omit<AttendanceRecord
 
       if (!snap.empty) {
         const docId = snap.docs[0].id;
-        await getTenantDoc(ATTENDANCE_COLLECTION, docId, ctx);
+        await getCompanyScopedDoc(ATTENDANCE_COLLECTION, docId, ctx);
         const docRef = colRef.doc(docId);
         await docRef.update({
           ...payload,
@@ -600,7 +600,7 @@ export async function bulkImportAttendanceRecords(records: Omit<AttendanceRecord
 export async function verifyStaffPassword(staffId: string, password: string): Promise<{ success: boolean; error?: string }> {
   try {
     const ctx = await getCurrentUserContext();
-    const staffDocSnap = await getTenantCollection("staff_profiles", ctx).where("__name__", "==", staffId).get();
+    const staffDocSnap = await getCompanyScopedCollection("staff_profiles", ctx).where("__name__", "==", staffId).get();
     if (staffDocSnap.empty) {
       return { success: false, error: "スタッフが見つかりません" };
     }

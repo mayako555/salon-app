@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  assertDocumentCompany,
   assertDocumentTenant,
   isUnscopedSystemOwner,
   requireCompanyId,
@@ -20,6 +21,21 @@ function context(overrides: Partial<UserContext> = {}): UserContext {
 }
 
 describe("tenant authorization policy", () => {
+  it("keeps operational records company-scoped for a system owner", () => {
+    const ctx = {
+      uid: "owner",
+      role: "systemOwner" as const,
+      companyId: "company-a",
+      salonIds: [],
+      isImpersonating: false,
+    };
+
+    assert.doesNotThrow(() => assertDocumentCompany(ctx, { companyId: "company-a" }));
+    assert.throws(
+      () => assertDocumentCompany(ctx, { companyId: "company-b" }),
+      /Unauthorized tenant access/,
+    );
+  });
   it("allows a tenant user to access a companyId document in their company", () => {
     assert.doesNotThrow(() => assertDocumentTenant(context(), { companyId: "tenant-a" }));
   });

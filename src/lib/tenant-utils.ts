@@ -1,6 +1,6 @@
 import { adminDb } from "./firebase-admin";
 import type { UserContext } from "./authorization";
-import { assertDocumentTenant, isUnscopedSystemOwner, requireCompanyId } from "./authorization";
+import { assertDocumentCompany, assertDocumentTenant, isUnscopedSystemOwner, requireCompanyId } from "./authorization";
 
 /**
  * Returns a Firestore Query restricted to the user's tenant.
@@ -23,5 +23,24 @@ export async function getTenantDoc(collectionName: string, docId: string, ctx: U
   }
   assertDocumentTenant(ctx, snap.data() || {});
   
+  return snap;
+}
+
+/**
+ * Always scopes a collection to the company selected in the current context.
+ * Unlike getTenantCollection, this intentionally does not expose all tenants
+ * to an unscoped system owner.
+ */
+export function getCompanyScopedCollection(collectionName: string, ctx: UserContext) {
+  return adminDb.collection(collectionName).where("companyId", "==", requireCompanyId(ctx));
+}
+
+/** Validates a document against the currently selected company for every role. */
+export async function getCompanyScopedDoc(collectionName: string, docId: string, ctx: UserContext) {
+  const snap = await adminDb.collection(collectionName).doc(docId).get();
+  if (!snap.exists) {
+    throw new Error("Document not found");
+  }
+  assertDocumentCompany(ctx, snap.data() || {});
   return snap;
 }

@@ -45,6 +45,18 @@ export function assertDocumentTenant(ctx: UserContext, data: TenantDocument): vo
   }
 }
 
+/**
+ * Enforces the company currently selected in the user context even for a
+ * system owner. Use this for operational screens where tenants must never be
+ * mixed together (for example attendance and payroll).
+ */
+export function assertDocumentCompany(ctx: UserContext, data: TenantDocument): void {
+  const companyId = requireCompanyId(ctx);
+  if (data.companyId !== companyId && data.tenant_id !== companyId) {
+    throw new Error("Unauthorized tenant access: Document belongs to a different tenant");
+  }
+}
+
 export function withTenantCompanyId<T extends Record<string, unknown>>(
   ctx: UserContext,
   data: T,
