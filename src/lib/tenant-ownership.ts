@@ -1,23 +1,19 @@
 import { adminDb } from "./firebase-admin";
 import { getCurrentUserContext } from "./auth-server";
-import { assertDocumentTenant, isUnscopedSystemOwner, withTenantCompanyId } from "./authorization";
+import { assertDocumentCompany, requireCompanyId } from "./authorization";
 
 // We accept any docRef/colRef from Client SDK, relying on their `.path` property.
 
 export async function assertTenantOwnership(docRef: any) {
   const ctx = await getCurrentUserContext();
   
-  if (isUnscopedSystemOwner(ctx)) {
-    return { snap: null, data: null, ctx };
-  }
-
   const snap = await adminDb.doc(docRef.path).get();
   if (!snap.exists) {
     throw new Error("Document not found");
   }
 
   const data = snap.data() || {};
-  assertDocumentTenant(ctx, data);
+  assertDocumentCompany(ctx, data);
 
   return { snap, data, ctx };
 }
@@ -60,21 +56,18 @@ export async function updateStoreOwnedDoc(docRef: any, updateData: any) {
 
 export async function addTenantOwnedDoc(colRef: any, data: any) {
   const ctx = await getCurrentUserContext();
-  const dataWithCompany = withTenantCompanyId(ctx, data);
+  const dataWithCompany = { ...data, companyId: requireCompanyId(ctx) };
   return adminDb.collection(colRef.path).add(dataWithCompany);
 }
 
 export async function setTenantOwnedDoc(docRef: any, data: any, options?: { merge: boolean }) {
   const ctx = await getCurrentUserContext();
-  const dataWithCompany = withTenantCompanyId(ctx, data);
-  if (isUnscopedSystemOwner(ctx)) {
-    return adminDb.doc(docRef.path).set(dataWithCompany, { merge: options?.merge ?? false });
-  }
+  const dataWithCompany = { ...data, companyId: requireCompanyId(ctx) };
   
   // Check existing
   const snap = await adminDb.doc(docRef.path).get();
   if (snap.exists) {
-    assertDocumentTenant(ctx, snap.data() || {});
+    assertDocumentCompany(ctx, snap.data() || {});
   }
   return adminDb.doc(docRef.path).set(dataWithCompany, { merge: options?.merge ?? false });
 }

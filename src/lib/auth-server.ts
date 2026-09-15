@@ -8,6 +8,14 @@ import type { UserContext, UserRole } from "./authorization";
 export type { UserContext, UserRole } from "./authorization";
 export { verifyPermission } from "./authorization";
 
+export async function requireSystemOwnerContext(): Promise<UserContext> {
+  const ctx = await getCurrentUserContext();
+  if (ctx.role !== "systemOwner" || ctx.isImpersonating) {
+    throw new Error("権限がありません");
+  }
+  return ctx;
+}
+
 /**
  * すべてのサーバーアクションの先頭で呼び出し、現在のユーザーコンテキストを取得する
  */

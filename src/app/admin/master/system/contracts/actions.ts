@@ -13,9 +13,7 @@ import {
   orderBy
 } from "@/lib/firestore-admin-wrapper";
 import { revalidatePath } from "next/cache";
-import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
-
-
+import { requireSystemOwnerContext } from "@/lib/auth-server";
 export type ContractTemplate = {
   id: string;
   title: string;
@@ -28,6 +26,7 @@ export type ContractTemplate = {
 const TEMPLATES_COLLECTION = "contract_templates";
 
 export async function getContractTemplates() {
+  await requireSystemOwnerContext();
   try {
     const colRef = collection(db, TEMPLATES_COLLECTION);
     const q = query(colRef, orderBy("createdAt", "desc"));
@@ -52,16 +51,17 @@ export async function getContractTemplates() {
 }
 
 export async function saveContractTemplate(id: string | null, payload: Omit<ContractTemplate, "id" | "createdAt" | "updatedAt">) {
+  await requireSystemOwnerContext();
   try {
     if (id) {
       const docRef = doc(db, TEMPLATES_COLLECTION, id);
-      await updateTenantOwnedDoc(docRef, {
+      await updateDocUnfiltered(docRef, {
         ...payload,
         updatedAt: serverTimestamp()
       });
     } else {
       const colRef = collection(db, TEMPLATES_COLLECTION);
-      await addTenantOwnedDoc(colRef, {
+      await addDocUnfiltered(colRef, {
         ...payload,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
@@ -76,9 +76,10 @@ export async function saveContractTemplate(id: string | null, payload: Omit<Cont
 }
 
 export async function deleteContractTemplate(id: string) {
+  await requireSystemOwnerContext();
   try {
     const docRef = doc(db, TEMPLATES_COLLECTION, id);
-    await deleteTenantOwnedDoc(docRef);
+    await deleteDocUnfiltered(docRef);
     revalidatePath("/admin/master/system/contracts");
     return { success: true };
   } catch (error: any) {
@@ -208,6 +209,7 @@ const DEFAULT_TEMPLATES: Omit<ContractTemplate, "id" | "createdAt" | "updatedAt"
 ];
 
 export async function seedDefaultTemplates() {
+  await requireSystemOwnerContext();
   try {
     const colRef = collection(db, TEMPLATES_COLLECTION);
     
@@ -218,7 +220,7 @@ export async function seedDefaultTemplates() {
     }
 
     const promises = DEFAULT_TEMPLATES.map(template => {
-      return addTenantOwnedDoc(colRef, {
+      return addDocUnfiltered(colRef, {
         ...template,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
