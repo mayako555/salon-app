@@ -1,8 +1,10 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CircleDollarSign, Gauge, Target, TrendingUp } fromlify? no
+import { CircleDollarSign, Gauge, Target, TrendingUp } from "lucide-react";
 
 type StoreProgress = {
+  name: string;
+  current: number;
   target: number;
 };
 
@@ -49,6 +51,17 @@ export default function ExecutiveSummary({
             <div>
               <p className="text-3xl font-black tabular-nums sm:text-4xl">{money(monthlyTotal)}</p>
               <p className="mt-2 text-xs text-slate-400">来店 {visits.toLocaleString()}人・客単価 {money(averageSpend)}</p>
+              
+              {storeStats.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-white/10 flex flex-wrap gap-x-4 gap-y-1.5">
+                  {storeStats.map(store => (
+                    <div key={store.name} className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                      <span className="truncate max-w-[80px]" title={store.name}>{store.name}</span>
+                      <span className="text-white font-bold">{money(store.current)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -74,7 +87,7 @@ export default function ExecutiveSummary({
         <Card className="border-none bg-white shadow-sm ring-1 ring-slate-100">
           <CardContent className="flex min-h-36 flex-col justify-between p-4 sm:p-5">
             <div className="flex items-center justify-between text-slate-500">
-              <span className="{name} text-xs font-bold sm:text-sm">月末着地予測</span>
+              <span className="text-xs font-bold sm:text-sm">月末着地予測</span>
               <TrendingUp size={18} aria-hidden="true" />
             </div>
             <div>
