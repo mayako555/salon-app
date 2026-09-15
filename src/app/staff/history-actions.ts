@@ -15,7 +15,7 @@ import { getTenantCollection, getTenantDoc } from "@/lib/tenant-utils";
 async function checkAdminAccess(staffTenantId: string) {
   const ctx = await getCurrentUserContext();
   if (!ctx.companyId) throw new Error("Unauthorized");
-  if ((ctx.role as any) !== "systemOwner" && (ctx.role as any) !== "payrollMasterAdmin" && ctx.companyId !== staffTenantId) {
+  if (ctx.companyId !== staffTenantId) {
     throw new Error("Unauthorized tenant access");
   }
   return ctx;
