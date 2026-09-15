@@ -1,15 +1,14 @@
 import { adminDb } from "./firebase-admin";
 import type { UserContext } from "./authorization";
-import { assertDocumentCompany, assertDocumentTenant, isUnscopedSystemOwner, requireCompanyId } from "./authorization";
+import { assertDocumentCompany, requireCompanyId } from "./authorization";
 
 /**
- * Returns a Firestore Query restricted to the user's tenant.
- * SystemOwners (when not impersonating) get unrestricted access.
+ * Returns a Firestore Query restricted to the company selected in the current
+ * context. Operational screens must never become cross-tenant simply because
+ * the signed-in user is a system owner.
  */
 export function getTenantCollection(collectionName: string, ctx: UserContext) {
-  const collection = adminDb.collection(collectionName);
-  if (isUnscopedSystemOwner(ctx)) return collection;
-  return collection.where("companyId", "==", requireCompanyId(ctx));
+  return adminDb.collection(collectionName).where("companyId", "==", requireCompanyId(ctx));
 }
 
 /**
@@ -21,7 +20,7 @@ export async function getTenantDoc(collectionName: string, docId: string, ctx: U
   if (!snap.exists) {
     throw new Error("Document not found");
   }
-  assertDocumentTenant(ctx, snap.data() || {});
+  assertDocumentCompany(ctx, snap.data() || {});
   
   return snap;
 }

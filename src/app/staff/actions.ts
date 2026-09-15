@@ -59,7 +59,7 @@ export type StaffProfile = {
 const STAFF_COLLECTION = "staff_profiles";
 
 import { getCurrentUserContext } from "@/lib/auth-server";
-import { getTenantCollection, getTenantDoc } from "@/lib/tenant-utils";
+import { getCompanyScopedCollection, getTenantDoc } from "@/lib/tenant-utils";
 import { addTenantOwnedDoc, updateTenantOwnedDoc, deleteTenantOwnedDoc, getTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { filterStaffByCompany } from "@/lib/staff-filtering";
 
@@ -67,7 +67,7 @@ export async function getStaffList(options?: { includeResigned?: boolean; compan
   try {
     const ctx = await getCurrentUserContext();
     const { adminDb } = await import("@/lib/firebase-admin");
-    const snapshot = await getTenantCollection(STAFF_COLLECTION, ctx).get();
+    const snapshot = await getCompanyScopedCollection(STAFF_COLLECTION, ctx).get();
     
     if (snapshot.empty) {
       return [];
