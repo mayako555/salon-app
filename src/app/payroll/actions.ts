@@ -959,6 +959,9 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
     const { adminDb } = await import("@/lib/firebase-admin");
     const ctx = await getCurrentUserContext();
     const companyId = ctx.companyId;
+    if (!companyId) {
+      return { success: false, error: "会社IDが指定されていません" };
+    }
 
     // 1. まず getContractsList 経由でテナントフィルタ込みで取得を試みる
     let contracts = await getContractsList();
@@ -967,22 +970,15 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
     if (!contracts || contracts.length === 0) {
       try {
         let snap: any;
-        if (companyId) {
-          snap = await adminDb
-            .collection("staff_contracts")
-            .where("companyId", "==", companyId)
-            .where("deleted", "!=", true)
-            .orderBy("valid_from", "desc")
-            .get();
-        } else {
-          // systemOwner (非インパーソネート)
-          snap = await adminDb
-            .collection("staff_contracts")
-            .where("deleted", "!=", true)
-            .orderBy("valid_from", "desc")
-            .get();
-        }
-        const staffSnap2 = await adminDb.collection("staff_profiles").get();
+        snap = await adminDb
+          .collection("staff_contracts")
+          .where("companyId", "==", companyId)
+          .where("deleted", "!=", true)
+          .orderBy("valid_from", "desc")
+          .get();
+        const staffSnap2 = await adminDb.collection("staff_profiles")
+          .where("companyId", "==", companyId)
+          .get();
         const staffMap2 = new Map<string, string>();
         staffSnap2.docs.forEach((d: any) => staffMap2.set(d.id, d.data().name));
         contracts = snap.docs.map((d: any) => ({
