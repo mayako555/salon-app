@@ -190,11 +190,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                 // Fetch available stores for this company
                 const masterRef = collection(db, "sales_master");
-                const storeQ = query(masterRef, where("itemType", "==", "store"));
+                const storeQ = query(
+                  masterRef,
+                  where("companyId", "==", companyIdToUse),
+                  where("itemType", "==", "store")
+                );
                 const storeSnap = await getDocs(storeQ);
                 const storeObjects = storeSnap.docs
                   .map(d => ({ id: d.id, ...d.data() } as SalesMasterItem))
-                  .filter(d => d.companyId === companyIdToUse && d.isActive !== false)
+                  .filter(d => d.isActive !== false)
                   .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
                   
                 const stores = storeObjects.map(d => d.name);
