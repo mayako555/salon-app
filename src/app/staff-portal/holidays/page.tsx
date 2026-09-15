@@ -133,14 +133,21 @@ export default function StaffPortalHolidaysPage() {
         }));
       }
       
-      await Promise.all(promises);
+      const results = await Promise.all(promises);
+      const failedResult = results.find((result) => !result.success);
+
+      if (failedResult) {
+        throw new Error(failedResult.error || "希望休を保存できませんでした。");
+      }
       
       alert("希望休を提出しました！");
       setRequestedDays({});
       setPaidLeaveDays({});
       await loadHistory();
     } catch (error) {
-      alert("エラーが発生しました。もう一度やり直してください。");
+      console.error("Failed to submit holiday requests:", error);
+      const message = error instanceof Error ? error.message : "エラーが発生しました。もう一度やり直してください。";
+      alert(message);
     } finally {
       setSubmitted(false);
     }

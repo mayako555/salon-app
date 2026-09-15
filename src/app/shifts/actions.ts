@@ -416,6 +416,9 @@ export async function submitHolidayRequest(data: Omit<HolidayRequest, "id" | "st
     if (!ctx.companyId) {
       return { success: false, error: "会社IDが指定されていません" };
     }
+    if (!ctx.profileId || ctx.profileId !== data.staff_id) {
+      return { success: false, error: "ログイン中のスタッフ情報を確認できません。再ログインしてからもう一度お試しください。" };
+    }
 
     const batch = writeBatch(db);
     // 1. Create the holiday request record first to get its ID
