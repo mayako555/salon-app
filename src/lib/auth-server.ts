@@ -25,12 +25,11 @@ export async function getCurrentUserContext(): Promise<UserContext> {
     const uid = decodedClaims.uid;
     const email = decodedClaims.email;
 
-    // users/{uid} ではなく、現状の仕様に合わせて staff_profiles を email で検索
-    let snapshot;
-    if (email) {
+    // UID is the authoritative identity. Email lookup is retained only for
+    // legacy profiles that have not yet been backfilled with a UID.
+    let snapshot = await adminDb.collection("staff_profiles").where("uid", "==", uid).limit(1).get();
+    if (snapshot.empty && email) {
       snapshot = await adminDb.collection("staff_profiles").where("email", "==", email).limit(1).get();
-    } else {
-      snapshot = await adminDb.collection("staff_profiles").where("uid", "==", uid).limit(1).get();
     }
     
     if (!snapshot || snapshot.empty) {
