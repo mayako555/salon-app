@@ -106,12 +106,18 @@ async function runTests() {
       assertPass("Create PASS (Spoofed companyId overridden by ctx)");
     }
 
-    // 6. SystemOwner (Normal)
+    // 6. SystemOwner (Operational company context)
+    // Operational helpers remain scoped even for a system owner. Cross-tenant
+    // access must use an explicit system administration path instead.
     try {
       await getTenantDoc(col, "docB", ctxSystemOwner as any);
-      assertPass("systemOwner PASS (Full access allowed)");
+      assertFail("systemOwner FAIL: Could read another tenant from an operational context");
     } catch (e: any) {
-      assertFail(`systemOwner FAIL: Blocked from reading B: ${e.message}`);
+      if (e.message.includes("Unauthorized tenant access")) {
+        assertPass("systemOwner PASS (Operational context remains tenant-scoped)");
+      } else {
+        assertFail(`systemOwner FAIL: Unexpected error: ${e.message}`);
+      }
     }
 
     // 7. SystemOwner (Impersonating)

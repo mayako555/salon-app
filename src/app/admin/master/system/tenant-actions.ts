@@ -1,6 +1,4 @@
 "use server";
-import { addTenantOwnedDoc } from "@/lib/tenant-ownership";
-
 import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
@@ -15,6 +13,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { generateDefaultFeatures } from "@/types/master";
 import { addAuditLog } from "@/app/audit/actions";
+import { requireSystemOwnerContext } from "@/lib/auth-server";
 
 export type CompanyTenant = {
   id: string;
@@ -36,6 +35,7 @@ const COMPANIES_COLLECTION = "companies";
 
 // Get all tenants (only systemOwner should call this, protected by UI usually but ideally needs server check)
 export async function getTenants() {
+  await requireSystemOwnerContext();
   try {
     const colRef = collection(db, COMPANIES_COLLECTION);
     const q = query(colRef, orderBy("createdAt", "desc"));
@@ -87,10 +87,11 @@ export async function getTenants() {
 
 // Add new tenant
 export async function addTenant(payload: Omit<CompanyTenant, "id" | "createdAt" | "updatedAt">) {
+  await requireSystemOwnerContext();
   try {
     const colRef = collection(db, COMPANIES_COLLECTION);
     const defaultFeatures = generateDefaultFeatures(false);
-    const docRef = await addTenantOwnedDoc(colRef, {
+    const docRef = await addDocUnfiltered(colRef, {
       ...payload,
       features: defaultFeatures,
       createdAt: serverTimestamp(),
@@ -117,6 +118,7 @@ export async function addTenant(payload: Omit<CompanyTenant, "id" | "createdAt" 
 
 // Update existing tenant
 export async function updateTenant(id: string, payload: Partial<Omit<CompanyTenant, "id" | "createdAt" | "updatedAt">>) {
+  await requireSystemOwnerContext();
   try {
     const docRef = doc(db, COMPANIES_COLLECTION, id);
     await updateDocUnfiltered(docRef, {
@@ -134,6 +136,7 @@ export async function updateTenant(id: string, payload: Partial<Omit<CompanyTena
 
 // Create initial admin user for a tenant
 export async function createTenantAdmin(payload: { email: string, password: string, name: string, companyId: string }) {
+  await requireSystemOwnerContext();
   try {
     // Dynamically import admin SDK so it doesn't break client components during build
     const { adminAuth, adminDb } = require("@/lib/firebase-admin");
@@ -174,6 +177,7 @@ export async function createTenantAdmin(payload: { email: string, password: stri
 }
 
 export async function getTenantAdmins(companyId: string) {
+  await requireSystemOwnerContext();
   try {
     const { adminDb } = require("@/lib/firebase-admin");
     const snapshot = await adminDb.collection("staff_profiles")
@@ -192,6 +196,7 @@ export async function getTenantAdmins(companyId: string) {
 }
 
 export async function updateTenantAdmin(uid: string, payload: { email?: string, password?: string, name?: string }) {
+  await requireSystemOwnerContext();
   try {
     const { adminAuth, adminDb } = require("@/lib/firebase-admin");
     

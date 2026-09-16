@@ -19,6 +19,10 @@ service cloud.firestore {
       return isUserActive() && getUserData().role == "systemOwner";
     }
 
+    function belongsToCurrentCompany(companyId) {
+      return isUserActive() && getUserData().companyId == companyId;
+    }
+
     // --- Users Collection ---
     // Users can read their own profile, or systemOwner can read all
     match /users/{userId} {
@@ -35,12 +39,12 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
-      allow read: if isSignedIn();
+      allow read: if isSystemOwner() || belongsToCurrentCompany(companyId);
       allow write: if false;
     }
 
     match /sales_master/{docId} {
-      allow read: if isSignedIn();
+      allow read: if isSystemOwner() || belongsToCurrentCompany(resource.data.companyId);
       allow write: if false;
     }
     

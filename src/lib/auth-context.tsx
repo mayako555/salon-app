@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import type { DocumentData, Query, QuerySnapshot } from "firebase/firestore";
 import { StaffProfile, StaffRole } from "@/app/staff/actions";
 import { SalesMasterItem, AttendancePolicy, FeatureKey, FeatureSettings, ensureFeatureDefaults } from "@/types/master";
 
@@ -112,15 +113,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }).catch(err => console.error("Failed to set session cookie:", err));
 
           const staffRef = collection(db, "staff_profiles");
-          const q = query(staffRef, where("email", "==", firebaseUser.email));
-          
-          // Add timeout to prevent infinite hang if Firestore fails to connect
-          const getDocsWithTimeout = Promise.race([
-            getDocs(q),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore auth fetch timeout")), 8000))
+          const fetchWithTimeout = (staffQuery: Query<DocumentData>): Promise<QuerySnapshot<DocumentData>> => Promise.race([
+            getDocs(staffQuery),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Firestore auth fetch timeout")), 8000))
           ]);
-          
-          const snapshot = await getDocsWithTimeout as any;
+
+          // UID is the authoritative identity. Email lookup is retained only
+          // for legacy profiles that have not yet been backfilled with a UID.
+          let snapshot = await fetchWithTimeout(query(staffRef, where("uid", "==", firebaseUser.uid)));
+          if (snapshot.empty) {
+            snapshot = await fetchWithTimeout(query(staffRef, where("email", "==", firebaseUser.email)));
+          }
           
           if (!snapshot.empty) {
             const staffDoc = snapshot.docs[0];
@@ -187,11 +190,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                 // Fetch available stores for this company
                 const masterRef = collection(db, "sales_master");
-                const storeQ = query(masterRef, where("itemType", "==", "store"));
+                const storeQ = query(
+                  masterRef,
+                  where("companyId", "==", companyIdToUse),
+                  where("itemType", "==", "store")
+                );
                 const storeSnap = await getDocs(storeQ);
                 const storeObjects = storeSnap.docs
                   .map(d => ({ id: d.id, ...d.data() } as SalesMasterItem))
-                  .filter(d => d.companyId === companyIdToUse && d.isActive !== false)
+                  .filter(d => d.isActive !== false)
                   .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
                   
                 const stores = storeObjects.map(d => d.name);
