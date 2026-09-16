@@ -10,6 +10,7 @@ import ReservationDetailDialog from "./ReservationDetailDialog";
 import ReservationFormDialog from "./ReservationFormDialog";
 import DraggableReservation from "./DraggableReservation";
 import { useAuth } from "@/lib/auth-context";
+import { calculateReservationLanes } from "@/lib/reservation-layout";
 
 type Props = {
   reservations: Reservation[];
@@ -279,6 +280,8 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
               const staffName = staffObjItem.name;
               const staffObj = sortedStaff.find(s => s.name === staffName);
               const isOffOrOther = staffObj?.isOffOrOtherStore;
+              const staffReservations = grouped[staffName] || [];
+              const reservationLanes = calculateReservationLanes(staffReservations);
 
               return (
                 <div 
@@ -309,18 +312,23 @@ export default function ReservationTimeline({ reservations, staffList, shifts = 
                     </div>
                   )}
 
-                  {grouped[staffName]?.map(res => (
-                    <DraggableReservation
-                      key={res.id}
-                      res={res}
-                      staffList={activeStaffList}
-                      currentStaffIndex={rowIndex}
-                      onClick={() => setSelectedRes(res)}
-                      onUpdateComplete={() => { if(onRefresh) onRefresh(); }}
-                      startHour={START_HOUR}
-                      totalHours={TOTAL_HOURS}
-                    />
-                  ))}
+                  {staffReservations.map(res => {
+                    const lane = reservationLanes.get(res.id) || { laneIndex: 0, laneCount: 1 };
+                    return (
+                      <DraggableReservation
+                        key={res.id}
+                        res={res}
+                        staffList={activeStaffList}
+                        currentStaffIndex={rowIndex}
+                        onClick={() => setSelectedRes(res)}
+                        onUpdateComplete={() => { if(onRefresh) onRefresh(); }}
+                        startHour={START_HOUR}
+                        totalHours={TOTAL_HOURS}
+                        laneIndex={lane.laneIndex}
+                        laneCount={lane.laneCount}
+                      />
+                    );
+                  })}
                 </div>
               );
             })}

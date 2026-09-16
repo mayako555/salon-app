@@ -54,9 +54,11 @@ type Props = {
   onUpdateComplete: () => void;
   startHour: number;
   totalHours: number;
+  laneIndex: number;
+  laneCount: number;
 };
 
-export default function DraggableReservation({ res, staffList, currentStaffIndex, onClick, onUpdateComplete, startHour, totalHours }: Props) {
+export default function DraggableReservation({ res, staffList, currentStaffIndex, onClick, onUpdateComplete, startHour, totalHours, laneIndex, laneCount }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [showHover, setShowHover] = useState(false);
@@ -168,6 +170,11 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
 
   const isCompleted = res.status === 'completed';
   const colorClass = getColorClasses(res);
+  const laneGap = 2;
+  const rowPadding = 2;
+  const safeLaneCount = Math.max(1, laneCount);
+  const laneHeight = (ROW_HEIGHT - rowPadding * 2 - laneGap * (safeLaneCount - 1)) / safeLaneCount;
+  const laneTop = rowPadding + laneIndex * (laneHeight + laneGap);
 
   return (
     <>
@@ -181,10 +188,12 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
         style={{ 
           left: currentLeft, 
           width: currentWidth,
+          top: laneTop,
+          height: laneHeight,
           transform: `translateY(${currentTop}px)`,
           zIndex: isDragging ? 50 : (showHover ? 40 : 10)
         }}
-        className={`absolute top-0.5 bottom-0.5 border flex flex-col p-0.5 overflow-hidden transition-colors text-left select-none touch-none
+        className={`absolute border flex flex-col p-0.5 overflow-hidden transition-colors text-left select-none touch-none
           ${res.type !== 'schedule' ? 'rounded-sm shadow-sm' : ''}
           ${colorClass}
           ${!isCompleted ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
