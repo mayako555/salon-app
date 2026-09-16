@@ -63,7 +63,6 @@ export async function getEvaluationsByStaffId(staffId: string): Promise<StaffEva
   try {
     const ctx = await getCurrentUserContext();
     if (!ctx.companyId && ctx.role !== "systemOwner") return [];
-
     const colRef = collection(db, EVALUATIONS_COLLECTION);
     const q = ctx.role === "systemOwner" && !ctx.isImpersonating
       ? query(colRef, where("staff_id", "==", staffId), orderBy("target_year", "desc"), orderBy("target_quarter", "desc"))
@@ -85,13 +84,14 @@ export async function getEvaluationsByStaffId(staffId: string): Promise<StaffEva
   }
 }
 
-export async function getAllEvaluations(): Promise<StaffEvaluation[]> {
+export async function getAllEvaluations(options?: { companyScoped?: boolean }): Promise<StaffEvaluation[]> {
   try {
     const ctx = await getCurrentUserContext();
     if (!ctx.companyId && ctx.role !== "systemOwner") return [];
+    if (options?.companyScoped && !ctx.companyId) return [];
 
     const colRef = collection(db, EVALUATIONS_COLLECTION);
-    const q = ctx.role === "systemOwner" && !ctx.isImpersonating
+    const q = ctx.role === "systemOwner" && !ctx.isImpersonating && !options?.companyScoped
       ? query(colRef, orderBy("target_year", "desc"), orderBy("target_quarter", "desc"))
       : query(colRef, where("companyId", "==", ctx.companyId), orderBy("target_year", "desc"), orderBy("target_quarter", "desc"));
     const snapshot = await getDocs(q);
