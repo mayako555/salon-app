@@ -170,7 +170,7 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
   try {
     // 1. 全在籍スタッフ取得
     
-    const staffList = await getStaffList();
+    const staffList = await getStaffList({ companyScoped: true });
     
     
     // 2. その月の全手当取得

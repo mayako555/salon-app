@@ -9,7 +9,6 @@ import {
   CalendarDays, 
   Clock, 
   Coins, 
-  Gift, 
   Calculator, 
   Settings,
   Scissors,
@@ -82,8 +81,7 @@ export function Sidebar() {
       items: [
         { name: "高度分析", href: "/analytics", icon: Sparkles, role: "admin" }, // All admins can see the page, but tabs are restricted inside
         { name: "経費・収支管理", href: "/admin/expenses", icon: Wallet, role: "admin", feature: "expenses" },
-        { name: "給与・報酬計算", href: "/payroll", icon: Calculator, role: "admin", feature: "payroll" },
-        { name: "手当管理", href: "/allowances", icon: Gift, role: "admin" },
+        { name: "給与・手当管理", href: "/allowances", activeHrefs: ["/allowances", "/payroll"], icon: Calculator, role: "admin", feature: "payroll" },
       ]
     },
     {
@@ -160,7 +158,8 @@ export function Sidebar() {
   ];
 
   const NavItem = ({ item, colorClass = "text-rose-600", bgClass = "bg-rose-50", iconColor = "text-rose-500" }: { item: any, colorClass?: string, bgClass?: string, iconColor?: string }) => {
-    const isActive = pathname.startsWith(item.href);
+    const activeHrefs = item.activeHrefs || [item.href];
+    const isActive = activeHrefs.some((href: string) => pathname.startsWith(href));
     return (
       <Link
         key={item.name}

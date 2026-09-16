@@ -16,6 +16,9 @@ import TransportHistoryDialog from "./TransportHistoryDialog";
 import AuthGuard from "@/components/AuthGuard";
 import { AllowanceTaskStatus, getMonthlyAllowanceTasks, unmarkAllowanceChecked } from "./actions";
 import { UserCheck } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import Link from "next/link";
+import PayrollWorkflowNav from "@/components/payroll/PayrollWorkflowNav";
 
 import { Suspense } from "react";
 
@@ -90,10 +93,17 @@ function AllowancesPageContent() {
   const totalCount = tasks.length;
   const totalAmount = tasks.reduce((sum, t) => sum + t.total_amount, 0);
   const isAllCompleted = totalCount > 0 && completedCount === totalCount;
+  const targetMonth = `${year}-${String(month).padStart(2, "0")}`;
+  const remainingCount = totalCount - completedCount;
 
   return (
     <AuthGuard requireRole="admin">
     <div className="space-y-6 animate-in fade-in duration-300">
+      <PayrollWorkflowNav
+        activeStep="allowances"
+        month={targetMonth}
+        allowancesCompleted={isAllCompleted}
+      />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">手当管理</h1>
@@ -163,11 +173,26 @@ function AllowancesPageContent() {
               </span>
             </div>
           </div>
-          {isAllCompleted && (
-            <div className="text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-full flex items-center gap-1">
-              <CheckCircle2 size={14} /> 全スタッフの確認完了
-            </div>
-          )}
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {isAllCompleted ? (
+              <div className="text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-full flex items-center gap-1">
+                <CheckCircle2 size={14} /> 全スタッフの確認完了
+              </div>
+            ) : (
+              <p className="text-xs font-bold text-amber-700">給与作成まで残り {remainingCount} 名の確認が必要です</p>
+            )}
+            {isAllCompleted ? (
+              <Button asChild className="bg-emerald-600 text-white hover:bg-emerald-700">
+                <Link href={`/payroll?month=${targetMonth}`}>
+                  給与作成へ進む <ArrowRight size={16} className="ml-1" />
+                </Link>
+              </Button>
+            ) : (
+              <Button disabled className="gap-1">
+                給与作成へ進む <ArrowRight size={16} />
+              </Button>
+            )}
+          </div>
         </div>
 
         <Table>

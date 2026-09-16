@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import { Banknote, UserCircle2, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard";
 import Link from "next/link";
+import { getMonthlyAllowanceTasks } from "../allowances/actions";
+import PayrollWorkflowNav from "@/components/payroll/PayrollWorkflowNav";
 
 function sanitizeObject(obj: any): any {
   if (obj === null || obj === undefined) return obj;
@@ -50,14 +52,19 @@ export default async function PayrollPage({
 
   const rawStatements = await getMonthlyStatements(year, month);
   const statements = sanitizeObject(rawStatements) as typeof rawStatements;
+  const allowanceTasks = await getMonthlyAllowanceTasks(year, month);
   
   const isClosed = statements.length > 0 && statements.every((s: any) => s.status === "closed");
   const totalPaid = statements.reduce((acc: number, curr: any) => acc + curr.final_paid_amount, 0);
 
   const prevMonth = format(new Date(year, month - 2, 1), "yyyy-MM");
   const nextMonth = format(new Date(year, month, 1), "yyyy-MM");
+  const targetMonth = format(new Date(year, month - 1, 1), "yyyy-MM");
+  const checkedAllowanceCount = allowanceTasks.filter(task => task.is_checked).length;
+  const uncheckedAllowanceCount = allowanceTasks.length - checkedAllowanceCount;
+  const allowancesCompleted = allowanceTasks.length > 0 && uncheckedAllowanceCount === 0;
 
-  const staffList = await getStaffList({ includeResigned: true });
+  const staffList = await getStaffList({ includeResigned: true, companyScoped: true });
   const simpleStaffList = staffList.map(s => ({ id: s.id, name: s.name }));
 
   // Find staff members without a statement in the current month
@@ -71,6 +78,30 @@ export default async function PayrollPage({
   return (
     <AuthGuard requireRole="admin" requireFeature="payroll">
       <div className="space-y-6 pb-24 animate-in fade-in duration-300">
+        <PayrollWorkflowNav
+          activeStep={isClosed ? "confirmation" : "payroll"}
+          month={targetMonth}
+          allowancesCompleted={allowancesCompleted}
+          payrollCreated={statements.length > 0}
+        />
+        {!allowancesCompleted && (
+          <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <AlertCircle size={20} className="mt-0.5 shrink-0 text-amber-600" />
+              <div>
+                <p className="text-sm font-black">手当確認が完了していません</p>
+                <p className="mt-0.5 text-xs font-medium text-amber-700">
+                  {allowanceTasks.length === 0
+                    ? "この月の手当確認対象がありません。スタッフ設定を確認してください。"
+                    : `未確認のスタッフが ${uncheckedAllowanceCount} 名います。給与を再計算する前に手当を確認してください。`}
+                </p>
+              </div>
+            </div>
+            <Button asChild variant="outline" className="shrink-0 border-amber-300 bg-white text-amber-800 hover:bg-amber-100">
+              <Link href={`/allowances?month=${targetMonth}`}>手当確認へ戻る</Link>
+            </Button>
+          </div>
+        )}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 p-1 rounded-lg">
