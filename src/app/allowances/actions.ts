@@ -148,6 +148,8 @@ export type AllowanceTaskStatus = {
   treatments: SalesRecord[];
   treatment_count_auto: number;
   treatment_store_breakdown?: Record<string, number>;
+  product_sales_total: number;
+  product_sales_store_breakdown?: Record<string, number>;
 };
 
 function normalizeStaffName(name: string) {
@@ -272,6 +274,17 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
         treatmentStoreBreakdown[store] = (treatmentStoreBreakdown[store] || 0) + 1;
       });
 
+      // 店販手当は給与計算時に契約・商品別ルールから算出されるため、
+      // ここでは確認用の店販売上だけを店舗別に集計する（二重計上防止）。
+      const productSalesStoreBreakdown: Record<string, number> = {};
+      monthlySales.forEach(s => {
+        if (normalizeStaffName(s.staff_name) !== staffNameNormal || s.product_sales <= 0) return;
+        const store = s.store_name || "不明";
+        productSalesStoreBreakdown[store] = (productSalesStoreBreakdown[store] || 0) + s.product_sales;
+      });
+      const productSalesTotal = Object.values(productSalesStoreBreakdown)
+        .reduce((sum, amount) => sum + amount, 0);
+
       return {
         staff_id: staff.id,
         staff_name: staff.name,
@@ -287,7 +300,9 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
         review_store_breakdown: reviewStoreBreakdown,
         treatments: staffTreatments,
         treatment_count_auto: staffTreatments.length,
-        treatment_store_breakdown: treatmentStoreBreakdown
+        treatment_store_breakdown: treatmentStoreBreakdown,
+        product_sales_total: productSalesTotal,
+        product_sales_store_breakdown: productSalesStoreBreakdown
       };
     });
 

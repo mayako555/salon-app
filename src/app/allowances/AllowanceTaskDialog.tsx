@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { X, CheckCircle2, MessageSquare, Edit3, Megaphone, HelpCircle, Trash2, Loader2 } from "lucide-react";
+import { X, CheckCircle2, MessageSquare, Edit3, Megaphone, HelpCircle, Trash2, Loader2, ShoppingBag } from "lucide-react";
 import { AllowanceTaskStatus, saveStaffAllowanceTask, markAllowanceChecked, AllowanceType, deleteAllowance, getAllowanceConfig, AllowanceConfig } from "./actions";
 import { useAuth } from "@/lib/auth-context";
 import { getTenantStores } from "@/lib/utils";
@@ -403,6 +403,35 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
                   })}
                 </tbody>
               </table>
+            </div>
+
+            {/* Product commission is calculated by payroll from sales and contract rules. */}
+            <div className="bg-amber-50/60 border border-amber-200 rounded-xl overflow-hidden shadow-sm">
+              <div className="flex items-start justify-between gap-4 px-4 py-3 border-b border-amber-200 bg-amber-100/60">
+                <div>
+                  <h4 className="flex items-center gap-2 text-sm font-black text-slate-800">
+                    <ShoppingBag size={16} className="text-amber-600" />
+                    店販手当
+                  </h4>
+                  <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
+                    店販売上を確認できます。手当額は雇用契約の還元率・商品別ルールを使い、給与計算時に自動反映されます。
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-[10px] font-bold text-slate-500">店販売上合計</p>
+                  <p className="text-base font-black text-amber-700">¥{task.product_sales_total.toLocaleString()}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 divide-y divide-amber-100 bg-white sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+                {STORES.map(store => (
+                  <div key={store} className="flex items-center justify-between gap-2 px-4 py-3 sm:block sm:text-center">
+                    <span className="text-xs font-bold text-slate-500">{store}店</span>
+                    <p className="text-sm font-black text-slate-800 sm:mt-1">
+                      ¥{(task.product_sales_store_breakdown?.[store] || 0).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Other allowances */}
