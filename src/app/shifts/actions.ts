@@ -502,17 +502,30 @@ export async function submitHolidayRequest(data: Omit<HolidayRequest, "id" | "st
 
 export async function getStaffHolidayRequests(staffId: string): Promise<HolidayRequest[]> {
   try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.companyId || !ctx.profileId) {
+      throw new Error("ログイン中のスタッフ情報を確認できません");
+    }
+    if (ctx.profileId !== staffId) {
+      throw new Error("他のスタッフの希望休履歴は取得できません");
+    }
+
     const colRef = collection(db, HOLIDAY_REQUESTS_COLLECTION);
-    const q = query(colRef, where("staff_id", "==", staffId), orderBy("date", "desc"));
+    // Firestore の複合インデックスに依存しないよう、本人IDだけで取得して
+    // companyId を検証後にアプリ側で日付順へ並べ替える。
+    const q = query(colRef, where("staff_id", "==", staffId));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null)
-      };
-    }) as HolidayRequest[];
+    return snapshot.docs
+      .map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : (data.created_at || null)
+        } as HolidayRequest & { companyId?: string };
+      })
+      .filter(request => request.companyId === ctx.companyId)
+      .sort((a, b) => b.date.localeCompare(a.date));
   } catch (error) {
     console.error("Error fetching staff holiday requests:", error);
     return [];
