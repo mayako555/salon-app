@@ -7,6 +7,7 @@ import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInte
 import { ja } from "date-fns/locale";
 import { useAuth } from "@/lib/auth-context";
 import { submitHolidayRequest, getStaffHolidayRequests } from "@/app/shifts/actions";
+import { getMyPaidLeaveBalance } from "@/app/paid-leaves/actions";
 import { useEffect } from "react";
 
 export default function StaffPortalHolidaysPage() {
@@ -24,6 +25,22 @@ export default function StaffPortalHolidaysPage() {
   const [submitted, setSubmitted] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [paidLeaveBalance, setPaidLeaveBalance] = useState<number | null>(null);
+
+  const loadPaidLeaveBalance = async () => {
+    try {
+      const result = await getMyPaidLeaveBalance();
+      if (result.success && typeof result.balance === "number") {
+        setPaidLeaveBalance(result.balance);
+      } else {
+        console.error("Failed to load paid leave balance:", result.error);
+        setPaidLeaveBalance(profile?.paid_leave_balance ?? 0);
+      }
+    } catch (error) {
+      console.error("Failed to load paid leave balance:", error);
+      setPaidLeaveBalance(profile?.paid_leave_balance ?? 0);
+    }
+  };
 
   const loadHistory = async () => {
     if (!profile?.id) return;
@@ -40,7 +57,10 @@ export default function StaffPortalHolidaysPage() {
 
   useEffect(() => {
     loadHistory();
+    loadPaidLeaveBalance();
   }, [profile?.id]);
+
+  const currentPaidLeaveBalance = paidLeaveBalance ?? 0;
 
   const monthStart = startOfMonth(targetMonthDate);
   const monthEnd = endOfMonth(monthStart);
@@ -77,11 +97,15 @@ export default function StaffPortalHolidaysPage() {
          return newObj;
        });
     } else {
+       if (paidLeaveBalance === null) {
+         alert("有給残日数を確認中です。少し待ってからもう一度お試しください。");
+         return;
+       }
        if (requestedDays[dateStr]) return;
        setPaidLeaveDays(prev => {
          const current = prev[dateStr] || 0;
          const currentTotal = Object.values(prev).reduce((a, b) => a + b, 0);
-         const balance = profile?.paid_leave_balance ?? 0;
+         const balance = currentPaidLeaveBalance;
          const available = balance - currentTotal + current;
 
          let next = 0;
@@ -144,6 +168,7 @@ export default function StaffPortalHolidaysPage() {
       setRequestedDays({});
       setPaidLeaveDays({});
       await loadHistory();
+      await loadPaidLeaveBalance();
     } catch (error) {
       console.error("Failed to submit holiday requests:", error);
       const message = error instanceof Error ? error.message : "エラーが発生しました。もう一度やり直してください。";
@@ -177,7 +202,7 @@ export default function StaffPortalHolidaysPage() {
               ※ 希望休は {maxRequests} 日まで可能です。
             </p>
             <p className="ml-5 leading-relaxed font-bold text-amber-600">
-              ※ 現在の有給残日数: {profile?.paid_leave_balance ?? 0} 日
+              ※ 現在の有給残日数: {paidLeaveBalance === null ? "確認中…" : `${currentPaidLeaveBalance} 日`}
             </p>
           </div>
           

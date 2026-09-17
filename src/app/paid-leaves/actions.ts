@@ -15,6 +15,8 @@ import {
 } from "@/lib/firestore-admin-wrapper";
 import { addAuditLog } from "@/app/audit/actions";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc } from "@/lib/tenant-ownership";
+import { getCurrentUserContext } from "@/lib/auth-server";
+import { adminDb } from "@/lib/firebase-admin";
 
 
 export type PaidLeaveTransaction = {
@@ -30,6 +32,49 @@ export type PaidLeaveTransaction = {
 
 const TRANSACTIONS_COLLECTION = "paid_leave_transactions";
 const STAFF_COLLECTION = "staff_profiles";
+
+/**
+ * スタッフポータル用。有給残数はクライアントに保持したログイン時点の
+ * プロフィールではなく、認証済み本人のプロフィールから都度取得する。
+ */
+export async function getMyPaidLeaveBalance(): Promise<{
+  success: boolean;
+  balance?: number;
+  error?: string;
+}> {
+  try {
+    const ctx = await getCurrentUserContext();
+    if (!ctx.profileId) {
+      return { success: false, error: "スタッフ情報が見つかりませんでした" };
+    }
+
+    const profileSnap = await adminDb.collection(STAFF_COLLECTION).doc(ctx.profileId).get();
+    if (!profileSnap.exists) {
+      return { success: false, error: "スタッフ情報が見つかりませんでした" };
+    }
+
+    const profile = profileSnap.data() || {};
+    if (ctx.role !== "systemOwner" && profile.companyId !== ctx.companyId) {
+      return { success: false, error: "所属会社が一致しません" };
+    }
+
+    const rawBalance = profile.paid_leave_balance;
+    const balance = typeof rawBalance === "number"
+      ? rawBalance
+      : Number.parseFloat(String(rawBalance ?? 0));
+
+    return {
+      success: true,
+      balance: Number.isFinite(balance) ? balance : 0,
+    };
+  } catch (error) {
+    console.error("Error fetching current staff paid leave balance:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "有給残日数を取得できませんでした",
+    };
+  }
+}
 
 export async function getPaidLeaveTransactions(staffId?: string): Promise<PaidLeaveTransaction[]> {
   try {
