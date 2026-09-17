@@ -23,9 +23,10 @@ import { getMonthlyReviews } from "@/app/admin/reviews/actions";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc, setTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { revalidatePath } from "next/cache";
+import { calculateTaxExclusiveProductCommission } from "@/lib/product-commission";
 
 
-export type AllowanceType = "review" | "blog" | "sns" | "treatment" | "transport" | "nomination" | "other";
+export type AllowanceType = "review" | "blog" | "sns" | "treatment" | "transport" | "nomination" | "product" | "other";
 
 // ... existing code ...
 
@@ -149,6 +150,8 @@ export type AllowanceTaskStatus = {
   treatment_count_auto: number;
   treatment_store_breakdown?: Record<string, number>;
   product_sales_total: number;
+  product_sales_tax_excluded: number;
+  product_commission_auto: number;
   product_sales_store_breakdown?: Record<string, number>;
 };
 
@@ -208,7 +211,9 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
     const tasks: AllowanceTaskStatus[] = staffList.map(staff => {
       // 古いデータは staff_id が staff-名前 だったりするので名前でもマッチさせる
       const staffAllowances = allAllowances.filter(a => a.staff_id === staff.id || a.staff_name === staff.name);
-      const totalAmount = staffAllowances.reduce((sum, a) => sum + a.amount, 0);
+      const totalAmount = staffAllowances
+        .filter(a => a.type !== "product")
+        .reduce((sum, a) => sum + a.amount, 0);
       
       // staffAllowancesをメモリ上でソート
       staffAllowances.sort((a, b) => {
@@ -284,6 +289,7 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
       });
       const productSalesTotal = Object.values(productSalesStoreBreakdown)
         .reduce((sum, amount) => sum + amount, 0);
+      const productCommission = calculateTaxExclusiveProductCommission(productSalesTotal, 10);
 
       return {
         staff_id: staff.id,
@@ -302,6 +308,8 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
         treatment_count_auto: staffTreatments.length,
         treatment_store_breakdown: treatmentStoreBreakdown,
         product_sales_total: productSalesTotal,
+        product_sales_tax_excluded: productCommission.taxExclusiveSales,
+        product_commission_auto: productCommission.commission,
         product_sales_store_breakdown: productSalesStoreBreakdown
       };
     });
@@ -356,10 +364,22 @@ export async function saveStaffAllowanceTask(data: {
     
     const batch = writeBatch(db);
     let addedCount = 0;
+
+    // 店販手当はスタッフ・月ごとに1件の上書き値として扱う。
+    // 再確認時は以前の値を置換し、二重計上を防ぐ。
+    if (data.allowances.some(item => item.type === "product")) {
+      const existingProductSnapshot = await getDocs(query(
+        collection(db, ALLOWANCES_COLLECTION),
+        where("staff_id", "==", data.staff_id),
+        where("target_month", "==", data.target_month),
+        where("type", "==", "product")
+      ));
+      existingProductSnapshot.docs.forEach(existing => batch.delete(existing.ref));
+    }
     
     // Create new allowances
     for (const item of data.allowances) {
-       if (item.amount > 0) {
+       if (item.type === "product" ? item.amount >= 0 : item.amount > 0) {
          const docRef = doc(collection(db, ALLOWANCES_COLLECTION));
           batch.set(docRef, {
             companyId: ctx.companyId,

@@ -385,6 +385,7 @@ export async function generateStatements(year: number, month: number) {
     const staffNameNormal = normalizeStaffName(contract.staff_name);
     const staffSales = sales.filter((s: any) => s.staff_name && normalizeStaffName(s.staff_name) === staffNameNormal);
     const staffAllowances = allowances.filter((a: any) => a.staff_name && normalizeStaffName(a.staff_name) === staffNameNormal);
+    const productCommissionOverride = staffAllowances.find((a: any) => a.type === "product")?.amount;
     const staffAttendances = attendances.filter((a: AttendanceRecord) => (a.staff_id && contract.staff_id && a.staff_id === contract.staff_id) || (a.staff_name && normalizeStaffName(a.staff_name) === staffNameNormal));
     const staffPaidLeaves = shifts.filter((s: ShiftRecord) => s.staff_id === contract.staff_id && s.type === "paid_leave").length;
 
@@ -487,7 +488,7 @@ export async function generateStatements(year: number, month: number) {
         }
       }
       const effectiveCashlessRetail = preservedAdjusts?.retail_cashless_sales_override ?? cashlessProductSales;
-      const productCommission = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules, companyId);
+      const productCommission = productCommissionOverride ?? calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules, companyId);
 
       const transportFee = preservedAdjusts?.transport_fee_override ?? transportAllowanceDb;
       const allowanceTotal = transportFee + nominationAllowanceDb + reviewAllowanceDb + blogAllowanceDb + otherAllowanceDb + contractCustomAllowanceTotal;
@@ -574,7 +575,7 @@ export async function generateStatements(year: number, month: number) {
          techCommission = Math.floor((totalTechSales - quota) * (contract.tech_sales_ratio / 100));
       }
       
-      const productCommission = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules, companyId);
+      const productCommission = productCommissionOverride ?? calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules, companyId);
       const nominationReward = nominationCount * contract.nomination_fee;
       
       const baseMonthlySalary = contract.monthly_base_salary || 0;
@@ -668,7 +669,7 @@ export async function generateStatements(year: number, month: number) {
         }
       }
       
-      const productCommission = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules, companyId);
+      const productCommission = productCommissionOverride ?? calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules, companyId);
       
       const nominationReward = nominationCount * contract.nomination_fee;
       const transportFee = preservedAdjusts?.transport_fee_override ?? (transportAllowanceDb > 0 ? transportAllowanceDb : 17950);
@@ -747,7 +748,7 @@ export async function generateStatements(year: number, month: number) {
     const baseTechSalary = Math.floor(commissionableTechSales * (contract.tech_sales_ratio / 100));
     const productCashlessFee = contract.deduction_cashless_ratio > 0 ? Math.floor(effectiveCashlessRetail * (contract.deduction_cashless_ratio / 100)) : 0;
     
-    const baseProductSalary = calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules, companyId);
+    const baseProductSalary = productCommissionOverride ?? calculateProductCommission(staffSales, contract, effectiveCashlessRetail, productCommissionRules, companyId);
     
     const nominationReward = nominationCount * contract.nomination_fee;
     let baseAmount = baseTechSalary + baseProductSalary + nominationReward;
@@ -1028,6 +1029,7 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
     const staffNameNormal = normalizeStaffName(contract.staff_name);
     const staffSales = sales.filter((s: any) => s.staff_name && normalizeStaffName(s.staff_name) === staffNameNormal);
     const staffAllowances = allowances.filter((a: any) => a.staff_name && normalizeStaffName(a.staff_name) === staffNameNormal);
+    const productCommissionOverride = staffAllowances.find((a: any) => a.type === "product")?.amount;
     const staffAttendances = attendances.filter((a: any) => (a.staff_id && contract.staff_id && a.staff_id === contract.staff_id) || (a.staff_name && normalizeStaffName(a.staff_name) === staffNameNormal));
     const paidLeaves = shifts.filter((s: ShiftRecord) => s.staff_id === contract.staff_id && s.type === "paid_leave").length;
 
@@ -1222,7 +1224,7 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
          techCommission = Math.floor((totalTechSales - quota) * (contract.tech_sales_ratio / 100));
       }
       
-      const prodCommissionVal = calculateProductCommission(staffSales, contract, 0, productCommissionRules, companyId);
+      const prodCommissionVal = productCommissionOverride ?? calculateProductCommission(staffSales, contract, 0, productCommissionRules, companyId);
       
       base_amount = contract.monthly_base_salary || 0;
       techIncentive = techCommission;
@@ -1277,7 +1279,7 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
       
       base_amount = baseMonthlySalary;
       techIncentive = incentive;
-      productCommission = calculateProductCommission(staffSales, contract, 0, productCommissionRules, companyId); // standard without cashless deduction filter for default estimation
+      productCommission = productCommissionOverride ?? calculateProductCommission(staffSales, contract, 0, productCommissionRules, companyId);
 
       transportAllowance = transportAllowanceDb > 0 ? transportAllowanceDb : 17950; // Standard transport fee if not entered in DB
 
@@ -1319,7 +1321,7 @@ export async function getStaffPayrollDefaultValues(staffId: string, year: number
 
       const cashlessProductSalesTmp = staffSales.filter(s => s.payment_method !== "現金" && s.payment_method !== "不明").reduce((sum, s) => sum + s.product_sales, 0);
       const effectiveCashlessRetailTmp = cashlessProductSalesTmp;
-      const baseProductSalary = calculateProductCommission(staffSales, contract, effectiveCashlessRetailTmp, productCommissionRules, companyId);
+      const baseProductSalary = productCommissionOverride ?? calculateProductCommission(staffSales, contract, effectiveCashlessRetailTmp, productCommissionRules, companyId);
       
       base_amount = baseTechSalary + baseProductSalary;
       techIncentive = baseTechSalary;

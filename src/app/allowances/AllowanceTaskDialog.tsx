@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { X, CheckCircle2, MessageSquare, Edit3, Megaphone, HelpCircle, Trash2, Loader2, ShoppingBag } from "lucide-react";
-import { AllowanceTaskStatus, saveStaffAllowanceTask, markAllowanceChecked, AllowanceType, deleteAllowance, getAllowanceConfig, AllowanceConfig } from "./actions";
+import { AllowanceTaskStatus, saveStaffAllowanceTask, AllowanceType, deleteAllowance, getAllowanceConfig, AllowanceConfig } from "./actions";
 import { useAuth } from "@/lib/auth-context";
 import { getTenantStores } from "@/lib/utils";
 import { format } from "date-fns";
@@ -66,6 +66,15 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
   
   const [transportAmount, setTransportAmount] = useState("");
   const [snsStore, setSnsStore] = useState("六甲");
+  const registeredProductAllowance = task.allowances.find(a => a.type === "product");
+  const [productCommission, setProductCommission] = useState(
+    String(registeredProductAllowance?.amount ?? task.product_commission_auto)
+  );
+
+  useEffect(() => {
+    const registered = task.allowances.find(a => a.type === "product");
+    setProductCommission(String(registered?.amount ?? task.product_commission_auto));
+  }, [task]);
 
   let defaultTreatmentStore = "六甲";
   if (!hasRegisteredTreatment && task.treatment_store_breakdown && Object.keys(task.treatment_store_breakdown).length > 0) {
@@ -177,6 +186,20 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
       const trAmount = parseInt(transportAmount || "0", 10);
       if (trAmount > 0) allowances.push({ type: "transport" as AllowanceType, amount: trAmount, store_name: "全店共通", target_details: { context: "管理画面から追加" } });
 
+      const productAmount = Math.max(0, parseInt(productCommission || "0", 10));
+      allowances.push({
+        type: "product" as AllowanceType,
+        amount: productAmount,
+        store_name: "全店共通",
+        target_details: {
+          tax_inclusive_sales: task.product_sales_total,
+          tax_exclusive_sales: task.product_sales_tax_excluded,
+          rate_percent: 10,
+          auto_amount: task.product_commission_auto,
+          is_manual_override: productAmount !== task.product_commission_auto
+        }
+      });
+
       const res = await saveStaffAllowanceTask({
         staff_id: task.staff_id,
         staff_name: task.staff_name,
@@ -215,7 +238,24 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
   const handleMarkNoAllowance = async () => {
     setIsSubmitting(true);
     try {
-      const res = await markAllowanceChecked(task.staff_id, task.target_month);
+      const productAmount = Math.max(0, parseInt(productCommission || "0", 10));
+      const res = await saveStaffAllowanceTask({
+        staff_id: task.staff_id,
+        staff_name: task.staff_name,
+        target_month: task.target_month,
+        allowances: [{
+          type: "product",
+          amount: productAmount,
+          store_name: "全店共通",
+          target_details: {
+            tax_inclusive_sales: task.product_sales_total,
+            tax_exclusive_sales: task.product_sales_tax_excluded,
+            rate_percent: 10,
+            auto_amount: task.product_commission_auto,
+            is_manual_override: productAmount !== task.product_commission_auto
+          }
+        }]
+      });
       if (res.success) {
         onSuccess();
       } else {
@@ -229,7 +269,7 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
   };
 
   const hasAnyBlogInput = STORES.some(s => blogStoreCounts[s]);
-  const hasAnyInput = STORES.some(s => reviewStoreCounts[s] || nominationStoreCounts[s]) || hasAnyBlogInput || snsCount || treatmentCount || transportAmount;
+  const hasAnyInput = STORES.some(s => reviewStoreCounts[s] || nominationStoreCounts[s]) || hasAnyBlogInput || snsCount || treatmentCount || transportAmount || productCommission !== "";
 
   if (!isOpen) return null;
 
@@ -263,8 +303,9 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
                       {a.type === 'sns' && <Megaphone size={14} className="text-cyan-500" />}
                       {a.type === 'treatment' && <HelpCircle size={14} className="text-amber-500" />}
                       {a.type === 'transport' && <span className="text-slate-500">🚆</span>}
+                      {a.type === 'product' && <ShoppingBag size={14} className="text-amber-600" />}
                       {a.type === 'other' && <span className="text-slate-500">📦</span>}
-                      {a.type === 'review' ? '口コミ手当' : a.type === 'nomination' ? '指名手当' : a.type === 'blog' ? 'ブログ' : a.type === 'sns' ? 'SNS' : a.type === 'treatment' ? 'トリートメント' : a.type === 'transport' ? '交通費申請' : 'その他'}
+                      {a.type === 'review' ? '口コミ手当' : a.type === 'nomination' ? '指名手当' : a.type === 'blog' ? 'ブログ' : a.type === 'sns' ? 'SNS' : a.type === 'treatment' ? 'トリートメント' : a.type === 'transport' ? '交通費申請' : a.type === 'product' ? '店販手当' : 'その他'}
                       {a.store_name && (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 ml-1">
                           {a.store_name}
@@ -405,7 +446,7 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
               </table>
             </div>
 
-            {/* Product commission is calculated by payroll from sales and contract rules. */}
+            {/* Product commission: tax-exclusive product sales x 10%, editable before confirmation. */}
             <div className="bg-amber-50/60 border border-amber-200 rounded-xl overflow-hidden shadow-sm">
               <div className="flex items-start justify-between gap-4 px-4 py-3 border-b border-amber-200 bg-amber-100/60">
                 <div>
@@ -414,7 +455,7 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
                     店販手当
                   </h4>
                   <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
-                    店販売上を確認できます。手当額は雇用契約の還元率・商品別ルールを使い、給与計算時に自動反映されます。
+                    税込店販売上を税別に換算し、その10%を自動入力します。必要な場合は金額を手入力で変更できます。
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
@@ -431,6 +472,32 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
                     </p>
                   </div>
                 ))}
+              </div>
+              <div className="flex flex-col gap-3 border-t border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-xs text-slate-600">
+                  <p>税別売上 <span className="font-black text-slate-800">¥{task.product_sales_tax_excluded.toLocaleString()}</span> × 10%</p>
+                  <p className="mt-0.5 text-[10px] text-slate-400">自動計算額：¥{task.product_commission_auto.toLocaleString()}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-slate-500">手当額</span>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-sm font-bold text-slate-400">¥</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={productCommission}
+                      onChange={e => setProductCommission(e.target.value)}
+                      className="h-10 w-32 rounded-md border border-amber-300 bg-white pl-8 pr-3 text-right font-black text-amber-700 outline-none focus:ring-2 focus:ring-amber-500/20"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setProductCommission(String(task.product_commission_auto))}
+                    className="text-[10px] font-bold text-amber-700 underline underline-offset-2"
+                  >
+                    自動額に戻す
+                  </button>
+                </div>
               </div>
             </div>
 
