@@ -21,6 +21,7 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
   const { companyId } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [showProductDetails, setShowProductDetails] = useState(false);
 
   const STORES = getTenantStores(companyId);
 
@@ -70,11 +71,6 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
   const [productCommission, setProductCommission] = useState(
     String(registeredProductAllowance?.amount ?? task.product_commission_auto)
   );
-
-  useEffect(() => {
-    const registered = task.allowances.find(a => a.type === "product");
-    setProductCommission(String(registered?.amount ?? task.product_commission_auto));
-  }, [task]);
 
   let defaultTreatmentStore = "六甲";
   if (!hasRegisteredTreatment && task.treatment_store_breakdown && Object.keys(task.treatment_store_breakdown).length > 0) {
@@ -186,19 +182,21 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
       const trAmount = parseInt(transportAmount || "0", 10);
       if (trAmount > 0) allowances.push({ type: "transport" as AllowanceType, amount: trAmount, store_name: "全店共通", target_details: { context: "管理画面から追加" } });
 
-      const productAmount = Math.max(0, parseInt(productCommission || "0", 10));
-      allowances.push({
-        type: "product" as AllowanceType,
-        amount: productAmount,
-        store_name: "全店共通",
-        target_details: {
-          tax_inclusive_sales: task.product_sales_total,
-          tax_exclusive_sales: task.product_sales_tax_excluded,
-          rate_percent: 10,
-          auto_amount: task.product_commission_auto,
-          is_manual_override: productAmount !== task.product_commission_auto
-        }
-      });
+      if (task.has_product_allowance) {
+        const productAmount = Math.max(0, parseInt(productCommission || "0", 10));
+        allowances.push({
+          type: "product" as AllowanceType,
+          amount: productAmount,
+          store_name: "全店共通",
+          target_details: {
+            tax_inclusive_sales: task.product_sales_total,
+            tax_exclusive_sales: task.product_sales_tax_excluded,
+            rate_percent: task.product_commission_rate,
+            auto_amount: task.product_commission_auto,
+            is_manual_override: productAmount !== task.product_commission_auto
+          }
+        });
+      }
 
       const res = await saveStaffAllowanceTask({
         staff_id: task.staff_id,
@@ -243,18 +241,18 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
         staff_id: task.staff_id,
         staff_name: task.staff_name,
         target_month: task.target_month,
-        allowances: [{
+        allowances: task.has_product_allowance ? [{
           type: "product",
           amount: productAmount,
           store_name: "全店共通",
           target_details: {
             tax_inclusive_sales: task.product_sales_total,
             tax_exclusive_sales: task.product_sales_tax_excluded,
-            rate_percent: 10,
+            rate_percent: task.product_commission_rate,
             auto_amount: task.product_commission_auto,
             is_manual_override: productAmount !== task.product_commission_auto
           }
-        }]
+        }] : []
       });
       if (res.success) {
         onSuccess();
@@ -269,7 +267,7 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
   };
 
   const hasAnyBlogInput = STORES.some(s => blogStoreCounts[s]);
-  const hasAnyInput = STORES.some(s => reviewStoreCounts[s] || nominationStoreCounts[s]) || hasAnyBlogInput || snsCount || treatmentCount || transportAmount || productCommission !== "";
+  const hasAnyInput = STORES.some(s => reviewStoreCounts[s] || nominationStoreCounts[s]) || hasAnyBlogInput || snsCount || treatmentCount || transportAmount || (task.has_product_allowance && productCommission !== "");
 
   if (!isOpen) return null;
 
@@ -447,7 +445,7 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
             </div>
 
             {/* Product commission: tax-exclusive product sales x 10%, editable before confirmation. */}
-            <div className="bg-amber-50/60 border border-amber-200 rounded-xl overflow-hidden shadow-sm">
+            {task.has_product_allowance && <div className="bg-amber-50/60 border border-amber-200 rounded-xl overflow-hidden shadow-sm">
               <div className="flex items-start justify-between gap-4 px-4 py-3 border-b border-amber-200 bg-amber-100/60">
                 <div>
                   <h4 className="flex items-center gap-2 text-sm font-black text-slate-800">
@@ -455,12 +453,19 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
                     店販手当
                   </h4>
                   <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
-                    税込店販売上を税別に換算し、その10%を自動入力します。必要な場合は金額を手入力で変更できます。
+                    税込店販売上を税別に換算し、その{task.product_commission_rate}%を自動入力します。必要な場合は金額を手入力で変更できます。
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="text-[10px] font-bold text-slate-500">店販売上合計</p>
                   <p className="text-base font-black text-amber-700">¥{task.product_sales_total.toLocaleString()}</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowProductDetails(current => !current)}
+                    className="mt-1 text-[10px] font-bold text-amber-700 underline underline-offset-2"
+                  >
+                    {showProductDetails ? "明細を閉じる" : `明細を見る（${task.product_sales_records.length}件）`}
+                  </button>
                 </div>
               </div>
               <div className="grid grid-cols-1 divide-y divide-amber-100 bg-white sm:grid-cols-3 sm:divide-x sm:divide-y-0">
@@ -473,9 +478,41 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
                   </div>
                 ))}
               </div>
+              {showProductDetails && (
+                <div className="max-h-52 overflow-y-auto border-t border-amber-200 bg-white">
+                  <table className="w-full text-left text-[11px]">
+                    <thead className="sticky top-0 bg-slate-50 text-slate-500">
+                      <tr>
+                        <th className="px-3 py-2">日付</th>
+                        <th className="px-3 py-2">店舗</th>
+                        <th className="px-3 py-2">顧客・商品</th>
+                        <th className="px-3 py-2 text-right">店販売上</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {task.product_sales_records.map(sale => (
+                        <tr key={sale.id}>
+                          <td className="px-3 py-2 whitespace-nowrap">{sale.date}<br /><span className="text-slate-400">{sale.time}</span></td>
+                          <td className="px-3 py-2">{sale.store_name || "不明"}</td>
+                          <td className="px-3 py-2">
+                            <span className="font-bold text-slate-700">{sale.customer_name || "—"}</span>
+                            <p className="mt-0.5 max-w-[220px] truncate text-slate-400" title={sale.product_details || sale.menu_course || ""}>
+                              {sale.product_details || sale.menu_course || "商品明細なし"}
+                            </p>
+                          </td>
+                          <td className="px-3 py-2 text-right font-black text-amber-700">¥{sale.product_sales.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      {task.product_sales_records.length === 0 && (
+                        <tr><td colSpan={4} className="px-3 py-6 text-center text-slate-400">対象の店販売上データはありません</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
               <div className="flex flex-col gap-3 border-t border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-xs text-slate-600">
-                  <p>税別売上 <span className="font-black text-slate-800">¥{task.product_sales_tax_excluded.toLocaleString()}</span> × 10%</p>
+                  <p>税別売上 <span className="font-black text-slate-800">¥{task.product_sales_tax_excluded.toLocaleString()}</span> × {task.product_commission_rate}%</p>
                   <p className="mt-0.5 text-[10px] text-slate-400">自動計算額：¥{task.product_commission_auto.toLocaleString()}</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -499,7 +536,7 @@ export default function AllowanceTaskDialog({ task, isOpen, onClose, onSuccess, 
                   </button>
                 </div>
               </div>
-            </div>
+            </div>}
 
             {/* Other allowances */}
             <div className="space-y-4">

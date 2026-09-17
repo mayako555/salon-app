@@ -12,3 +12,11 @@ export function calculateTaxExclusiveProductCommission(
     commission: Math.floor(taxExclusiveSales * (safeRate / 100)),
   };
 }
+
+export function normalizeProductStoreLabel(storeName: string) {
+  const compact = (storeName || "不明").replace(/[\s　]/g, "");
+  if (compact.includes("六甲")) return "六甲";
+  if (compact.includes("元町") || compact.toUpperCase().includes("BROWGYM")) return "元町";
+  if (compact.includes("神戸")) return "神戸";
+  return storeName || "不明";
+}

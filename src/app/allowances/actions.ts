@@ -23,7 +23,7 @@ import { getMonthlyReviews } from "@/app/admin/reviews/actions";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc, setTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { revalidatePath } from "next/cache";
-import { calculateTaxExclusiveProductCommission } from "@/lib/product-commission";
+import { calculateTaxExclusiveProductCommission, normalizeProductStoreLabel } from "@/lib/product-commission";
 
 
 export type AllowanceType = "review" | "blog" | "sns" | "treatment" | "transport" | "nomination" | "product" | "other";
@@ -152,6 +152,9 @@ export type AllowanceTaskStatus = {
   product_sales_total: number;
   product_sales_tax_excluded: number;
   product_commission_auto: number;
+  product_commission_rate: number;
+  has_product_allowance: boolean;
+  product_sales_records: SalesRecord[];
   product_sales_store_breakdown?: Record<string, number>;
 };
 
@@ -205,6 +208,7 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
     // 5. その月の全口コミ取得（★5自動カウント用）
     
     const monthlyReviews = await getMonthlyReviews(year, month);
+    const allowanceConfig = await getAllowanceConfig();
     
 
     // 6. スタッフごとに集計
@@ -282,14 +286,19 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
       // 店販手当は給与計算時に契約・商品別ルールから算出されるため、
       // ここでは確認用の店販売上だけを店舗別に集計する（二重計上防止）。
       const productSalesStoreBreakdown: Record<string, number> = {};
-      monthlySales.forEach(s => {
-        if (normalizeStaffName(s.staff_name) !== staffNameNormal || s.product_sales <= 0) return;
-        const store = s.store_name || "不明";
+      const productSalesRecords = monthlySales.filter(s => {
+        return normalizeStaffName(s.staff_name) === staffNameNormal && s.product_sales > 0;
+      });
+      productSalesRecords.forEach(s => {
+        const store = normalizeProductStoreLabel(s.store_name);
         productSalesStoreBreakdown[store] = (productSalesStoreBreakdown[store] || 0) + s.product_sales;
       });
       const productSalesTotal = Object.values(productSalesStoreBreakdown)
         .reduce((sum, amount) => sum + amount, 0);
-      const productCommission = calculateTaxExclusiveProductCommission(productSalesTotal, 10);
+      const productCommission = calculateTaxExclusiveProductCommission(
+        productSalesTotal,
+        allowanceConfig.product_commission_rate
+      );
 
       return {
         staff_id: staff.id,
@@ -310,6 +319,9 @@ export async function getMonthlyAllowanceTasks(year: number, month: number): Pro
         product_sales_total: productSalesTotal,
         product_sales_tax_excluded: productCommission.taxExclusiveSales,
         product_commission_auto: productCommission.commission,
+        product_commission_rate: allowanceConfig.product_commission_rate,
+        has_product_allowance: allowanceConfig.has_product_allowance,
+        product_sales_records: productSalesRecords,
         product_sales_store_breakdown: productSalesStoreBreakdown
       };
     });
@@ -540,6 +552,8 @@ export type AllowanceConfig = {
   has_blog_allowance: boolean;
   has_sns_allowance: boolean;
   has_treatment_allowance: boolean;
+  has_product_allowance: boolean;
+  product_commission_rate: number;
 };
 
 export async function getAllowanceConfig(): Promise<AllowanceConfig> {
@@ -560,7 +574,10 @@ export async function getAllowanceConfig(): Promise<AllowanceConfig> {
     treatment_amount: 5000,
     has_blog_allowance: companyId === "company_default", // 弊社だけの手当とするための初期制御
     has_sns_allowance: true,
-    has_treatment_allowance: true
+    has_treatment_allowance: true,
+    // 店販10%はJasmine Lash固有。ほかのテナントは設定画面で明示的に有効化する。
+    has_product_allowance: companyId === "company_default",
+    product_commission_rate: companyId === "company_default" ? 10 : 0
   };
 
   if (!snap.exists()) {

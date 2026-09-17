@@ -192,7 +192,7 @@ export default function AllowanceConfigDialog({ isOpen, onClose, onSuccess }: Al
             </div>
 
             {/* Treatment Settings */}
-            <div className="space-y-3 pb-2">
+            <div className="space-y-3 border-b border-slate-100 pb-4">
               <div className="flex justify-between items-center">
                 <label className="text-sm font-bold text-slate-700">トリートメント手当の支給</label>
                 <input 
@@ -233,6 +233,37 @@ export default function AllowanceConfigDialog({ isOpen, onClose, onSuccess }: Al
                 </div>
               )}
               <p className="text-[11px] text-slate-400">特定トリートメント件数の月間ノルマ達成手当を設定します。</p>
+            </div>
+
+            {/* Product commission settings */}
+            <div className="space-y-3 pb-2">
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-bold text-slate-700">店販手当の支給</label>
+                <input
+                  type="checkbox"
+                  checked={config.has_product_allowance}
+                  onChange={e => updateField("has_product_allowance", e.target.checked)}
+                  className="w-9 h-5 bg-slate-200 checked:bg-emerald-600 rounded-full appearance-none cursor-pointer relative before:content-[''] before:absolute before:w-4 before:h-4 before:bg-white before:rounded-full before:top-0.5 before:left-0.5 checked:before:translate-x-4 before:transition-transform"
+                />
+              </div>
+              {config.has_product_allowance && (
+                <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <span className="text-[10px] text-slate-500 font-bold">税別店販売上に対する手当率</span>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={config.product_commission_rate}
+                      onChange={e => updateField("product_commission_rate", Number(e.target.value) || 0)}
+                      className="w-24 text-right font-bold h-8 text-xs bg-white"
+                    />
+                    <span className="text-[10px] text-slate-400">%</span>
+                  </div>
+                </div>
+              )}
+              <p className="text-[11px] text-slate-400">Jasmine Lashは初期値10%。他社は無効から開始し、会社ごとに設定できます。</p>
             </div>
 
             <DialogFooter className="pt-2">
