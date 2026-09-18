@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   calculateReservationStartTime,
+  extractCouponImportMetadata,
   extractSalesDateTime,
   isDuplicateImportedReservation,
   isDuplicateImportedSale,
@@ -12,6 +13,35 @@ import {
 } from "../sales-import-normalization";
 
 describe("sales import normalization", () => {
+  it("extracts explicit coupon metadata without guessing from a menu name", () => {
+    assert.deepEqual(extractCouponImportMetadata([{
+      "会計ID": "acc-1",
+      "予約ID": "res-1",
+      "クーポンタイトル": "【人気No.1】束感まつげパーマ",
+      "クーポン説明": "美容液仕上げ",
+      "メニューカテゴリ": "まつげパーマ",
+    }]), {
+      accountingId: "acc-1",
+      reservationId: "res-1",
+      couponName: "【人気No.1】束感まつげパーマ",
+      couponDescription: "美容液仕上げ",
+      menuCategory: "まつげパーマ",
+      segmentTags: [],
+    });
+
+    assert.equal(extractCouponImportMetadata([{
+      "メニュー・店販・割引・サービス・オプション": "通常まつげパーマ",
+    }]).couponName, "");
+  });
+
+  it("tags special price segments for configurable exclusion", () => {
+    const result = extractCouponImportMetadata([{
+      "クーポン名": "学割モデル募集",
+      "割引理由": "社員施術",
+    }]);
+    assert.deepEqual(result.segmentTags, ["student_discount", "model_price", "employee_treatment"]);
+  });
+
   it("extracts the explicit accounting date and time before fallback columns", () => {
     assert.deepEqual(extractSalesDateTime({
       "会計日": "2026/09/09",

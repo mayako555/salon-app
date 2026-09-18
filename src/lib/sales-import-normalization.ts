@@ -4,6 +4,72 @@ const DEFAULT_TREATMENT_MINUTES = 60;
 
 export type CsvSalesRow = Record<string, unknown>;
 
+const firstNonEmpty = (row: CsvSalesRow, keys: readonly string[]): string => {
+  for (const key of keys) {
+    const value = String(row[key] ?? "").trim();
+    if (value) return value;
+  }
+  return "";
+};
+
+export type CouponImportMetadata = {
+  accountingId: string;
+  reservationId: string;
+  couponName: string;
+  couponDescription: string;
+  menuCategory: string;
+  segmentTags: string[];
+};
+
+/**
+ * Extracts only explicit CSV columns. We intentionally do not guess a coupon
+ * title from a menu name because that would contaminate later regression data.
+ */
+export function extractCouponImportMetadata(rows: readonly CsvSalesRow[]): CouponImportMetadata {
+  const first = rows[0] || {};
+  const accountingId = firstNonEmpty(first, ["会計ID"]);
+  const reservationId = firstNonEmpty(first, ["予約ID", "予約番号"]);
+  const couponName = rows.map((row) => firstNonEmpty(row, [
+    "クーポン名",
+    "クーポンタイトル",
+    "利用クーポン",
+    "予約時クーポン名",
+  ])).find(Boolean) || "";
+  const couponDescription = rows.map((row) => firstNonEmpty(row, [
+    "クーポン説明",
+    "クーポン内容",
+    "クーポン詳細",
+  ])).find(Boolean) || "";
+  const menuCategory = rows.map((row) => firstNonEmpty(row, [
+    "メニューカテゴリ",
+    "メニュー大カテゴリ",
+    "大カテゴリ",
+  ])).find(Boolean) || "";
+
+  const segmentSource = rows.map((row) => [
+    firstNonEmpty(row, ["メニュー・店販・割引・サービス・オプション"]),
+    firstNonEmpty(row, ["クーポン名", "クーポンタイトル", "利用クーポン"]),
+    firstNonEmpty(row, ["割引名", "割引理由"]),
+  ].join(" ")).join(" ");
+
+  const segmentMatchers: Array<[string, RegExp]> = [
+    ["student_discount", /学割|学生/],
+    ["model_price", /モデル(?:価格|施術|募集)?/],
+    ["employee_treatment", /社員施術|スタッフ施術|社割/],
+  ];
+
+  return {
+    accountingId,
+    reservationId,
+    couponName,
+    couponDescription,
+    menuCategory,
+    segmentTags: segmentMatchers
+      .filter(([, pattern]) => pattern.test(segmentSource))
+      .map(([tag]) => tag),
+  };
+}
+
 export function extractSalesDateTime(row: CsvSalesRow): { rawDate: string; rawTime: string } {
   let rawDate = String(row["会計日"] || row["来店日"] || "");
   let rawTime = String(row["会計時間"] || row["来店時間"] || "");
