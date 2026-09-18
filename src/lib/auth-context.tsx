@@ -7,6 +7,7 @@ import { doc, getDoc, collection, query, where, getDocs } from "firebase/firesto
 import type { DocumentData, Query, QuerySnapshot } from "firebase/firestore";
 import { StaffProfile, StaffRole } from "@/app/staff/actions";
 import { SalesMasterItem, AttendancePolicy, FeatureKey, FeatureSettings, ensureFeatureDefaults } from "@/types/master";
+import { resolveStaffProfileCandidate } from "@/lib/staff-profile-resolution";
 
 interface AuthContextType {
   user: User | null;
@@ -118,15 +119,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Firestore auth fetch timeout")), 8000))
           ]);
 
-          // UID is the authoritative identity. Email lookup is retained only
-          // for legacy profiles that have not yet been backfilled with a UID.
-          let snapshot = await fetchWithTimeout(query(staffRef, where("uid", "==", firebaseUser.uid)));
-          if (snapshot.empty) {
-            snapshot = await fetchWithTimeout(query(staffRef, where("email", "==", firebaseUser.email)));
-          }
+          // Firestore rules allow a signed-in staff member to query their own
+          // email. Resolve the authoritative UID only within those permitted
+          // candidates, with a single unbound legacy profile as fallback.
+          const snapshot = await fetchWithTimeout(
+            query(staffRef, where("email", "==", firebaseUser.email)),
+          );
+          const resolvedCandidate = resolveStaffProfileCandidate(
+            snapshot.docs.map((staffDoc) => ({
+              id: staffDoc.id,
+              uid: staffDoc.data().uid,
+              staffDoc,
+            })),
+            firebaseUser.uid,
+          );
           
-          if (!snapshot.empty) {
-            const staffDoc = snapshot.docs[0];
+          if (resolvedCandidate) {
+            const staffDoc = resolvedCandidate.staffDoc;
             const data = staffDoc.data();
             setProfile({ id: staffDoc.id, ...data } as StaffProfile);
             
