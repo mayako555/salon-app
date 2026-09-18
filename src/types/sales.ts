@@ -47,6 +47,22 @@ export type SalesRecord = {
   companyId?: string;
   store_id?: string;
   product_details?: string;
+  /** CSV上の会計・予約識別子。既存データとの互換性のため任意項目。 */
+  accounting_id?: string;
+  reservation_id?: string;
+  /** クーポン最適化で使用する、取込時点の文言スナップショット。 */
+  coupon_name?: string;
+  coupon_description?: string;
+  menu_category?: string;
+  menu_items?: Array<{
+    name: string;
+    category: string;
+    grossPrice: number;
+  }>;
+  /** 学割・モデル・社員施術等を後から設定で除外するためのタグ。 */
+  segment_tags?: string[];
+  is_cancelled?: boolean;
+  import_batch_id?: string;
   created_at: unknown;
   updated_at?: unknown;
 };

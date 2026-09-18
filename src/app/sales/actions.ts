@@ -32,6 +32,7 @@ import { resolvePaymentReservationId } from "@/lib/payment-sync";
 import { serializeFirestoreRecord } from "@/lib/firestore-serialization";
 import {
   calculateReservationStartTime,
+  extractCouponImportMetadata,
   extractSalesDateTime,
   isDuplicateImportedReservation,
   isDuplicateImportedSale,
@@ -403,6 +404,7 @@ export async function importHotPepperCsv(formData: FormData) {
     
     const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, dynamicTyping: true });
     const rows = parsed.data as any[];
+    const importBatchId = crypto.randomUUID();
 
     // Step 1: Group rows by Accounting ID and collect min/max dates
     const groups: Record<string, any[]> = {};
@@ -477,6 +479,7 @@ export async function importHotPepperCsv(formData: FormData) {
 
     for (const groupRows of Object.values(groups)) {
       const firstRow = groupRows[0];
+      const importMetadata = extractCouponImportMetadata(groupRows);
       const rawStaffName = groupRows.find(r => r["スタッフ"] || r["担当スタッフ"] || r["スタッフ名"])?.["スタッフ"] || "フリー";
       const staffName = String(rawStaffName).replace(/\s+/g, "");
       
@@ -502,6 +505,7 @@ export async function importHotPepperCsv(formData: FormData) {
       
        let techSales = 0, prodSales = 0, discount = 0, hpbPoints = 0, nominationFee = 0;
        let menuCourses: string[] = [], discountReasons: string[] = [], optionsList: string[] = [];
+       const menuItems: { name: string; category: string; grossPrice: number }[] = [];
        const productDetailsList: { name: string, price: number }[] = [];
 
        groupRows.forEach(row => {
@@ -528,6 +532,14 @@ export async function importHotPepperCsv(formData: FormData) {
            if (!optionsList.includes(menu)) optionsList.push(menu);
          } else if (menu && !menuCourses.includes(menu) && !menu.includes("割引") && !menu.includes("指名料") && !category.includes("店販")) {
            menuCourses.push(menu);
+         }
+
+         if (menu && !category.includes("店販") && !category.includes("割引") && !menu.includes("指名料")) {
+           menuItems.push({
+             name: menu,
+             category: String(row["メニューカテゴリ"] || row["メニュー大カテゴリ"] || row["大カテゴリ"] || row["カテゴリ"] || ""),
+             grossPrice: val,
+           });
          }
          
          hpbPoints += isCancel ? -Math.abs(parseSalesAmount(row["ポイント使用"])) : Math.abs(parseSalesAmount(row["ポイント使用"]));
@@ -583,6 +595,15 @@ export async function importHotPepperCsv(formData: FormData) {
         source: "hotpepper" as SalesSource,
         merge_status: "CSV_ONLY",
         product_details: JSON.stringify(productDetailsList),
+        accounting_id: importMetadata.accountingId,
+        reservation_id: importMetadata.reservationId,
+        coupon_name: importMetadata.couponName,
+        coupon_description: importMetadata.couponDescription,
+        menu_category: importMetadata.menuCategory,
+        menu_items: menuItems,
+        segment_tags: importMetadata.segmentTags,
+        is_cancelled: groupRows.some(r => String(r["会計区分"] || "").includes("取り消し")),
+        import_batch_id: importBatchId,
         created_at: serverTimestamp()
       });
 
