@@ -153,12 +153,19 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">アクセス権限</label>
+            {staff?.role === "systemOwner" && (
+              <input type="hidden" name="role" value="systemOwner" />
+            )}
             <select 
               name="role" 
               value={role}
               onChange={(e) => setRole(e.target.value as any)}
+              disabled={staff?.role === "systemOwner"}
               className="w-full h-10 px-3 border border-slate-300 rounded-md shadow-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none bg-white"
             >
+              {staff?.role === "systemOwner" && (
+                <option value="systemOwner">システムオーナー（変更不可）</option>
+              )}
               <option value="staff">スタッフ（閲覧・売上入力のみ）</option>
               <option value="manager">店長（シフト作成可）</option>
               <option value="admin">管理者（給与設定・全機能）</option>
@@ -169,6 +176,11 @@ export default function StaffFormDialog({ staff }: { staff?: StaffProfile }) {
                 </>
               )}
             </select>
+            {staff?.role === "systemOwner" && (
+              <p className="text-[10px] text-amber-600 mt-1 font-bold">
+                ※ システムオーナー権限はスタッフ管理画面から変更できません。
+              </p>
+            )}
           </div>
 
           <div className="pt-2">
