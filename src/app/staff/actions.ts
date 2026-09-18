@@ -62,6 +62,7 @@ import { getCurrentUserContext } from "@/lib/auth-server";
 import { getCompanyScopedCollection, getTenantDoc } from "@/lib/tenant-utils";
 import { addTenantOwnedDoc, updateTenantOwnedDoc, deleteTenantOwnedDoc, getTenantOwnedDoc } from "@/lib/tenant-ownership";
 import { filterStaffByCompany } from "@/lib/staff-filtering";
+import { validateStaffRoleChange } from "@/lib/staff-role-guard";
 
 export async function getStaffList(options?: { includeResigned?: boolean; companyScoped?: boolean }): Promise<StaffProfile[]> {
   try {
@@ -301,7 +302,7 @@ export async function editStaff(id: string, formData: FormData) {
     const employment_type = formData.get("employment_type") as "employee" | "outsourcing" | "part_time";
     const is_invoice_registered = formData.get("is_invoice_registered") === "true";
     const max_holiday_requests = parseFloat(formData.get("max_holiday_requests") as string || "3");
-    const role = (formData.get("role") as StaffRole) || "staff";
+    const requestedRole = formData.get("role") as StaffRole | null;
     const monthly_sales_target = parseInt(formData.get("monthly_sales_target") as string || "0", 10);
     const nomination_fee = parseInt(formData.get("nomination_fee") as string || "300", 10);
     const hourly_wage = parseInt(formData.get("hourly_wage") as string || "0", 10);
@@ -322,12 +323,19 @@ export async function editStaff(id: string, formData: FormData) {
       return { success: false, error: "名前、メールアドレスは必須です" };
     }
 
-    // Get current profile to check uid
+    // Get current profile before accepting security-sensitive changes.
     const snap = await getTenantOwnedDoc(doc(db, STAFF_COLLECTION, id));
     let currentUid = "";
+    let currentRole: StaffRole = "staff";
     if (snap.exists) {
       currentUid = snap.data()?.uid || "";
+      currentRole = (snap.data()?.role as StaffRole) || "staff";
     }
+
+    // Missing form values must preserve the current role. In particular,
+    // systemOwner must never silently fall back to staff.
+    const role = requestedRole || currentRole;
+    validateStaffRoleChange(currentRole, role);
 
     const colRef = doc(db, STAFF_COLLECTION, id);
     const staffData = {
