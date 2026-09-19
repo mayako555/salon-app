@@ -14,6 +14,7 @@ import StoreAnalysis from "./StoreAnalysis";
 import ReferralAnalysis from "./ReferralAnalysis";
 import ChannelAnalysis from "./ChannelAnalysis";
 import MenuAnalysis from "./MenuAnalysis";
+import CouponOptimizationAnalysis from "./coupon-optimization/CouponOptimizationAnalysis";
 
 export default function AnalyticsPage() {
   const { profile, isSystemOwner, impersonatingCompanyId } = useAuth();
@@ -76,6 +77,13 @@ export default function AnalyticsPage() {
               >
                 メニュー分析
               </TabsTrigger>
+
+              <TabsTrigger
+                value="coupon-optimization"
+                className="rounded-lg font-bold px-4 py-2.5 md:py-1.5 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all"
+              >
+                価格・文言最適化
+              </TabsTrigger>
               
               {showAdvancedStats && (
                 <>
@@ -135,6 +143,10 @@ export default function AnalyticsPage() {
 
           <TabsContent value="menu" className="mt-6">
             <MenuAnalysis />
+          </TabsContent>
+
+          <TabsContent value="coupon-optimization" className="mt-6">
+            <CouponOptimizationAnalysis />
           </TabsContent>
           
           {showAdvancedStats && (
