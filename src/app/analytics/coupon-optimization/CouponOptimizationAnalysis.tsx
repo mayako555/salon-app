@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, BadgeJapaneseYen, Loader2, Save, Sparkles, TrendingUp } from "lucide-react";
+import { AlertTriangle, BadgeJapaneseYen, Building2, Loader2, Plus, Save, Sparkles, Trash2, TrendingUp } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   getCouponOptimizationAnalysis,
+  addManualCompetitorPrice,
+  deleteManualCompetitorPrice,
   saveCouponVariableCost,
   type CouponOptimizationResponse,
 } from "./actions";
+import { summarizeCompetitorPrices } from "@/lib/coupon-optimization/competitors";
 
 const yen = (value: number | null | undefined) => value == null ? "—" : `¥${Math.round(value).toLocaleString()}`;
 const confidenceLabel = { HIGH: "高", MEDIUM: "中", LOW: "低", INSUFFICIENT: "データ不足" } as const;
@@ -22,6 +25,12 @@ export default function CouponOptimizationAnalysis() {
   const [costInput, setCostInput] = useState("");
   const [savingCost, setSavingCost] = useState(false);
   const [costMessage, setCostMessage] = useState("");
+  const [competitorName, setCompetitorName] = useState("");
+  const [competitorArea, setCompetitorArea] = useState("");
+  const [competitorPrice, setCompetitorPrice] = useState("");
+  const [competitorDate, setCompetitorDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [savingCompetitor, setSavingCompetitor] = useState(false);
+  const [competitorMessage, setCompetitorMessage] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -44,6 +53,9 @@ export default function CouponOptimizationAnalysis() {
         setResult(response);
         setCostInput(response.variableCost == null ? "" : String(response.variableCost));
         setCostMessage("");
+        const areas = [...new Set((response.competitorPrices || []).map((item) => item.area))];
+        setCompetitorArea((current) => current && areas.includes(current) ? current : (areas[0] || current));
+        setCompetitorMessage("");
         setLoading(false);
       }
     });
@@ -54,6 +66,12 @@ export default function CouponOptimizationAnalysis() {
   const menus = useMemo(() => (result.scopes || []).filter((scope) => scope.storeName === storeName), [result.scopes, storeName]);
   const scope = menus.find((item) => item.menuCategory === menuCategory);
   const model = result.model;
+  const competitorAreas = useMemo(() => [...new Set((result.competitorPrices || []).map((item) => item.area))].sort(), [result.competitorPrices]);
+  const competitorSummary = useMemo(() => summarizeCompetitorPrices(
+    result.competitorPrices || [],
+    competitorArea,
+    result.currentObservedPrice ?? null,
+  ), [result.competitorPrices, competitorArea, result.currentObservedPrice]);
   const wording = (model?.coefficients || [])
     .filter((item) => !["intercept", "price_per_1000"].includes(item.name) && item.coefficient > 0)
     .sort((a, b) => b.coefficient - a.coefficient);
@@ -94,6 +112,51 @@ export default function CouponOptimizationAnalysis() {
     setSavingCost(false);
   };
 
+  const refreshAnalysis = async () => {
+    const refreshed = await getCouponOptimizationAnalysis({ months, storeName, menuCategory });
+    setResult(refreshed);
+    return refreshed;
+  };
+
+  const addCompetitor = async () => {
+    const price = Number(competitorPrice);
+    if (!competitorName.trim() || !competitorArea.trim() || !Number.isInteger(price) || price <= 0) {
+      setCompetitorMessage("競合名・エリア・1円以上の整数価格を入力してください");
+      return;
+    }
+    setSavingCompetitor(true);
+    setCompetitorMessage("");
+    const saved = await addManualCompetitorPrice({
+      storeName,
+      menuCategory,
+      competitorName,
+      area: competitorArea,
+      price,
+      capturedAt: competitorDate,
+    });
+    if (!saved.success) {
+      setCompetitorMessage(saved.error || "登録に失敗しました");
+    } else {
+      await refreshAnalysis();
+      setCompetitorName("");
+      setCompetitorPrice("");
+      setCompetitorMessage("競合価格の履歴を登録しました");
+    }
+    setSavingCompetitor(false);
+  };
+
+  const deleteCompetitor = async (id: string) => {
+    setSavingCompetitor(true);
+    setCompetitorMessage("");
+    const deleted = await deleteManualCompetitorPrice({ id });
+    if (!deleted.success) setCompetitorMessage(deleted.error || "削除に失敗しました");
+    else {
+      await refreshAnalysis();
+      setCompetitorMessage("競合価格の履歴を削除しました");
+    }
+    setSavingCompetitor(false);
+  };
+
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -129,12 +192,14 @@ export default function CouponOptimizationAnalysis() {
         <div className="rounded-2xl border bg-white p-8 text-center text-slate-500">分析対象となる新規クーポンデータがありません。</div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Metric label="直近観測価格" value={yen(result.currentObservedPrice)} />
             <Metric label="売上最大予測価格" value={yen(model?.revenueOptimalPrice)} accent />
             <Metric label="推定粗利益最大価格" value={yen(model?.grossProfitOptimalPrice)} />
             <Metric label="分析信頼度" value={confidenceLabel[scope.confidence]} />
             <Metric label="分析データ" value={`${scope.reservationCount}件・${scope.observedWeeks}週`} />
+            <Metric label="周辺価格中央値" value={yen(competitorSummary.medianPrice)} />
+            <Metric label="周辺平均との差" value={competitorSummary.differencePercent == null ? "—" : `${competitorSummary.differencePercent >= 0 ? "+" : ""}${competitorSummary.differencePercent.toFixed(1)}%`} />
           </div>
 
           <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
@@ -154,6 +219,44 @@ export default function CouponOptimizationAnalysis() {
             </div>
             {costMessage && <p className="mt-2 text-sm text-emerald-900">{costMessage}</p>}
             {model?.variableCost == null && <p className="mt-3 text-xs text-amber-700">原価未設定のため、推定粗利益最大価格は表示していません。</p>}
+          </section>
+
+          <section className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h3 className="flex items-center gap-2 font-bold text-slate-900"><Building2 size={19} className="text-blue-600" />競合価格（手動登録）</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500">同一エリアの各競合について、最新の登録価格から中央値を計算します。過去履歴は上書きせず保存します。</p>
+              </div>
+              {competitorAreas.length > 0 && (
+                <Select value={competitorArea} onValueChange={setCompetitorArea}>
+                  <SelectTrigger className="w-48"><SelectValue placeholder="エリアを選択" /></SelectTrigger>
+                  <SelectContent>{competitorAreas.map((area) => <SelectItem key={area} value={area}>{area}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_140px_160px_auto]">
+              <input value={competitorName} onChange={(event) => setCompetitorName(event.target.value)} placeholder="競合サロン名" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              <input value={competitorArea} onChange={(event) => setCompetitorArea(event.target.value)} placeholder="商圏・エリア" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              <input type="number" min="1" step="1" value={competitorPrice} onChange={(event) => setCompetitorPrice(event.target.value)} placeholder="価格（円）" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              <input type="date" value={competitorDate} onChange={(event) => setCompetitorDate(event.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              <button type="button" onClick={addCompetitor} disabled={savingCompetitor} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+                {savingCompetitor ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}登録
+              </button>
+            </div>
+            {competitorMessage && <p className="mt-2 text-sm text-blue-800">{competitorMessage}</p>}
+            {competitorArea && (
+              <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-slate-50 text-left text-xs text-slate-500"><tr><th className="px-3 py-2">競合</th><th className="px-3 py-2">最新価格</th><th className="px-3 py-2">取得日</th><th className="px-3 py-2">履歴数</th><th className="px-3 py-2"></th></tr></thead>
+                  <tbody>{competitorSummary.latestPrices.map((item) => {
+                    const historyCount = (result.competitorPrices || []).filter((record) => record.area === competitorArea && record.competitorName === item.competitorName).length;
+                    return <tr key={item.id} className="border-t border-slate-100"><td className="px-3 py-2 font-medium">{item.competitorName}</td><td className="px-3 py-2">{yen(item.price)}</td><td className="px-3 py-2">{item.capturedAt}</td><td className="px-3 py-2">{historyCount}件</td><td className="px-3 py-2 text-right"><button type="button" onClick={() => deleteCompetitor(item.id)} disabled={savingCompetitor || item.sourceType !== "manual"} aria-label={`${item.competitorName}の最新手動価格を削除`} className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"><Trash2 size={16} /></button></td></tr>;
+                  })}</tbody>
+                </table>
+                {competitorSummary.latestPrices.length === 0 && <p className="p-4 text-center text-sm text-slate-500">このエリアの競合価格は未登録です。</p>}
+              </div>
+            )}
+            <p className="mt-3 text-xs leading-5 text-amber-700">外部サイトからの自動収集は行っていません。相対価格は表示用で、履歴期間と価格変動が十分になるまで回帰モデルには投入しません。</p>
           </section>
 
           {model?.revenueOptimalPrice == null ? (
