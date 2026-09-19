@@ -14,6 +14,10 @@ import {
   type CouponAnalysisReadiness,
 } from "@/lib/coupon-optimization/readiness";
 import type { SalesRecord } from "@/types/sales";
+import {
+  filterCompetitorPriceHistory,
+  type CompetitorPriceRecord,
+} from "@/lib/coupon-optimization/competitors";
 
 const ALLOWED_ROLES = new Set(["systemOwner", "companyOwner", "admin", "manager", "storeManager"]);
 
@@ -24,9 +28,11 @@ export type CouponOptimizationResponse = {
   model?: CouponOptimizationModel;
   currentObservedPrice?: number | null;
   variableCost?: number | null;
+  competitorPrices?: CompetitorPriceRecord[];
 };
 
 const COST_COLLECTION = "coupon_optimization_costs";
+const COMPETITOR_PRICE_COLLECTION = "competitor_price_history";
 
 function costSettingId(companyId: string, storeName: string, menuCategory: string): string {
   return createHash("sha256")
@@ -42,6 +48,34 @@ async function getVariableCost(companyId: string, storeName: string, menuCategor
   if (data?.companyId !== companyId) throw new Error("原価設定のテナントが一致しません");
   const value = Number(data?.variableCost);
   return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+async function getCompetitorPrices(
+  companyId: string,
+  storeName: string,
+  menuCategory: string,
+): Promise<CompetitorPriceRecord[]> {
+  const snapshot = await adminDb.collection(COMPETITOR_PRICE_COLLECTION)
+    .where("companyId", "==", companyId)
+    .get();
+  const records = snapshot.docs.map((doc: { id: string; data: () => Record<string, unknown> }) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      companyId: String(data.companyId || ""),
+      storeName: String(data.storeName || ""),
+      menuCategory: String(data.menuCategory || ""),
+      competitorName: String(data.competitorName || ""),
+      area: String(data.area || ""),
+      price: Number(data.price || 0),
+      capturedAt: String(data.capturedAt || ""),
+      sourceType: data.sourceType === "csv" || data.sourceType === "external_api" || data.sourceType === "crawler"
+        ? data.sourceType
+        : "manual",
+    } satisfies CompetitorPriceRecord;
+  });
+  return filterCompetitorPriceHistory(records, companyId, storeName, menuCategory)
+    .sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
 }
 
 export async function getCouponOptimizationAnalysis(input?: {
@@ -77,6 +111,7 @@ export async function getCouponOptimizationAnalysis(input?: {
     if (!selectedScope) return { success: false, error: "選択した分析対象のデータがありません", scopes };
 
     const variableCost = await getVariableCost(companyId, input.storeName, input.menuCategory);
+    const competitorPrices = await getCompetitorPrices(companyId, input.storeName, input.menuCategory);
     const model = buildCouponOptimizationModel(sales, companyId, input.storeName, input.menuCategory, {}, variableCost);
     const recentPrices = sales
       .filter((sale: SalesRecord) => sale.store_name === input.storeName &&
@@ -92,10 +127,82 @@ export async function getCouponOptimizationAnalysis(input?: {
       model,
       currentObservedPrice: recentPrices[0] ?? null,
       variableCost,
+      competitorPrices,
     };
   } catch (error) {
     console.error("Coupon optimization analysis failed:", error);
     return { success: false, error: error instanceof Error ? error.message : "分析データの取得に失敗しました" };
+  }
+}
+
+export async function addManualCompetitorPrice(input: {
+  storeName: string;
+  menuCategory: string;
+  competitorName: string;
+  area: string;
+  price: number;
+  capturedAt: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const ctx = await getCurrentUserContext();
+    if (!ALLOWED_ROLES.has(ctx.role)) return { success: false, error: "権限がありません" };
+    const companyId = requireCompanyId(ctx);
+    const storeName = input.storeName.normalize("NFKC").trim();
+    const menuCategory = input.menuCategory.normalize("NFKC").trim();
+    const competitorName = input.competitorName.normalize("NFKC").trim();
+    const area = input.area.normalize("NFKC").trim();
+    if (!storeName || !menuCategory || !competitorName || !area) {
+      return { success: false, error: "店舗・メニュー・競合名・エリアを入力してください" };
+    }
+    if (!Number.isInteger(input.price) || input.price <= 0 || input.price > 10_000_000) {
+      return { success: false, error: "価格は1〜10,000,000円の整数で入力してください" };
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.capturedAt) || Number.isNaN(new Date(`${input.capturedAt}T00:00:00Z`).getTime())) {
+      return { success: false, error: "取得日を正しく入力してください" };
+    }
+
+    await adminDb.collection(COMPETITOR_PRICE_COLLECTION).add({
+      companyId,
+      storeName,
+      menuCategory,
+      competitorName,
+      area,
+      price: input.price,
+      capturedAt: input.capturedAt,
+      sourceType: "manual",
+      createdAt: new Date(),
+      createdBy: ctx.uid,
+    });
+    revalidatePath("/analytics");
+    return { success: true };
+  } catch (error) {
+    console.error("Adding competitor price failed:", error);
+    return { success: false, error: error instanceof Error ? error.message : "競合価格の登録に失敗しました" };
+  }
+}
+
+export async function deleteManualCompetitorPrice(input: {
+  id: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const ctx = await getCurrentUserContext();
+    if (!ALLOWED_ROLES.has(ctx.role)) return { success: false, error: "権限がありません" };
+    const companyId = requireCompanyId(ctx);
+    if (!input.id.trim()) return { success: false, error: "削除対象がありません" };
+    const ref = adminDb.collection(COMPETITOR_PRICE_COLLECTION).doc(input.id);
+    const existing = await ref.get();
+    if (!existing.exists || existing.data()?.companyId !== companyId) {
+      return { success: false, error: "対象の競合価格が見つかりません" };
+    }
+    if (existing.data()?.sourceType !== "manual") {
+      return { success: false, error: "手動登録以外の履歴はこの画面から削除できません" };
+    }
+    await ref.delete();
+    revalidatePath("/analytics");
+    return { success: true };
+  } catch (error) {
+    console.error("Deleting competitor price failed:", error);
+    return { success: false, error: error instanceof Error ? error.message : "競合価格の削除に失敗しました" };
   }
 }
 
