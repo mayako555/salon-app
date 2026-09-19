@@ -27,6 +27,29 @@ describe("coupon optimization model", () => {
     ]);
   });
 
+  it("calculates gross-profit simulation only when variable cost is configured", () => {
+    const sales = Array.from({ length: 36 }, (_, index) => sale(index, 4_000 + (index % 6) * 500));
+    const withoutCost = buildCouponOptimizationModel(sales, "company-a", "六甲道店", "まつげパーマ", {
+      minimumWeeks: 2,
+      minimumReservations: 4,
+      minimumPriceVariations: 2,
+      minimumWordingSamples: 100,
+    });
+    assert.equal(withoutCost.variableCost, null);
+    assert.equal(withoutCost.grossProfitOptimalPrice, null);
+    assert.ok(withoutCost.simulation.every((point) => point.predictedGrossProfit === null));
+
+    const withCost = buildCouponOptimizationModel(sales, "company-a", "六甲道店", "まつげパーマ", {
+      minimumWeeks: 2,
+      minimumReservations: 4,
+      minimumPriceVariations: 2,
+      minimumWordingSamples: 100,
+    }, 1_200);
+    assert.equal(withCost.variableCost, 1_200);
+    assert.notEqual(withCost.grossProfitOptimalPrice, null);
+    assert.ok(withCost.simulation.every((point) => point.predictedGrossProfit != null));
+  });
+
   it("aggregates only the requested tenant, store and menu", () => {
     const sales = [sale(0, 5_000), sale(1, 5_000), sale(2, 5_000, { companyId: "company-b" }), sale(3, 5_000, { store_name: "神戸店" })];
     const observations = aggregateWeeklyCouponObservations(sales, "company-a", "六甲道店", "まつげパーマ");

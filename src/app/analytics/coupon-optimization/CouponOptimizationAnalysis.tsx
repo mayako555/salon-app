@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, BadgeJapaneseYen, Loader2, Sparkles, TrendingUp } from "lucide-react";
+import { AlertTriangle, BadgeJapaneseYen, Loader2, Save, Sparkles, TrendingUp } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   getCouponOptimizationAnalysis,
+  saveCouponVariableCost,
   type CouponOptimizationResponse,
 } from "./actions";
 
@@ -18,6 +19,9 @@ export default function CouponOptimizationAnalysis() {
   const [menuCategory, setMenuCategory] = useState("");
   const [result, setResult] = useState<CouponOptimizationResponse>({ success: true, scopes: [] });
   const [loading, setLoading] = useState(true);
+  const [costInput, setCostInput] = useState("");
+  const [savingCost, setSavingCost] = useState(false);
+  const [costMessage, setCostMessage] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -36,7 +40,12 @@ export default function CouponOptimizationAnalysis() {
     if (!storeName || !menuCategory) return;
     let active = true;
     getCouponOptimizationAnalysis({ months, storeName, menuCategory }).then((response) => {
-      if (active) { setResult(response); setLoading(false); }
+      if (active) {
+        setResult(response);
+        setCostInput(response.variableCost == null ? "" : String(response.variableCost));
+        setCostMessage("");
+        setLoading(false);
+      }
     });
     return () => { active = false; };
   }, [months, storeName, menuCategory]);
@@ -63,6 +72,26 @@ export default function CouponOptimizationAnalysis() {
   const chooseMonths = (value: string) => {
     setLoading(true);
     setMonths(Number(value) as 12 | 24 | 36);
+  };
+
+  const saveCost = async () => {
+    const trimmed = costInput.trim();
+    const variableCost = trimmed === "" ? null : Number(trimmed);
+    if (variableCost != null && (!Number.isInteger(variableCost) || variableCost < 0)) {
+      setCostMessage("0円以上の整数で入力してください");
+      return;
+    }
+    setSavingCost(true);
+    setCostMessage("");
+    const saved = await saveCouponVariableCost({ storeName, menuCategory, variableCost });
+    if (!saved.success) {
+      setCostMessage(saved.error || "保存に失敗しました");
+    } else {
+      const refreshed = await getCouponOptimizationAnalysis({ months, storeName, menuCategory });
+      setResult(refreshed);
+      setCostMessage(variableCost == null ? "原価設定を解除しました" : "変動原価を保存しました");
+    }
+    setSavingCost(false);
   };
 
   return (
@@ -100,12 +129,32 @@ export default function CouponOptimizationAnalysis() {
         <div className="rounded-2xl border bg-white p-8 text-center text-slate-500">分析対象となる新規クーポンデータがありません。</div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <Metric label="直近観測価格" value={yen(result.currentObservedPrice)} />
             <Metric label="売上最大予測価格" value={yen(model?.revenueOptimalPrice)} accent />
+            <Metric label="推定粗利益最大価格" value={yen(model?.grossProfitOptimalPrice)} />
             <Metric label="分析信頼度" value={confidenceLabel[scope.confidence]} />
             <Metric label="分析データ" value={`${scope.reservationCount}件・${scope.observedWeeks}週`} />
           </div>
+
+          <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h3 className="font-bold text-emerald-950">メニュー1件あたりの変動原価</h3>
+                <p className="mt-1 text-xs leading-5 text-emerald-800">材料費など、施術1件増加に伴い増える原価を入力してください。固定費や人件費は含めません。</p>
+              </div>
+              <div className="flex items-end gap-2">
+                <label className="text-xs font-medium text-emerald-900">変動原価（円）
+                  <input type="number" min="0" step="1" value={costInput} onChange={(event) => setCostInput(event.target.value)} placeholder="未設定" className="mt-1 block w-40 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-base text-slate-900" />
+                </label>
+                <button type="button" onClick={saveCost} disabled={savingCost} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+                  {savingCost ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}保存
+                </button>
+              </div>
+            </div>
+            {costMessage && <p className="mt-2 text-sm text-emerald-900">{costMessage}</p>}
+            {model?.variableCost == null && <p className="mt-3 text-xs text-amber-700">原価未設定のため、推定粗利益最大価格は表示していません。</p>}
+          </section>
 
           {model?.revenueOptimalPrice == null ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
@@ -125,6 +174,7 @@ export default function CouponOptimizationAnalysis() {
                       <YAxis tickFormatter={(value) => `¥${Math.round(Number(value) / 1000)}千`} width={58} />
                       <Tooltip formatter={(value) => yen(Number(value))} labelFormatter={(value) => `価格 ${yen(Number(value))}`} />
                       <Line type="monotone" dataKey="predictedRevenue" name="予測売上" stroke="#4f46e5" strokeWidth={3} dot={false} />
+                      {model.variableCost != null && <Line type="monotone" dataKey="predictedGrossProfit" name="推定粗利益" stroke="#059669" strokeWidth={3} dot={false} />}
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -145,7 +195,7 @@ export default function CouponOptimizationAnalysis() {
           )}
 
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600">
-            この結果は、選択したサロンの過去CSVデータをもとにした予測・意思決定支援です。相関を因果関係として示すものではなく、価格変更後の結果を保証しません。
+            この結果は、選択したサロンの過去CSVデータをもとにした予測・意思決定支援です。相関を因果関係として示すものではなく、価格変更後の結果を保証しません。「推定粗利益」は入力した変動原価だけを差し引いた予測で、会計上の純利益ではありません。
           </div>
         </>
       )}

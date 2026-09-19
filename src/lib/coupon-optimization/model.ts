@@ -25,6 +25,7 @@ export type CouponPricePoint = {
   price: number;
   predictedReservations: number;
   predictedRevenue: number;
+  predictedGrossProfit: number | null;
 };
 
 export type CouponOptimizationModel = {
@@ -38,6 +39,8 @@ export type CouponOptimizationModel = {
   rSquared: number | null;
   adjustedRSquared: number | null;
   revenueOptimalPrice: number | null;
+  variableCost: number | null;
+  grossProfitOptimalPrice: number | null;
   simulation: CouponPricePoint[];
   warnings: string[];
 };
@@ -194,6 +197,7 @@ export function buildCouponOptimizationModel(
   storeName: string,
   menuCategory: string,
   overrides: Partial<CouponAnalysisConfig> = {},
+  variableCost: number | null = null,
 ): CouponOptimizationModel {
   const config = { ...DEFAULT_COUPON_ANALYSIS_CONFIG, ...overrides };
   const readiness = assessCouponAnalysisReadiness(sales, companyId, config)
@@ -209,7 +213,7 @@ export function buildCouponOptimizationModel(
     warnings: [...(readiness?.warnings || ["分析対象データがありません"]), "CSVでは予約ゼロの掲載週を識別できないため因果効果ではありません"],
   };
   if (!readiness?.canEstimatePrice || observations.length < 4) {
-    return { ...base, coefficients: [], rSquared: null, adjustedRSquared: null, revenueOptimalPrice: null, simulation: [] };
+    return { ...base, coefficients: [], rSquared: null, adjustedRSquared: null, revenueOptimalPrice: null, variableCost, grossProfitOptimalPrice: null, simulation: [] };
   }
 
   const wordingCounts = new Map<string, number>();
@@ -222,7 +226,7 @@ export function buildCouponOptimizationModel(
     .sort();
   const names = ["intercept", "price_per_1000", ...wording];
   if (observations.length <= names.length + 1) {
-    return { ...base, coefficients: [], rSquared: null, adjustedRSquared: null, revenueOptimalPrice: null, simulation: [] };
+    return { ...base, coefficients: [], rSquared: null, adjustedRSquared: null, revenueOptimalPrice: null, variableCost, grossProfitOptimalPrice: null, simulation: [] };
   }
   const x = observations.map((item) => [
     1,
@@ -231,7 +235,7 @@ export function buildCouponOptimizationModel(
   ]);
   const fitted = fitOls(x, observations.map((item) => item.reservations), names);
   if (!fitted) {
-    return { ...base, coefficients: [], rSquared: null, adjustedRSquared: null, revenueOptimalPrice: null, simulation: [], warnings: [...base.warnings, "説明変数が重複しているためモデルを推定できません"] };
+    return { ...base, coefficients: [], rSquared: null, adjustedRSquared: null, revenueOptimalPrice: null, variableCost, grossProfitOptimalPrice: null, simulation: [], warnings: [...base.warnings, "説明変数が重複しているためモデルを推定できません"] };
   }
 
   const prices = observations.map((item) => item.averagePrice);
@@ -249,15 +253,29 @@ export function buildCouponOptimizationModel(
       return sum + coefficient * wordingMeans[index];
     }, 0);
     const predictedReservations = Math.max(0, intercept + priceCoefficient * (price / 1_000) + wordingEffect);
-    simulation.push({ price, predictedReservations, predictedRevenue: price * predictedReservations });
+    simulation.push({
+      price,
+      predictedReservations,
+      predictedRevenue: price * predictedReservations,
+      predictedGrossProfit: variableCost == null ? null : (price - variableCost) * predictedReservations,
+    });
   }
   const best = simulation.reduce((current, item) => item.predictedRevenue > current.predictedRevenue ? item : current);
+  const grossProfitBest = variableCost == null
+    ? null
+    : simulation.reduce((current, item) =>
+      (item.predictedGrossProfit ?? Number.NEGATIVE_INFINITY) > (current.predictedGrossProfit ?? Number.NEGATIVE_INFINITY)
+        ? item
+        : current,
+    );
   return {
     ...base,
     coefficients: fitted.coefficients,
     rSquared: fitted.rSquared,
     adjustedRSquared: fitted.adjustedRSquared,
     revenueOptimalPrice: best.price,
+    variableCost,
+    grossProfitOptimalPrice: grossProfitBest?.price ?? null,
     simulation,
   };
 }
