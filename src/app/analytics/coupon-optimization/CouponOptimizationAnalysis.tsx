@@ -27,6 +27,7 @@ export default function CouponOptimizationAnalysis() {
   const [costMessage, setCostMessage] = useState("");
   const [competitorName, setCompetitorName] = useState("");
   const [competitorArea, setCompetitorArea] = useState("");
+  const [competitorFormArea, setCompetitorFormArea] = useState("");
   const [competitorPrice, setCompetitorPrice] = useState("");
   const [competitorDate, setCompetitorDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [savingCompetitor, setSavingCompetitor] = useState(false);
@@ -48,19 +49,20 @@ export default function CouponOptimizationAnalysis() {
   useEffect(() => {
     if (!storeName || !menuCategory) return;
     let active = true;
-    getCouponOptimizationAnalysis({ months, storeName, menuCategory }).then((response) => {
+    getCouponOptimizationAnalysis({ months, storeName, menuCategory, competitorArea: competitorArea || undefined }).then((response) => {
       if (active) {
         setResult(response);
         setCostInput(response.variableCost == null ? "" : String(response.variableCost));
         setCostMessage("");
         const areas = [...new Set((response.competitorPrices || []).map((item) => item.area))];
-        setCompetitorArea((current) => current && areas.includes(current) ? current : (areas[0] || current));
+        setCompetitorArea((current) => current && areas.includes(current) ? current : (areas[0] || ""));
+        setCompetitorFormArea((current) => current || areas[0] || "");
         setCompetitorMessage("");
         setLoading(false);
       }
     });
     return () => { active = false; };
-  }, [months, storeName, menuCategory]);
+  }, [months, storeName, menuCategory, competitorArea]);
 
   const stores = useMemo(() => [...new Set((result.scopes || []).map((scope) => scope.storeName))], [result.scopes]);
   const menus = useMemo(() => (result.scopes || []).filter((scope) => scope.storeName === storeName), [result.scopes, storeName]);
@@ -73,7 +75,7 @@ export default function CouponOptimizationAnalysis() {
     result.currentObservedPrice ?? null,
   ), [result.competitorPrices, competitorArea, result.currentObservedPrice]);
   const wording = (model?.coefficients || [])
-    .filter((item) => !["intercept", "price_per_1000"].includes(item.name) && item.coefficient > 0)
+    .filter((item) => !["intercept", "price_per_1000", "relative_price_ratio"].includes(item.name) && item.coefficient > 0)
     .sort((a, b) => b.coefficient - a.coefficient);
 
   const chooseStore = (value: string) => {
@@ -105,7 +107,7 @@ export default function CouponOptimizationAnalysis() {
     if (!saved.success) {
       setCostMessage(saved.error || "保存に失敗しました");
     } else {
-      const refreshed = await getCouponOptimizationAnalysis({ months, storeName, menuCategory });
+      const refreshed = await getCouponOptimizationAnalysis({ months, storeName, menuCategory, competitorArea: competitorArea || undefined });
       setResult(refreshed);
       setCostMessage(variableCost == null ? "原価設定を解除しました" : "変動原価を保存しました");
     }
@@ -113,14 +115,14 @@ export default function CouponOptimizationAnalysis() {
   };
 
   const refreshAnalysis = async () => {
-    const refreshed = await getCouponOptimizationAnalysis({ months, storeName, menuCategory });
+    const refreshed = await getCouponOptimizationAnalysis({ months, storeName, menuCategory, competitorArea: competitorArea || undefined });
     setResult(refreshed);
     return refreshed;
   };
 
   const addCompetitor = async () => {
     const price = Number(competitorPrice);
-    if (!competitorName.trim() || !competitorArea.trim() || !Number.isInteger(price) || price <= 0) {
+    if (!competitorName.trim() || !competitorFormArea.trim() || !Number.isInteger(price) || price <= 0) {
       setCompetitorMessage("競合名・エリア・1円以上の整数価格を入力してください");
       return;
     }
@@ -130,7 +132,7 @@ export default function CouponOptimizationAnalysis() {
       storeName,
       menuCategory,
       competitorName,
-      area: competitorArea,
+      area: competitorFormArea,
       price,
       capturedAt: competitorDate,
     });
@@ -138,6 +140,7 @@ export default function CouponOptimizationAnalysis() {
       setCompetitorMessage(saved.error || "登録に失敗しました");
     } else {
       await refreshAnalysis();
+      setCompetitorArea(competitorFormArea.trim());
       setCompetitorName("");
       setCompetitorPrice("");
       setCompetitorMessage("競合価格の履歴を登録しました");
@@ -228,7 +231,7 @@ export default function CouponOptimizationAnalysis() {
                 <p className="mt-1 text-xs leading-5 text-slate-500">同一エリアの各競合について、最新の登録価格から中央値を計算します。過去履歴は上書きせず保存します。</p>
               </div>
               {competitorAreas.length > 0 && (
-                <Select value={competitorArea} onValueChange={setCompetitorArea}>
+                <Select value={competitorArea} onValueChange={(value) => { setLoading(true); setCompetitorArea(value); setCompetitorFormArea(value); }}>
                   <SelectTrigger className="w-48"><SelectValue placeholder="エリアを選択" /></SelectTrigger>
                   <SelectContent>{competitorAreas.map((area) => <SelectItem key={area} value={area}>{area}</SelectItem>)}</SelectContent>
                 </Select>
@@ -236,7 +239,7 @@ export default function CouponOptimizationAnalysis() {
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_140px_160px_auto]">
               <input value={competitorName} onChange={(event) => setCompetitorName(event.target.value)} placeholder="競合サロン名" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-              <input value={competitorArea} onChange={(event) => setCompetitorArea(event.target.value)} placeholder="商圏・エリア" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              <input value={competitorFormArea} onChange={(event) => setCompetitorFormArea(event.target.value)} placeholder="商圏・エリア" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
               <input type="number" min="1" step="1" value={competitorPrice} onChange={(event) => setCompetitorPrice(event.target.value)} placeholder="価格（円）" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
               <input type="date" value={competitorDate} onChange={(event) => setCompetitorDate(event.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
               <button type="button" onClick={addCompetitor} disabled={savingCompetitor} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
@@ -256,7 +259,17 @@ export default function CouponOptimizationAnalysis() {
                 {competitorSummary.latestPrices.length === 0 && <p className="p-4 text-center text-sm text-slate-500">このエリアの競合価格は未登録です。</p>}
               </div>
             )}
-            <p className="mt-3 text-xs leading-5 text-amber-700">外部サイトからの自動収集は行っていません。相対価格は表示用で、履歴期間と価格変動が十分になるまで回帰モデルには投入しません。</p>
+            <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+              <p>外部サイトからの自動収集は行っていません。</p>
+              {model?.competitorAdjustmentApplied ? (
+                <p className="font-medium">相対価格モデルを適用中（競合価格でカバーできた週：{model.competitorCoveredWeeks}週）</p>
+              ) : (
+                <>
+                  <p>相対価格は表示用です。履歴期間・価格変動・説明変数の独立性が十分な場合のみ回帰モデルへ投入します。</p>
+                  {(model?.warnings || []).filter((warning) => warning.includes("競合") || warning.includes("相対価格") || warning.includes("共線性")).map((warning) => <p key={warning}>・{warning}</p>)}
+                </>
+              )}
+            </div>
           </section>
 
           {model?.revenueOptimalPrice == null ? (

@@ -75,3 +75,11 @@ export function summarizeCompetitorPrices(
     differencePercent: relativePriceRatio == null ? null : (relativePriceRatio - 1) * 100,
   };
 }
+
+export function competitorMedianAsOf(
+  records: readonly CompetitorPriceRecord[],
+  area: string,
+  asOfDate: string,
+): number | null {
+  return summarizeCompetitorPrices(records, area, null, asOfDate).medianPrice;
+}

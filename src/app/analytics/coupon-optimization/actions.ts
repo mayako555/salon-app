@@ -82,6 +82,7 @@ export async function getCouponOptimizationAnalysis(input?: {
   storeName?: string;
   menuCategory?: string;
   months?: 12 | 24 | 36;
+  competitorArea?: string;
 }): Promise<CouponOptimizationResponse> {
   try {
     const ctx = await getCurrentUserContext();
@@ -112,7 +113,16 @@ export async function getCouponOptimizationAnalysis(input?: {
 
     const variableCost = await getVariableCost(companyId, input.storeName, input.menuCategory);
     const competitorPrices = await getCompetitorPrices(companyId, input.storeName, input.menuCategory);
-    const model = buildCouponOptimizationModel(sales, companyId, input.storeName, input.menuCategory, {}, variableCost);
+    const competitorArea = input.competitorArea?.normalize("NFKC").trim();
+    const model = buildCouponOptimizationModel(
+      sales,
+      companyId,
+      input.storeName,
+      input.menuCategory,
+      {},
+      variableCost,
+      competitorArea ? { records: competitorPrices, area: competitorArea } : undefined,
+    );
     const recentPrices = sales
       .filter((sale: SalesRecord) => sale.store_name === input.storeName &&
         (sale.menu_category || sale.menu_course) === input.menuCategory &&

@@ -2,9 +2,16 @@ import type { SalesRecord } from "@/types/sales";
 import { DEFAULT_COUPON_ANALYSIS_CONFIG, type CouponAnalysisConfig } from "./config";
 import { assessCouponAnalysisReadiness, type AnalysisConfidence } from "./readiness";
 import { extractWordingCategories } from "./wording";
+import {
+  competitorMedianAsOf,
+  filterCompetitorPriceHistory,
+  summarizeCompetitorPrices,
+  type CompetitorPriceRecord,
+} from "./competitors";
 
 export type WeeklyCouponObservation = {
   week: string;
+  weekEndDate: string;
   storeName: string;
   menuCategory: string;
   couponSignature: string;
@@ -42,7 +49,16 @@ export type CouponOptimizationModel = {
   variableCost: number | null;
   grossProfitOptimalPrice: number | null;
   simulation: CouponPricePoint[];
+  competitorAdjustmentApplied: boolean;
+  competitorCoveredWeeks: number;
+  competitorMedianPrice: number | null;
+  competitorArea: string | null;
   warnings: string[];
+};
+
+export type CompetitorModelContext = {
+  records: readonly CompetitorPriceRecord[];
+  area: string;
 };
 
 type Matrix = number[][];
@@ -50,14 +66,22 @@ type Matrix = number[][];
 const normalize = (value: string | undefined): string =>
   (value || "").normalize("NFKC").replace(/\s+/g, " ").trim();
 
-function weekKey(dateText: string): string | null {
+function weekMetadata(dateText: string): { key: string; endDate: string } | null {
   const date = new Date(`${dateText}T00:00:00Z`);
   if (Number.isNaN(date.getTime())) return null;
   const day = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  const week = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return `${date.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+  const monday = new Date(date);
+  monday.setUTCDate(date.getUTCDate() - day + 1);
+  const thursday = new Date(monday);
+  thursday.setUTCDate(monday.getUTCDate() + 3);
+  const yearStart = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((thursday.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  return {
+    key: `${thursday.getUTCFullYear()}-W${String(week).padStart(2, "0")}`,
+    endDate: sunday.toISOString().slice(0, 10),
+  };
 }
 
 function eligibleSale(sale: SalesRecord, companyId: string, config: CouponAnalysisConfig): boolean {
@@ -77,20 +101,20 @@ export function aggregateWeeklyCouponObservations(
 ): WeeklyCouponObservation[] {
   if (!companyId.trim()) throw new Error("companyId is required for coupon analysis");
   const config = { ...DEFAULT_COUPON_ANALYSIS_CONFIG, ...overrides };
-  const groups = new Map<string, { prices: number[]; wording: Set<string> }>();
+  const groups = new Map<string, { prices: number[]; wording: Set<string>; weekEndDate: string }>();
 
   for (const sale of sales) {
     if (!eligibleSale(sale, companyId, config)) continue;
     const saleStore = normalize(sale.store_name);
     const saleMenu = normalize(sale.menu_category) || normalize(sale.menu_course);
     if (saleStore !== normalize(storeName) || saleMenu !== normalize(menuCategory)) continue;
-    const week = weekKey(sale.date);
+    const week = weekMetadata(sale.date);
     const price = Math.max(0, Number(sale.tech_sales || 0) - Number(sale.discount || 0));
     if (!week || price <= 0) continue;
     const couponText = `${sale.coupon_name || ""} ${sale.coupon_description || ""}`.trim();
     const signature = normalize(couponText) || "(文言なし)";
-    const key = `${week}::${signature}::${price}`;
-    const group = groups.get(key) || { prices: [], wording: new Set<string>() };
+    const key = `${week.key}::${signature}::${price}`;
+    const group = groups.get(key) || { prices: [], wording: new Set<string>(), weekEndDate: week.endDate };
     group.prices.push(price);
     extractWordingCategories(couponText).forEach((category) => group.wording.add(category));
     groups.set(key, group);
@@ -100,6 +124,7 @@ export function aggregateWeeklyCouponObservations(
     const [week, couponSignature] = key.split("::");
     return {
       week,
+      weekEndDate: group.weekEndDate,
       storeName: normalize(storeName),
       menuCategory: normalize(menuCategory),
       couponSignature,
@@ -108,6 +133,17 @@ export function aggregateWeeklyCouponObservations(
       wordingCategories: [...group.wording].sort(),
     };
   }).sort((a, b) => a.week.localeCompare(b.week) || a.averagePrice - b.averagePrice);
+}
+
+function correlation(a: readonly number[], b: readonly number[]): number | null {
+  if (a.length !== b.length || a.length < 2) return null;
+  const meanA = a.reduce((sum, value) => sum + value, 0) / a.length;
+  const meanB = b.reduce((sum, value) => sum + value, 0) / b.length;
+  const covariance = a.reduce((sum, value, index) => sum + (value - meanA) * (b[index] - meanB), 0);
+  const varianceA = a.reduce((sum, value) => sum + (value - meanA) ** 2, 0);
+  const varianceB = b.reduce((sum, value) => sum + (value - meanB) ** 2, 0);
+  if (varianceA === 0 || varianceB === 0) return null;
+  return covariance / Math.sqrt(varianceA * varianceB);
 }
 
 function transpose(matrix: Matrix): Matrix {
@@ -198,11 +234,45 @@ export function buildCouponOptimizationModel(
   menuCategory: string,
   overrides: Partial<CouponAnalysisConfig> = {},
   variableCost: number | null = null,
+  competitorContext?: CompetitorModelContext,
 ): CouponOptimizationModel {
   const config = { ...DEFAULT_COUPON_ANALYSIS_CONFIG, ...overrides };
   const readiness = assessCouponAnalysisReadiness(sales, companyId, config)
     .find((item) => item.storeName === normalize(storeName) && item.menuCategory === normalize(menuCategory));
   const observations = aggregateWeeklyCouponObservations(sales, companyId, storeName, menuCategory, config);
+  const competitorArea = normalize(competitorContext?.area);
+  const competitorRows = competitorContext
+    ? filterCompetitorPriceHistory(competitorContext.records, companyId, storeName, menuCategory)
+    : [];
+  const observationsWithCompetitor = observations.map((observation) => ({
+    ...observation,
+    competitorMedian: competitorArea
+      ? competitorMedianAsOf(competitorRows, competitorArea, observation.weekEndDate)
+      : null,
+  }));
+  const coveredWeeks = new Set(observationsWithCompetitor.filter((item) => item.competitorMedian != null).map((item) => item.week)).size;
+  const medianVariations = new Set(observationsWithCompetitor.map((item) => item.competitorMedian).filter((value): value is number => value != null)).size;
+  const completeCompetitorRows = observationsWithCompetitor.filter((item): item is typeof item & { competitorMedian: number } => item.competitorMedian != null);
+  const priceValues = completeCompetitorRows.map((item) => item.averagePrice / 1_000);
+  const relativeValues = completeCompetitorRows.map((item) => item.averagePrice / item.competitorMedian);
+  const predictorCorrelation = correlation(priceValues, relativeValues);
+  const competitorAdjustmentApplied = Boolean(
+    competitorArea &&
+    coveredWeeks >= config.minimumCompetitorCoveredWeeks &&
+    medianVariations >= config.minimumCompetitorMedianVariations &&
+    predictorCorrelation != null &&
+    Math.abs(predictorCorrelation) <= config.maximumPredictorCorrelation,
+  );
+  const competitorMedianPrice = competitorArea
+    ? summarizeCompetitorPrices(competitorRows, competitorArea, null).medianPrice
+    : null;
+  const competitorWarnings: string[] = [];
+  if (competitorArea && !competitorAdjustmentApplied) {
+    if (coveredWeeks < config.minimumCompetitorCoveredWeeks) competitorWarnings.push(`競合価格でカバーできる週が${config.minimumCompetitorCoveredWeeks}週未満のため、相対価格は表示のみです`);
+    else if (medianVariations < config.minimumCompetitorMedianVariations) competitorWarnings.push("競合中央値の変動が少ないため、相対価格は回帰に投入していません");
+    else competitorWarnings.push("自店価格と相対価格の相関が高いため、多重共線性を避けて相対価格を回帰から除外しました");
+  }
+  const modelObservations = competitorAdjustmentApplied ? completeCompetitorRows : observationsWithCompetitor;
   const base = {
     companyId,
     storeName: normalize(storeName),
@@ -210,30 +280,35 @@ export function buildCouponOptimizationModel(
     confidence: readiness?.confidence || "INSUFFICIENT" as AnalysisConfidence,
     sampleCount: observations.length,
     observedWeeks: new Set(observations.map((item) => item.week)).size,
-    warnings: [...(readiness?.warnings || ["分析対象データがありません"]), "CSVでは予約ゼロの掲載週を識別できないため因果効果ではありません"],
+    competitorAdjustmentApplied,
+    competitorCoveredWeeks: coveredWeeks,
+    competitorMedianPrice,
+    competitorArea: competitorArea || null,
+    warnings: [...(readiness?.warnings || ["分析対象データがありません"]), ...competitorWarnings, "CSVでは予約ゼロの掲載週を識別できないため因果効果ではありません"],
   };
   if (!readiness?.canEstimatePrice || observations.length < 4) {
     return { ...base, coefficients: [], rSquared: null, adjustedRSquared: null, revenueOptimalPrice: null, variableCost, grossProfitOptimalPrice: null, simulation: [] };
   }
 
   const wordingCounts = new Map<string, number>();
-  observations.forEach((item) => item.wordingCategories.forEach((category) =>
+  modelObservations.forEach((item) => item.wordingCategories.forEach((category) =>
     wordingCounts.set(category, (wordingCounts.get(category) || 0) + item.reservations),
   ));
   const wording = [...wordingCounts.entries()]
     .filter(([, count]) => count >= config.minimumWordingSamples && count < readiness.reservationCount)
     .map(([category]) => category)
     .sort();
-  const names = ["intercept", "price_per_1000", ...wording];
-  if (observations.length <= names.length + 1) {
+  const names = ["intercept", "price_per_1000", ...(competitorAdjustmentApplied ? ["relative_price_ratio"] : []), ...wording];
+  if (modelObservations.length <= names.length + 1) {
     return { ...base, coefficients: [], rSquared: null, adjustedRSquared: null, revenueOptimalPrice: null, variableCost, grossProfitOptimalPrice: null, simulation: [] };
   }
-  const x = observations.map((item) => [
+  const x = modelObservations.map((item) => [
     1,
     item.averagePrice / 1_000,
+    ...(competitorAdjustmentApplied ? [item.averagePrice / (item.competitorMedian || 1)] : []),
     ...wording.map((category) => Number(item.wordingCategories.includes(category))),
   ]);
-  const fitted = fitOls(x, observations.map((item) => item.reservations), names);
+  const fitted = fitOls(x, modelObservations.map((item) => item.reservations), names);
   if (!fitted) {
     return { ...base, coefficients: [], rSquared: null, adjustedRSquared: null, revenueOptimalPrice: null, variableCost, grossProfitOptimalPrice: null, simulation: [], warnings: [...base.warnings, "説明変数が重複しているためモデルを推定できません"] };
   }
@@ -243,8 +318,9 @@ export function buildCouponOptimizationModel(
   const maximum = Math.ceil(Math.max(...prices) / config.priceStep) * config.priceStep;
   const intercept = fitted.coefficients.find((item) => item.name === "intercept")?.coefficient || 0;
   const priceCoefficient = fitted.coefficients.find((item) => item.name === "price_per_1000")?.coefficient || 0;
+  const relativePriceCoefficient = fitted.coefficients.find((item) => item.name === "relative_price_ratio")?.coefficient || 0;
   const wordingMeans = wording.map((category) =>
-    observations.filter((item) => item.wordingCategories.includes(category)).length / observations.length,
+    modelObservations.filter((item) => item.wordingCategories.includes(category)).length / modelObservations.length,
   );
   const simulation: CouponPricePoint[] = [];
   for (let price = minimum; price <= maximum; price += config.priceStep) {
@@ -252,7 +328,10 @@ export function buildCouponOptimizationModel(
       const coefficient = fitted.coefficients.find((item) => item.name === category)?.coefficient || 0;
       return sum + coefficient * wordingMeans[index];
     }, 0);
-    const predictedReservations = Math.max(0, intercept + priceCoefficient * (price / 1_000) + wordingEffect);
+    const relativePriceEffect = competitorAdjustmentApplied && competitorMedianPrice
+      ? relativePriceCoefficient * (price / competitorMedianPrice)
+      : 0;
+    const predictedReservations = Math.max(0, intercept + priceCoefficient * (price / 1_000) + relativePriceEffect + wordingEffect);
     simulation.push({
       price,
       predictedReservations,
