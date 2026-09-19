@@ -5,6 +5,9 @@ export const COUPON_ANALYSIS_DEFAULTS = {
   minimumWordingSamples: 10,
   priceStep: 100,
   maximumDiscountRate: 0.7,
+  minimumCompetitorCoveredWeeks: 8,
+  minimumCompetitorMedianVariations: 3,
+  maximumPredictorCorrelation: 0.98,
 } as const;
 
 export type CouponAnalysisConfig = {
@@ -14,6 +17,9 @@ export type CouponAnalysisConfig = {
   minimumWordingSamples: number;
   priceStep: number;
   maximumDiscountRate: number;
+  minimumCompetitorCoveredWeeks: number;
+  minimumCompetitorMedianVariations: number;
+  maximumPredictorCorrelation: number;
   excludedSegmentTags: string[];
 };
 
