@@ -11,6 +11,7 @@ import { Plus, Calculator, Calendar, User, ShieldAlert, BadgeCheck, Clock } from
 import { createManualStatement, getStaffPayrollDefaultValues } from "./actions";
 import { toast } from "sonner";
 import { calculatePayrollTaxes } from "@/lib/tax-calculator";
+import { calculateStatementPayment } from "@/lib/payroll-core";
 import { useAuth } from "@/lib/auth-context";
 
 type StaffProfileSimple = {
@@ -217,6 +218,13 @@ export default function CreateStatementDialog({
           setAttendanceAllowance((d.attendanceAllowance || 0).toString());
           setTechIncentive((d.techIncentive || 0).toString());
           setProductCommission((d.productCommission || 0).toString());
+          if (d.type === "reward") {
+            setRewardTechCommission(d.techIncentive || 0);
+            setRewardProductCommission(d.productCommission || 0);
+          } else {
+            setRewardTechCommission(0);
+            setRewardProductCommission(0);
+          }
           setTaxAddition(d.taxAddition.toString());
           
           setHealth(d.health.toString());
@@ -376,7 +384,15 @@ export default function CreateStatementDialog({
   const numChildcare = type === "salary" ? (Number(childcare) || 0) : 0;
 
   const totalDeductions = numHealth + numPension + numEmployment + numIncomeTax + numResidentTax + numChildcare;
-  const finalPaidAmount = numBase + numTechInc + numProdComm + numAllowance + numTaxAdd - totalDeductions;
+  const finalPaidAmount = calculateStatementPayment({
+    type,
+    baseAmount: numBase,
+    techIncentive: numTechInc,
+    productCommission: numProdComm,
+    allowances: numAllowance,
+    taxAddition: numTaxAdd,
+    deductions: totalDeductions,
+  });
 
   const numAlreadyPaid = Number(alreadyPaidAmount) || 0;
   const numAdvanceDeduction = Number(advanceDeduction) || 0;
