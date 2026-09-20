@@ -25,7 +25,8 @@ export default function CreateStatementDialog({
   defaultMonth,
   initialStaffId,
   triggerBtn,
-  onSuccess 
+  onSuccess,
+  defaultOpen = false,
 }: { 
   staffList: StaffProfileSimple[];
   defaultYear: number;
@@ -33,8 +34,9 @@ export default function CreateStatementDialog({
   initialStaffId?: string;
   triggerBtn?: React.ReactNode;
   onSuccess?: () => void;
+  defaultOpen?: boolean;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const [isSaving, setIsSaving] = useState(false);
 
   // Form State
@@ -537,7 +539,9 @@ export default function CreateStatementDialog({
         setAdvanceDeduction("");
         
         if (typeof window !== "undefined") {
-          window.location.reload();
+          const nextUrl = new URL(window.location.href);
+          nextUrl.searchParams.delete("createStaff");
+          window.location.replace(`${nextUrl.pathname}${nextUrl.search}`);
         }
       } else {
         toast.error(`作成エラー: ${res.error}`);
