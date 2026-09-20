@@ -155,3 +155,26 @@ export function calculatePayrollTaxesCore(ctx: PayrollCalculationContext) {
     sources
   };
 }
+
+interface StatementPaymentInput {
+  type: "salary" | "reward";
+  baseAmount: number;
+  techIncentive: number;
+  productCommission: number;
+  allowances: number;
+  taxAddition: number;
+  deductions: number;
+}
+
+/** Contractor commissions are already included in baseAmount. */
+export function calculateStatementPayment(input: StatementPaymentInput): number {
+  const salaryCommissions = input.type === "salary"
+    ? input.techIncentive + input.productCommission
+    : 0;
+
+  return input.baseAmount
+    + salaryCommissions
+    + input.allowances
+    + input.taxAddition
+    - input.deductions;
+}

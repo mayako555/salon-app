@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { calculatePayrollTaxesCore } from "@/lib/payroll-core";
+import { calculatePayrollTaxesCore, calculateStatementPayment } from "@/lib/payroll-core";
 
 type PayrollContext = Parameters<typeof calculatePayrollTaxesCore>[0];
 
@@ -77,5 +77,43 @@ describe("calculatePayrollTaxesCore", () => {
     }));
 
     assert.equal(result.income_tax, 18_000);
+  });
+});
+
+describe("calculateStatementPayment", () => {
+  it("does not add contractor commission breakdown twice", () => {
+    assert.equal(calculateStatementPayment({
+      type: "reward",
+      baseAmount: 24_904,
+      techIncentive: 24_904,
+      productCommission: 0,
+      allowances: 0,
+      taxAddition: 0,
+      deductions: 0,
+    }), 24_904);
+  });
+
+  it("adds salary incentives and allowances as before", () => {
+    assert.equal(calculateStatementPayment({
+      type: "salary",
+      baseAmount: 230_000,
+      techIncentive: 10_000,
+      productCommission: 5_000,
+      allowances: 20_000,
+      taxAddition: 0,
+      deductions: 30_000,
+    }), 235_000);
+  });
+
+  it("adds contractor consumption tax and allowances once", () => {
+    assert.equal(calculateStatementPayment({
+      type: "reward",
+      baseAmount: 31_105,
+      techIncentive: 31_105,
+      productCommission: 0,
+      allowances: 3_000,
+      taxAddition: 3_410,
+      deductions: 0,
+    }), 37_515);
   });
 });

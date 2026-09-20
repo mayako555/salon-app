@@ -41,7 +41,7 @@ function sanitizeObject(obj: any): any {
 export default async function PayrollPage({
   searchParams
 }: {
-  searchParams: Promise<{ month?: string }>
+  searchParams: Promise<{ month?: string; createStaff?: string }>
 }) {
   const params = await searchParams;
   const targetDate = params?.month ? new Date(params.month) : new Date();
@@ -94,7 +94,13 @@ export default async function PayrollPage({
           </div>
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             <CSVExportButton statements={statements} year={year} month={month} />
-            <CreateStatementDialog staffList={simpleStaffList} defaultYear={year} defaultMonth={month} />
+            <CreateStatementDialog
+              staffList={simpleStaffList}
+              defaultYear={year}
+              defaultMonth={month}
+              initialStaffId={params.createStaff}
+              defaultOpen={Boolean(params.createStaff)}
+            />
             {!isClosed && <GenerateButton year={year} month={month} />}
             <CloseButton year={year} month={month} hasData={statements.length > 0} disabled={isClosed} />
           </div>
@@ -239,17 +245,11 @@ export default async function PayrollPage({
                     </div>
                     <span className="font-bold text-slate-700 text-sm">{staff.name}</span>
                   </div>
-                  <CreateStatementDialog 
-                    staffList={simpleStaffList} 
-                    defaultYear={year} 
-                    defaultMonth={month} 
-                    initialStaffId={staff.id}
-                    triggerBtn={
-                      <Button size="sm" variant="outline" className="h-8 text-xs font-bold bg-white text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300">
-                        <Plus size={12} className="mr-1" />明細作成
-                      </Button>
-                    }
-                  />
+                  <Button asChild size="sm" variant="outline" className="h-8 shrink-0 text-xs font-bold bg-white text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300">
+                    <Link href={`/payroll?month=${format(new Date(year, month - 1, 1), "yyyy-MM")}&createStaff=${encodeURIComponent(staff.id)}`}>
+                      <Plus size={12} className="mr-1" />明細作成
+                    </Link>
+                  </Button>
                 </div>
               ))}
             </div>

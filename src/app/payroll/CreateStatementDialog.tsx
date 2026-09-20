@@ -11,6 +11,7 @@ import { Plus, Calculator, Calendar, User, ShieldAlert, BadgeCheck, Clock } from
 import { createManualStatement, getStaffPayrollDefaultValues } from "./actions";
 import { toast } from "sonner";
 import { calculatePayrollTaxes } from "@/lib/tax-calculator";
+import { calculateStatementPayment } from "@/lib/payroll-core";
 import { useAuth } from "@/lib/auth-context";
 
 type StaffProfileSimple = {
@@ -24,7 +25,8 @@ export default function CreateStatementDialog({
   defaultMonth,
   initialStaffId,
   triggerBtn,
-  onSuccess 
+  onSuccess,
+  defaultOpen = false,
 }: { 
   staffList: StaffProfileSimple[];
   defaultYear: number;
@@ -32,8 +34,9 @@ export default function CreateStatementDialog({
   initialStaffId?: string;
   triggerBtn?: React.ReactNode;
   onSuccess?: () => void;
+  defaultOpen?: boolean;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const [isSaving, setIsSaving] = useState(false);
 
   // Form State
@@ -217,6 +220,13 @@ export default function CreateStatementDialog({
           setAttendanceAllowance((d.attendanceAllowance || 0).toString());
           setTechIncentive((d.techIncentive || 0).toString());
           setProductCommission((d.productCommission || 0).toString());
+          if (d.type === "reward") {
+            setRewardTechCommission(d.techIncentive || 0);
+            setRewardProductCommission(d.productCommission || 0);
+          } else {
+            setRewardTechCommission(0);
+            setRewardProductCommission(0);
+          }
           setTaxAddition(d.taxAddition.toString());
           
           setHealth(d.health.toString());
@@ -368,6 +378,29 @@ export default function CreateStatementDialog({
 
   const numTaxAdd = Number(taxAddition) || 0;
 
+  // Keep the displayed contractor breakdown aligned with recalculateReward.
+  // These values are presentation-only; the saved calculation continues to use
+  // rewardTechCommission / rewardProductCommission.
+  const rewardTechSalesAmount = Number(techSales) || 0;
+  const rewardProductSalesAmount = Number(productSales) || 0;
+  const rewardCashlessRatio = contractData?.deduction_cashless_ratio || 0;
+  const rewardTechTaxAmount = Math.floor(rewardTechSalesAmount * 0.1);
+  const rewardProductTaxAmount = Math.floor(rewardProductSalesAmount * 0.1);
+  const rewardTechCashlessFee = rewardCashlessRatio > 0
+    ? Math.floor((Number(techCashless) || 0) * (rewardCashlessRatio / 100))
+    : 0;
+  const rewardProductCashlessFee = rewardCashlessRatio > 0
+    ? Math.floor((Number(productCashless) || 0) * (rewardCashlessRatio / 100))
+    : 0;
+  const rewardTechCommissionBase = Math.max(
+    0,
+    rewardTechSalesAmount - rewardTechTaxAmount - rewardTechCashlessFee
+  );
+  const rewardProductCommissionBase = Math.max(
+    0,
+    rewardProductSalesAmount - rewardProductTaxAmount - rewardProductCashlessFee
+  );
+
   const numHealth = type === "salary" ? (Number(health) || 0) : 0;
   const numPension = type === "salary" ? (Number(pension) || 0) : 0;
   const numEmployment = type === "salary" ? (Number(employment) || 0) : 0;
@@ -376,7 +409,15 @@ export default function CreateStatementDialog({
   const numChildcare = type === "salary" ? (Number(childcare) || 0) : 0;
 
   const totalDeductions = numHealth + numPension + numEmployment + numIncomeTax + numResidentTax + numChildcare;
-  const finalPaidAmount = numBase + numTechInc + numProdComm + numAllowance + numTaxAdd - totalDeductions;
+  const finalPaidAmount = calculateStatementPayment({
+    type,
+    baseAmount: numBase,
+    techIncentive: numTechInc,
+    productCommission: numProdComm,
+    allowances: numAllowance,
+    taxAddition: numTaxAdd,
+    deductions: totalDeductions,
+  });
 
   const numAlreadyPaid = Number(alreadyPaidAmount) || 0;
   const numAdvanceDeduction = Number(advanceDeduction) || 0;
@@ -521,7 +562,9 @@ export default function CreateStatementDialog({
         setAdvanceDeduction("");
         
         if (typeof window !== "undefined") {
-          window.location.reload();
+          const nextUrl = new URL(window.location.href);
+          nextUrl.searchParams.delete("createStaff");
+          window.location.replace(`${nextUrl.pathname}${nextUrl.search}`);
         }
       } else {
         toast.error(`作成エラー: ${res.error}`);
@@ -759,22 +802,51 @@ export default function CreateStatementDialog({
                     <span>自動計算の歩合詳細:</span>
                     <span className="text-[10px] text-emerald-600 font-normal">※給与明細の印刷にはこの計算内訳は出力されません</span>
                   </div>
+                  <div className="rounded-lg border border-emerald-200 bg-white px-4 py-3 shadow-sm">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                      <div>
+                        <p className="text-[11px] font-bold text-emerald-700">
+                          技術歩合報酬額（{contractData.tech_sales_ratio || 0}%）
+                        </p>
+                        <p className="mt-1 text-[11px] font-medium text-slate-600">
+                          歩合対象額 ¥{rewardTechCommissionBase.toLocaleString()} × {contractData.tech_sales_ratio || 0}%
+                        </p>
+                      </div>
+                      <p className="text-2xl font-black tracking-tight text-emerald-700">
+                        ¥{rewardTechCommission.toLocaleString()}
+                      </p>
+                    </div>
+                    {rewardProductCommission > 0 && (
+                      <div className="mt-2 flex items-center justify-between border-t border-emerald-100 pt-2 text-[11px]">
+                        <span className="font-medium text-slate-600">
+                          商品歩合：対象額 ¥{rewardProductCommissionBase.toLocaleString()} × {contractData.product_sales_ratio || 0}%
+                        </span>
+                        <strong className="text-emerald-700">¥{rewardProductCommission.toLocaleString()}</strong>
+                      </div>
+                    )}
+                    <div className="mt-2 flex items-center justify-between border-t border-emerald-100 pt-2 text-xs font-bold">
+                      <span>歩合報酬ベース合計</span>
+                      <span className="text-base font-black text-emerald-800">
+                        ¥{(rewardTechCommission + rewardProductCommission).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
                   <div className="flex flex-col gap-1.5 text-[11px] leading-relaxed">
                     <div>
                       <span className="font-bold">【技術歩合】</span>
                       <span>
-                        税抜技術売上 ¥{Math.floor((Number(techSales) || 0) / 1.1).toLocaleString()} から
-                        {contractData.deduction_cashless_ratio > 0 ? ` キャッシュレス決済手数料相当額 ¥${(Math.floor((Number(techCashless) || 0) * (contractData.deduction_cashless_ratio / 100))).toLocaleString()} (${contractData.deduction_cashless_ratio}%) を引いた` : "消費税を引いた"}
-                        金額の {contractData.tech_sales_ratio || 0}% ➔ <strong className="text-emerald-700">¥{rewardTechCommission.toLocaleString()}</strong>
+                        売上 ¥{rewardTechSalesAmount.toLocaleString()} − 消費税相当額 ¥{rewardTechTaxAmount.toLocaleString()}
+                        {rewardTechCashlessFee > 0 ? ` − キャッシュレス決済手数料相当額 ¥${rewardTechCashlessFee.toLocaleString()} (${rewardCashlessRatio}%)` : ""}
+                        ＝ 歩合対象額 ¥{rewardTechCommissionBase.toLocaleString()}
                       </span>
                     </div>
                     {rewardProductCommission > 0 && (
                       <div>
                         <span className="font-bold">【商品歩合】</span>
                         <span>
-                          税抜商品売上 ¥{Math.floor((Number(productSales) || 0) / 1.1).toLocaleString()} から
-                          {contractData.deduction_cashless_ratio > 0 ? ` キャッシュレス決済手数料相当額 ¥${(Math.floor((Number(productCashless) || 0) * (contractData.deduction_cashless_ratio / 100))).toLocaleString()} (${contractData.deduction_cashless_ratio}%) を引いた` : "消費税を引いた"}
-                          金額の {contractData.product_sales_ratio || 0}% ➔ <strong className="text-emerald-700">¥{rewardProductCommission.toLocaleString()}</strong>
+                          売上 ¥{rewardProductSalesAmount.toLocaleString()} − 消費税相当額 ¥{rewardProductTaxAmount.toLocaleString()}
+                          {rewardProductCashlessFee > 0 ? ` − キャッシュレス決済手数料相当額 ¥${rewardProductCashlessFee.toLocaleString()} (${rewardCashlessRatio}%)` : ""}
+                          ＝ 歩合対象額 ¥{rewardProductCommissionBase.toLocaleString()}
                         </span>
                       </div>
                     )}
@@ -815,7 +887,7 @@ export default function CreateStatementDialog({
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 block">
                     {type === "reward" 
-                      ? "技術歩合報酬ベース (円)" 
+                      ? `歩合報酬ベース合計（技術 ${contractData?.tech_sales_ratio || 0}%${rewardProductCommission > 0 ? " + 商品歩合" : ""}）`
                       : (contractType === "monthly" || contractType === "tier_monthly") 
                         ? "基本給 (円)" 
                         : "基本給 (時給ベース) (円)"}
@@ -828,6 +900,13 @@ export default function CreateStatementDialog({
                     className="h-10 text-xs rounded-lg font-bold border-slate-200 focus:ring-rose-500"
                     required
                   />
+                  {type === "reward" && contractData && (
+                    <p className="text-[10px] font-semibold text-emerald-700">
+                      自動計算：技術歩合 ¥{rewardTechCommission.toLocaleString()}
+                      {rewardProductCommission > 0 ? ` ＋ 商品歩合 ¥${rewardProductCommission.toLocaleString()}` : ""}
+                      ＝ ¥{(rewardTechCommission + rewardProductCommission).toLocaleString()}
+                    </p>
+                  )}
                 </div>
 
                 {type === "salary" && (
