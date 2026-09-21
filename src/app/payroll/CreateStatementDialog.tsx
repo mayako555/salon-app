@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { calculatePayrollTaxes } from "@/lib/tax-calculator";
 import { calculateStatementPayment } from "@/lib/payroll-core";
 import { useAuth } from "@/lib/auth-context";
+import { useRouter } from "next/navigation";
 
 type StaffProfileSimple = {
   id: string;
@@ -36,6 +37,7 @@ export default function CreateStatementDialog({
   onSuccess?: () => void;
   defaultOpen?: boolean;
 }) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -147,9 +149,24 @@ export default function CreateStatementDialog({
   // Contract Warning Banner State
   const [contractWarning, setContractWarning] = useState<string | null>(null);
 
+  // This component remains mounted during client-side navigation within the
+  // payroll page. Keep the dialog state in sync when a staff-specific create
+  // URL is selected after the initial render.
+  useEffect(() => {
+    if (defaultOpen && initialStaffId) {
+      setStaffId(initialStaffId);
+      setIsOpen(true);
+    }
+  }, [defaultOpen, initialStaffId]);
+
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
     if (!open) {
+      if (initialStaffId && typeof window !== "undefined") {
+        const nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.delete("createStaff");
+        router.replace(`${nextUrl.pathname}${nextUrl.search}`, { scroll: false });
+      }
       setContractType("");
       setStaffId("");
       setBaseAmount("");
