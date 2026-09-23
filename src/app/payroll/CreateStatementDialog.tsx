@@ -14,6 +14,12 @@ import { calculatePayrollTaxes } from "@/lib/tax-calculator";
 import { calculateStatementPayment } from "@/lib/payroll-core";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
+import {
+  contractorCommissionTotal,
+  serializeContractorCommissionLines,
+  type ContractorCommissionLineDraft,
+} from "@/lib/contractor-commission";
+import ContractorCommissionLines from "./ContractorCommissionLines";
 
 type StaffProfileSimple = {
   id: string;
@@ -100,6 +106,8 @@ export default function CreateStatementDialog({
   const [productCashless, setProductCashless] = useState("");
   const [rewardTechCommission, setRewardTechCommission] = useState(0);
   const [rewardProductCommission, setRewardProductCommission] = useState(0);
+  const [useCommissionLines, setUseCommissionLines] = useState(false);
+  const [commissionLines, setCommissionLines] = useState<ContractorCommissionLineDraft[]>([]);
 
   const updateStoreSales = (storeName: string, field: string, value: string) => {
     const current = storeSales[storeName] || {
@@ -200,6 +208,8 @@ export default function CreateStatementDialog({
       setStoreSales({});
       setRewardTechCommission(0);
       setRewardProductCommission(0);
+      setUseCommissionLines(false);
+      setCommissionLines([]);
       setProductSalesItems([]);
     } else if (initialStaffId) {
       setStaffId(initialStaffId);
@@ -475,10 +485,20 @@ export default function CreateStatementDialog({
     const commProd = Math.max(0, prodSalesNum - prodTax - prodCashlessFee);
     const baseProd = Math.floor(commProd * (prodRatio / 100));
 
-    setRewardTechCommission(baseTech);
+    const effectiveTechCommission = useCommissionLines
+      ? contractorCommissionTotal(commissionLines)
+      : baseTech;
+    setRewardTechCommission(effectiveTechCommission);
     setRewardProductCommission(baseProd);
-    setBaseAmount((baseTech + baseProd).toString());
+    setBaseAmount((effectiveTechCommission + baseProd).toString());
   };
+
+  useEffect(() => {
+    if (type !== "reward" || !useCommissionLines) return;
+    const effectiveTechCommission = contractorCommissionTotal(commissionLines);
+    setRewardTechCommission(effectiveTechCommission);
+    setBaseAmount((effectiveTechCommission + rewardProductCommission).toString());
+  }, [type, useCommissionLines, commissionLines, rewardProductCommission]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -517,6 +537,13 @@ export default function CreateStatementDialog({
         details: {
           base_tech_salary: type === "reward" ? rewardTechCommission : numTechInc,
           base_product_salary: type === "reward" ? rewardProductCommission : numProdComm,
+          ...(type === "reward"
+            ? {
+                commission_calculation_lines: useCommissionLines
+                  ? serializeContractorCommissionLines(commissionLines)
+                  : [],
+              }
+            : {}),
           nomination_reward: numNomination,
           transport_fee: numTransport,
           review_allowance: numReview,
@@ -814,6 +841,18 @@ export default function CreateStatementDialog({
               </div>
 
               {type === "reward" && contractData && (
+                <ContractorCommissionLines
+                  enabled={useCommissionLines}
+                  onEnabledChange={setUseCommissionLines}
+                  lines={commissionLines}
+                  onChange={setCommissionLines}
+                  defaultRate={contractData.tech_sales_ratio || 0}
+                  menuSpecificRates={contractData.menu_specific_rates || []}
+                  initialCalculationBase={rewardTechCommissionBase}
+                />
+              )}
+
+              {type === "reward" && contractData && (
                 <div className="bg-emerald-50 text-emerald-800 p-3 rounded-lg flex flex-col shadow-sm border border-emerald-100 mt-2 gap-2">
                   <div className="font-bold border-b border-emerald-100 pb-1 flex justify-between items-center text-xs">
                     <span>自動計算の歩合詳細:</span>
@@ -823,10 +862,14 @@ export default function CreateStatementDialog({
                     <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                       <div>
                         <p className="text-[11px] font-bold text-emerald-700">
-                          技術歩合報酬額（{contractData.tech_sales_ratio || 0}%）
+                          {useCommissionLines
+                            ? "技術歩合報酬額（計算方法別）"
+                            : `技術歩合報酬額（${contractData.tech_sales_ratio || 0}%）`}
                         </p>
                         <p className="mt-1 text-[11px] font-medium text-slate-600">
-                          歩合対象額 ¥{rewardTechCommissionBase.toLocaleString()} × {contractData.tech_sales_ratio || 0}%
+                          {useCommissionLines
+                            ? "下の計算行で選択した歩合額の合計"
+                            : `歩合対象額 ¥${rewardTechCommissionBase.toLocaleString()} × ${contractData.tech_sales_ratio || 0}%`}
                         </p>
                       </div>
                       <p className="text-2xl font-black tracking-tight text-emerald-700">
@@ -848,7 +891,7 @@ export default function CreateStatementDialog({
                       </span>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-1.5 text-[11px] leading-relaxed">
+                  {!useCommissionLines && <div className="flex flex-col gap-1.5 text-[11px] leading-relaxed">
                     <div>
                       <span className="font-bold">【技術歩合】</span>
                       <span>
@@ -867,12 +910,14 @@ export default function CreateStatementDialog({
                         </span>
                       </div>
                     )}
-                  </div>
+                  </div>}
                 </div>
               )}
 
               <p className="text-[10px] text-slate-400 font-semibold italic mt-2">
-                ※ 各店舗の売上を入力すると、自動的に合算され、契約情報（技術歩合 {contractData.tech_sales_ratio}% / 商品歩合 {contractData.product_sales_ratio}% / 手数料 {contractData.deduction_cashless_ratio}%）に基づき「歩合報酬ベース」が自動計算されます。
+                {useCommissionLines
+                  ? "※ 計算方法ごとの対象売上は重複しないように入力してください。選択した計算行の合計が歩合報酬ベースになります。"
+                  : `※ 各店舗の売上を入力すると、自動的に合算され、契約情報（技術歩合 ${contractData.tech_sales_ratio}% / 商品歩合 ${contractData.product_sales_ratio}% / 手数料 ${contractData.deduction_cashless_ratio}%）に基づき「歩合報酬ベース」が自動計算されます。`}
               </p>
             </div>
           )}

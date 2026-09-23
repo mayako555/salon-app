@@ -106,6 +106,7 @@ export type MonthlyStatement = {
     executive_allowance?: number;
     business_allowance?: number;
     attendance_allowance?: number;
+    commission_calculation_lines?: import("@/lib/contractor-commission").ContractorCommissionLine[];
     social_insurance?: {
       employment: number;
       health: number;

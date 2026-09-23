@@ -26,9 +26,19 @@ import { toast } from "sonner";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { calculatePayrollTaxes } from "@/lib/tax-calculator";
+import ContractorCommissionLines from "./ContractorCommissionLines";
+import {
+  contractorCommissionTotal,
+  hydrateContractorCommissionLines,
+  serializeContractorCommissionLines,
+  type ContractorCommissionLineDraft,
+} from "@/lib/contractor-commission";
 
 export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }) {
   const router = useRouter();
+  const initialCommissionLines = hydrateContractorCommissionLines(
+    stmt.details.commission_calculation_lines
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -36,6 +46,8 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
   const [hourlyBasePay, setHourlyBasePay] = useState("0");
 
   const [techSalary, setTechSalary] = useState(stmt.details.base_tech_salary?.toString() || "0");
+  const [useCommissionLines, setUseCommissionLines] = useState(initialCommissionLines.length > 0);
+  const [commissionLines, setCommissionLines] = useState<ContractorCommissionLineDraft[]>(initialCommissionLines);
   const [productSalary, setProductSalary] = useState((stmt.details.base_product_salary || 0).toString());
   const [transportAllowance, setTransportAllowance] = useState((stmt.details.transport_fee || 0).toString());
   const [nominationAllowance, setNominationAllowance] = useState((stmt.details.nomination_reward || 0).toString());
@@ -137,6 +149,11 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
 
     }
   }, [isOpen, stmt.staff_id, stmt.staff_name, stmt.target_month]);
+
+  useEffect(() => {
+    if (stmt.type !== "reward" || !useCommissionLines) return;
+    setTechSalary(String(contractorCommissionTotal(commissionLines)));
+  }, [stmt.type, useCommissionLines, commissionLines]);
 
   // Manual tax calculation trigger
   const handleRecalculateTaxes = () => {
@@ -244,6 +261,13 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
         details: {
           ...stmt.details,
           base_tech_salary: numTech,
+          ...(stmt.type === "reward"
+            ? {
+                commission_calculation_lines: useCommissionLines
+                  ? serializeContractorCommissionLines(commissionLines)
+                  : [],
+              }
+            : {}),
           base_product_salary: numProduct,
           nomination_reward: numNomination,
           transport_fee: numTransport,
@@ -546,6 +570,21 @@ export default function EditStatementDialog({ stmt }: { stmt: MonthlyStatement }
                       </div>
                     )}
                   </div>
+                )}
+                {stmt.type === "reward" && contractData && (
+                  <ContractorCommissionLines
+                    enabled={useCommissionLines}
+                    onEnabledChange={setUseCommissionLines}
+                    lines={commissionLines}
+                    onChange={setCommissionLines}
+                    defaultRate={contractData.tech_sales_ratio || 0}
+                    menuSpecificRates={contractData.menu_specific_rates || []}
+                    initialCalculationBase={
+                      (contractData.tech_sales_ratio || 0) > 0
+                        ? Math.floor((Number(techSalary) || 0) * 100 / contractData.tech_sales_ratio)
+                        : 0
+                    }
+                  />
                 )}
                 {stmt.type === "reward" && (() => {
                   const defaultRatio = contractData?.tech_sales_ratio || 0;
