@@ -35,10 +35,11 @@ import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
-import AdvancedCharts from "./AdvancedCharts";
 import SNSTaskSection from "@/app/tasks/SNSTaskSection";
 import { getEvaluationReminders } from "@/app/evaluations/actions";
 import FundsCard from "@/components/dashboard/FundsCard";
+import ExecutiveSummary from "@/components/dashboard/ExecutiveSummary";
+import DashboardSecondaryLinks from "@/components/dashboard/DashboardSecondaryLinks";
 
 export default function DashboardPage() {
   const { profile, isAdmin, isManager, hasFeature } = useAuth();
@@ -159,66 +160,17 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Funds Dashboard Card (Visible only to company/system owners) */}
-        {hasFeature("cash_management") && (
-          <div className="grid grid-cols-1 mb-8">
-            <FundsCard />
-          </div>
+        {/* ADMIN/MANAGER TOP SUMMARY */}
+        {(isAdmin || isManager) && (
+          <>
+            <ExecutiveSummary
+              monthlyTotal={stats?.monthlyTotal || 0}
+              regularVisits={stats?.monthlyRegularVisits || 0}
+              minimoVisits={stats?.monthlyMinimoVisits || 0}
+              storeStats={stats?.storeStats || []}
+            />
+          </>
         )}
-
-        {/* Staff Quick Links (Visible to all roles) */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {hasFeature("payroll") && (
-            <Link href="/staff-portal/payroll">
-              <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-rose-200 transition-all cursor-pointer text-center py-4 flex flex-col items-center gap-2 group">
-                <div className="p-3 bg-rose-50 text-rose-500 rounded-xl group-hover:scale-110 transition-transform">
-                  <Calculator size={24} />
-                </div>
-                <span className="text-xs font-bold text-slate-700">給与明細確認</span>
-              </Card>
-            </Link>
-          )}
-          {hasFeature("shifts") && (
-            <Link href="/staff-portal/holidays">
-              <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all cursor-pointer text-center py-4 flex flex-col items-center gap-2 group">
-                <div className="p-3 bg-blue-50 text-blue-500 rounded-xl group-hover:scale-110 transition-transform">
-                  <Calendar size={24} />
-                </div>
-                <span className="text-xs font-bold text-slate-700">希望休申請</span>
-              </Card>
-            </Link>
-          )}
-          {hasFeature("payroll") && (
-            <Link href="/staff-portal/transport">
-              <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all cursor-pointer text-center py-4 flex flex-col items-center gap-2 group">
-                <div className="p-3 bg-emerald-50 text-emerald-500 rounded-xl group-hover:scale-110 transition-transform">
-                  <Clock size={24} />
-                </div>
-                <span className="text-xs font-bold text-slate-700">交通費申請</span>
-              </Card>
-            </Link>
-          )}
-          {hasFeature("expenses") && (
-            <Link href="/staff-portal/expenses">
-              <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-amber-200 transition-all cursor-pointer text-center py-4 flex flex-col items-center gap-2 group">
-                <div className="p-3 bg-amber-50 text-amber-500 rounded-xl group-hover:scale-110 transition-transform">
-                  <FileText size={24} />
-                </div>
-                <span className="text-xs font-bold text-slate-700">経費精算</span>
-              </Card>
-            </Link>
-          )}
-          {hasFeature("training") && (
-            <Link href="/manuals">
-              <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-purple-200 transition-all cursor-pointer text-center py-4 flex flex-col items-center gap-2 group">
-                <div className="p-3 bg-purple-50 text-purple-500 rounded-xl group-hover:scale-110 transition-transform">
-                  <BookOpen size={24} />
-                </div>
-                <span className="text-xs font-bold text-slate-700">マニュアル</span>
-              </Card>
-            </Link>
-          )}
-        </div>
 
         {/* STAFF VIEW */}
         {!isAdmin && !isManager && (
@@ -376,64 +328,15 @@ export default function DashboardPage() {
                 <SNSTaskSection />
               </div>
             )}
+
+            {/* Funds Dashboard Card (Moved to Funds & Profits section) */}
+            {hasFeature("cash_management") && (
+              <div className="grid grid-cols-1 mb-8 mt-8">
+                <FundsCard />
+              </div>
+            )}
+
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 whitespace-nowrap">
-              <Card className="bg-white border-none shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-slate-600">登録スタッフ数</CardTitle>
-                  <Users className="h-4 w-4 text-emerald-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-slate-900">{stats?.staffCount ?? '...'} 人</div>
-                  <p className="text-xs text-slate-500 mt-1">稼働中の全スタッフ</p>
-                </CardContent>
-              </Card>
-              
-              {hasFeature("attendance") && (
-                <Card className="bg-white border-none shadow-sm hover:shadow-md transition-shadow">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-slate-600">未処理の勤怠</CardTitle>
-                    <FileText className="h-4 w-4 text-rose-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-slate-900">{stats?.unprocessedAttendanceCount ?? '...'} 件</div>
-                    <p className="text-xs text-slate-500 mt-1">打刻漏れ等の確認が必要</p>
-                  </CardContent>
-                </Card>
-              )}
-
-              {hasFeature("sales") && (
-                <Card className="bg-white border-none shadow-sm hover:shadow-md transition-shadow">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-slate-600">今月の売上</CardTitle>
-                    <Database className="h-4 w-4 text-blue-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-slate-900">¥{(stats?.monthlyTotal ?? 0).toLocaleString()}</div>
-                    <div className="flex flex-col gap-1.5 mt-2">
-                      <div className="flex justify-between text-[10px] font-bold">
-                        <span className="text-emerald-600">通常:</span>
-                        <span className="text-slate-700 text-right">¥{(stats?.monthlyRegularTotal ?? 0).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between text-[10px] font-bold">
-                        <span className="text-indigo-600">ミニモ:</span>
-                        <span className="text-slate-700 text-right">¥{(stats?.monthlyMinimoTotal ?? 0).toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              <Card className="bg-white border-none shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-slate-600">システム状態</CardTitle>
-                  <ShieldCheck className="h-4 w-4 text-indigo-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-slate-900">正常</div>
-                  <p className="text-xs text-slate-500 mt-1">セキュリティ保護済み</p>
-                </CardContent>
-              </Card>
-
               {hasFeature("evaluations") && evalReminders.length > 0 && (
                 <Card className="col-span-full bg-white border-none shadow-xl ring-2 ring-purple-500/20 overflow-hidden relative group">
                   <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform pointer-events-none">
@@ -506,8 +409,6 @@ export default function DashboardPage() {
               </Link>
             </div>
 
-            <AdvancedCharts />
-
             <div className="grid gap-6 md:grid-cols-2">
               <Card className="col-span-1 bg-white border-none shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -571,8 +472,9 @@ export default function DashboardPage() {
             </div>
           </>
         )}
+
+        <DashboardSecondaryLinks />
       </div>
     </AuthGuard>
   );
 }
-
