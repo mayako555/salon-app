@@ -1,9 +1,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminAuth, adminDb } from "./firebase-admin";
-import { requireFeature } from "./feature-utils";
-import { FeatureKey } from "@/types/master";
 import type { UserContext, UserRole } from "./authorization";
+import { normalizeTenantStatus, type TenantStatus } from "./tenant-access";
 
 export type { UserContext, UserRole } from "./authorization";
 export { verifyPermission } from "./authorization";
@@ -78,16 +77,23 @@ export async function getCurrentUserContext(): Promise<UserContext> {
     
     let schoolEnabled = false;
     let schoolName = "";
+    let companyStatus: TenantStatus = "active";
     if (companyId) {
       try {
         const companySnap = await adminDb.collection("companies").doc(companyId).get();
         if (companySnap.exists) {
-          schoolEnabled = !!companySnap.data()?.schoolEnabled;
-          schoolName = companySnap.data()?.schoolName || "";
+          const companyData = companySnap.data();
+          schoolEnabled = !!companyData?.schoolEnabled;
+          schoolName = companyData?.schoolName || "";
+          companyStatus = normalizeTenantStatus(companyData?.status);
         }
       } catch (e) {
         console.error("Failed to fetch company info in auth-server:", e);
       }
+    }
+
+    if (role !== "systemOwner" && companyStatus === "inactive") {
+      throw new Error("このテナントの契約は現在停止中です");
     }
 
     return {

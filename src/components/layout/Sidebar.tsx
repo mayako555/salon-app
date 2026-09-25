@@ -83,7 +83,7 @@ export function Sidebar() {
         { name: "高度分析", href: "/analytics", icon: Sparkles, role: "admin" }, // All admins can see the page, but tabs are restricted inside
         { name: "経費・収支管理", href: "/admin/expenses", icon: Wallet, role: "admin", feature: "expenses" },
         { name: "給与・報酬計算", href: "/payroll", icon: Calculator, role: "admin", feature: "payroll" },
-        { name: "手当管理", href: "/allowances", icon: Gift, role: "admin" },
+        { name: "手当管理", href: "/allowances", icon: Gift, role: "admin", feature: "payroll" },
       ]
     },
     {
@@ -228,13 +228,15 @@ export function Sidebar() {
               if (tenantPlan === "Solo" && category.title === "マニュアル・規程") {
                 return null;
               }
+              const visibleItems = category.items.filter(item => !(item as any).feature || hasFeature((item as any).feature));
+              if (visibleItems.length === 0) return null;
               return (
               <div key={category.title} className="space-y-1">
                 <h3 className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                   {category.title}
                 </h3>
                 <div className="space-y-1">
-                  {category.items.map((item) => (
+                  {visibleItems.map((item) => (
                     <NavItem 
                       key={item.name} 
                       item={item} 
