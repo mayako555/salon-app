@@ -13,7 +13,8 @@ import { Save, Settings, MessageCircle, HelpCircle, Clock, LayoutDashboard } fro
 import { useAuth } from "@/lib/auth-context";
 
 export default function SystemSettingsPage() {
-  const { profile, isAdmin, availableStores, isSystemOwnerCompany } = useAuth();
+  const { profile, isAdmin, availableStores, isSystemOwnerCompany, hasFeature } = useAuth();
+  const lineAutomationEnabled = hasFeature("line_automation");
   const [settings, setSettings] = useState<ReservationSettings | null>(null);
   const [lineSettings, setLineSettings] = useState<LineSettingsMap>({});
   const [lineAutomationSettings, setLineAutomationSettings] = useState<LineAutomationSettings | null>(null);
@@ -30,10 +31,10 @@ export default function SystemSettingsPage() {
       try {
         const [data, lineData, compData, kioskData, lineAutomationData] = await Promise.all([
           getReservationSettings(),
-          getLineSettings(),
+          lineAutomationEnabled ? getLineSettings() : Promise.resolve({}),
           getCompanySettings(companyId),
           getKioskSettings(companyId),
-          getLineAutomationSettings(companyId)
+          lineAutomationEnabled ? getLineAutomationSettings(companyId) : Promise.resolve(null)
         ]);
         setSettings(data);
         setLineSettings(lineData);
@@ -49,7 +50,7 @@ export default function SystemSettingsPage() {
       }
     }
     load();
-  }, [profile?.companyId]);
+  }, [profile?.companyId, lineAutomationEnabled]);
 
   if (!isAdmin) {
     return <div className="p-12 text-center text-slate-400 font-bold">アクセス権限がありません</div>;
@@ -105,9 +106,9 @@ export default function SystemSettingsPage() {
     const res = await saveReservationSettings(settings);
     
     // Save Line Settings
-    const linePromises = Object.entries(lineSettings).map(([store, token]) => {
-      return saveLineSettings(store, token);
-    });
+    const linePromises = lineAutomationEnabled
+      ? Object.entries(lineSettings).map(([store, token]) => saveLineSettings(store, token))
+      : [];
     
     // Save Kiosk Settings
     const kioskPromises = Object.entries(kioskSettings).map(([store, data]) => {
@@ -123,7 +124,7 @@ export default function SystemSettingsPage() {
     }
 
     // Save Line Automation Settings
-    if (lineAutomationSettings) {
+    if (lineAutomationEnabled && lineAutomationSettings) {
       const lineAuthRes = await saveLineAutomationSettings(lineAutomationSettings);
       if (!lineAuthRes.success) {
         toast.error(`自動配信設定の保存に失敗: ${lineAuthRes.error}`);
@@ -219,7 +220,7 @@ export default function SystemSettingsPage() {
         </Card>
       )}
 
-      {lineAutomationSettings && (
+      {lineAutomationEnabled && lineAutomationSettings && (
         <LineAutomationSettingsPanel 
           settings={lineAutomationSettings} 
           onChange={setLineAutomationSettings} 
@@ -291,6 +292,7 @@ export default function SystemSettingsPage() {
           </Card>
         ); })}
 
+        {lineAutomationEnabled && <>
         <div className="pt-8 pb-4">
           <h2 className="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2">
             <MessageCircle className="text-green-600" /> LINE公式アカウント連携
@@ -342,6 +344,7 @@ export default function SystemSettingsPage() {
             </CardContent>
           </Card>
         ))}
+        </>}
 
         <div className="pt-8 pb-4">
           <h2 className="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2">

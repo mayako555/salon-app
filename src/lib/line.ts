@@ -2,62 +2,8 @@
 
 import { adminDb } from "./firebase-admin";
 import { getCurrentUserContext } from "./auth-server";
-import { getLineConfig } from "./lineConfig";
-
-const FALLBACK_LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-
-/**
- * 送信メッセージを生成する
- */
-export async function sendLineMessage(lineUserId: string, message: string, storeName?: string, companyId?: string) {
-  let token: string | undefined;
-  
-  if (storeName && companyId) {
-    const config = await getLineConfig(storeName, companyId);
-    if (config && config.channelAccessToken) {
-      token = config.channelAccessToken;
-    }
-  }
-
-  // The global token is retained only for legacy single-tenant calls. A tenant-aware
-  // call must never silently send from another company's LINE account.
-  if (!companyId) token = FALLBACK_LINE_CHANNEL_ACCESS_TOKEN;
-
-  if (!token) {
-    console.warn("LINE_CHANNEL_ACCESS_TOKEN is not set for store: ", storeName, ". Skipping LINE message.");
-    console.log(`[MOCK LINE TO ${lineUserId}]: ${message}`);
-    return { success: false, error: "LINE設定が未完了です" };
-  }
-
-  try {
-    const response = await fetch("https://api.line.me/v2/bot/message/push", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        to: lineUserId,
-        messages: [
-          {
-            type: "text",
-            text: message,
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(JSON.stringify(errorData));
-    }
-
-    return { success: true };
-  } catch (error: any) {
-    console.error("Error sending LINE message:", error);
-    return { success: false, error: error.message };
-  }
-}
+import { requireFeature } from "./feature-utils";
+import { sendLineMessage } from "./line-delivery";
 
 /**
  * データベースへ送信履歴を記録しつつLINEメッセージを送信する
@@ -79,9 +25,13 @@ export async function sendAndLogLineMessage({
   storeName?: string;
   companyId?: string;
 }) {
-  const ctx = companyId ? null : await getCurrentUserContext();
-  const effectiveCompanyId = companyId || ctx?.companyId;
+  const ctx = await getCurrentUserContext();
+  const effectiveCompanyId = ctx.companyId;
   if (!effectiveCompanyId) return { success: false, error: "会社IDが取得できません" };
+  if (companyId && companyId !== effectiveCompanyId) {
+    return { success: false, error: "他社のLINE設定は使用できません" };
+  }
+  await requireFeature(effectiveCompanyId, "line_automation");
   const sendResult = await sendLineMessage(lineUserId, messageBody, storeName, effectiveCompanyId);
   
   try {
@@ -135,14 +85,23 @@ ${storeName}店
  * 次回予約確定メッセージを送信する（レガシー互換用・ログ保存なし）
  */
 export async function sendBookingConfirmation(customerName: string, lineUserId: string, date: string, time: string, storeName: string = "メイン店舗", companyId?: string) {
+  const ctx = await getCurrentUserContext();
+  if (!ctx.companyId) return { success: false, error: "会社IDが取得できません" };
+  if (companyId && companyId !== ctx.companyId) {
+    return { success: false, error: "他社のLINE設定は使用できません" };
+  }
+  await requireFeature(ctx.companyId, "line_automation");
   const message = await generateBookingConfirmationText(date, time, storeName);
-  return await sendLineMessage(lineUserId, message, storeName, companyId);
+  return await sendLineMessage(lineUserId, message, storeName, ctx.companyId);
 }
 
 /**
  * リマインダーメッセージを送信する
  */
 export async function sendBookingReminder(customerName: string, lineUserId: string, date: string, time: string, storeName: string = "メイン店舗") {
+  const ctx = await getCurrentUserContext();
+  if (!ctx.companyId) return { success: false, error: "会社IDが取得できません" };
+  await requireFeature(ctx.companyId, "line_automation");
   const dateObj = new Date(date);
   const dayOfWeek = ["日", "月", "火", "水", "木", "金", "土"][dateObj.getDay()];
   const formattedDate = `${dateObj.getMonth() + 1}／${dateObj.getDate()}（${dayOfWeek}）`;
@@ -159,5 +118,5 @@ ${formattedDate} ${time}〜
 日時のご確認をお願いいたします。
 当日お気をつけてお越しくださいませ🤍`;
 
-  return await sendLineMessage(lineUserId, message, storeName);
+  return await sendLineMessage(lineUserId, message, storeName, ctx.companyId);
 }

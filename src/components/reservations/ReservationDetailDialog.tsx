@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/lib/auth-context";
 
 type Props = {
   reservation: Reservation;
@@ -29,6 +30,8 @@ type Props = {
 };
 
 export default function ReservationDetailDialog({ reservation, isOpen, onClose, onEdit, onRefresh, onNextBooking, onOptimisticUpdate }: Props) {
+  const { hasFeature } = useAuth();
+  const lineAutomationEnabled = hasFeature("line_automation");
   const [staffs, setStaffs] = useState<StaffProfile[]>([]);
   const [updatingStaff, setUpdatingStaff] = useState(false);
   
@@ -123,7 +126,7 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
         });
 
         // Send LINE if requested
-        if (sendLine && showLinePreview && accountingId) {
+        if (lineAutomationEnabled && sendLine && showLinePreview && accountingId) {
           const { sendAndLogLineMessage } = await import("@/lib/line");
           // NOTE: we need customer's line_user_id. For now, fetch it via the server action or pass it if available.
           const { getCustomerById } = await import("@/lib/customers");
@@ -157,7 +160,7 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
   };
 
   const handleCheckoutClick = async () => {
-    if (hasNextBooking && nextBookingDate && nextBookingTime && sendLine && reservation.customer_id) {
+    if (lineAutomationEnabled && hasNextBooking && nextBookingDate && nextBookingTime && sendLine && reservation.customer_id) {
       // Need to preview LINE first
       const { getCustomerById } = await import("@/lib/customers");
       const customer = await getCustomerById(reservation.customer_id);
@@ -548,6 +551,7 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
                     </div>
                   </div>
                   
+                  {lineAutomationEnabled && (
                   <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
                     <div className="flex items-center gap-2">
                       <Checkbox 
@@ -570,6 +574,7 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
                       </Label>
                     </div>
                   </div>
+                  )}
                 </div>
               )}
             </div>
@@ -609,7 +614,7 @@ export default function ReservationDetailDialog({ reservation, isOpen, onClose, 
       </DialogContent>
 
       {/* LINE Preview Modal */}
-      {showLinePreview && (
+      {lineAutomationEnabled && showLinePreview && (
         <Dialog open={showLinePreview} onOpenChange={(open) => !open && setShowLinePreview(false)}>
           <DialogContent className="sm:max-w-[400px] bg-slate-50 p-0 overflow-hidden">
             <DialogHeader className="bg-emerald-600 px-4 py-3">

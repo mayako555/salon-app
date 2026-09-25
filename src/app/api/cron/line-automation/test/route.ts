@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUserContext } from "@/lib/auth-server";
-import { sendLineMessage } from "@/lib/line";
+import { sendLineMessage } from "@/lib/line-delivery";
+import { requireFeature } from "@/lib/feature-utils";
 
 export async function POST(request: Request) {
   try {
@@ -8,6 +9,7 @@ export async function POST(request: Request) {
     if (!ctx.companyId || !["systemOwner", "companyOwner", "admin"].includes(ctx.role)) {
       return NextResponse.json({ success: false, error: "権限がありません" }, { status: 403 });
     }
+    await requireFeature(ctx.companyId, "line_automation");
 
     const { lineUserId, message, storeName } = await request.json();
     if (typeof lineUserId !== "string" || !/^U[0-9a-f]{32}$/i.test(lineUserId)) {

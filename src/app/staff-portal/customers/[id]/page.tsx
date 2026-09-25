@@ -77,7 +77,8 @@ export default function CustomerDetailPage() {
   const [entryUrl, setEntryUrl] = useState(""); // New: Entry URL
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
 
-  const { availableStores, availableStoreObjects } = useAuth();
+  const { availableStores, availableStoreObjects, hasFeature } = useAuth();
+  const lineAutomationEnabled = hasFeature("line_automation");
 
   const LINE_OA_IDS = availableStoreObjects.reduce((acc, store) => {
     acc[store.name] = store.lineOaId || process.env.NEXT_PUBLIC_LINE_OA_ID || "@dummy_line_id";
@@ -373,7 +374,7 @@ export default function CustomerDetailPage() {
                 </div>
               </div>
               <div className="pt-2">
-                    {customer.line_user_id ? (
+                    {lineAutomationEnabled && customer.line_user_id ? (
                       <div className="flex items-center gap-2">
                         <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
                           <CheckCircle2 size={10} />
@@ -399,7 +400,7 @@ export default function CustomerDetailPage() {
                       <Smartphone size={14} /> お客様入力用QR (カルテ)
                     </Button>
 
-                    {!customer.line_user_id && (
+                    {lineAutomationEnabled && !customer.line_user_id && (
                       <Button 
                         variant="outline" 
                         size="sm" 
@@ -985,6 +986,7 @@ export default function CustomerDetailPage() {
       </Dialog>
 
       {/* LINE Link QR Dialog */}
+      {lineAutomationEnabled && (
       <Dialog open={isLinkQrOpen} onOpenChange={(open) => { setIsLinkQrOpen(open); if (!open) setSelectedStore(null); }}>
         <DialogContent className="sm:max-w-sm rounded-[2rem] text-center">
           <DialogHeader>
@@ -1056,6 +1058,7 @@ export default function CustomerDetailPage() {
           </Button>
         </DialogContent>
       </Dialog>
+      )}
 
       {/* Counseling Entry QR Dialog */}
       <Dialog open={isEntryQrOpen} onOpenChange={setIsEntryQrOpen}>
