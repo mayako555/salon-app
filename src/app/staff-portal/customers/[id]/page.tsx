@@ -52,6 +52,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QRCodeSVG } from "qrcode.react";
+import {
+  getPublicLineStoreSettings,
+  type PublicLineStoreSettings,
+} from "@/app/staff-portal/customers/line-public-actions";
 
 export default function CustomerDetailPage() {
   const { id } = useParams();
@@ -76,19 +80,10 @@ export default function CustomerDetailPage() {
   const [linkUrl, setLinkUrl] = useState("");
   const [entryUrl, setEntryUrl] = useState(""); // New: Entry URL
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
+  const [linePublicSettings, setLinePublicSettings] = useState<Record<string, PublicLineStoreSettings>>({});
 
-  const { availableStores, availableStoreObjects, hasFeature } = useAuth();
+  const { availableStores, hasFeature } = useAuth();
   const lineAutomationEnabled = hasFeature("line_automation");
-
-  const LINE_OA_IDS = availableStoreObjects.reduce((acc, store) => {
-    acc[store.name] = store.lineOaId || process.env.NEXT_PUBLIC_LINE_OA_ID || "@dummy_line_id";
-    return acc;
-  }, {} as Record<string, string>);
-
-  const LIFF_IDS = availableStoreObjects.reduce((acc, store) => {
-    acc[store.name] = store.liffId || process.env.NEXT_PUBLIC_LIFF_ID || "2009912937-1KgShdZB";
-    return acc;
-  }, {} as Record<string, string>);
 
   useEffect(() => {
     async function load() {
@@ -107,6 +102,27 @@ export default function CustomerDetailPage() {
     }
     load();
   }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!lineAutomationEnabled) {
+      setLinePublicSettings({});
+      return;
+    }
+
+    getPublicLineStoreSettings()
+      .then((settings) => {
+        if (!cancelled) setLinePublicSettings(settings);
+      })
+      .catch(() => {
+        if (!cancelled) setLinePublicSettings({});
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [lineAutomationEnabled]);
 
   const handleEditClick = () => {
     if (!customer) return;
@@ -200,13 +216,17 @@ export default function CustomerDetailPage() {
   };
 
   useEffect(() => {
-    if (isLinkQrOpen && selectedStore) {
-      const storeLiffId = LIFF_IDS[selectedStore];
-      setLinkUrl(`https://liff.line.me/${storeLiffId}/link-line/${id}?store=${encodeURIComponent(selectedStore)}`);
+    const settings = selectedStore ? linePublicSettings[selectedStore] : undefined;
+    if (isLinkQrOpen && selectedStore && settings) {
+      const query = new URLSearchParams({
+        store: selectedStore,
+        liffId: settings.liffId,
+      });
+      setLinkUrl(`https://liff.line.me/${encodeURIComponent(settings.liffId)}/link-line/${id}?${query.toString()}`);
     } else {
       setLinkUrl("");
     }
-  }, [isLinkQrOpen, selectedStore, id, LIFF_IDS]);
+  }, [isLinkQrOpen, selectedStore, id, linePublicSettings]);
 
   const handleShowEntryQr = () => {
     // Use the current direct URL instead of LIFF to ensure it always opens the entry form
@@ -996,8 +1016,13 @@ export default function CustomerDetailPage() {
             {/* Step 1: Store selection */}
             <div className="w-full">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">STEP 1 — 店舗を選択して友だち追加</p>
+              {Object.keys(linePublicSettings).length === 0 ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-xs font-bold leading-relaxed text-amber-800">
+                  LINE設定済みの店舗がありません。管理画面の「システム設定」→「LINE公式連携」で店舗設定を完了してください。
+                </div>
+              ) : (
               <div className="grid grid-cols-3 gap-2">
-                {Object.keys(LINE_OA_IDS).map(store => (
+                {Object.keys(linePublicSettings).map(store => (
                   <button
                     key={store}
                     onClick={() => setSelectedStore(store)}
@@ -1011,21 +1036,22 @@ export default function CustomerDetailPage() {
                   </button>
                 ))}
               </div>
+              )}
             </div>
 
-            {selectedStore && (
+            {selectedStore && linePublicSettings[selectedStore] && (
               <div className="w-full flex flex-col items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedStore}店 公式LINE 友だち追加QR</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedStore} 公式LINE 友だち追加QR</p>
                 <div className="p-3 bg-[#06C755]/5 rounded-2xl border-2 border-[#06C755]/20">
                   <QRCodeSVG 
-                    value={`https://line.me/R/ti/p/${LINE_OA_IDS[selectedStore]}`}
+                    value={`https://line.me/R/ti/p/${linePublicSettings[selectedStore].lineOaId}`}
                     size={140}
                     level="H"
                     includeMargin={false}
                     fgColor="#06C755"
                   />
                 </div>
-                <p className="text-[9px] text-slate-400 font-bold">{LINE_OA_IDS[selectedStore]}</p>
+                <p className="text-[9px] text-slate-400 font-bold">{linePublicSettings[selectedStore].lineOaId}</p>
               </div>
             )}
 
@@ -1039,18 +1065,26 @@ export default function CustomerDetailPage() {
             {/* Step 2: LIFF linking */}
             <div className="w-full flex flex-col items-center gap-2">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">STEP 2 — このQRでLINE IDを登録</p>
-              <div className="p-3 bg-white rounded-2xl border border-slate-100 shadow-sm">
+              {linkUrl ? (
+              <>
+                <div className="p-3 bg-white rounded-2xl border border-slate-100 shadow-sm">
                 <QRCodeSVG 
                   value={linkUrl} 
                   size={140}
                   level="H"
                   includeMargin={false}
                 />
-              </div>
-              <p className="text-[9px] text-slate-400 leading-relaxed font-bold text-center">
-                スキャンするとLINEログイン画面が開きます。<br/>
-                連携完了後、LINEでのお知らせが自動化されます。
-              </p>
+                </div>
+                <p className="text-[9px] text-slate-400 leading-relaxed font-bold text-center">
+                  スキャンするとLINEログイン画面が開きます。<br/>
+                  連携完了後、LINEでのお知らせが自動化されます。
+                </p>
+              </>
+              ) : (
+                <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs font-bold text-slate-500">
+                  設定済みの店舗を選択すると連携QRが表示されます。
+                </p>
+              )}
             </div>
           </div>
           <Button variant="outline" onClick={() => { setIsLinkQrOpen(false); setSelectedStore(null); }} className="rounded-xl w-full">
