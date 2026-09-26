@@ -36,7 +36,7 @@ export default function AIChatWidget() {
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       setMessages([
-        { role: "ai", content: "こんにちは！サポートAIです。\n操作方法や設定について、分からないことを入力してください。" }
+        { role: "ai", content: "こんにちは！SALON AGENTです。\n操作方法や設定、加盟店のLINE連携手順について質問できます。" }
       ]);
     }
   }, [isOpen]);
@@ -85,7 +85,7 @@ export default function AIChatWidget() {
           <CardHeader className="bg-gradient-to-r from-indigo-600 to-indigo-700 p-4 py-3 flex flex-row items-center justify-between text-white shrink-0">
             <div className="flex items-center gap-2">
               <Bot size={22} className="text-indigo-100" />
-              <CardTitle className="text-base font-bold m-0 text-white">AIチャットサポート</CardTitle>
+              <CardTitle className="text-base font-bold m-0 text-white">SALON AGENT</CardTitle>
             </div>
             <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-100 hover:bg-indigo-500/50 hover:text-white" onClick={() => setIsOpen(false)}>
               <X size={20} />
@@ -136,7 +136,7 @@ export default function AIChatWidget() {
                   </div>
                   <div className="bg-white text-slate-500 p-3 rounded-2xl rounded-tl-sm border border-slate-200 shadow-sm flex items-center gap-2">
                     <Loader2 size={16} className="animate-spin text-indigo-600" />
-                    <span className="text-xs font-medium">AIが回答を生成中...</span>
+                    <span className="text-xs font-medium">SALON AGENTが確認中...</span>
                   </div>
                 </div>
               )}
@@ -148,7 +148,7 @@ export default function AIChatWidget() {
               <Input 
                 value={inputValue}
                 onChange={e => setInputValue(e.target.value)}
-                placeholder="質問を入力してください..." 
+                placeholder="操作方法やLINE連携を質問..."
                 className="flex-1 bg-slate-50 focus-visible:ring-indigo-500"
                 disabled={isTyping}
               />

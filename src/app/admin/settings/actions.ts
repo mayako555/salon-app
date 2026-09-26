@@ -6,6 +6,10 @@ import { doc, getDoc, setDoc, collection, query, getDocs, where, deleteDoc } fro
 import { revalidatePath } from "next/cache";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { requireFeature } from "@/lib/feature-utils";
+import {
+  LineStoreSettings,
+  normalizeLineStoreSettings,
+} from "@/lib/line-integration-settings";
 
 export type StoreReservationSettings = {
   startHour: number;
@@ -76,7 +80,7 @@ export async function saveReservationSettings(settings: ReservationSettings) {
   }
 }
 
-export type LineSettingsMap = Record<string, string>;
+export type LineSettingsMap = Record<string, LineStoreSettings>;
 
 export async function getLineSettings(): Promise<LineSettingsMap> {
   try {
@@ -90,8 +94,12 @@ export async function getLineSettings(): Promise<LineSettingsMap> {
     const result: LineSettingsMap = {};
     snapshot.docs.forEach(doc => {
       const data = doc.data();
-      if (data.storeName && data.channelAccessToken) {
-        result[data.storeName] = data.channelAccessToken;
+      if (data.storeName) {
+        result[data.storeName] = normalizeLineStoreSettings({
+          channelAccessToken: data.channelAccessToken,
+          lineOaId: data.lineOaId,
+          liffId: data.liffId,
+        });
       }
     });
     return result;
@@ -101,7 +109,7 @@ export async function getLineSettings(): Promise<LineSettingsMap> {
   }
 }
 
-export async function saveLineSettings(storeName: string, channelAccessToken: string) {
+export async function saveLineSettings(storeName: string, settings: LineStoreSettings) {
   try {
     const ctx = await getCurrentUserContext();
     if (!ctx.companyId || !["systemOwner", "companyOwner", "admin"].includes(ctx.role)) {
@@ -109,27 +117,33 @@ export async function saveLineSettings(storeName: string, channelAccessToken: st
     }
     await requireFeature(ctx.companyId, "line_automation");
 
-    const q = query(collection(db, "line_integrations"), where("companyId", "==", ctx.companyId), where("storeName", "==", storeName));
+    const normalizedStoreName = storeName.trim();
+    if (!normalizedStoreName) {
+      return { success: false, error: "店舗名がありません" };
+    }
+    const normalizedSettings = normalizeLineStoreSettings(settings);
+
+    const q = query(collection(db, "line_integrations"), where("companyId", "==", ctx.companyId), where("storeName", "==", normalizedStoreName));
     const snapshot = await getDocs(q);
     
     // Find if the store already has an integration
     let docId = "";
     snapshot.docs.forEach(d => {
-      if (d.data().storeName === storeName) {
+      if (d.data().storeName === normalizedStoreName) {
         docId = d.id;
       }
     });
 
     if (docId) {
       await setTenantOwnedDoc(doc(db, "line_integrations", docId), {
-        storeName,
-        channelAccessToken,
+        storeName: normalizedStoreName,
+        ...normalizedSettings,
         companyId: ctx.companyId
       }, { merge: true });
     } else {
       await setTenantOwnedDoc(doc(collection(db, "line_integrations")), {
-        storeName,
-        channelAccessToken,
+        storeName: normalizedStoreName,
+        ...normalizedSettings,
         companyId: ctx.companyId
       });
     }

@@ -5,6 +5,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { FAQItem } from "@/app/admin/faqs/types";
 import { FieldValue } from "firebase-admin/firestore";
+import { getSalonAgentBuiltInAnswer } from "@/lib/salon-agent-knowledge";
 
 const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
@@ -32,6 +33,15 @@ export async function askAiSupport(question: string, contextUrl: string) {
     const userId = authStatus.uid;
 
     const maskedQuestion = maskPersonalInformation(question);
+
+    const builtInAnswer = getSalonAgentBuiltInAnswer(maskedQuestion);
+    if (builtInAnswer) {
+      return {
+        answer_status: "answered",
+        message: builtInAnswer,
+        related_faq_id: null,
+      };
+    }
 
     if (!genAI) {
       console.warn("Gemini API Key is not set.");
