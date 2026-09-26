@@ -2,34 +2,35 @@
 
 import { useEffect, useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
-import { useAuth } from "@/lib/auth-context";
 import { getTenantContractInfo, getTenantBillings, reportPayment } from "./actions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, FileText, CheckCircle2, Download, ExternalLink, AlertCircle, Building2, Banknote } from "lucide-react";
 import { toast } from "sonner";
+import { DEFAULT_MONTHLY_FEE_YEN, getSubscriptionStatusLabel } from "@/lib/tenant-subscription";
 
 export default function SubscriptionPage() {
-  const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [contract, setContract] = useState<any>(null);
   const [billings, setBillings] = useState<any[]>([]);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    if (profile?.companyId) {
-      loadData(profile.companyId);
-    }
-  }, [profile]);
+    loadData();
+  }, []);
 
-  const loadData = async (companyId: string) => {
+  const loadData = async () => {
     setLoading(true);
+    setLoadError("");
     const [cData, bData] = await Promise.all([
-      getTenantContractInfo(companyId),
-      getTenantBillings(companyId)
+      getTenantContractInfo(),
+      getTenantBillings()
     ]);
-    setContract(cData);
-    setBillings(bData);
+    if (cData.success) setContract(cData.contract);
+    if (bData.success) setBillings(bData.billings || []);
+    const error = !cData.success ? cData.error : !bData.success ? bData.error : "";
+    if (error) setLoadError(error || "契約・請求情報の取得に失敗しました");
     setLoading(false);
   };
 
@@ -38,9 +39,9 @@ export default function SubscriptionPage() {
     const res = await reportPayment(billingId);
     if (res.success) {
       toast.success("入金報告を送信しました。運営元での確認をお待ちください。");
-      if (profile?.companyId) loadData(profile.companyId);
+      loadData();
     } else {
-      toast.error("処理に失敗しました");
+      toast.error(res.error || "処理に失敗しました");
     }
   };
 
@@ -59,10 +60,17 @@ export default function SubscriptionPage() {
   
   const paidBillings = billings.filter(b => b.status === "支払済" || b.status === "入金確認待ち");
   const lastPaymentDate = paidBillings.length > 0 ? paidBillings[0].paidDate || "確認中" : "なし";
+  const monthlyFee = Number.isFinite(Number(contract?.fee)) ? Number(contract.fee) : DEFAULT_MONTHLY_FEE_YEN;
+  const subscriptionLabel = getSubscriptionStatusLabel(contract?.subscriptionStatus);
 
   return (
     <AuthGuard>
       <div className="p-6 max-w-5xl mx-auto space-y-8">
+        {loadError && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700">
+            {loadError}
+          </div>
+        )}
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900 flex items-center gap-2">
             <Building2 className="text-indigo-600" /> 契約・請求ダッシュボード
@@ -88,8 +96,18 @@ export default function SubscriptionPage() {
                 <span className="font-bold text-slate-800">{contract?.startDate || "未設定"}</span>
               </div>
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <span className="text-sm font-bold text-slate-500">契約状態</span>
+                <Badge variant="outline">{subscriptionLabel}</Badge>
+              </div>
+              {contract?.subscriptionStatus === "trial" && (
+                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <span className="text-sm font-bold text-slate-500">無料お試し終了日</span>
+                  <span className="font-bold text-slate-800">{contract?.trialEndDate || "未設定"}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                 <span className="text-sm font-bold text-slate-500">月額利用料金</span>
-                <span className="font-black text-lg text-slate-800">¥{contract?.fee?.toLocaleString() || 0}</span>
+                <span className="font-black text-lg text-slate-800">¥{monthlyFee.toLocaleString()}</span>
               </div>
               <div className="pt-2 flex flex-col gap-3">
                 <Button variant="outline" className="w-full justify-between" asChild>
@@ -170,7 +188,7 @@ export default function SubscriptionPage() {
                            b.billingType === "fc_fee" ? "FC加盟金" : "その他"}
                         </Badge>
                       </td>
-                      <td className="px-4 py-4 font-black text-right">¥{b.amount.toLocaleString()}</td>
+                      <td className="px-4 py-4 font-black text-right">¥{Number(b.amount || 0).toLocaleString()}</td>
                       <td className="px-4 py-4">
                         <Badge 
                           variant={b.status === "支払済" ? "default" : b.status === "入金確認待ち" ? "secondary" : "destructive"}

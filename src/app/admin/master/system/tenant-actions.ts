@@ -14,6 +14,13 @@ import { revalidatePath } from "next/cache";
 import { generateDefaultFeatures } from "@/types/master";
 import { addAuditLog } from "@/app/audit/actions";
 import { requireSystemOwnerContext } from "@/lib/auth-server";
+import {
+  createTrialSubscriptionDefaults,
+  isIsoDate,
+  isSubscriptionStatus,
+  normalizeMonthlyFee,
+  type SubscriptionStatus,
+} from "@/lib/tenant-subscription";
 
 export type CompanyTenant = {
   id: string;
@@ -22,6 +29,8 @@ export type CompanyTenant = {
   status: "active" | "inactive";
   fee?: number;
   startDate?: string;
+  trialEndDate?: string;
+  subscriptionStatus?: SubscriptionStatus;
   contractPdfUrl?: string;
   termsPdfUrl?: string;
   createdAt?: any;
@@ -89,10 +98,24 @@ export async function getTenants() {
 export async function addTenant(payload: Omit<CompanyTenant, "id" | "createdAt" | "updatedAt">) {
   await requireSystemOwnerContext();
   try {
+    const name = payload.name?.trim();
+    if (!name) throw new Error("テナント名を入力してください");
+    if (payload.startDate && !isIsoDate(payload.startDate)) throw new Error("契約開始日の形式が正しくありません");
+    if (payload.trialEndDate && !isIsoDate(payload.trialEndDate)) throw new Error("無料期間終了日の形式が正しくありません");
+    if (payload.subscriptionStatus && !isSubscriptionStatus(payload.subscriptionStatus)) throw new Error("契約状態が正しくありません");
+
+    const trialDefaults = createTrialSubscriptionDefaults(payload.startDate);
+    const subscriptionStatus = payload.subscriptionStatus ?? trialDefaults.subscriptionStatus;
     const colRef = collection(db, COMPANIES_COLLECTION);
     const defaultFeatures = generateDefaultFeatures(false);
     const docRef = await addDocUnfiltered(colRef, {
       ...payload,
+      name,
+      fee: normalizeMonthlyFee(payload.fee),
+      startDate: payload.startDate || trialDefaults.startDate,
+      trialEndDate: payload.trialEndDate
+        || (subscriptionStatus === "trial" ? trialDefaults.trialEndDate : ""),
+      subscriptionStatus,
       features: defaultFeatures,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
@@ -120,9 +143,18 @@ export async function addTenant(payload: Omit<CompanyTenant, "id" | "createdAt" 
 export async function updateTenant(id: string, payload: Partial<Omit<CompanyTenant, "id" | "createdAt" | "updatedAt">>) {
   await requireSystemOwnerContext();
   try {
+    if (payload.name !== undefined && !payload.name.trim()) throw new Error("テナント名を入力してください");
+    if (payload.startDate !== undefined && payload.startDate !== "" && !isIsoDate(payload.startDate)) throw new Error("契約開始日の形式が正しくありません");
+    if (payload.trialEndDate !== undefined && payload.trialEndDate !== "" && !isIsoDate(payload.trialEndDate)) throw new Error("無料期間終了日の形式が正しくありません");
+    if (payload.subscriptionStatus !== undefined && !isSubscriptionStatus(payload.subscriptionStatus)) throw new Error("契約状態が正しくありません");
+    const normalizedPayload = {
+      ...payload,
+      ...(payload.name !== undefined ? { name: payload.name.trim() } : {}),
+      ...(payload.fee !== undefined ? { fee: normalizeMonthlyFee(payload.fee) } : {}),
+    };
     const docRef = doc(db, COMPANIES_COLLECTION, id);
     await updateDocUnfiltered(docRef, {
-      ...payload,
+      ...normalizedPayload,
       updatedAt: serverTimestamp()
     });
     
