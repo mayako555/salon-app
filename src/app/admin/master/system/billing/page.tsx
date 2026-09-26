@@ -11,6 +11,7 @@ import { Loader2, Plus, Banknote, Building2, Download, CheckCircle2 } from "luci
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { DEFAULT_MONTHLY_FEE_YEN } from "@/lib/tenant-subscription";
 
 export default function BillingMasterPage() {
   const [loading, setLoading] = useState(true);
@@ -23,7 +24,7 @@ export default function BillingMasterPage() {
     companyId: "",
     billingMonth: format(new Date(), "yyyy-MM"),
     billingType: "system_fee",
-    amount: 10000
+    amount: DEFAULT_MONTHLY_FEE_YEN
   });
 
   useEffect(() => {
@@ -36,6 +37,8 @@ export default function BillingMasterPage() {
     if (res.success) {
       setBillings(res.billings || []);
       setCompanies(res.companies || []);
+    } else {
+      toast.error(res.error || "請求データの取得に失敗しました");
     }
     setLoading(false);
   };
@@ -52,7 +55,7 @@ export default function BillingMasterPage() {
       setIsDialogOpen(false);
       loadData();
     } else {
-      toast.error("発行に失敗しました");
+      toast.error(res.error || "発行に失敗しました");
     }
     setSaving(false);
   };
@@ -64,7 +67,7 @@ export default function BillingMasterPage() {
       toast.success("入金確認を完了しました");
       loadData();
     } else {
-      toast.error("エラーが発生しました");
+      toast.error(res.error || "エラーが発生しました");
     }
   };
 
@@ -77,7 +80,7 @@ export default function BillingMasterPage() {
       companyId: companies.length > 0 ? companies[0].id : "",
       billingMonth: format(new Date(), "yyyy-MM"),
       billingType: "system_fee",
-      amount: companies.length > 0 && companies[0].fee ? companies[0].fee : 10000
+      amount: companies.length > 0 ? Number(companies[0].fee ?? DEFAULT_MONTHLY_FEE_YEN) : DEFAULT_MONTHLY_FEE_YEN
     });
     setIsDialogOpen(true);
   };
@@ -131,7 +134,7 @@ export default function BillingMasterPage() {
                            b.billingType === "fc_fee" ? "FC加盟金" : "その他"}
                         </Badge>
                       </td>
-                      <td className="px-4 py-4 font-black text-right">¥{b.amount.toLocaleString()}</td>
+                      <td className="px-4 py-4 font-black text-right">¥{Number(b.amount || 0).toLocaleString()}</td>
                       <td className="px-4 py-4 text-center">
                         <Badge 
                           variant={b.status === "支払済" ? "default" : b.status === "入金確認待ち" ? "secondary" : "destructive"}
@@ -186,7 +189,7 @@ export default function BillingMasterPage() {
                   onChange={e => {
                     const cId = e.target.value;
                     const c = companies.find(x => x.id === cId);
-                    setFormData({...formData, companyId: cId, amount: c?.fee || 10000});
+                    setFormData({...formData, companyId: cId, amount: Number(c?.fee ?? DEFAULT_MONTHLY_FEE_YEN)});
                   }}
                 >
                   {companies.map(c => (
@@ -220,6 +223,8 @@ export default function BillingMasterPage() {
                 <label className="text-xs font-black text-slate-500">請求額（円）</label>
                 <Input 
                   type="number"
+                  min={0}
+                  step={1}
                   value={formData.amount} 
                   onChange={e => setFormData({...formData, amount: Number(e.target.value)})}
                   className="font-bold h-11"

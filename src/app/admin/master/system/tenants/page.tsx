@@ -13,6 +13,45 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { FeatureManagerDialog } from "./FeatureManagerDialog";
 import { FeatureSettings } from "@/types/master";
+import {
+  DEFAULT_MONTHLY_FEE_YEN,
+  addCalendarMonths,
+  createTrialSubscriptionDefaults,
+  getSubscriptionStatusLabel,
+  normalizeSubscriptionStatus,
+  type SubscriptionStatus,
+} from "@/lib/tenant-subscription";
+
+type TenantFormData = {
+  name: string;
+  plan: string;
+  status: "active" | "inactive";
+  fee: number;
+  startDate: string;
+  trialEndDate: string;
+  subscriptionStatus: SubscriptionStatus;
+  contractPdfUrl: string;
+  termsPdfUrl: string;
+  schoolEnabled: boolean;
+  schoolName: string;
+};
+
+const createTenantFormData = (): TenantFormData => {
+  const defaults = createTrialSubscriptionDefaults();
+  return {
+    name: "",
+    plan: "Standard",
+    status: "active",
+    fee: defaults.fee,
+    startDate: defaults.startDate,
+    trialEndDate: defaults.trialEndDate,
+    subscriptionStatus: defaults.subscriptionStatus,
+    contractPdfUrl: "",
+    termsPdfUrl: "",
+    schoolEnabled: false,
+    schoolName: "",
+  };
+};
 
 export default function TenantsPage() {
   const { isSystemOwner } = useAuth();
@@ -23,7 +62,7 @@ export default function TenantsPage() {
   const [featureDialogOpen, setFeatureDialogOpen] = useState(false);
   const [selectedTenantForFeatures, setSelectedTenantForFeatures] = useState<{id: string, name: string, features?: FeatureSettings} | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: "", plan: "Standard", status: "active" as "active"|"inactive", fee: 0, startDate: "", contractPdfUrl: "", termsPdfUrl: "", schoolEnabled: false, schoolName: "" });
+  const [formData, setFormData] = useState<TenantFormData>(createTenantFormData);
 
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [userLoading, setUserLoading] = useState(false);
@@ -58,7 +97,7 @@ export default function TenantsPage() {
         setIsDialogOpen(false);
         loadTenants();
       } else {
-        toast.error("更新に失敗しました");
+        toast.error(`更新に失敗しました: ${res.error || "不明なエラー"}`);
       }
     } else {
       const res = await addTenant(formData);
@@ -67,14 +106,14 @@ export default function TenantsPage() {
         setIsDialogOpen(false);
         loadTenants();
       } else {
-        toast.error("追加に失敗しました");
+        toast.error(`追加に失敗しました: ${res.error || "不明なエラー"}`);
       }
     }
   };
 
   const openAddDialog = () => {
     setEditingId(null);
-    setFormData({ name: "", plan: "Standard", status: "active", fee: 0, startDate: "", contractPdfUrl: "", termsPdfUrl: "", schoolEnabled: false, schoolName: "" });
+    setFormData(createTenantFormData());
     setIsDialogOpen(true);
   };
 
@@ -84,8 +123,10 @@ export default function TenantsPage() {
       name: tenant.name, 
       plan: tenant.plan, 
       status: tenant.status,
-      fee: tenant.fee || 0,
+      fee: tenant.fee ?? DEFAULT_MONTHLY_FEE_YEN,
       startDate: tenant.startDate || "",
+      trialEndDate: tenant.trialEndDate || "",
+      subscriptionStatus: normalizeSubscriptionStatus(tenant.subscriptionStatus),
       contractPdfUrl: tenant.contractPdfUrl || "",
       termsPdfUrl: tenant.termsPdfUrl || "",
       schoolEnabled: tenant.schoolEnabled || false,
@@ -154,7 +195,7 @@ export default function TenantsPage() {
       });
       if (!res.ok) throw new Error('Failed to impersonate');
       toast.success("代理ログインを開始しました");
-      window.location.href = "/admin/dashboard"; // Redirect to dashboard
+      window.location.href = "/dashboard"; // Redirect to the existing owner dashboard
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -210,6 +251,24 @@ export default function TenantsPage() {
                     <Button variant="ghost" size="sm" onClick={() => openEditDialog(tenant)} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50">
                       <Edit2 size={16} />
                     </Button>
+                  </div>
+                  <div className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 text-xs text-slate-600">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold">契約状態</span>
+                      <Badge variant="outline" className="bg-white">
+                        {getSubscriptionStatusLabel(tenant.subscriptionStatus)}
+                      </Badge>
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <span>月額</span>
+                      <span className="font-black text-slate-800">¥{(tenant.fee ?? DEFAULT_MONTHLY_FEE_YEN).toLocaleString()}</span>
+                    </div>
+                    {normalizeSubscriptionStatus(tenant.subscriptionStatus) === "trial" && tenant.trialEndDate && (
+                      <div className="mt-1 flex items-center justify-between">
+                        <span>無料期間終了</span>
+                        <span className="font-bold">{tenant.trialEndDate}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-2 w-full">
                     <Button 
@@ -321,7 +380,7 @@ export default function TenantsPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-black text-slate-500">ステータス</label>
+              <label className="text-xs font-black text-slate-500">利用可否（緊急停止）</label>
               <select
                 className="flex h-11 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 value={formData.status}
@@ -329,6 +388,21 @@ export default function TenantsPage() {
               >
                 <option value="active">稼働中</option>
                 <option value="inactive">停止中</option>
+              </select>
+              <p className="text-[11px] text-slate-400">契約状態とは別です。停止するとログイン・利用を止める運用を想定しています。</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-500">契約状態</label>
+              <select
+                className="flex h-11 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2"
+                value={formData.subscriptionStatus}
+                onChange={e => setFormData({...formData, subscriptionStatus: e.target.value as SubscriptionStatus})}
+              >
+                <option value="trial">無料お試し</option>
+                <option value="active">契約中</option>
+                <option value="past_due">入金確認待ち</option>
+                <option value="cancelled">解約済み</option>
               </select>
             </div>
 
@@ -338,7 +412,7 @@ export default function TenantsPage() {
                 type="number"
                 value={formData.fee} 
                 onChange={e => setFormData({...formData, fee: Number(e.target.value)})}
-                placeholder="10000"
+                placeholder={String(DEFAULT_MONTHLY_FEE_YEN)}
                 className="font-bold h-11"
               />
             </div>
@@ -348,9 +422,30 @@ export default function TenantsPage() {
               <Input 
                 type="date"
                 value={formData.startDate} 
-                onChange={e => setFormData({...formData, startDate: e.target.value})}
+                onChange={e => {
+                  const startDate = e.target.value;
+                  setFormData({
+                    ...formData,
+                    startDate,
+                    trialEndDate: formData.subscriptionStatus === "trial" && startDate
+                      ? addCalendarMonths(startDate, 3)
+                      : formData.trialEndDate,
+                  });
+                }}
                 className="font-bold h-11"
               />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-500">無料期間終了日</label>
+              <Input
+                type="date"
+                value={formData.trialEndDate}
+                onChange={e => setFormData({...formData, trialEndDate: e.target.value})}
+                disabled={formData.subscriptionStatus !== "trial"}
+                className="font-bold h-11"
+              />
+              <p className="text-[11px] text-slate-400">新規登録時は契約開始日から3か月後を自動設定します。</p>
             </div>
 
             <div className="space-y-2">
