@@ -8,6 +8,7 @@ import type { DocumentData, Query, QuerySnapshot } from "firebase/firestore";
 import { StaffProfile, StaffRole } from "@/app/staff/actions";
 import { SalesMasterItem, AttendancePolicy, FeatureKey, FeatureSettings, ensureFeatureDefaults } from "@/types/master";
 import { resolveStaffProfileCandidate } from "@/lib/staff-profile-resolution";
+import { normalizeTenantStatus, type TenantStatus } from "@/lib/tenant-access";
 
 interface AuthContextType {
   user: User | null;
@@ -31,6 +32,8 @@ interface AuthContextType {
   schoolName: string;
   isSystemOwnerCompany: boolean;
   attendancePolicy: AttendancePolicy;
+  companyStatus: TenantStatus;
+  isCompanyActive: boolean;
   hasFeature: (feature: FeatureKey) => boolean;
 }
 
@@ -56,6 +59,8 @@ const AuthContext = createContext<AuthContextType>({
   schoolName: "",
   isSystemOwnerCompany: false,
   attendancePolicy: { roundingEnabled: false, roundingIntervalMinutes: 0 },
+  companyStatus: "active",
+  isCompanyActive: true,
   hasFeature: () => false,
 });
 
@@ -76,6 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isSystemOwnerCompany, setIsSystemOwnerCompany] = useState<boolean>(false);
   const [attendancePolicy, setAttendancePolicy] = useState<AttendancePolicy>({ roundingEnabled: false, roundingIntervalMinutes: 0 });
   const [features, setFeatures] = useState<Record<string, boolean>>({});
+  const [companyStatus, setCompanyStatus] = useState<TenantStatus>("active");
 
   // Stop impersonating function
   const stopImpersonating = () => {
@@ -84,6 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const hasFeature = (feature: FeatureKey) => {
+    if (profile?.role === "systemOwner") return true;
     return !!features[feature];
   };
   const [loading, setLoading] = useState(true);
@@ -102,6 +109,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
+      setLoading(true);
+      setProfile(null);
+      setFeatures({});
+      setCompanyStatus("active");
+      setAvailableStores([]);
+      setAvailableStoreObjects([]);
+      setTenantPlan("Standard");
+      setSchoolEnabled(false);
+      setSchoolName("");
+      setIsSystemOwner(false);
+      setIsAccountant(false);
+      setImpersonatingCompanyId(null);
+      setIsSystemOwnerCompany(false);
+      setAttendancePolicy({ roundingEnabled: false, roundingIntervalMinutes: 0 });
       
       if (firebaseUser && firebaseUser.email) {
         try {
@@ -173,6 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               try {
                 const companyDoc = await getDoc(doc(db, "companies", companyIdToUse));
                 const companyData = companyDoc.exists() ? companyDoc.data() : {};
+                setCompanyStatus(normalizeTenantStatus(companyData.status));
                 
                 const isSystemOwnerContext = companyData.companyType === "system_owner" || companyIdToUse === "company_default";
                 
@@ -274,6 +296,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     schoolName,
     isSystemOwnerCompany,
     attendancePolicy,
+    companyStatus,
+    isCompanyActive: profile?.role === "systemOwner" || companyStatus === "active",
     hasFeature,
     isAccountant,
     impersonatingCompanyId,

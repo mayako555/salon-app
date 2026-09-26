@@ -7,6 +7,8 @@ import { Loader2 } from "lucide-react";
 
 import { FeatureKey } from "@/types/master";
 import { FeatureDenied } from "@/components/layout/FeatureDenied";
+import { TenantInactive } from "@/components/layout/TenantInactive";
+import { getFeatureForPathname } from "@/lib/tenant-access";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -15,7 +17,7 @@ interface AuthGuardProps {
 }
 
 export default function AuthGuard({ children, requireRole = "staff", requireFeature }: AuthGuardProps) {
-  const { user, profile, loading, isAdmin, isManager, isStaff, isSystemOwner, isCompanyOwner, hasFeature } = useAuth();
+  const { user, profile, loading, isAdmin, isManager, isStaff, isSystemOwner, isCompanyOwner, isCompanyActive, hasFeature } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -37,7 +39,7 @@ export default function AuthGuard({ children, requireRole = "staff", requireFeat
         router.push("/login?error=profile_not_found");
       }
     }
-  }, [user, profile, loading, requireRole, router, pathname, isAdmin, isManager, isStaff, isSystemOwner]);
+  }, [user, profile, loading, requireRole, router, pathname, isAdmin, isManager, isStaff, isSystemOwner, isCompanyOwner]);
 
   if (loading) {
     return (
@@ -64,7 +66,12 @@ export default function AuthGuard({ children, requireRole = "staff", requireFeat
     return null; // Will redirect in useEffect
   }
 
-  if (requireFeature && !hasFeature(requireFeature)) {
+  if (!isCompanyActive && !isSystemOwner) {
+    return <TenantInactive />;
+  }
+
+  const effectiveFeature = requireFeature ?? getFeatureForPathname(pathname);
+  if (effectiveFeature && !hasFeature(effectiveFeature)) {
     return <FeatureDenied />;
   }
 

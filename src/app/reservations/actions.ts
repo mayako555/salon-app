@@ -58,7 +58,7 @@ export async function getReservations(store: string, dateStr: string): Promise<R
     const { getCurrentUserContext } = await import("@/lib/auth-server");
     const { requireFeature } = await import("@/lib/feature-utils");
     const ctx = await getCurrentUserContext();
-  if (ctx.companyId) await requireFeature(ctx.companyId, "reservations");
+    if (ctx.companyId) await requireFeature(ctx.companyId, "reservations");
     if (!ctx.companyId) throw new Error("会社IDが指定されていません");
 
     let results = snapshot.docs.map(d => {
@@ -155,9 +155,9 @@ export async function getReservations(store: string, dateStr: string): Promise<R
 export async function addReservation(data: Omit<Reservation, "id" | "created_at" | "updated_at">) {
   try {
     const { getCurrentUserContext } = await import("@/lib/auth-server");
-    const { requireFeature } = await import("@/lib/feature-utils");
+    const { requireFeature, isFeatureEnabled } = await import("@/lib/feature-utils");
     const ctx = await getCurrentUserContext();
-  if (ctx.companyId) await requireFeature(ctx.companyId, "reservations");
+    if (ctx.companyId) await requireFeature(ctx.companyId, "reservations");
     if (!ctx.companyId) throw new Error("会社IDが指定されていません");
 
     const colRef = collection(db, RESERVATIONS_COLLECTION);
@@ -182,7 +182,11 @@ export async function addReservation(data: Omit<Reservation, "id" | "created_at"
     });
 
     // 次回予約確定時の即時LINE自動送信トリガー
-    if (data.customer_id && data.type !== "schedule") {
+    if (
+      data.customer_id &&
+      data.type !== "schedule" &&
+      await isFeatureEnabled(ctx.companyId, "line_automation")
+    ) {
       try {
         const customerDoc = await getDoc(doc(db, "customers", data.customer_id));
         const customerData = customerDoc.exists() ? customerDoc.data() : null;
@@ -192,7 +196,11 @@ export async function addReservation(data: Omit<Reservation, "id" | "created_at"
           const settingsDoc = await getDoc(doc(db, "line_automation_settings", ctx.companyId));
           const settingsData = settingsDoc.exists() ? settingsDoc.data() : null;
 
-          if (settingsData?.nextBookingEnabled && settingsData?.nextBookingTemplate) {
+          if (
+            settingsData?.automationEnabled &&
+            settingsData?.nextBookingEnabled &&
+            settingsData?.nextBookingTemplate
+          ) {
             const { replaceLineTemplate } = await import("@/lib/lineTemplate");
             const { sendAndLogLineMessage } = await import("@/lib/line");
 

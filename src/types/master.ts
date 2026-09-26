@@ -139,6 +139,7 @@ export const FEATURE_DEPENDENCIES: Record<FeatureKey, { requires: FeatureKey[], 
 export type CompanyInfo = {
   id?: string;
   name?: string;
+  status?: "active" | "inactive";
   planId?: string; // 料金プラン
   schoolEnabled?: boolean;
   schoolName?: string;

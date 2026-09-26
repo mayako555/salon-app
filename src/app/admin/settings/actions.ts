@@ -5,6 +5,7 @@ import { db } from "@/lib/firestore-admin-wrapper";
 import { doc, getDoc, setDoc, collection, query, getDocs, where, deleteDoc } from "@/lib/firestore-admin-wrapper";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserContext } from "@/lib/auth-server";
+import { requireFeature } from "@/lib/feature-utils";
 
 export type StoreReservationSettings = {
   startHour: number;
@@ -80,7 +81,8 @@ export type LineSettingsMap = Record<string, string>;
 export async function getLineSettings(): Promise<LineSettingsMap> {
   try {
     const ctx = await getCurrentUserContext();
-    if (!ctx.companyId) return {};
+    if (!ctx.companyId || !["systemOwner", "companyOwner", "admin"].includes(ctx.role)) return {};
+    await requireFeature(ctx.companyId, "line_automation");
 
     const colRef = collection(db, "line_integrations");
     const q = query(colRef, where("companyId", "==", ctx.companyId));
@@ -102,7 +104,10 @@ export async function getLineSettings(): Promise<LineSettingsMap> {
 export async function saveLineSettings(storeName: string, channelAccessToken: string) {
   try {
     const ctx = await getCurrentUserContext();
-    if (!ctx.companyId) return { success: false, error: "Company ID missing" };
+    if (!ctx.companyId || !["systemOwner", "companyOwner", "admin"].includes(ctx.role)) {
+      return { success: false, error: "権限がありません" };
+    }
+    await requireFeature(ctx.companyId, "line_automation");
 
     const q = query(collection(db, "line_integrations"), where("companyId", "==", ctx.companyId), where("storeName", "==", storeName));
     const snapshot = await getDocs(q);

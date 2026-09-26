@@ -8,10 +8,13 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
+import { FeatureDenied } from "./FeatureDenied";
+import { TenantInactive } from "./TenantInactive";
+import { getFeatureForPathname } from "@/lib/tenant-access";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, profile, loading, impersonatingCompanyId, stopImpersonating } = useAuth();
+  const { user, profile, loading, isSystemOwner, isCompanyActive, hasFeature, impersonatingCompanyId, stopImpersonating } = useAuth();
   const isLoginPage = pathname === "/login";
 
   if (isLoginPage) {
@@ -27,6 +30,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     pathname.startsWith("/link-line")
   ) {
     return <div className="min-h-screen bg-slate-50">{children}</div>;
+  }
+
+  const requiredFeature = getFeatureForPathname(pathname);
+  if (!loading && user && !isCompanyActive && !isSystemOwner) {
+    return <TenantInactive />;
+  }
+
+  if (!loading && user && requiredFeature && !hasFeature(requiredFeature)) {
+    return <FeatureDenied />;
   }
 
   const handleLogout = () => {

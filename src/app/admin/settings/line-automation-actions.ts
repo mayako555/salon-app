@@ -5,6 +5,7 @@ import { db } from "@/lib/firestore-admin-wrapper";
 import { collection, doc, getDoc, setDoc, serverTimestamp } from "@/lib/firestore-admin-wrapper";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { adminDb } from "@/lib/firebase-admin";
+import { requireFeature } from "@/lib/feature-utils";
 
 export interface LineAutomationSettings {
   id?: string;
@@ -43,7 +44,10 @@ const DEFAULT_LINE_AUTOMATION_SETTINGS: Omit<LineAutomationSettings, "tenantId">
 
 export async function getLineAutomationSettings(tenantId: string, storeId?: string): Promise<LineAutomationSettings> {
   const ctx = await getCurrentUserContext();
-  if (!ctx.companyId) throw new Error("会社IDが指定されていません");
+  if (!ctx.companyId || !["systemOwner", "companyOwner", "admin"].includes(ctx.role)) {
+    throw new Error("権限がありません");
+  }
+  await requireFeature(ctx.companyId, "line_automation");
   tenantId = ctx.companyId;
   const docId = storeId ? `${tenantId}_${storeId}` : tenantId;
   const snapshot = await adminDb.collection("line_automation_settings").doc(docId).get();
@@ -75,6 +79,7 @@ export async function saveLineAutomationSettings(settings: LineAutomationSetting
     if (!ctx.companyId || !["systemOwner", "companyOwner", "admin"].includes(ctx.role)) {
       return { success: false, error: "権限がありません" };
     }
+    await requireFeature(ctx.companyId, "line_automation");
     settings = { ...settings, tenantId: ctx.companyId };
     const docId = settings.storeId ? `${settings.tenantId}_${settings.storeId}` : settings.tenantId;
     const docRef = doc(db, "line_automation_settings", docId);

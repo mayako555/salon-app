@@ -4,20 +4,31 @@ import { useAuth } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { LogOut, User, LayoutDashboard, Users, Receipt, Calendar, Database, Settings, Train, Clock, ClipboardPaste, Lock, BookOpen, Wallet, Calculator, Target } from "lucide-react";
+import { LogOut, LayoutDashboard, Users, Calendar, Database, Settings, Train, Clock, ClipboardPaste, Lock, BookOpen, Wallet, Calculator, Target, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { motion } from "framer-motion";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { FeatureDenied } from "@/components/layout/FeatureDenied";
+import { TenantInactive } from "@/components/layout/TenantInactive";
+import { getFeatureForPathname } from "@/lib/tenant-access";
+import type { FeatureKey } from "@/types/master";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+type StaffNavItem = {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  feature?: FeatureKey;
+};
+
 export default function StaffPortalLayout({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading, selectedStore, setSelectedStore, availableStores, tenantPlan } = useAuth();
+  const { user, profile, loading, selectedStore, setSelectedStore, availableStores, tenantPlan, isSystemOwner, isCompanyActive, hasFeature } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -38,6 +49,15 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
 
   if (!user) return null;
 
+  if (!isCompanyActive && !isSystemOwner) {
+    return <TenantInactive />;
+  }
+
+  const requiredFeature = getFeatureForPathname(pathname);
+  if (requiredFeature && !hasFeature(requiredFeature)) {
+    return <FeatureDenied />;
+  }
+
   const handleLogout = async () => {
     await signOut(auth);
     router.push("/staff/login");
@@ -49,35 +69,36 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
   const isTenantAdmin = profile?.role === "systemOwner" || profile?.role === "admin" || profile?.role === "companyOwner";
   const allowedStores = isTenantAdmin ? availableStores : (profile?.salonIds && profile.salonIds.length > 0 ? profile.salonIds : availableStores);
 
-  const navItems = [
+  const navItems: StaffNavItem[] = [
     { name: "ホーム", href: "/staff-portal", icon: LayoutDashboard },
-    { name: "予約カレンダー", href: "/staff-portal/reservations", icon: Calendar },
-    { name: "顧客管理", href: "/staff-portal/customers", icon: Users },
-    { name: "売上管理・レジ締め", href: "/sales", icon: Lock },
-    { name: "シフト確認", href: "/staff-portal/shifts", icon: Calendar },
-    { name: "目標・KPI", href: "/staff-portal/goals", icon: Target },
+    { name: "予約カレンダー", href: "/staff-portal/reservations", icon: Calendar, feature: "reservations" },
+    { name: "顧客管理", href: "/staff-portal/customers", icon: Users, feature: "customers" },
+    { name: "売上管理・レジ締め", href: "/sales", icon: Lock, feature: "sales" },
+    { name: "シフト確認", href: "/staff-portal/shifts", icon: Calendar, feature: "shifts" },
+    { name: "目標・KPI", href: "/staff-portal/goals", icon: Target, feature: "goals" },
     ...(isManagerOrAbove ? [
       { name: "ダッシュボード", href: "/dashboard", icon: LayoutDashboard },
-      { name: "全体KPI管理", href: "/admin/goals", icon: Target },
+      { name: "全体KPI管理", href: "/admin/goals", icon: Target, feature: "goals" as FeatureKey },
       { name: "スタッフ管理", href: "/staff", icon: Users },
       { name: "メニュー・商品設定", href: "/admin/master/operations", icon: Database },
-      { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste },
+      { name: "顧客一括取込", href: "/admin/import", icon: ClipboardPaste, feature: "customers" as FeatureKey },
     ] : []),
     ...(isCompanyOwnerOrAbove ? [
-      { name: "給与・報酬計算", href: "/payroll", icon: Calculator },
+      { name: "給与・報酬計算", href: "/payroll", icon: Calculator, feature: "payroll" as FeatureKey },
     ] : []),
     ...(canViewTimecard ? [
-      { name: "タイムカード", href: "/attendance", icon: Clock },
+      { name: "タイムカード", href: "/attendance", icon: Clock, feature: "attendance" as FeatureKey },
     ] : []),
-    { name: "在庫・発注", href: "/staff-portal/inventory", icon: Database },
+    { name: "在庫・発注", href: "/staff-portal/inventory", icon: Database, feature: "inventory" },
     ...(tenantPlan !== "Solo" ? [
-      { name: "交通費申請", href: "/staff-portal/transport", icon: Train },
-      { name: "希望休申請", href: "/staff-portal/holidays", icon: Calendar },
-      { name: "給与明細確認", href: "/staff-portal/payroll", icon: Calculator },
-      { name: "マニュアル", href: "/manuals", icon: BookOpen },
+      { name: "交通費申請", href: "/staff-portal/transport", icon: Train, feature: "payroll" as FeatureKey },
+      { name: "希望休申請", href: "/staff-portal/holidays", icon: Calendar, feature: "shifts" as FeatureKey },
+      { name: "給与明細確認", href: "/staff-portal/payroll", icon: Calculator, feature: "payroll" as FeatureKey },
+      { name: "マニュアル", href: "/manuals", icon: BookOpen, feature: "training" as FeatureKey },
     ] : []),
-    { name: "経費精算", href: "/staff-portal/expenses", icon: Wallet },
+    { name: "経費精算", href: "/staff-portal/expenses", icon: Wallet, feature: "expenses" },
   ];
+  const visibleNavItems = navItems.filter((item) => !item.feature || hasFeature(item.feature));
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
@@ -121,7 +142,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
         </div>
 
         <nav className="flex-1 overflow-y-auto px-8 space-y-1 no-scrollbar pb-8">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <Link 
               key={item.href} 
               href={item.href}
@@ -207,7 +228,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
       {/* Mobile Nav */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex overflow-x-auto z-40 pb-safe no-scrollbar">
         <div className="flex min-w-full justify-start px-2">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <Link 
               key={item.href} 
               href={item.href}

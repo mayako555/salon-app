@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import { sendLineMessage } from "@/lib/line";
+import { sendLineMessage } from "@/lib/line-delivery";
 import { LineAutomationSettings } from "@/app/admin/settings/line-automation-actions";
 import { replaceLineTemplate } from "@/lib/lineTemplate";
 import { requireFeature } from "@/lib/feature-utils";
