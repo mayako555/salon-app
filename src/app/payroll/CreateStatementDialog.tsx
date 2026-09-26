@@ -445,6 +445,15 @@ export default function CreateStatementDialog({
     taxAddition: numTaxAdd,
     deductions: totalDeductions,
   });
+  const grossPaymentAmount = calculateStatementPayment({
+    type,
+    baseAmount: numBase,
+    techIncentive: numTechInc,
+    productCommission: numProdComm,
+    allowances: numAllowance,
+    taxAddition: 0,
+    deductions: 0,
+  });
 
   const numAlreadyPaid = Number(alreadyPaidAmount) || 0;
   const numAdvanceDeduction = Number(advanceDeduction) || 0;
@@ -930,18 +939,7 @@ export default function CreateStatementDialog({
               </div>
               <div className="bg-rose-50 text-rose-700 px-3 py-1 rounded-full text-xs font-black border border-rose-100 flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
                 <span>総支給額 (基本給 + 手当):</span>
-                <span className="text-sm font-black text-rose-800">¥{(
-                  (Number(baseAmount) || 0) + 
-                  (Number(techIncentive) || 0) + 
-                  (Number(productCommission) || 0) + 
-                  (Number(transportAllowance) || 0) + 
-                  (Number(nominationAllowance) || 0) + 
-                  (Number(reviewAllowance) || 0) + 
-                  (Number(blogAllowance) || 0) + 
-                  (Number(executiveAllowance) || 0) +
-                  (Number(businessAllowance) || 0) +
-                  (Number(attendanceAllowance) || 0)
-                ).toLocaleString()}</span>
+                <span className="text-sm font-black text-rose-800">¥{grossPaymentAmount.toLocaleString()}</span>
               </div>
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
