@@ -195,7 +195,7 @@ export default function TenantsPage() {
       });
       if (!res.ok) throw new Error('Failed to impersonate');
       toast.success("代理ログインを開始しました");
-      window.location.href = "/admin/dashboard"; // Redirect to dashboard
+      window.location.href = "/dashboard"; // Redirect to the existing owner dashboard
     } catch (e: any) {
       toast.error(e.message);
     }
