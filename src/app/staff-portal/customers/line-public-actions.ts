@@ -3,6 +3,7 @@
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { requireFeature } from "@/lib/feature-utils";
 import { adminDb } from "@/lib/firebase-admin";
+import { requireLineStore } from "@/lib/line-store-access";
 import { normalizeLineStoreSettings } from "@/lib/line-integration-settings";
 
 export type PublicLineStoreSettings = {
@@ -31,7 +32,8 @@ export async function getPublicLineStoreSettings(): Promise<
         typeof data.storeName === "string" ? data.storeName.trim() : "";
       const settings = normalizeLineStoreSettings(data);
 
-      if (storeName && settings.lineOaId && settings.liffId) {
+      if (storeName && settings.channelAccessToken && settings.lineOaId && settings.liffId) {
+        try { await requireLineStore(context, storeName); } catch { continue; }
         result[storeName] = {
           lineOaId: settings.lineOaId,
           liffId: settings.liffId,

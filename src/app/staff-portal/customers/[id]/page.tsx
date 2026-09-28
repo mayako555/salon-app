@@ -51,6 +51,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { createCustomerLineLink } from "@/app/link-line/actions";
 import { QRCodeSVG } from "qrcode.react";
 import {
   getPublicLineStoreSettings,
@@ -216,16 +217,16 @@ export default function CustomerDetailPage() {
   };
 
   useEffect(() => {
-    const settings = selectedStore ? linePublicSettings[selectedStore] : undefined;
-    if (isLinkQrOpen && selectedStore && settings) {
-      const query = new URLSearchParams({
-        store: selectedStore,
-        liffId: settings.liffId,
-      });
-      setLinkUrl(`https://liff.line.me/${encodeURIComponent(settings.liffId)}/link-line/${id}?${query.toString()}`);
-    } else {
-      setLinkUrl("");
+    let cancelled = false;
+    setLinkUrl("");
+    if (isLinkQrOpen && selectedStore && linePublicSettings[selectedStore] && typeof id === "string") {
+      createCustomerLineLink(id, selectedStore).then(result => {
+        if (cancelled) return;
+        if (result.success) setLinkUrl(result.url);
+        else toast.error(result.error);
+      }).catch(() => { if (!cancelled) toast.error("QRを発行できませんでした"); });
     }
+    return () => { cancelled = true; };
   }, [isLinkQrOpen, selectedStore, id, linePublicSettings]);
 
   const handleShowEntryQr = () => {
