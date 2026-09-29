@@ -208,6 +208,8 @@ export default function NewKartePage() {
   const [staffList, setStaffList] = useState<StaffProfile[]>([]);
   const [templates, setTemplates] = useState<SalesMasterItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -241,29 +243,45 @@ export default function NewKartePage() {
   const [selectedTemplateUrl, setSelectedTemplateUrl] = useState("");
 
   useEffect(() => {
-    async function load() {
-      if (typeof id !== 'string') return;
-      const [cData, sData, tData] = await Promise.all([
-        getCustomerById(id),
-        getStaffList(),
-        getMasterItems() // Will filter for karteTemplate below
-      ]);
-      setCustomer(cData);
-      setStaffList(sData);
-      
-      const karteTemplates = tData.filter(i => i.itemType === 'karteTemplate' && i.isActive);
-      setTemplates(karteTemplates);
-      if (karteTemplates.length > 0) {
-        setSelectedTemplateUrl(karteTemplates[0].imageUrl || "");
-      }
-
-      if (profile) {
-        setFormData(prev => ({ ...prev, staff_id: profile.id, staff_name: profile.name }));
-      }
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    const timeout = setTimeout(() => {
+      cancelled = true;
+      setLoadError("読み込みに時間がかかっています。通信状態を確認して、もう一度お試しください。");
       setLoading(false);
+    }, 20_000);
+
+    async function load() {
+      try {
+        if (typeof id !== 'string') throw new Error("Invalid customer ID");
+        const [cData, sData, tData] = await Promise.all([
+          getCustomerById(id),
+          getStaffList(),
+          getMasterItems()
+        ]);
+        if (cancelled) return;
+        setCustomer(cData);
+        setStaffList(sData);
+        const karteTemplates = tData.filter(i => i.itemType === 'karteTemplate' && i.isActive);
+        setTemplates(karteTemplates);
+        setSelectedTemplateUrl(karteTemplates[0]?.imageUrl || "");
+        if (profile) {
+          setFormData(prev => ({ ...prev, staff_id: profile.id, staff_name: profile.name }));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to load karte form", error);
+          setLoadError("カルテ作成に必要な情報を読み込めませんでした。もう一度お試しください。");
+        }
+      } finally {
+        clearTimeout(timeout);
+        if (!cancelled) setLoading(false);
+      }
     }
-    load();
-  }, [id, profile]);
+    void load();
+    return () => { cancelled = true; clearTimeout(timeout); };
+  }, [id, profile, loadAttempt]);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'photos' | 'treatment_photos' | 'past_karte_photos') => {
     const file = e.target.files?.[0];
@@ -311,6 +329,15 @@ export default function NewKartePage() {
   };
 
   if (loading) return <div className="p-10 text-center animate-pulse text-slate-400">読み込み中...</div>;
+  if (loadError) return (
+    <div className="p-10 text-center space-y-4" role="alert">
+      <p>{loadError}</p>
+      <div className="flex justify-center gap-3">
+        <Button variant="outline" onClick={() => router.back()}>戻る</Button>
+        <Button onClick={() => setLoadAttempt(attempt => attempt + 1)}>再読み込み</Button>
+      </div>
+    </div>
+  );
   if (!customer) return <div className="p-10 text-center">お客様が見つかりませんでした</div>;
 
   return (
