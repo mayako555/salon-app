@@ -1,4 +1,7 @@
 "use client";
+import KarteFormRouter from "@/components/forms/KarteFormRouter";
+import EyeDiagramCanvas from "@/components/forms/KarteDrawingCanvas";
+import type { DrawingDocument } from "@/lib/drawing-document";
 
 import { useEffect, useState, useRef } from "react";
 import { canvasPoint, createCanvasDrawing } from "@/lib/canvas-drawing";
@@ -11,10 +14,10 @@ import { SalesMasterItem } from "@/types/master";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { 
-  ChevronLeft, 
-  Save, 
-  User, 
+import {
+  ChevronLeft,
+  Save,
+  User,
   Calendar,
   Sparkles,
   Camera,
@@ -28,157 +31,8 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
 
 // --- Drawing Canvas Component with Text Support ---
-const EyeDiagramCanvas = ({ 
-  onSave, 
-  bgImage 
-}: { 
-  onSave: (url: string) => void;
-  bgImage: string;
-}) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(createCanvasDrawing());
-  const [mode, setMode] = useState<'draw' | 'text'>('draw');
-  const [textNodes, setTextNodes] = useState<{ x: number, y: number, text: string }[]>([]);
-  const [activeText, setActiveText] = useState<{ x: number, y: number, text: string } | null>(null);
-
-  const defaultBg = "/assets/eye_template.png";
-  const currentBg = bgImage || defaultBg;
-
-  const renderCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const img = new Image();
-    img.src = currentBg;
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      
-      // Draw text nodes
-      ctx.font = "bold 16px sans-serif";
-      ctx.fillStyle = "#e11d48";
-      textNodes.forEach(node => {
-        ctx.fillText(node.text, node.x, node.y);
-      });
-      
-      onSave(canvas.toDataURL());
-    };
-  };
-
-  useEffect(() => {
-    renderCanvas();
-  }, [currentBg, textNodes]);
-
-  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!e.isPrimary || e.button !== 0) return;
-    e.preventDefault();
-    if (mode === 'text') {
-      setActiveText({ ...canvasPoint(e.currentTarget, e), text: "" });
-      return;
-    }
-    drawing.current.start(e.currentTarget, e);
-  };
-
-  const stopDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (drawing.current.end(e.currentTarget, e.pointerId)) onSave(e.currentTarget.toDataURL());
-  };
-
-  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    drawing.current.move(e.currentTarget, e);
-  };
-
-  const handleAddText = () => {
-    if (activeText && activeText.text.trim()) {
-      setTextNodes([...textNodes, activeText]);
-      setActiveText(null);
-    } else {
-      setActiveText(null);
-    }
-  };
-
-  const clear = () => {
-    if (!confirm("入力をすべて消去しますか？")) return;
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      setTextNodes([]);
-      renderCanvas();
-    }
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-between items-center px-1">
-        <div className="flex gap-2">
-          <Button 
-            type="button"
-            variant={mode === 'draw' ? 'default' : 'outline'} 
-            size="sm" 
-            onClick={() => setMode('draw')}
-            className="h-8 rounded-full text-[10px] font-bold gap-1"
-          >
-            <Pencil size={12} /> ペン
-          </Button>
-          <Button 
-            type="button"
-            variant={mode === 'text' ? 'default' : 'outline'} 
-            size="sm" 
-            onClick={() => setMode('text')}
-            className="h-8 rounded-full text-[10px] font-bold gap-1"
-          >
-            <Type size={12} /> テキスト
-          </Button>
-        </div>
-        <Button type="button" variant="ghost" size="sm" onClick={clear} className="text-slate-400 text-[10px] h-6 px-2 hover:text-rose-500">
-          <Trash2 size={10} className="mr-1" /> 全消去
-        </Button>
-      </div>
-      
-      <div className="relative border-4 border-slate-100 rounded-3xl bg-white overflow-hidden touch-none shadow-inner aspect-[3/2]">
-        <canvas
-          ref={canvasRef}
-          width={600}
-          height={400}
-          onPointerDown={startDrawing}
-          onPointerUp={stopDrawing}
-          onPointerMove={draw}
-          onPointerCancel={stopDrawing}
-          onLostPointerCapture={stopDrawing}
-          style={{ touchAction: "none" }}
-          className={`w-full h-full ${mode === 'draw' ? 'cursor-crosshair' : 'cursor-text'}`}
-        />
-
-        {activeText && (
-          <div 
-            className="absolute z-10 p-2 bg-white shadow-xl border-2 border-rose-500 rounded-xl flex gap-2 animate-in zoom-in-95 duration-200"
-            style={{ left: `${(activeText.x / 600) * 100}%`, top: `${(activeText.y / 400) * 100}%`, transform: 'translate(-50%, -100%)' }}
-          >
-            <Input 
-              autoFocus
-              className="h-8 text-sm font-bold w-32 border-none bg-slate-50 focus-visible:ring-0" 
-              value={activeText.text}
-              onChange={(e) => setActiveText({ ...activeText, text: e.target.value })}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddText()}
-            />
-            <Button size="sm" className="h-8 bg-rose-500 hover:bg-rose-600 px-2" onClick={handleAddText}><Save size={14} /></Button>
-            <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => setActiveText(null)}><X size={14} /></Button>
-          </div>
-        )}
-      </div>
-      <p className="text-[10px] text-slate-400 text-center font-bold">
-        {mode === 'draw' ? '指やペンで描画してください' : '文字を入れたい場所をタップしてください'}
-      </p>
-    </div>
-  );
-};
-
 // --- Main Page Component ---
-export default function NewKartePage() {
+function NewKartePage() {
   const { id } = useParams();
   const router = useRouter();
   const { profile } = useAuth();
@@ -211,6 +65,7 @@ export default function NewKartePage() {
       perm_solution_2_time: 0,
       hair_material: "セーブル"
     },
+    drawing_document: undefined as DrawingDocument | undefined,
     eye_diagram_url: "",
     photos: [] as { url: string; description: string }[],
     treatment_photos: [] as { url: string; description: string }[],
@@ -266,14 +121,14 @@ export default function NewKartePage() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      setFormData(prev => ({ 
-        ...prev, 
-        [target]: [...prev[target], { url: ev.target?.result as string, description: "" }] 
+      setFormData(prev => ({
+        ...prev,
+        [target]: [...prev[target], { url: ev.target?.result as string, description: "" }]
       }));
     };
     reader.readAsDataURL(file);
   };
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (typeof id !== 'string') return;
@@ -362,8 +217,8 @@ export default function NewKartePage() {
                   type="button"
                   onClick={() => setSelectedTemplateUrl(t.imageUrl || "")}
                   className={`px-4 py-2 rounded-xl text-xs font-black whitespace-nowrap transition-all border-2 ${
-                    selectedTemplateUrl === t.imageUrl 
-                      ? "border-rose-500 bg-rose-50 text-rose-600" 
+                    selectedTemplateUrl === t.imageUrl
+                      ? "border-rose-500 bg-rose-50 text-rose-600"
                       : "border-slate-100 bg-slate-50 text-slate-400"
                   }`}
                 >
@@ -374,8 +229,8 @@ export default function NewKartePage() {
                 type="button"
                 onClick={() => setSelectedTemplateUrl("")}
                 className={`px-4 py-2 rounded-xl text-xs font-black whitespace-nowrap transition-all border-2 ${
-                  selectedTemplateUrl === "" 
-                    ? "border-rose-500 bg-rose-50 text-rose-600" 
+                  selectedTemplateUrl === ""
+                    ? "border-rose-500 bg-rose-50 text-rose-600"
                     : "border-slate-100 bg-slate-50 text-slate-400"
                 }`}
               >
@@ -384,9 +239,9 @@ export default function NewKartePage() {
             </div>
           </div>
 
-          <EyeDiagramCanvas 
-            bgImage={selectedTemplateUrl} 
-            onSave={(url) => setFormData(prev => ({...prev, eye_diagram_url: url}))} 
+          <EyeDiagramCanvas
+            bgImage={selectedTemplateUrl || "/assets/eye_template.png"}
+            onSave={(url, drawing_document) => setFormData(prev => ({...prev, eye_diagram_url: url, drawing_document}))}
           />
         </Card>
 
@@ -397,7 +252,7 @@ export default function NewKartePage() {
             <h3 className="uppercase tracking-tighter text-sm">過去の（紙）カルテ画像</h3>
           </div>
           <p className="text-[10px] text-slate-400 font-bold">以前の紙カルテや外部の写真を記録として残せます</p>
-          
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {formData.past_karte_photos.map((photo, i) => (
               <div key={i} className="aspect-square bg-slate-50 rounded-2xl overflow-hidden relative border-2 border-slate-100">
@@ -422,8 +277,8 @@ export default function NewKartePage() {
         <Card className="rounded-3xl p-6 border-none shadow-xl space-y-4">
           <div className="space-y-1.5">
             <label className="text-[10px] text-slate-400 font-black uppercase tracking-widest">自由記述メモ</label>
-            <textarea 
-              className="w-full min-h-[120px] p-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-amber-500/20" 
+            <textarea
+              className="w-full min-h-[120px] p-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-amber-500/20"
               placeholder="施術のポイントやお客様の反応など"
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
@@ -441,15 +296,15 @@ export default function NewKartePage() {
 
 function Plus({ size, className }: { size?: number, className?: string }) {
   return (
-    <svg 
-      width={size || 24} 
-      height={size || 24} 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="3" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
+    <svg
+      width={size || 24}
+      height={size || 24}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       className={className}
     >
       <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -457,3 +312,5 @@ function Plus({ size, className }: { size?: number, className?: string }) {
     </svg>
   );
 }
+
+export default function Page() { return <KarteFormRouter><NewKartePage /></KarteFormRouter>; }
