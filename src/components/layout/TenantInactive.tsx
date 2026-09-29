@@ -1,15 +1,11 @@
 "use client";
 
+import { useAuth } from "@/lib/auth-context";
 import { Ban, LogOut } from "lucide-react";
-import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
 
 export function TenantInactive() {
-  const handleLogout = async () => {
-    await signOut(auth);
-    await fetch("/api/auth/session", { method: "DELETE" }).catch(() => undefined);
-    window.location.href = "/login";
-  };
+  const { logout } = useAuth();
+  const handleLogout = () => logout();
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">

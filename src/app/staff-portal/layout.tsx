@@ -6,8 +6,6 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { LogOut, LayoutDashboard, Users, Calendar, Database, Settings, Train, Clock, ClipboardPaste, Lock, BookOpen, Wallet, Calculator, Target, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { auth } from "@/lib/firebase";
-import { signOut } from "firebase/auth";
 import { motion } from "framer-motion";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -28,7 +26,7 @@ type StaffNavItem = {
 };
 
 export default function StaffPortalLayout({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading, selectedStore, setSelectedStore, availableStores, tenantPlan, isSystemOwner, isCompanyActive, hasFeature } = useAuth();
+  const { user, profile, loading, logout, selectedStore, setSelectedStore, availableStores, tenantPlan, isSystemOwner, isCompanyActive, hasFeature } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -58,10 +56,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
     return <FeatureDenied />;
   }
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.push("/staff/login");
-  };
+  const handleLogout = () => logout("/staff/login");
 
   const isManagerOrAbove = profile?.role === "manager" || profile?.role === "admin" || profile?.role === "companyOwner" || profile?.role === "systemOwner";
   const isCompanyOwnerOrAbove = profile?.role === "companyOwner" || profile?.role === "systemOwner";
