@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getReservationSettings, saveReservationSettings, getLineSettings, saveLineSettings, ReservationSettings, LineSettingsMap, getCompanySettings, saveCompanyAttendancePolicy, getKioskSettings, saveKioskSettings, saveCompanyProductRules, ProductCommissionRule } from "./actions";
 import { getLineAutomationSettings, saveLineAutomationSettings, LineAutomationSettings } from "./line-automation-actions";
+import LineSetupWizard from "./LineSetupWizard";
 import LineAutomationSettingsPanel from "./LineAutomationSettingsPanel";
 import ProductCommissionSettingsPanel from "./ProductCommissionSettingsPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -81,17 +82,6 @@ export default function SystemSettingsPage() {
     });
   };
 
-  const handleLineStoreChange = (store: string, field: keyof LineStoreSettings, value: string) => {
-    setLineSettings(prev => ({
-      ...prev,
-      [store]: {
-        ...EMPTY_LINE_STORE_SETTINGS,
-        ...prev[store],
-        [field]: value,
-      }
-    }));
-  };
-
   const handleKioskTokenGenerate = (store: string) => {
     const randomToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     setKioskSettings(prev => ({
@@ -113,11 +103,6 @@ export default function SystemSettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     const res = await saveReservationSettings(settings);
-    
-    // Save Line Settings
-    const linePromises = lineAutomationEnabled
-      ? Object.entries(lineSettings).map(([store, storeLineSettings]) => saveLineSettings(store, storeLineSettings))
-      : [];
     
     // Save Kiosk Settings
     const kioskPromises = Object.entries(kioskSettings).map(([store, data]) => {
@@ -145,7 +130,7 @@ export default function SystemSettingsPage() {
       await saveCompanyProductRules(profile.companyId, productRules);
     }
 
-    await Promise.all([...linePromises, ...kioskPromises]);
+    await Promise.all(kioskPromises);
 
     if (res.success) {
       toast.success("設定を保存しました");
@@ -306,107 +291,12 @@ export default function SystemSettingsPage() {
           <h2 className="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2">
             <MessageCircle className="text-green-600" /> LINE公式アカウント連携
           </h2>
-          <p className="text-slate-500 font-medium">各店舗のLINE公式アカウントとLIFFを接続します</p>
+          <p className="text-slate-500 font-medium">店舗ごとに3ステップで設定できます</p>
         </div>
 
-        <Card className="border border-green-100 shadow-sm rounded-3xl overflow-hidden bg-green-50/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-black text-slate-800 flex items-center gap-2">
-              <HelpCircle className="text-green-600" /> 加盟店向け・連携の流れ
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-6 pb-6">
-            <ol className="list-decimal pl-5 space-y-2 text-sm font-medium text-slate-700 leading-relaxed">
-              <li>店舗ごとのLINE公式アカウントを用意します。</li>
-              <li>LINE DevelopersでMessaging APIチャネルを作成し、ロングタームのチャネルアクセストークンを発行します。</li>
-              <li>同じプロバイダーにLINEログインチャネルとLIFFアプリを作り、エンドポイントURLを <code className="px-1.5 py-0.5 rounded bg-white border border-green-100">{typeof window !== "undefined" ? `${window.location.origin}/link-line` : "/link-line"}</code> に設定します。</li>
-              <li>下の店舗欄へ「Basic ID」「LIFF ID」「チャネルアクセストークン」を入力して保存します。</li>
-              <li>自動配信設定を有効にし、テスト送信後に顧客詳細の「LINE連携」から友だち追加・顧客紐付けを案内します。</li>
-            </ol>
-            <p className="mt-4 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-xl p-3">
-              店舗ごとに別の設定を登録してください。未設定の店舗からは送信されません。チャネルアクセストークンは外部へ共有しないでください。
-            </p>
-            <div className="mt-3 flex flex-wrap gap-3 text-xs font-bold">
-              <a className="text-green-700 underline" href="https://developers.line.biz/ja/docs/messaging-api/getting-started/" target="_blank" rel="noreferrer">Messaging API公式手順</a>
-              <a className="text-green-700 underline" href="https://developers.line.biz/ja/docs/liff/getting-started/" target="_blank" rel="noreferrer">LIFF公式手順</a>
-            </div>
-          </CardContent>
-        </Card>
+        {availableStores.filter(store => store !== "共通" && store !== "全店舗").length === 0 && <p>店舗運用マスタで店舗を登録してください。</p>}
+        {availableStores.filter(store => store !== "共通" && store !== "全店舗").map(store => <LineSetupWizard key={`${profile?.companyId}-${store}`} store={store} settings={lineSettings[store] || EMPTY_LINE_STORE_SETTINGS} onSaved={value => setLineSettings(previous => ({ ...previous, [store]: value }))} />)}
 
-        {availableStores.filter(store => store !== "共通" && store !== "全店舗").length === 0 && (
-          <div className="p-6 bg-slate-50 border border-slate-100 rounded-2xl text-center">
-            <p className="text-sm font-bold text-slate-500 mb-2">店舗が登録されていません</p>
-            <p className="text-xs text-slate-400">
-              左メニューの「店舗運用マスタ」から店舗を登録すると、<br/>
-              こちらに店舗ごとのLINE設定項目が表示されます。
-            </p>
-          </div>
-        )}
-
-        {availableStores.filter(store => store !== "共通" && store !== "全店舗").map((store) => {
-          const storeLineSettings = lineSettings[store] || EMPTY_LINE_STORE_SETTINGS;
-          const isComplete = isLineStoreSettingsComplete(storeLineSettings);
-          return (
-          <Card key={`line-${store}`} className="border-none shadow-lg shadow-slate-200/50 rounded-3xl overflow-hidden bg-white">
-            <CardHeader className="bg-green-50 border-b border-green-100">
-              <CardTitle className="text-lg font-black text-slate-800 flex items-center justify-between gap-3">
-                <span>{store}店 LINE設定</span>
-                <span className={`text-xs px-3 py-1 rounded-full ${isComplete ? "bg-green-600 text-white" : "bg-amber-100 text-amber-700"}`}>
-                  {isComplete ? "設定済み" : "未設定項目あり"}
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">LINE公式アカウント Basic ID</label>
-                  <Input
-                    type="text"
-                    placeholder="例: @salon_rokkodai"
-                    value={storeLineSettings.lineOaId}
-                    onChange={(e) => handleLineStoreChange(store, "lineOaId", e.target.value)}
-                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4 w-full"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">LIFF ID</label>
-                  <Input
-                    type="text"
-                    placeholder="例: 1234567890-AbCdEfGh"
-                    value={storeLineSettings.liffId}
-                    onChange={(e) => handleLineStoreChange(store, "liffId", e.target.value)}
-                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4 w-full"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">チャネルアクセストークン (Channel Access Token)</label>
-                  <div className="group relative flex items-center">
-                    <HelpCircle size={14} className="text-slate-400 hover:text-slate-600 cursor-help transition-colors" />
-                    <div className="absolute left-0 bottom-full mb-2 w-[340px] p-4 bg-slate-800 text-white text-xs rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
-                      <p className="font-bold mb-2 text-green-400 flex items-center gap-1.5"><MessageCircle size={14} /> トークンの取得方法</p>
-                      <ol className="list-decimal pl-4 space-y-1.5 text-[11px] leading-relaxed text-slate-200">
-                        <li>LINE Developersで対象店舗の<strong className="text-white">「Messaging API」</strong>チャネルを開く<br/><span className="text-slate-400 text-[10px]">※「LINEログイン」チャネルではありません</span></li>
-                        <li>上のタブから<strong className="text-white">「Messaging API設定」</strong>を選択</li>
-                        <li>一番下までスクロールし、「チャネルアクセストークン (ロングターム)」の<strong className="text-white">【発行】</strong>ボタンを押す</li>
-                        <li>表示された長い文字列をコピーして下の枠へ貼り付け</li>
-                      </ol>
-                      <div className="absolute -bottom-1 left-1.5 w-3 h-3 bg-slate-800 rotate-45" />
-                    </div>
-                  </div>
-                </div>
-                <Input 
-                  type="password"
-                  placeholder="LINE Developersコンソールから取得したトークンを入力"
-                  value={storeLineSettings.channelAccessToken}
-                  onChange={(e) => handleLineStoreChange(store, "channelAccessToken", e.target.value)}
-                  className="h-12 bg-slate-50 border-none rounded-2xl font-bold px-4 w-full"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        ); })}
         </>}
 
         <div className="pt-8 pb-4">

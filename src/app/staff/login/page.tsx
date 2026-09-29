@@ -21,30 +21,17 @@ export default function StaffLoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      let userCredential;
       try {
-        userCredential = await signInWithEmailAndPassword(auth, email, password + "_salon");
+        await signInWithEmailAndPassword(auth, email, password + "_salon");
       } catch (firstErr: any) {
         if (firstErr.code === "auth/invalid-credential" || firstErr.code === "auth/wrong-password" || firstErr.code === "auth/user-not-found") {
           // パスワード再設定済みのアカウントは入力値をそのまま試す
-          userCredential = await signInWithEmailAndPassword(auth, email, password);
+          await signInWithEmailAndPassword(auth, email, password);
         } else {
           throw firstErr;
         }
       }
       
-      // Get ID token and set session cookie
-      const idToken = await userCredential.user.getIdToken();
-      const sessionRes = await fetch("/api/auth/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken }),
-      });
-      
-      if (!sessionRes.ok) {
-        throw new Error("セッションの作成に失敗しました");
-      }
-
       toast.success("ログインしました");
       router.push("/staff-portal");
     } catch (error: any) {

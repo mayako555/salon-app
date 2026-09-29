@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { getCurrentUserContext } from "@/lib/auth-server";
 import { adminAuth } from "@/lib/firebase-admin";
 
 export async function POST(request: Request) {
@@ -10,6 +11,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing idToken" }, { status: 400 });
     }
 
+    const identity = await adminAuth.verifyIdToken(idToken);
+
     // セッションの有効期限 (例: 5日間)
     const expiresIn = 60 * 60 * 24 * 5 * 1000;
 
@@ -18,8 +21,15 @@ export async function POST(request: Request) {
 
     // Cookieにセット (Next.js 15+ では await が必要)
     const cookieStore = await cookies();
+    const previousSession = cookieStore.get("session")?.value;
+    let previousUid: string | undefined;
+    if (previousSession) {
+      try { previousUid = (await adminAuth.verifySessionCookie(previousSession, true)).uid; }
+      catch { /* Expired or invalid sessions must not retain impersonation. */ }
+    }
+    if (previousUid !== identity.uid) cookieStore.delete("impersonated_company_id");
     cookieStore.set("session", sessionCookie, {
-      maxAge: expiresIn,
+      maxAge: expiresIn / 1000,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       path: "/",
@@ -37,6 +47,7 @@ export async function DELETE() {
   try {
     const cookieStore = await cookies();
     cookieStore.delete("session");
+    cookieStore.delete("impersonated_company_id");
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -51,13 +62,13 @@ export async function GET() {
     
     try {
       const decodedClaims = await adminAuth.verifySessionCookie(session, true);
-      return NextResponse.json({ success: true, uid: decodedClaims.uid });
+      const context = await getCurrentUserContext();
+      return NextResponse.json({ success: true, uid: decodedClaims.uid, companyId: context.companyId || "" }, { headers: { "Cache-Control": "private, no-store" } });
     } catch (e: any) {
       return NextResponse.json({ 
         error: "verifySessionCookie failed", 
         message: e.message || String(e),
         code: e.code,
-        sessionValue: session.substring(0, 20) + "..."
       });
     }
   } catch (error: any) {

@@ -42,7 +42,7 @@ import ExecutiveSummary from "@/components/dashboard/ExecutiveSummary";
 import DashboardSecondaryLinks from "@/components/dashboard/DashboardSecondaryLinks";
 
 export default function DashboardPage() {
-  const { profile, isAdmin, isManager, hasFeature } = useAuth();
+  const { user, companyId, loading: authLoading, profile, isAdmin, isManager, hasFeature } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,11 +68,23 @@ export default function DashboardPage() {
   }, [loading, isAdmin, isManager]);
 
   useEffect(() => {
+    if (authLoading || !user || !profile) return;
+    const controller = new AbortController();
+    setLoading(true);
+    setStats(null);
+    setTasks([]);
+    setEvalReminders([]);
+    setSetupStatus(null);
     async function load() {
       try {
-        const res = await fetch(`/api/dashboard/stats?quarter=${currentQuarter}`);
+        const res = await fetch(`/api/dashboard/stats?quarter=${currentQuarter}`, {
+          cache: "no-store",
+          signal: controller.signal,
+          headers: { "X-Expected-User": user!.uid, "X-Expected-Company": companyId || "" },
+        });
         const result = await res.json();
-        if (result.success) {
+        if (controller.signal.aborted) return;
+        if (res.ok && result.success && result.uid === user!.uid && result.companyId === (companyId || "")) {
           setStats(result.stats);
           setEvalReminders(result.evalReminders);
           setSetupStatus(result.setupStatus);
@@ -81,13 +93,14 @@ export default function DashboardPage() {
           console.error("Failed to load dashboard stats:", result.error);
         }
       } catch (e) {
-        console.error("Dashboard stats fetch error:", e);
+        if (!controller.signal.aborted) console.error("Dashboard stats fetch error:", e);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
-    load();
-  }, [isAdmin, isManager, profile?.id, currentQuarter]);
+    void load();
+    return () => controller.abort();
+  }, [authLoading, user, companyId, isAdmin, isManager, profile, currentQuarter]);
 
   const handleGenerateReply = async (task: TaskRecord) => {
     // For demo: pretend we picked these slots

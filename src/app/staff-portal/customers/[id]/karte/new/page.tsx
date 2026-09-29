@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { canvasPoint, createCanvasDrawing } from "@/lib/canvas-drawing";
 import { useParams, useRouter } from "next/navigation";
 import { getCustomerById, Customer } from "@/lib/customers";
 import { addKarteRecord } from "@/lib/karte";
@@ -35,7 +36,7 @@ const EyeDiagramCanvas = ({
   bgImage: string;
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const drawing = useRef(createCanvasDrawing());
   const [mode, setMode] = useState<'draw' | 'text'>('draw');
   const [textNodes, setTextNodes] = useState<{ x: number, y: number, text: string }[]>([]);
   const [activeText, setActiveText] = useState<{ x: number, y: number, text: string } | null>(null);
@@ -71,45 +72,22 @@ const EyeDiagramCanvas = ({
     renderCanvas();
   }, [currentBg, textNodes]);
 
-  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!e.isPrimary || e.button !== 0) return;
+    e.preventDefault();
     if (mode === 'text') {
-      const rect = canvasRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const x = ('touches' in e) ? e.touches[0].clientX - rect.left : (e as React.MouseEvent).clientX - rect.left;
-      const y = ('touches' in e) ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top;
-      setActiveText({ x, y, text: "" });
+      setActiveText({ ...canvasPoint(e.currentTarget, e), text: "" });
       return;
     }
-    setIsDrawing(true);
-    draw(e);
+    drawing.current.start(e.currentTarget, e);
   };
 
-  const stopDrawing = () => {
-    setIsDrawing(false);
-    if (mode === 'draw') {
-      const canvas = canvasRef.current;
-      if (canvas) onSave(canvas.toDataURL());
-    }
+  const stopDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (drawing.current.end(e.currentTarget, e.pointerId)) onSave(e.currentTarget.toDataURL());
   };
 
-  const draw = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing || mode !== 'draw') return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = ('touches' in e) ? e.touches[0].clientX - rect.left : (e as React.MouseEvent).clientX - rect.left;
-    const y = ('touches' in e) ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top;
-
-    ctx.lineWidth = 3;
-    ctx.lineCap = "round";
-    ctx.strokeStyle = "#e11d48";
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x, y);
+  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    drawing.current.move(e.currentTarget, e);
   };
 
   const handleAddText = () => {
@@ -166,12 +144,12 @@ const EyeDiagramCanvas = ({
           ref={canvasRef}
           width={600}
           height={400}
-          onMouseDown={startDrawing}
-          onMouseUp={stopDrawing}
-          onMouseMove={draw}
-          onTouchStart={startDrawing}
-          onTouchEnd={stopDrawing}
-          onTouchMove={draw}
+          onPointerDown={startDrawing}
+          onPointerUp={stopDrawing}
+          onPointerMove={draw}
+          onPointerCancel={stopDrawing}
+          onLostPointerCapture={stopDrawing}
+          style={{ touchAction: "none" }}
           className={`w-full h-full ${mode === 'draw' ? 'cursor-crosshair' : 'cursor-text'}`}
         />
 
@@ -208,6 +186,8 @@ export default function NewKartePage() {
   const [staffList, setStaffList] = useState<StaffProfile[]>([]);
   const [templates, setTemplates] = useState<SalesMasterItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -241,29 +221,45 @@ export default function NewKartePage() {
   const [selectedTemplateUrl, setSelectedTemplateUrl] = useState("");
 
   useEffect(() => {
-    async function load() {
-      if (typeof id !== 'string') return;
-      const [cData, sData, tData] = await Promise.all([
-        getCustomerById(id),
-        getStaffList(),
-        getMasterItems() // Will filter for karteTemplate below
-      ]);
-      setCustomer(cData);
-      setStaffList(sData);
-      
-      const karteTemplates = tData.filter(i => i.itemType === 'karteTemplate' && i.isActive);
-      setTemplates(karteTemplates);
-      if (karteTemplates.length > 0) {
-        setSelectedTemplateUrl(karteTemplates[0].imageUrl || "");
-      }
-
-      if (profile) {
-        setFormData(prev => ({ ...prev, staff_id: profile.id, staff_name: profile.name }));
-      }
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    const timeout = setTimeout(() => {
+      cancelled = true;
+      setLoadError("読み込みに時間がかかっています。通信状態を確認して、もう一度お試しください。");
       setLoading(false);
+    }, 20_000);
+
+    async function load() {
+      try {
+        if (typeof id !== 'string') throw new Error("Invalid customer ID");
+        const [cData, sData, tData] = await Promise.all([
+          getCustomerById(id),
+          getStaffList(),
+          getMasterItems()
+        ]);
+        if (cancelled) return;
+        setCustomer(cData);
+        setStaffList(sData);
+        const karteTemplates = tData.filter(i => i.itemType === 'karteTemplate' && i.isActive);
+        setTemplates(karteTemplates);
+        setSelectedTemplateUrl(karteTemplates[0]?.imageUrl || "");
+        if (profile) {
+          setFormData(prev => ({ ...prev, staff_id: profile.id, staff_name: profile.name }));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to load karte form", error);
+          setLoadError("カルテ作成に必要な情報を読み込めませんでした。もう一度お試しください。");
+        }
+      } finally {
+        clearTimeout(timeout);
+        if (!cancelled) setLoading(false);
+      }
     }
-    load();
-  }, [id, profile]);
+    void load();
+    return () => { cancelled = true; clearTimeout(timeout); };
+  }, [id, profile, loadAttempt]);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'photos' | 'treatment_photos' | 'past_karte_photos') => {
     const file = e.target.files?.[0];
@@ -311,6 +307,15 @@ export default function NewKartePage() {
   };
 
   if (loading) return <div className="p-10 text-center animate-pulse text-slate-400">読み込み中...</div>;
+  if (loadError) return (
+    <div className="p-10 text-center space-y-4" role="alert">
+      <p>{loadError}</p>
+      <div className="flex justify-center gap-3">
+        <Button variant="outline" onClick={() => router.back()}>戻る</Button>
+        <Button onClick={() => setLoadAttempt(attempt => attempt + 1)}>再読み込み</Button>
+      </div>
+    </div>
+  );
   if (!customer) return <div className="p-10 text-center">お客様が見つかりませんでした</div>;
 
   return (
@@ -381,7 +386,7 @@ export default function NewKartePage() {
 
           <EyeDiagramCanvas 
             bgImage={selectedTemplateUrl} 
-            onSave={(url) => setFormData({...formData, eye_diagram_url: url})} 
+            onSave={(url) => setFormData(prev => ({...prev, eye_diagram_url: url}))} 
           />
         </Card>
 

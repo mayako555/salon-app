@@ -9,7 +9,11 @@ import { requireFeature } from "@/lib/feature-utils";
 import {
   LineStoreSettings,
   normalizeLineStoreSettings,
+  publicLineSettings,
+  lineSettingsPatch,
 } from "@/lib/line-integration-settings";
+
+import { requireLineStore } from "@/lib/line-store-access";
 
 export type StoreReservationSettings = {
   startHour: number;
@@ -95,7 +99,7 @@ export async function getLineSettings(): Promise<LineSettingsMap> {
     snapshot.docs.forEach(doc => {
       const data = doc.data();
       if (data.storeName) {
-        result[data.storeName] = normalizeLineStoreSettings({
+        result[data.storeName] = publicLineSettings({
           channelAccessToken: data.channelAccessToken,
           lineOaId: data.lineOaId,
           liffId: data.liffId,
@@ -104,7 +108,7 @@ export async function getLineSettings(): Promise<LineSettingsMap> {
     });
     return result;
   } catch (error) {
-    console.error("Failed to fetch LINE settings:", error);
+    console.error("Failed to fetch LINE settings");
     return {};
   }
 }
@@ -121,7 +125,8 @@ export async function saveLineSettings(storeName: string, settings: LineStoreSet
     if (!normalizedStoreName) {
       return { success: false, error: "店舗名がありません" };
     }
-    const normalizedSettings = normalizeLineStoreSettings(settings);
+    await requireLineStore(ctx, normalizedStoreName);
+    const normalizedSettings = lineSettingsPatch(settings);
 
     const q = query(collection(db, "line_integrations"), where("companyId", "==", ctx.companyId), where("storeName", "==", normalizedStoreName));
     const snapshot = await getDocs(q);
@@ -151,8 +156,8 @@ export async function saveLineSettings(storeName: string, settings: LineStoreSet
     revalidatePath("/admin/settings");
     return { success: true };
   } catch (error: any) {
-    console.error("Failed to save LINE settings:", error);
-    return { success: false, error: error.message };
+    console.error("Failed to save LINE settings");
+    return { success: false, error: "LINE設定を保存できませんでした。店舗と権限をご確認ください。" };
   }
 }
 
