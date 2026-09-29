@@ -19,10 +19,11 @@ export function validateIntakeSubmission(template: FormTemplate, data: { name: s
   if (template.legacy && (!data.services?.length || data.services.some(s => !services.includes(s)))) throw new Error('施術を選択してください');
   if (data.signature && (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(data.signature) || data.signature.length > 250000)) throw new Error('署名が無効です');
   if (template.legacy && !data.signature) throw new Error('署名を入力してください');
-  const profileLabels = ['name_kana', 'postal_code', 'address', 'email', 'birthday', 'blood_type', 'occupation', 'referral_name', 'photo_permission', 'sns_permission', 'sns_permission_scope'];
-  const profile = Object.fromEntries(profileLabels.filter(key => typeof data.profile?.[key] === 'string').map(key => {
-    const value = data.profile![key] as string;
-    if (value.length > 2000) throw new Error('基本情報が長すぎます');
+  const profileLabels = ['name_kana', 'postal_code', 'address', 'email', 'birthday', 'blood_type', 'occupation', 'referral_name', 'referral_source', 'photo_permission', 'sns_permission', 'sns_permission_scope', 'email_marketing_allowed', 'dm_allowed', 'is_minimo'];
+  const profile = Object.fromEntries(profileLabels.filter(key => data.profile?.[key] !== undefined).map(key => {
+    const raw = data.profile![key];
+    const value = typeof raw === 'boolean' ? (raw ? 'yes' : 'no') : Array.isArray(raw) && raw.every(v => typeof v === 'string') ? raw.join('、') : raw;
+    if (typeof value !== 'string' || value.length > 2000) throw new Error('基本情報が無効か長すぎます');
     return [key, value];
   }));
   return { submitted_profile: profile, respondent: { name: data.name.trim(), phone: data.phone.trim() }, answers, service_types: template.legacy ? data.services! : [], signature_url: data.signature || '' };

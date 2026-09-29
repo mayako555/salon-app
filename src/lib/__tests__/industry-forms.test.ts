@@ -48,3 +48,8 @@ test('undo followed by a stroke discards redo branch and copies points', () => {
   const b = appendDrawingHistory(a.history, 0, []);
   assert.equal(b.history.length, 2); assert.deepEqual(b.history[1], []);
 });
+
+test('submitted contact preferences survive without trusting client LINE identity', () => {
+  const result = validateIntakeSubmission(templateById('hair-counseling-v1', 'counseling'), { name: 'Test', phone: '09012345678', consent: true, answers: {}, profile: { dm_allowed: false, referral_source: ['紹介'], line_user_id: 'fake' } });
+  assert.deepEqual(result.submitted_profile, { referral_source: '紹介', dm_allowed: 'no' });
+});
