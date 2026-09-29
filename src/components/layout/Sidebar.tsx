@@ -191,7 +191,7 @@ export function Sidebar() {
           <div className="bg-gradient-to-tr from-slate-800 to-slate-700 p-2 rounded-lg text-white shadow-md">
             <Scissors size={20} />
           </div>
-          <span className="font-black text-lg tracking-tight text-slate-900 italic">SalonManager</span>
+          <span className="font-black text-lg tracking-tight text-slate-900 italic">SALON AGENT</span>
         </div>
       </div>
       

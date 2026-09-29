@@ -104,7 +104,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
             <div className="bg-blue-600 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20">
               <span className="text-xl font-black italic">S</span>
             </div>
-            <h1 className="text-xl font-black tracking-tighter">SALON PORTAL</h1>
+            <h1 className="text-xl font-black tracking-tighter">SALON AGENT</h1>
           </div>
 
           <div className="mb-4">
@@ -189,7 +189,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
           <div className="bg-blue-600 w-8 h-8 rounded-lg flex items-center justify-center">
             <span className="text-sm font-black italic">S</span>
           </div>
-          <span className="text-sm font-black tracking-tighter">SALON PORTAL</span>
+          <span className="text-sm font-black tracking-tighter">SALON AGENT</span>
         </div>
         <div className="flex items-center gap-3">
           {allowedStores.length > 1 ? (
