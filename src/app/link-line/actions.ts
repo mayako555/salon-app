@@ -42,7 +42,7 @@ export async function createCustomerLineLink(customerId: string, storeName: stri
       tx.update(ref, { line_link_nonce: payload.nonce });
     });
     const token = signLineLink(payload, config.channelAccessToken);
-    return { success: true as const, url: `https://liff.line.me/${encodeURIComponent(config.liffId)}?token=${encodeURIComponent(token)}` };
+    return { success: true as const, expiresAt: payload.expiresAt, url: `https://liff.line.me/${encodeURIComponent(config.liffId)}?token=${encodeURIComponent(token)}` };
   } catch {
     return { success: false as const, error: "QRを発行できません。顧客の所属店舗・LINE設定・店舗権限をご確認ください。" };
   }
