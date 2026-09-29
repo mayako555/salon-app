@@ -6,15 +6,13 @@ import { MobileBottomNav } from "./MobileBottomNav";
 import { Search, User, LogOut, Scissors } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { auth } from "@/lib/firebase";
-import { signOut } from "firebase/auth";
 import { FeatureDenied } from "./FeatureDenied";
 import { TenantInactive } from "./TenantInactive";
 import { getFeatureForPathname } from "@/lib/tenant-access";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, profile, loading, isSystemOwner, isCompanyActive, hasFeature, impersonatingCompanyId, stopImpersonating } = useAuth();
+  const { user, profile, loading, logout, isSystemOwner, isCompanyActive, hasFeature, impersonatingCompanyId, stopImpersonating } = useAuth();
   const isLoginPage = pathname === "/login";
 
   if (isLoginPage) {
@@ -41,9 +39,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return <FeatureDenied />;
   }
 
-  const handleLogout = () => {
-    signOut(auth);
-  };
+  const handleLogout = () => logout();
 
   return (
     <div className="app-shell flex w-full bg-slate-50 overflow-hidden text-slate-900">

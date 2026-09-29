@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { createCanvasDrawing } from "@/lib/canvas-drawing";
 import { useParams, useRouter } from "next/navigation";
 import { getCustomerById, Customer } from "@/lib/customers";
 import { editKarteRecord } from "@/lib/karte";
@@ -27,7 +28,7 @@ import { doc, getDoc } from "firebase/firestore";
 // --- Drawing Canvas Component ---
 const EyeDiagramCanvas = ({ initialDataUrl, onSave }: { initialDataUrl?: string, onSave: (url: string) => void }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const drawing = useRef(createCanvasDrawing());
   const bgImage = "/assets/eye_template.png";
 
   useEffect(() => {
@@ -47,32 +48,18 @@ const EyeDiagramCanvas = ({ initialDataUrl, onSave }: { initialDataUrl?: string,
     ctx.strokeStyle = "#e11d48";
   }, [initialDataUrl]);
 
-  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
-    setIsDrawing(true);
-    draw(e);
+  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!e.isPrimary || e.button !== 0) return;
+    e.preventDefault();
+    drawing.current.start(e.currentTarget, e);
   };
 
-  const stopDrawing = () => {
-    setIsDrawing(false);
-    const canvas = canvasRef.current;
-    if (canvas) onSave(canvas.toDataURL());
+  const stopDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (drawing.current.end(e.currentTarget, e.pointerId)) onSave(e.currentTarget.toDataURL());
   };
 
-  const draw = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = ('touches' in e) ? e.touches[0].clientX - rect.left : (e as React.MouseEvent).clientX - rect.left;
-    const y = ('touches' in e) ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top;
-
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x, y);
+  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    drawing.current.move(e.currentTarget, e);
   };
 
   const clear = () => {
@@ -106,12 +93,12 @@ const EyeDiagramCanvas = ({ initialDataUrl, onSave }: { initialDataUrl?: string,
           ref={canvasRef}
           width={600}
           height={400}
-          onMouseDown={startDrawing}
-          onMouseUp={stopDrawing}
-          onMouseMove={draw}
-          onTouchStart={startDrawing}
-          onTouchEnd={stopDrawing}
-          onTouchMove={draw}
+          onPointerDown={startDrawing}
+          onPointerUp={stopDrawing}
+          onPointerMove={draw}
+          onPointerCancel={stopDrawing}
+          onLostPointerCapture={stopDrawing}
+          style={{ touchAction: "none" }}
           className="w-full h-full cursor-crosshair"
         />
       </div>
@@ -482,7 +469,7 @@ export default function EditKartePage() {
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
           <Card className="rounded-3xl p-6 border-none shadow-xl">
-            <EyeDiagramCanvas initialDataUrl={formData.eye_diagram_url} onSave={(url) => setFormData({...formData, eye_diagram_url: url})} />
+            <EyeDiagramCanvas initialDataUrl={formData.eye_diagram_url} onSave={(url) => setFormData(prev => ({...prev, eye_diagram_url: url}))} />
           </Card>
         </motion.div>
 

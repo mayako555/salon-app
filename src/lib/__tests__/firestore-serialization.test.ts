@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { Timestamp } from "firebase-admin/firestore";
 import { serializeFirestoreRecord } from "@/lib/firestore-serialization";
 
 describe("serializeFirestoreRecord", () => {
@@ -32,4 +33,17 @@ describe("serializeFirestoreRecord", () => {
     });
     assert.equal(result.split_payments, splitPayments);
   });
+});
+
+// Lefite's store was created with createdAt rather than created_at. Returning
+// this Admin SDK class unchanged makes the entire karte form action reject.
+it("serializes legacy master createdAt without changing stored data", () => {
+  const createdAt = Timestamp.fromMillis(1_790_600_000_981);
+  const record = { companyId: "leﬁte-test", itemType: "store", name: "Test store", createdAt, updated_at: createdAt };
+  const result = serializeFirestoreRecord(record);
+  assert.equal(result.createdAt, createdAt.toMillis());
+  assert.equal(result.updated_at, createdAt.toMillis());
+  assert.equal(result.companyId, record.companyId);
+  assert.equal(record.createdAt, createdAt);
+  assert.equal(typeof result.createdAt, "number");
 });

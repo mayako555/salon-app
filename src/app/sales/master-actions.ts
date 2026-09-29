@@ -14,6 +14,7 @@ import {
   deleteDoc,
   writeBatch
 } from "@/lib/firestore-admin-wrapper";
+import { serializeFirestoreRecord } from "@/lib/firestore-serialization";
 import { SalesMasterItem } from "@/types/master";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { addAuditLog } from "../audit/actions";
@@ -35,7 +36,7 @@ export async function getMasterItems(store?: string): Promise<SalesMasterItem[]>
       const data = doc.data();
       return {
         id: doc.id,
-        ...data,
+        ...serializeFirestoreRecord(data),
         created_at: data.created_at?.toMillis?.() || data.created_at || null,
         updated_at: data.updated_at?.toMillis?.() || data.updated_at || null,
       };

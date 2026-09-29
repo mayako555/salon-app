@@ -1,7 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
+import React, { createContext, useContext, useEffect, useState, useRef } from "react";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import type { DocumentData, Query, QuerySnapshot } from "firebase/firestore";
@@ -10,7 +10,11 @@ import { SalesMasterItem, AttendancePolicy, FeatureKey, FeatureSettings, ensureF
 import { resolveStaffProfileCandidate } from "@/lib/staff-profile-resolution";
 import { normalizeTenantStatus, type TenantStatus } from "@/lib/tenant-access";
 
+import { usePathname, useRouter } from "next/navigation";
+import { sessionQueue, storeSelectionKey, isPublicAuthPath, createAuthRevision } from "./auth-transition";
+
 interface AuthContextType {
+  logout: (destination?: string) => Promise<void>;
   user: User | null;
   profile: StaffProfile | null;
   companyId?: string;
@@ -38,6 +42,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType>({
+  logout: async () => {},
   user: null,
   profile: null,
   companyId: undefined,
@@ -67,6 +72,10 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const generation = useRef(createAuthRevision());
+  const [renderRevision, setRenderRevision] = useState(0);
+  const pathname = usePathname();
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<StaffProfile | null>(null);
   const [selectedStore, setSelectedStoreState] = useState<string>("");
@@ -95,19 +104,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
   const [loading, setLoading] = useState(true);
 
-  // Persistence for selected store
-  useEffect(() => {
-    const saved = localStorage.getItem("selected_store");
-    if (saved) setSelectedStoreState(saved);
-  }, []);
-
   const setSelectedStore = (store: string) => {
     setSelectedStoreState(store);
-    localStorage.setItem("selected_store", store);
+    if (user && (impersonatingCompanyId || profile?.companyId)) {
+      localStorage.setItem(storeSelectionKey(user.uid, impersonatingCompanyId || profile!.companyId!), store);
+    }
+  };
+
+  const logout = async (destination = "/login") => {
+    generation.current.next();
+    setLoading(true);
+    setProfile(null);
+    setSelectedStoreState("");
+    try {
+      await signOut(auth);
+      await sessionQueue.run(async () => {
+        const response = await fetch("/api/auth/session", { method: "DELETE" });
+        if (!response.ok) throw new Error("ログアウト処理に失敗しました");
+      });
+      window.location.replace(destination);
+    } catch (error) {
+      console.error("Logout failed", error);
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
+    if (!loading && !user && !isPublicAuthPath(pathname)) {
+      router.replace(pathname.startsWith("/staff-portal") ? "/staff/login" : "/login");
+    }
+  }, [loading, user, pathname, router]);
+
+  useEffect(() => {
+    let disposed = false;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      const currentGeneration = generation.current.next();
+      setRenderRevision(currentGeneration);
+      const isCurrent = () => !disposed && generation.current.isCurrent(currentGeneration) && auth.currentUser?.uid === firebaseUser?.uid;
+      setSelectedStoreState("");
       setUser(firebaseUser);
       setLoading(true);
       setProfile(null);
@@ -127,12 +161,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (firebaseUser && firebaseUser.email) {
         try {
           // Ensure session cookie is set for server actions
-          const token = await firebaseUser.getIdToken();
-          await fetch("/api/auth/session", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken: token })
-          }).catch(err => console.error("Failed to set session cookie:", err));
+          await sessionQueue.run(async () => {
+            if (!isCurrent()) return;
+            const token = await firebaseUser.getIdToken();
+            if (!isCurrent()) return;
+            const response = await fetch("/api/auth/session", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ idToken: token })
+            });
+            if (!response.ok) throw new Error("セッションを確認できませんでした");
+          });
+          if (!isCurrent()) return;
 
           const staffRef = collection(db, "staff_profiles");
           const fetchWithTimeout = (staffQuery: Query<DocumentData>): Promise<QuerySnapshot<DocumentData>> => Promise.race([
@@ -146,6 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const snapshot = await fetchWithTimeout(
             query(staffRef, where("email", "==", firebaseUser.email)),
           );
+          if (!isCurrent()) return;
           const resolvedCandidate = resolveStaffProfileCandidate(
             snapshot.docs.map((staffDoc) => ({
               id: staffDoc.id,
@@ -183,6 +224,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
             }
 
+            const sessionResponse = await fetch("/api/auth/session", { cache: "no-store" });
+            const serverIdentity = await sessionResponse.json();
+            if (!isCurrent()) return;
+            if (!sessionResponse.ok || !serverIdentity.success || serverIdentity.uid !== firebaseUser.uid || serverIdentity.companyId !== (companyIdToUse || "")) {
+              throw new Error("ブラウザとサーバーのサロン情報が一致しません。再度ログインしてください。");
+            }
+
             if (!companyIdToUse && data.role !== "systemOwner") {
               console.error("会社情報が未設定です");
               setProfile(null);
@@ -193,7 +241,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (companyIdToUse) {
               try {
                 const companyDoc = await getDoc(doc(db, "companies", companyIdToUse));
-                const companyData = companyDoc.exists() ? companyDoc.data() : {};
+                if (!isCurrent()) return;
+                if (!companyDoc.exists()) throw new Error("サロン情報が存在しません");
+                const companyData = companyDoc.data();
                 setCompanyStatus(normalizeTenantStatus(companyData.status));
                 
                 const isSystemOwnerContext = companyData.companyType === "system_owner" || companyIdToUse === "company_default";
@@ -227,6 +277,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   where("itemType", "==", "store")
                 );
                 const storeSnap = await getDocs(storeQ);
+                if (!isCurrent()) return;
                 const storeObjects = storeSnap.docs
                   .map(d => ({ id: d.id, ...d.data() } as SalesMasterItem))
                   .filter(d => d.isActive !== false)
@@ -236,48 +287,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setAvailableStores(stores);
                 setAvailableStoreObjects(storeObjects);
 
-                const savedStore = localStorage.getItem("selected_store");
+                const savedStore = localStorage.getItem(storeSelectionKey(firebaseUser.uid, companyIdToUse));
                 if (savedStore && stores.includes(savedStore)) {
                   setSelectedStoreState(savedStore);
                 } else if (data.store_name && stores.includes(data.store_name)) {
-                  setSelectedStore(data.store_name);
+                  setSelectedStoreState(data.store_name);
                 } else if (stores.length > 0) {
-                  setSelectedStore(stores[0]);
+                  setSelectedStoreState(stores[0]);
                 }
               } catch (e) {
-                console.error("Failed to fetch company info:", e);
+                throw e;
               }
             }
           } else {
-            const fallbackName = firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : "ゲスト");
-            setProfile({
-              id: "guest_" + firebaseUser.uid,
-              name: fallbackName,
-              role: "guest",
-              companyId: undefined,
-              employment_status: "active",
-              is_active: true,
-              is_trainee: false,
-              employment_type: "employee",
-              max_holiday_requests: 3
-            } as any);
+            setProfile(null);
             setAvailableStores([]);
           }
         } catch (error) {
+          if (!isCurrent()) return;
           console.error("Error fetching staff profile:", error);
           setProfile(null);
         }
       } else {
+        try {
+          await sessionQueue.run(async () => {
+            if (!isCurrent()) return;
+            const response = await fetch("/api/auth/session", { method: "DELETE" });
+            if (!response.ok) throw new Error("セッションを終了できませんでした");
+          });
+        } catch (error) {
+          console.error("Session cleanup failed", error);
+        }
+        if (!isCurrent()) return;
         setProfile(null);
       }
       
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => { disposed = true; generation.current.next(); unsubscribe(); };
   }, []);
 
   const value = {
+    logout,
     user,
     profile,
     companyId: impersonatingCompanyId || profile?.companyId,
@@ -285,7 +337,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAdmin: profile?.role === "admin" || profile?.role === "systemOwner" || profile?.role === "companyOwner",
     isSystemOwner: profile?.role === "systemOwner",
     isManager: profile?.role === "manager" || profile?.role === "storeManager" || profile?.role === "admin" || profile?.role === "systemOwner" || profile?.role === "companyOwner",
-    isStaff: true,
+    isStaff: !!profile,
     isCompanyOwner: profile?.role === "companyOwner",
     selectedStore,
     setSelectedStore,
@@ -304,5 +356,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     stopImpersonating
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  // Do not mount private pages (including their data-fetching effects) until
+  // Firebase identity, the server session and tenant settings agree.
+  const publicPage = isPublicAuthPath(pathname);
+  const ready = !loading && !!user && auth.currentUser?.uid === user.uid && !!profile;
+  return <AuthContext.Provider value={value}>
+    {publicPage || ready ? (
+      <React.Fragment key={publicPage ? "public" : `${user!.uid}:${impersonatingCompanyId || profile?.companyId || "system"}:${renderRevision}`}>
+        {children}
+      </React.Fragment>
+    ) : (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50" role="status">
+        <p>{loading ? "サロン情報を確認中…" : !user ? "ログイン画面へ移動中…" : "サロン情報を確認できませんでした。再度ログインしてください。"}</p>
+        {!loading && <button onClick={() => void logout()}>ログインし直す</button>}
+      </div>
+    )}
+  </AuthContext.Provider>;
 }

@@ -51,6 +51,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { createCustomerLineLink } from "@/app/link-line/actions";
+import { LineLinkQrDownload } from "@/components/LineLinkQrDownload";
 import { QRCodeSVG } from "qrcode.react";
 import {
   getPublicLineStoreSettings,
@@ -78,6 +80,7 @@ export default function CustomerDetailPage() {
   const [isLinkQrOpen, setIsLinkQrOpen] = useState(false);
   const [isEntryQrOpen, setIsEntryQrOpen] = useState(false); // New: Counseling QR
   const [linkUrl, setLinkUrl] = useState("");
+  const [linkExpiresAt, setLinkExpiresAt] = useState(0);
   const [entryUrl, setEntryUrl] = useState(""); // New: Entry URL
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const [linePublicSettings, setLinePublicSettings] = useState<Record<string, PublicLineStoreSettings>>({});
@@ -216,16 +219,17 @@ export default function CustomerDetailPage() {
   };
 
   useEffect(() => {
-    const settings = selectedStore ? linePublicSettings[selectedStore] : undefined;
-    if (isLinkQrOpen && selectedStore && settings) {
-      const query = new URLSearchParams({
-        store: selectedStore,
-        liffId: settings.liffId,
-      });
-      setLinkUrl(`https://liff.line.me/${encodeURIComponent(settings.liffId)}/link-line/${id}?${query.toString()}`);
-    } else {
-      setLinkUrl("");
+    let cancelled = false;
+    setLinkUrl("");
+    setLinkExpiresAt(0);
+    if (isLinkQrOpen && selectedStore && linePublicSettings[selectedStore] && typeof id === "string") {
+      createCustomerLineLink(id, selectedStore).then(result => {
+        if (cancelled) return;
+        if (result.success) { setLinkUrl(result.url); setLinkExpiresAt(result.expiresAt); }
+        else toast.error(result.error);
+      }).catch(() => { if (!cancelled) toast.error("QRを発行できませんでした"); });
     }
+    return () => { cancelled = true; };
   }, [isLinkQrOpen, selectedStore, id, linePublicSettings]);
 
   const handleShowEntryQr = () => {
@@ -1008,7 +1012,7 @@ export default function CustomerDetailPage() {
       {/* LINE Link QR Dialog */}
       {lineAutomationEnabled && (
       <Dialog open={isLinkQrOpen} onOpenChange={(open) => { setIsLinkQrOpen(open); if (!open) setSelectedStore(null); }}>
-        <DialogContent className="sm:max-w-sm rounded-[2rem] text-center">
+        <DialogContent className="sm:max-w-sm max-h-[90dvh] overflow-y-auto rounded-[2rem] text-center">
           <DialogHeader>
             <DialogTitle className="text-xl font-black text-[#06C755]">LINE連携</DialogTitle>
           </DialogHeader>
@@ -1079,6 +1083,7 @@ export default function CustomerDetailPage() {
                   スキャンするとLINEログイン画面が開きます。<br/>
                   連携完了後、LINEでのお知らせが自動化されます。
                 </p>
+                <LineLinkQrDownload key={linkUrl} url={linkUrl} storeName={selectedStore || ""} expiresAt={linkExpiresAt} />
               </>
               ) : (
                 <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs font-bold text-slate-500">
