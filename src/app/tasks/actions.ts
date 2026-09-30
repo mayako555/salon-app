@@ -23,7 +23,7 @@ import { requireFeature } from "@/lib/feature-utils";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
-export type TaskType = "booking_change_request" | "general_inquiry" | "staff_evaluation";
+export type TaskType = "booking_change_request" | "general_inquiry" | "staff_evaluation" | "staff_mapping";
 
 export type TaskRecord = {
   id: string;

@@ -1,6 +1,7 @@
 "use client";
 export const maxDuration = 60;
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { 
@@ -457,7 +458,10 @@ export default function AdminExpensesDashboard() {
         staff_id: profile?.id || "admin"
       }));
 
-      const res = await addExpensesBatch(expensesToSave);
+      let res = await addExpensesBatch(expensesToSave);
+      if (res.requiresDuplicateConfirmation && window.confirm(`${res.duplicateCount}件は同じ経費の可能性があります。重複候補も別の経費として登録しますか？`)) {
+        res = await addExpensesBatch(expensesToSave, true);
+      }
       
       if (res.success) {
         toast.success(`${res.count}件の経費をデータベースに登録しました！${res.skipped ? `（${res.skipped}件は重複としてスキップされました）` : ''}`);
@@ -547,6 +551,7 @@ export default function AdminExpensesDashboard() {
     <AuthGuard requireRole="manager" requireFeature="expenses">
       <div className="space-y-6 animate-in fade-in duration-500 max-w-[1600px] mx-auto px-4 md:px-0">
         
+        <Link href="/admin/expenses/entry" className="block rounded-xl border bg-white p-4 text-blue-700 font-bold">経費の手入力・CSV取込・カテゴリ設定 →</Link>
         {/* Header Control Panel */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 border border-slate-200 rounded-2xl shadow-sm">
           <div className="flex items-center gap-3">

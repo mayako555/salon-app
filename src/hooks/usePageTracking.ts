@@ -13,6 +13,11 @@ export function usePageTracking() {
   const currentPathRef = useRef<string>(pathname);
 
   useEffect(() => {
+    if (pathname.startsWith("/availability/") || currentPathRef.current.startsWith("/availability/")) {
+      currentPathRef.current = pathname;
+      startTimeRef.current = Date.now();
+      return;
+    }
     if (!user || !profile?.companyId || tenantPlan !== "Test") return;
 
     // パスが変わった場合、前のページの滞在時間を記録

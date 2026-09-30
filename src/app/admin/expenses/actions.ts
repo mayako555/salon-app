@@ -20,6 +20,7 @@ import { getAdvancedAnalytics } from "@/app/dashboard/actions";
 import { addAuditLog } from "@/app/audit/actions";
 import * as Papa from "papaparse";
 import * as crypto from "crypto";
+import { duplicateExpense } from "@/lib/accounting/model";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc, setTenantOwnedDoc } from "@/lib/tenant-ownership";
 
 
@@ -32,6 +33,10 @@ export type ExpenseRecord = {
   description: string;
   staff_name: string;
   staff_id: string;
+  source?: "manual" | "csv" | "freee" | "moneyforward" | "yayoi";
+  paymentMethod?: string;
+  counterparty?: string;
+  receiptId?: string | null;
   is_imported?: boolean;
   created_at?: string;
 };
@@ -74,6 +79,7 @@ export async function addExpense(data: Omit<ExpenseRecord, 'id' | 'created_at'>)
     const colRef = collection(db, EXPENSES_COLLECTION);
     const docRef = await addTenantOwnedDoc(colRef, {
       ...data,
+      source: "manual",
       created_at: serverTimestamp()
     });
 
@@ -95,7 +101,7 @@ export async function addExpense(data: Omit<ExpenseRecord, 'id' | 'created_at'>)
   }
 }
 
-export async function addExpensesBatch(expenses: Omit<ExpenseRecord, 'id' | 'created_at'>[]) {
+export async function addExpensesBatch(expenses: Omit<ExpenseRecord, 'id' | 'created_at'>[], confirmDuplicates = false) {
   try {
     if (expenses.length === 0) return { success: true, count: 0, skipped: 0 };
 
@@ -114,24 +120,22 @@ export async function addExpensesBatch(expenses: Omit<ExpenseRecord, 'id' | 'cre
     const snapshot = await getDocs(q);
     const existingRecords = snapshot.docs.map(doc => doc.data() as ExpenseRecord);
 
-    // Filter out duplicates
-    const newExpenses = expenses.filter(newExp => {
-      const isDuplicate = existingRecords.some(ex => 
-        ex.date === newExp.date && 
-        ex.category === newExp.category && 
-        ex.amount === newExp.amount
-      );
-      return !isDuplicate;
-    });
-
-    if (newExpenses.length === 0) {
-      return { success: true, count: 0, skipped: expenses.length };
+    // Similar records are candidates, never silently removed or merged.
+    const duplicateCount = expenses.filter((row, index) =>
+      existingRecords.some(existing => duplicateExpense(row, existing)) ||
+      expenses.slice(0, index).some(existing => duplicateExpense(row, existing))
+    ).length;
+    if (duplicateCount && !confirmDuplicates) {
+      return { success: false, requiresDuplicateConfirmation: true, duplicateCount,
+        error: "同じ経費の可能性があります。内容を確認してください。" };
     }
+    const newExpenses = expenses;
 
     // Insert new expenses
     await Promise.all(newExpenses.map(async (data) => {
       await addTenantOwnedDoc(colRef, {
         ...data,
+        source: "csv",
         is_imported: true, // Flag as imported via CSV
         created_at: serverTimestamp()
       });

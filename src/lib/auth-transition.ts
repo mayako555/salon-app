@@ -17,7 +17,7 @@ export function storeSelectionKey(uid: string, companyId: string) {
 }
 
 export function isPublicAuthPath(pathname: string) {
-  return ["/login", "/staff/login", "/entry", "/customers/intake", "/kiosk/attendance", "/link-line", "/privacy", "/lp"].some(
+  return ["/availability", "/login", "/staff/login", "/entry", "/customers/intake", "/kiosk/attendance", "/link-line", "/privacy", "/lp"].some(
     path => pathname === path || pathname.startsWith(`${path}/`),
   );
 }

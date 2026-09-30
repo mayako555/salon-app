@@ -43,6 +43,10 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /companies/{companyId}/{collection}/{docId} {
+      allow read, write: if false;
+    }
+
     match /sales_master/{docId} {
       allow read: if isSystemOwner() || belongsToCurrentCompany(resource.data.companyId);
       allow write: if false;

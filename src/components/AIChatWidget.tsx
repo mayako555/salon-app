@@ -69,6 +69,8 @@ export default function AIChatWidget() {
     }
   };
 
+  if (pathname.startsWith("/availability/")) return null;
+
   return (
     <>
       {!isOpen && (
