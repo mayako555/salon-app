@@ -78,7 +78,7 @@ export async function getReservations(store: string, dateStr: string): Promise<R
     if (customerIds.length > 0) {
       // Split into chunks of 10 for 'in' queries
       const counts: Record<string, number> = {};
-      const customerInfo: Record<string, { notes: string, allergies: string[] }> = {};
+      const customerInfo: Record<string, { notes: string, allergies: string[], phone: string }> = {};
       
       const { documentId } = await import('@/lib/firestore-admin-wrapper');
       
@@ -96,6 +96,7 @@ export async function getReservations(store: string, dateStr: string): Promise<R
           const data = cSnap.data();
           counts[cSnap.id] = data.same_day_cancel_count || 0;
           customerInfo[cSnap.id] = {
+            phone: data.phone || "",
             notes: data.notes || "",
             allergies: data.allergies || []
           };
@@ -107,6 +108,7 @@ export async function getReservations(store: string, dateStr: string): Promise<R
           return { 
             ...r, 
             same_day_cancel_count: counts[r.customer_id],
+            customer_phone: customerInfo[r.customer_id].phone,
             customer_notes: customerInfo[r.customer_id].notes,
             customer_allergies: customerInfo[r.customer_id].allergies
           };

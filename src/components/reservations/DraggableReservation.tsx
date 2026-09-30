@@ -268,7 +268,7 @@ export default function DraggableReservation({ res, staffList, currentStaffIndex
           </div>
           <div className="space-y-1.5 text-slate-600">
             <div className="flex items-start gap-2"><MapPin className="w-3.5 h-3.5 mt-0.5 text-slate-400" /> <span className="flex-1">{res.menu_name}</span></div>
-            <div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-slate-400" /> 090-XXXX-XXXX</div>
+            {res.customer_phone && <div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-slate-400" /> {res.customer_phone}</div>}
             <div className="flex items-center gap-2"><User className="w-3.5 h-3.5 text-slate-400" /> 担当: {res.staff_name}</div>
             
             <div className="mt-2 pt-2 border-t border-slate-100 grid grid-cols-2 gap-2 text-[10px]">

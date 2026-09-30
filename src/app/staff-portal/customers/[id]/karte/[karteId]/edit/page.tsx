@@ -1,4 +1,7 @@
 "use client";
+import KarteFormRouter from "@/components/forms/KarteFormRouter";
+import EyeDiagramCanvas from "@/components/forms/KarteDrawingCanvas";
+import type { DrawingDocument } from "@/lib/drawing-document";
 
 import { useEffect, useState, useRef } from "react";
 import { createCanvasDrawing } from "@/lib/canvas-drawing";
@@ -23,90 +26,10 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
 import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { getKarteByCustomer } from "@/lib/karte";
 
 // --- Drawing Canvas Component ---
-const EyeDiagramCanvas = ({ initialDataUrl, onSave }: { initialDataUrl?: string, onSave: (url: string) => void }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(createCanvasDrawing());
-  const bgImage = "/assets/eye_template.png";
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const img = new Image();
-    img.src = initialDataUrl || bgImage;
-    img.onload = () => {
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    };
-
-    ctx.lineWidth = 3;
-    ctx.lineCap = "round";
-    ctx.strokeStyle = "#e11d48";
-  }, [initialDataUrl]);
-
-  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!e.isPrimary || e.button !== 0) return;
-    e.preventDefault();
-    drawing.current.start(e.currentTarget, e);
-  };
-
-  const stopDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (drawing.current.end(e.currentTarget, e.pointerId)) onSave(e.currentTarget.toDataURL());
-  };
-
-  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    drawing.current.move(e.currentTarget, e);
-  };
-
-  const clear = () => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const img = new Image();
-      img.src = bgImage;
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        onSave(canvas.toDataURL());
-      };
-      ctx.beginPath();
-    }
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-between items-center px-1">
-        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-          <Sparkles size={12} className="text-amber-500" /> 手書きデザインマップ
-        </label>
-        <Button variant="ghost" size="sm" onClick={clear} className="text-slate-400 text-[10px] h-6 px-2 hover:text-rose-500">
-          <Trash2 size={10} className="mr-1" /> リセット
-        </Button>
-      </div>
-      <div className="border-4 border-slate-100 rounded-3xl bg-white overflow-hidden touch-none shadow-inner aspect-[3/2]">
-        <canvas
-          ref={canvasRef}
-          width={600}
-          height={400}
-          onPointerDown={startDrawing}
-          onPointerUp={stopDrawing}
-          onPointerMove={draw}
-          onPointerCancel={stopDrawing}
-          onLostPointerCapture={stopDrawing}
-          style={{ touchAction: "none" }}
-          className="w-full h-full cursor-crosshair"
-        />
-      </div>
-    </div>
-  );
-};
-
-export default function EditKartePage() {
+function EditKartePage() {
   const { id, karteId } = useParams();
   const router = useRouter();
   const { profile } = useAuth();
@@ -142,6 +65,7 @@ export default function EditKartePage() {
       left_total: 0,
       right_total: 0
     },
+    drawing_document: undefined as DrawingDocument | undefined,
     eye_diagram_url: "",
     photos: [] as { url: string; description: string }[],
     treatment_photos: [] as { url: string; description: string }[],
@@ -162,10 +86,9 @@ export default function EditKartePage() {
       setStaffList(sData);
 
       // Fetch existing karte record
-      const docRef = doc(db, "karte_records", karteId);
-      const snapshot = await getDoc(docRef);
-      if (snapshot.exists()) {
-        const data = snapshot.data();
+      const records = await getKarteByCustomer(id);
+      const data = records.find(record => record.id === karteId);
+      if (data) {
         let dateStr = new Date().toISOString().split('T')[0];
         if (data.date) {
           dateStr = data.date.toMillis ? new Date(data.date.toMillis()).toISOString().split('T')[0] : new Date(data.date).toISOString().split('T')[0];
@@ -175,7 +98,7 @@ export default function EditKartePage() {
           staff_id: data.staff_id || "",
           staff_name: data.staff_name || "",
           date: dateStr,
-          service_type: data.service_type || "eyelash_ext",
+          service_type: (data.service_type || "eyelash_ext") as typeof formData.service_type,
           visit_type: data.visit_type || "repeat",
           design: {
             curl: data.design?.curl || "C",
@@ -198,6 +121,7 @@ export default function EditKartePage() {
             left_total: data.design?.left_total || 0,
             right_total: data.design?.right_total || 0
           },
+          drawing_document: data.drawing_document,
           eye_diagram_url: data.eye_diagram_url || "",
           photos: data.photos || [],
           treatment_photos: data.treatment_photos || [],
@@ -205,7 +129,7 @@ export default function EditKartePage() {
         });
 
         // Determine if we should show split view for new visit
-        if (data.visit_type === 'new' && (data.design?.left_total > 0 || data.design?.right_total > 0)) {
+        if (data.visit_type === 'new' && ((data.design?.left_total || 0) > 0 || (data.design?.right_total || 0) > 0)) {
           setSplitLeftRight(true);
         }
       }
@@ -469,7 +393,7 @@ export default function EditKartePage() {
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
           <Card className="rounded-3xl p-6 border-none shadow-xl">
-            <EyeDiagramCanvas initialDataUrl={formData.eye_diagram_url} onSave={(url) => setFormData(prev => ({...prev, eye_diagram_url: url}))} />
+            <EyeDiagramCanvas initialDataUrl={formData.eye_diagram_url} initialDocument={formData.drawing_document} onSave={(url, drawing_document) => setFormData(prev => ({...prev, eye_diagram_url: url, drawing_document}))} />
           </Card>
         </motion.div>
 
@@ -558,3 +482,5 @@ export default function EditKartePage() {
     </div>
   );
 }
+
+export default function Page() { return <KarteFormRouter editing><EditKartePage /></KarteFormRouter>; }
