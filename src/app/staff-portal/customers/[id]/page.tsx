@@ -1,4 +1,5 @@
 "use client";
+import { createCounselingIntake } from "@/lib/intake-actions";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -232,12 +233,14 @@ export default function CustomerDetailPage() {
     return () => { cancelled = true; };
   }, [isLinkQrOpen, selectedStore, id, linePublicSettings]);
 
-  const handleShowEntryQr = () => {
-    // Use the current direct URL instead of LIFF to ensure it always opens the entry form
-    // regardless of LIFF endpoint settings.
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    setEntryUrl(`${baseUrl}/entry?id=${id}`);
-    setIsEntryQrOpen(true);
+  const handleShowEntryQr = async () => {
+    if (typeof id !== 'string') return;
+    try {
+      const result = await createCounselingIntake(id);
+      if (!result.success) { toast.error(result.error); return; }
+      setEntryUrl(`${window.location.origin}/entry?token=${result.token}`);
+      setIsEntryQrOpen(true);
+    } catch { toast.error('入力用QRを発行できませんでした'); }
   };
 
   const handleTestLineMessage = async () => {
@@ -602,7 +605,7 @@ export default function CustomerDetailPage() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-black text-slate-800 uppercase tracking-wider">{(record.service_type || 'other').replace('_', ' ')}</span>
+                          <span className="font-black text-slate-800 uppercase tracking-wider">{record.form_snapshot?.name || (record.service_type || 'other').replace('_', ' ')}</span>
                           <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-bold uppercase">{record.visit_type}</span>
                         </div>
                         <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1 mt-0.5">
@@ -624,6 +627,7 @@ export default function CustomerDetailPage() {
                     </div>
                   </div>
                   
+                  {record.form_snapshot && !record.form_snapshot.legacy ? <dl className="space-y-3">{record.form_snapshot.fields.map(field => <div key={field.id}><dt className="text-xs font-bold text-slate-500">{field.label}</dt><dd className="whitespace-pre-wrap text-sm">{record.form_answers?.[field.id] || '—'}</dd></div>)}</dl> : (<>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div className="bg-slate-50 p-3 rounded-2xl">
                       <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Menu</p>
@@ -648,6 +652,7 @@ export default function CustomerDetailPage() {
                     </div>
                   </div>
 
+                  </>)}
                   {(record.design.left_added || record.design.right_added) && (
                     <div className="flex gap-2">
                       <div className="flex-1 bg-emerald-50/50 border border-emerald-100 rounded-xl p-2 text-center">
@@ -787,7 +792,7 @@ export default function CustomerDetailPage() {
                       <ClipboardList size={20} />
                     </div>
                     <div>
-                      <p className="text-sm font-black text-slate-800 uppercase tracking-tight">{(entry.service_types || []).join(' / ') || '未設定'}</p>
+                      <p className="text-sm font-black text-slate-800 uppercase tracking-tight">{entry.form_snapshot?.name || (entry.service_types || []).join(' / ') || '未設定'}</p>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                         {format(entry.created_at?.toDate?.() || entry.created_at || new Date(), "yyyy/MM/dd HH:mm")}
                       </p>
@@ -1115,10 +1120,12 @@ export default function CustomerDetailPage() {
               />
             </div>
             <div className="space-y-2">
+              <a className="block text-sm text-blue-600 underline" href={entryUrl} target="_blank" rel="noreferrer">入力画面を開く</a>
               <p className="text-sm font-bold text-slate-700">お客様のスマホで読み取ってください</p>
               <p className="text-[10px] text-slate-400 leading-relaxed font-bold">
                 スキャンするとお客様自身のスマホで<br/>
-                カウンセリング内容を入力・修正いただけます。
+                選択した業種のカウンセリングに回答できます。<br/>
+                このお客様専用・発行から24時間・送信は1回です。
               </p>
             </div>
           </div>

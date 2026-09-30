@@ -1,4 +1,5 @@
 "use server";
+import { readIndustryForms, validateIndustryForms, type IndustryForms } from "@/lib/industry-forms";
 import { db } from "@/lib/firestore-admin-wrapper";
 import { 
   collection, 
@@ -29,6 +30,7 @@ export type CompanyTenant = {
   adminEmails?: string[];
   schoolEnabled?: boolean;
   schoolName?: string;
+  industryForms?: IndustryForms;
 };
 
 const COMPANIES_COLLECTION = "companies";
@@ -93,6 +95,7 @@ export async function addTenant(payload: Omit<CompanyTenant, "id" | "createdAt" 
     const defaultFeatures = generateDefaultFeatures(false);
     const docRef = await addDocUnfiltered(colRef, {
       ...payload,
+      industryForms: readIndustryForms(payload.industryForms),
       features: defaultFeatures,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
@@ -123,6 +126,7 @@ export async function updateTenant(id: string, payload: Partial<Omit<CompanyTena
     const docRef = doc(db, COMPANIES_COLLECTION, id);
     await updateDocUnfiltered(docRef, {
       ...payload,
+      ...(payload.industryForms ? { industryForms: validateIndustryForms(payload.industryForms) } : {}),
       updatedAt: serverTimestamp()
     });
     

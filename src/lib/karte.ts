@@ -1,25 +1,20 @@
 "use server";
-
-import { db } from "./firebase";
-import { updateTenantOwnedDoc, deleteTenantOwnedDoc } from "@/lib/tenant-ownership";
-import {
-  collection,
-  getDocs, 
-  addDoc, 
-  query, 
-  where, 
-  orderBy, 
-  serverTimestamp,
-  Timestamp 
-} from "firebase/firestore";
-
+import { cleanKartePatch } from "./karte-validation";
+import { adminDb as untypedDb } from './firebase-admin';
+const adminDb = untypedDb as import("firebase-admin/firestore").Firestore;
+import { requireCustomerAccess, serializeRecord } from './customer-record-access';
+import { getIndustryFormSettings } from './industry-form-actions';
+import { templateById, cleanFormAnswers, type FormTemplate } from './industry-forms';
 export type KarteRecord = {
+  drawing_document?: import("./drawing-document").DrawingDocument;
+  form_snapshot?: FormTemplate;
+  form_answers?: Record<string, string>;
   id: string;
   customer_id: string;
   staff_id: string;
   staff_name: string;
   date: any;
-  service_type: 'eyelash_ext' | 'lash_lift' | 'eyebrow' | 'and_healthy';
+  service_type: 'eyelash_ext' | 'lash_lift' | 'eyebrow' | 'and_healthy' | 'hair' | 'nail' | 'esthetic' | 'relaxation' | 'general';
   visit_type: 'new' | 'repeat' | 'refill'; // 付け足し/付け替え等
   
   // Design Details (Specialized by Service)
@@ -71,87 +66,42 @@ export type KarteRecord = {
   created_at: any;
 };
 
-const KARTE_COLLECTION = "karte_records";
 
 export async function addKarteRecord(data: Omit<KarteRecord, 'id' | 'created_at' | 'edit_history'>) {
   try {
-    const colRef = collection(db, KARTE_COLLECTION);
-    const docRef = await addDoc(colRef, {
-      ...data,
-      created_at: serverTimestamp(),
-      edit_history: []
-    });
-    return { success: true, id: docRef.id };
-  } catch (error: any) {
-    console.error("Error adding karte record:", error);
-    return { success: false, error: error.message };
-  }
+    const { ctx } = await requireCustomerAccess(data.customer_id);
+    const settings = await getIndustryFormSettings();
+    const template = templateById(settings.karteTemplateId, 'karte');
+    if (data.form_snapshot?.id !== template.id && !(template.legacy && !data.form_snapshot)) throw new Error('シート設定が変更されました。画面を開き直してください');
+    const { form_snapshot, form_answers, ...rest } = data;
+    const doc = await adminDb.collection('karte_records').add({ ...cleanKartePatch(rest), customer_id: data.customer_id, companyId: ctx.companyId,
+      form_snapshot: template, form_answers: template.legacy ? {} : cleanFormAnswers(template, form_answers),
+      created_at: new Date(), edit_history: [] });
+    return { success: true, id: doc.id };
+  } catch { return { success: false, error: '保存できませんでした。顧客・シート設定と入力内容を確認してください。' }; }
 }
-
-export async function editKarteRecord(karteId: string, newData: Partial<KarteRecord>, editorId: string, editorName: string) {
+export async function editKarteRecord(karteId: string, newData: Partial<KarteRecord>, _editorId: string, _editorName: string) {
   try {
-    const { doc, getDoc, updateDoc } = await import("firebase/firestore");
-    const docRef = doc(db, KARTE_COLLECTION, karteId);
-    const snapshot = await getDoc(docRef);
-    
-    if (!snapshot.exists()) {
-      return { success: false, error: "Karte not found" };
-    }
-    
-    const oldData = snapshot.data() as KarteRecord;
-    const historyEntry = {
-      edited_at: new Date().toISOString(),
-      edited_by_id: editorId,
-      edited_by_name: editorName,
-      previous_data: { ...oldData }
-    };
-    
-    const updatedHistory = [...(oldData.edit_history || []), historyEntry];
-    
-    // Clean up newData so we don't accidentally overwrite id or created_at
-    const cleanData = { ...newData };
-    delete cleanData.id;
-    delete cleanData.created_at;
-    delete cleanData.edit_history;
-
-    await updateTenantOwnedDoc(docRef, {
-      ...cleanData,
-      edit_history: updatedHistory
+    const ref = adminDb.collection('karte_records').doc(karteId);
+    const initial = await ref.get();
+    const { ctx } = await requireCustomerAccess(initial.data()?.customer_id);
+    await adminDb.runTransaction(async (tx: import("firebase-admin/firestore").Transaction) => {
+      const snapshot = await tx.get(ref); const old = snapshot.data();
+      if (!old || old.customer_id !== initial.data()?.customer_id || (old.companyId && old.companyId !== ctx.companyId)) throw new Error('権限がありません');
+      const { id, customer_id, created_at, edit_history, form_snapshot, form_answers, ...patch } = newData;
+      // Preserve the original form definition when tenant settings change.
+      const previous = { ...old }; delete previous.edit_history;
+      await tx.update(ref, { ...cleanKartePatch(patch), companyId: ctx.companyId,
+        ...(old.form_snapshot && !old.form_snapshot.legacy ? { form_answers: cleanFormAnswers(old.form_snapshot, form_answers ?? old.form_answers) } : {}),
+        edit_history: [...(old.edit_history || []), { edited_at: new Date().toISOString(), edited_by_id: ctx.uid, edited_by_name: ctx.profileId || ctx.uid, previous_data: previous }] });
     });
-    
     return { success: true };
-  } catch (error: any) {
-    console.error("Error editing karte record:", error);
-    return { success: false, error: error.message };
-  }
+  } catch { return { success: false, error: 'カルテを更新できませんでした' }; }
 }
-
 export async function getKarteByCustomer(customerId: string): Promise<KarteRecord[]> {
-  try {
-    const colRef = collection(db, KARTE_COLLECTION);
-    const q = query(colRef, where("customer_id", "==", customerId));
-    const snapshot = await getDocs(q);
-    
-    const records = snapshot.docs.map(doc => {
-      const data = doc.data() as any;
-      return { 
-        id: doc.id, 
-        ...data,
-        created_at: data.created_at?.toMillis?.() || data.created_at || null,
-        date: data.date?.toMillis?.() || data.date || null
-      };
-    }) as KarteRecord[];
-    
-    // Sort in-memory by date descending to avoid composite index requirement
-    records.sort((a, b) => {
-      const timeA = typeof a.date === 'number' ? a.date : new Date(a.date).getTime();
-      const timeB = typeof b.date === 'number' ? b.date : new Date(b.date).getTime();
-      return (timeB || 0) - (timeA || 0);
-    });
-    
-    return records;
-  } catch (error) {
-    console.error("Error fetching karte records:", error);
-    return [];
-  }
+  const { ctx } = await requireCustomerAccess(customerId);
+  const snapshot = await adminDb.collection('karte_records').where('customer_id', '==', customerId).get();
+  return snapshot.docs.filter((d: import("firebase-admin/firestore").QueryDocumentSnapshot) => !d.data().companyId || d.data().companyId === ctx.companyId)
+    .map((d: import("firebase-admin/firestore").QueryDocumentSnapshot) => serializeRecord({ ...d.data(), id: d.id }) as KarteRecord)
+    .sort((a: KarteRecord, b: KarteRecord) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }

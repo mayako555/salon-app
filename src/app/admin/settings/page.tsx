@@ -1,4 +1,5 @@
 "use client";
+import IndustryFormSettings from "@/components/forms/IndustryFormSettings";
 
 import { useEffect, useState } from "react";
 import { getReservationSettings, saveReservationSettings, getLineSettings, saveLineSettings, ReservationSettings, LineSettingsMap, getCompanySettings, saveCompanyAttendancePolicy, getKioskSettings, saveKioskSettings, saveCompanyProductRules, ProductCommissionRule } from "./actions";
@@ -63,7 +64,7 @@ export default function SystemSettingsPage() {
   }
 
   if (loading || !settings) {
-    return <div className="p-12 text-center text-slate-400 font-bold animate-pulse">Loading Settings...</div>;
+    return <div className="p-6 max-w-4xl mx-auto space-y-6"><h1 className="text-3xl font-bold">システム設定</h1><IndustryFormSettings key={profile?.companyId} /><p role="status">{loading ? "その他の設定を読み込み中…" : "その他の設定を読み込めませんでした。ページを開き直してください。"}</p></div>;
   }
 
   const handleStoreChange = (store: string, field: "startHour" | "endHour" | "slotDuration", value: number) => {
@@ -158,6 +159,8 @@ export default function SystemSettingsPage() {
           {saving ? "保存中..." : "保存する"}
         </Button>
       </div>
+
+      <IndustryFormSettings key={profile?.companyId} />
 
       {isSystemOwnerCompany && (
         <Card className="border-none shadow-lg shadow-slate-200/50 rounded-3xl overflow-hidden bg-white mb-8">

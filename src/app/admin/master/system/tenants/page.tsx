@@ -1,5 +1,7 @@
 "use client";
 
+import { IndustryFormFields } from "@/components/forms/IndustryFormSettings";
+import { defaultIndustryForms, readIndustryForms } from "@/lib/industry-forms";
 import { useEffect, useState } from "react";
 import { getTenants, addTenant, updateTenant, createTenantAdmin, CompanyTenant, getTenantAdmins, updateTenantAdmin } from "../tenant-actions";
 import { useAuth } from "@/lib/auth-context";
@@ -23,7 +25,7 @@ export default function TenantsPage() {
   const [featureDialogOpen, setFeatureDialogOpen] = useState(false);
   const [selectedTenantForFeatures, setSelectedTenantForFeatures] = useState<{id: string, name: string, features?: FeatureSettings} | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: "", plan: "Standard", status: "active" as "active"|"inactive", fee: 0, startDate: "", contractPdfUrl: "", termsPdfUrl: "", schoolEnabled: false, schoolName: "" });
+  const [formData, setFormData] = useState({ name: "", plan: "Standard", status: "active" as "active"|"inactive", fee: 0, startDate: "", contractPdfUrl: "", termsPdfUrl: "", schoolEnabled: false, schoolName: "", industryForms: defaultIndustryForms() });
 
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [userLoading, setUserLoading] = useState(false);
@@ -74,13 +76,14 @@ export default function TenantsPage() {
 
   const openAddDialog = () => {
     setEditingId(null);
-    setFormData({ name: "", plan: "Standard", status: "active", fee: 0, startDate: "", contractPdfUrl: "", termsPdfUrl: "", schoolEnabled: false, schoolName: "" });
+    setFormData({ name: "", plan: "Standard", status: "active", fee: 0, startDate: "", contractPdfUrl: "", termsPdfUrl: "", schoolEnabled: false, schoolName: "", industryForms: defaultIndustryForms() });
     setIsDialogOpen(true);
   };
 
   const openEditDialog = (tenant: CompanyTenant) => {
     setEditingId(tenant.id);
     setFormData({ 
+      industryForms: readIndustryForms(tenant.industryForms),
       name: tenant.name, 
       plan: tenant.plan, 
       status: tenant.status,
@@ -291,7 +294,7 @@ export default function TenantsPage() {
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[520px] max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-black">{editingId ? "テナントの編集" : "新規テナント追加"}</DialogTitle>
           </DialogHeader>
@@ -403,6 +406,7 @@ export default function TenantsPage() {
             </div>
           </div>
           
+          <IndustryFormFields value={formData.industryForms} onChange={industryForms => setFormData({ ...formData, industryForms })} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="h-11">キャンセル</Button>
             <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white h-11">
