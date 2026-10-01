@@ -26,9 +26,27 @@ test('demo edits affect local summaries without touching the original fixture',(
  assert.match(demoAiReply('なぜ売上が下がった？'),/3.2%/);assert.match(demoAiReply('LINE'),/実際のLINE送信は行いません/);
 });
 test('demo modules contain no production service imports or network clients',()=>{
- for(const file of ['src/lib/demo/data.ts','src/components/demo/DemoApp.tsx','src/app/demo/page.tsx']) {
+ for(const file of ['src/lib/demo/data.ts','src/components/demo/DemoApp.tsx','src/app/demo/page.tsx','src/lib/demo/evaluations.ts','src/components/demo/DemoEvaluations.tsx','src/components/demo/DemoAnalytics.tsx','src/components/demo/DemoPayroll.tsx','src/app/evaluations/shared.ts']) {
   const source=readFileSync(file,'utf8');assert.doesNotMatch(source,/from\s+['"][^'"]*(?:firebase|auth-context|actions|line-delivery|accounting)/);assert.doesNotMatch(source,/\b(?:fetch|XMLHttpRequest|WebSocket|sendBeacon|localStorage|sessionStorage)\b/);
  }
  const boundary=readFileSync('src/components/layout/RuntimeShell.tsx','utf8');assert.match(boundary,/dynamic\(\(\)=>import/);assert.match(boundary,/isDemoPath\(pathname\)/);
  const config=readFileSync('next.config.ts','utf8');assert.match(config,/source: '\/demo\/:path\*'/);assert.match(config,/connect-src 'none'/);assert.match(config,/form-action 'none'/);
+});
+
+
+test('demo evaluations reuse production scoring and reset without shared mutations',async()=>{
+ const {createDemoEvaluations}=await import('../demo/evaluations');
+ const {calculateDynamicScore}=await import('../../app/evaluations/shared');
+ const data=createDemoData();const records=createDemoEvaluations(data.staff);
+ assert.equal(records.length,9);
+ for(const row of records){
+  const calculated=calculateDynamicScore(row.snapshot!.template,row.auto_metrics,row.manager_raw_scores);
+  assert.deepEqual(row.calculated_scores,calculated.calculated_scores);
+  assert.equal(row.rank,calculated.rank);
+  assert.ok(data.staff.some(s=>s.id===row.staff_id));
+ }
+ const first=records[0];first.comments='changed';first.manager_raw_scores[first.snapshot!.template.managerItems[0].id]=1;
+ const reset=createDemoEvaluations(data.staff);
+ assert.notEqual(reset[0].comments,'changed');
+ assert.notDeepEqual(reset[0].manager_raw_scores,first.manager_raw_scores);
 });

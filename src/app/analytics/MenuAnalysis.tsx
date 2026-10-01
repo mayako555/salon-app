@@ -1,5 +1,6 @@
 "use client";
 
+import {menuCategory,groupMenuCategories} from "@/lib/menu-category";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { getMenuAnalytics, getStoreNames } from "./actions";
@@ -43,7 +44,7 @@ export default function MenuAnalysis() {
   const [period, setPeriod] = useState("thisMonth");
   const [store, setStore] = useState("all");
   const [stores, setStores] = useState<string[]>([]);
-  const [data, setData] = useState<any[]>([]);
+  const [rawData, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"bar" | "pie">("bar");
 
@@ -58,21 +59,23 @@ export default function MenuAnalysis() {
     loadStores();
   }, [profile?.companyId]);
 
+  const [error,setError]=useState('');
   useEffect(() => {
-    fetchData();
-  }, [period, store, profile?.companyId]);
+    let cancelled=false;
+    setLoading(true);setError('');setData([]);
+    getMenuAnalytics(profile?.companyId||'',period,store).then(res=>{
+      if(cancelled)return;
+      if(res.success)setData(res.data||[]);
+      else setError('分析を取得できませんでした。');
+    }).catch(()=>{if(!cancelled)setError('分析を取得できませんでした。');})
+      .finally(()=>{if(!cancelled)setLoading(false);});
+    return ()=>{cancelled=true;};
+  },[period,store,profile?.companyId]);
 
-  const fetchData = async () => {
-    setLoading(true);
-    const res = await getMenuAnalytics(
-      profile?.companyId!,
-      period,
-      store
-    );
-    if (res.success) setData(res.data || []);
-    setLoading(false);
-  };
-
+  const [grouping,setGrouping]=useState('menu');
+  const [category,setCategory]=useState('all');
+  const filtered=rawData.filter(r=>category==='all'||menuCategory(r.menu)===category);
+  const data=grouping==='category'?groupMenuCategories(filtered):filtered;
   const totalCount = data.reduce((s, d) => s + d.count, 0);
   const top10 = data.slice(0, 10);
   const pieData = data.slice(0, 8).map((d, i) => ({
@@ -82,12 +85,14 @@ export default function MenuAnalysis() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap gap-4 bg-white border rounded-xl p-4"><label className="text-sm">表示単位<select className="block border rounded p-2 mt-1" value={grouping} onChange={e=>setGrouping(e.target.value)}><option value="menu">メニュー別</option><option value="category">カテゴリー別</option></select></label><label className="text-sm">カテゴリー<select className="block border rounded p-2 mt-1" value={category} onChange={e=>setCategory(e.target.value)}><option value="all">すべて</option>{[...new Set(rawData.map(r=>menuCategory(r.menu)))].sort().map(c=><option key={c}>{c}</option>)}</select></label><p className="text-xs text-slate-500 self-end">メニュー名からの自動分類です。複合メニューやその他・未分類も確認してください。</p></div>
+      {error&&<p role="alert" className="text-red-600">{error}</p>}
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div>
           <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <BarChart2 className="text-indigo-500" size={22} />
-            メニュー別予約数
+            {grouping==='category'?'カテゴリー別予約数':'メニュー別予約数'}
           </h2>
           <p className="text-slate-500 text-sm mt-1">
             期間内に予約されたメニューの件数・割合を可視化します

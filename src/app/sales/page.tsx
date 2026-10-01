@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { getMonthlySales, deleteSale, clearMonthlyCsvImports } from "./actions";
 import type { SalesRecord } from "@/types/sales";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Download, ChevronLeft, ChevronRight, Search, FileUp, Settings, Lock, Trash2, Calendar, ArrowUpDown } from "lucide-react";
 import Link from "next/link";
+import {useSearchParams} from "next/navigation";
 import { format, isSameMonth, subMonths } from "date-fns";
 import { ja } from "date-fns/locale";
 import CSVUploadButton from "./CSVUploadButton";
@@ -34,14 +35,14 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export default function SalesPage({
-  searchParams
-}: {
-  searchParams: Promise<{ month?: string }>
-}) {
-  const params = use(searchParams);
+export default function SalesPage() {
+  return <Suspense fallback={<p role="status">売上を読み込み中…</p>}><SalesContent/></Suspense>;
+}
+function SalesContent() {
+  const searchParams=useSearchParams();
+  const params={month:searchParams.get('month')||undefined};
   const { profile, loading: authLoading, availableStores, isAdmin } = useAuth();
-  const targetDateStr = params.month || format(new Date(), "yyyy-MM");
+  const targetDateStr = params.month && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.month) ? params.month : format(new Date(), "yyyy-MM");
   const [yearNum, monthNum] = targetDateStr.split("-").map(Number);
   const year = yearNum;
   const month = monthNum;
@@ -51,9 +52,12 @@ export default function SalesPage({
   const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
   const [goals, setGoals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError,setLoadError]=useState('');
 
   useEffect(() => {
     if (authLoading) return;
+    let cancelled=false;
+    setLoading(true);setLoadError('');
     async function load() {
       const prevDate = subMonths(new Date(year, month - 1, 1), 1);
       const [salesData, prevSalesData, staffData, goalsData] = await Promise.all([
@@ -62,13 +66,15 @@ export default function SalesPage({
         getStaffList({ includeResigned: true }),
         getCompanyGoalsForMonth(targetDateStr)
       ]);
+      if(cancelled)return;
       setSales(salesData);
       setPrevMonthSales(prevSalesData);
       setStaffProfiles(staffData);
       setGoals(goalsData);
       setLoading(false);
     }
-    load();
+    void load().catch(()=>{if(!cancelled){setSales([]);setPrevMonthSales([]);setGoals([]);setLoadError('売上を取得できませんでした。再読み込みしてください。');setLoading(false);}});
+    return ()=>{cancelled=true;};
   }, [year, month, authLoading, targetDateStr]);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -327,6 +333,7 @@ export default function SalesPage({
   return (
     <AuthGuard requireRole="manager" requireFeature="sales">
       <div className="space-y-6 animate-in fade-in duration-300">
+        {loadError && <p role="alert" className="text-red-600">{loadError}</p>}
         {loading ? (
           <div className="flex items-center justify-center py-20 text-slate-500">読み込み中...</div>
         ) : (

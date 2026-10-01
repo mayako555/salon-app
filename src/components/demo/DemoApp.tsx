@@ -1,7 +1,10 @@
 'use client';
 import {useMemo,useState} from 'react';
+import DemoEvaluations from './DemoEvaluations';
+import DemoAnalytics from './DemoAnalytics';
+import DemoPayroll from './DemoPayroll';
 import {AreaChart,Area,XAxis,YAxis,CartesianGrid,Tooltip,ResponsiveContainer,BarChart,Bar,Cell} from 'recharts';
-import {LayoutDashboard,CalendarDays,Users,Wallet,UserRound,ChartNoAxesCombined,Settings,Sparkles,Menu,X,Upload,Plus,RotateCcw,Send,ChevronRight} from 'lucide-react';
+import {LayoutDashboard,CalendarDays,Users,Wallet,UserRound,ChartNoAxesCombined,Settings,Award,Sparkles,Menu,X,Upload,Plus,RotateCcw,Send,ChevronRight} from 'lucide-react';
 import ExecutiveSummary from '@/components/dashboard/ExecutiveSummary';
 import {Card,CardContent,CardHeader,CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
@@ -9,12 +12,13 @@ import {Input} from '@/components/ui/input';
 import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import {createDemoData,demoSummary,demoAiReply,DEMO_STORE,DEMO_DATE,DEMO_MONTH,DEMO_TARGET,DEMO_MENUS,type DemoCustomer,type DemoReservation,type DemoStaff,type DemoExpense} from '@/lib/demo/data';
 const money=(n:number)=>`¥${Math.round(n).toLocaleString('ja-JP')}`;
-const tabs=[{id:'dashboard',name:'ダッシュボード',icon:LayoutDashboard},{id:'reservations',name:'予約カレンダー',icon:CalendarDays},{id:'customers',name:'顧客管理',icon:Users},{id:'sales',name:'売上管理',icon:Wallet},{id:'staff',name:'スタッフ分析',icon:UserRound},{id:'analysis',name:'経営・顧客分析',icon:ChartNoAxesCombined},{id:'expenses',name:'経費管理',icon:Wallet},{id:'settings',name:'設定・外部連携',icon:Settings}] as const;
+const tabs=[{id:'dashboard',name:'ダッシュボード',icon:LayoutDashboard},{id:'reservations',name:'予約カレンダー',icon:CalendarDays},{id:'customers',name:'顧客管理',icon:Users},{id:'sales',name:'売上管理',icon:Wallet},{id:'staff',name:'スタッフ分析',icon:UserRound},{id:'analysis',name:'高度分析',icon:ChartNoAxesCombined},{id:'evaluations',name:'評価制度・育成',icon:Award},{id:'payroll',name:'給与・報酬計算',icon:Wallet},{id:'expenses',name:'経費管理',icon:Wallet},{id:'settings',name:'設定・外部連携',icon:Settings}] as const;
 type Tab=typeof tabs[number]['id'];
 type FormKind='customer'|'reservation'|'expense'|'staff'|'csv'|'line'|'settings';
 type Editor={kind:FormKind;id?:string};
 export default function DemoApp() {
  const [dataset,setDataset]=useState(createDemoData),[tab,setTab]=useState<Tab>('dashboard'),[month,setMonth]=useState(DEMO_MONTH),[date,setDate]=useState(DEMO_DATE),[search,setSearch]=useState(''),[page,setPage]=useState(0);
+ const [resetVersion,setResetVersion]=useState(0);
  const [mobile,setMobile]=useState(false),[editor,setEditor]=useState<Editor|null>(null),[notice,setNotice]=useState(''),[chatOpen,setChatOpen]=useState(false),[question,setQuestion]=useState('');
  const [messages,setMessages]=useState<{role:'user'|'ai';text:string}[]>([{role:'ai',text:'9月の売上は前月比3.2%減少しています。新規のお客様の再来状況に変化が見られます。原因を一緒に確認しましょう。'}]);
  const summary=useMemo(()=>demoSummary(dataset.reservations,dataset.expenses,month),[dataset,month]);
@@ -22,8 +26,6 @@ export default function DemoApp() {
  const monthly=months.map(m=>({month:m.slice(5)+'月',...demoSummary(dataset.reservations,dataset.expenses,m)}));
  const current=dataset.reservations.filter(r=>r.date.startsWith(month)&&r.status!=='キャンセル');
  const staffStats=dataset.staff.map(s=>({...s,revenue:current.filter(r=>r.staffId===s.id).reduce((sum,r)=>sum+r.amount,0),count:current.filter(r=>r.staffId===s.id).length}));
- const menuStats=DEMO_MENUS.map(m=>({name:m.name,revenue:current.filter(r=>r.menu===m.name).reduce((sum,r)=>sum+r.amount,0),count:current.filter(r=>r.menu===m.name).length}));
- const weekday=['日','月','火','水','木','金','土'].map((name,i)=>({name,count:current.filter(r=>new Date(r.date+'T12:00:00+09:00').getUTCDay()===i).length}));
  const calendarTimes=[...new Set(['09:00','11:00','13:00','15:00','17:00',...dataset.reservations.filter(r=>r.date===date&&r.status!=='キャンセル').map(r=>r.time)])].sort();
  const customers=dataset.customers.filter(c=>c.name.includes(search)||c.id.includes(search));
  function navigate(next:Tab){setTab(next);setPage(0);setSearch('');setMobile(false);setNotice('');}
@@ -47,11 +49,11 @@ export default function DemoApp() {
    <div className="p-6 flex items-center gap-3"><span className="bg-blue-600 w-12 h-12 rounded-2xl grid place-items-center text-2xl font-black">S</span><span className="font-black text-lg tracking-tight">SALON AGENT</span></div>
    <div className="mx-4 mb-5 p-3 rounded-2xl bg-white/10 text-sm"><p className="text-[10px] text-slate-400 mb-1">勤務店舗</p><span className="text-emerald-400 mr-2">●</span>DEMO 神戸店</div>
    <nav aria-label="デモ内メニュー" className="flex-1 overflow-y-auto px-3 space-y-1">{tabs.map(t=><button key={t.id} className={`flex items-center gap-3 w-full text-left rounded-xl px-4 py-3 text-sm font-bold ${tab===t.id?'bg-blue-600 text-white':'text-slate-400 hover:bg-white/5 hover:text-white'}`} onClick={()=>navigate(t.id)}><t.icon size={20}/>{t.name}</button>)}</nav>
-   <div className="m-4 rounded-2xl bg-white/5 p-4 text-sm"><p className="font-bold">デモ オーナー</p><p className="mt-1 text-xs text-slate-400">ログイン不要・架空のサロン</p><button className="mt-4 text-xs flex items-center gap-2 text-slate-300" onClick={()=>{setDataset(createDemoData());setMonth(DEMO_MONTH);setDate(DEMO_DATE);navigate('dashboard');setMessages([{role:'ai',text:'デモを初期状態に戻しました。9月の売上低下について確認してみましょう。'}]);mock('初期データに戻しました');}}><RotateCcw size={14}/>デモをリセット</button></div>
+   <div className="m-4 rounded-2xl bg-white/5 p-4 text-sm"><p className="font-bold">デモ オーナー</p><p className="mt-1 text-xs text-slate-400">ログイン不要・架空のサロン</p><button className="mt-4 text-xs flex items-center gap-2 text-slate-300" onClick={()=>{setDataset(createDemoData());setResetVersion(v=>v+1);setMonth(DEMO_MONTH);setDate(DEMO_DATE);navigate('dashboard');setMessages([{role:'ai',text:'デモを初期状態に戻しました。9月の売上低下について確認してみましょう。'}]);mock('初期データに戻しました');}}><RotateCcw size={14}/>デモをリセット</button></div>
   </aside>
   <div className="flex flex-1 min-w-0 flex-col"><header className="h-16 shrink-0 border-b bg-white px-4 sm:px-7 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><button className="lg:hidden" aria-label="メニューを開く" onClick={()=>setMobile(true)}><Menu/></button><span className="font-bold">{activeTitle}</span></div><div className="text-right"><span className="text-[10px] bg-amber-100 text-amber-800 font-bold rounded px-2 py-1">DEMO</span><p className="text-[10px] text-slate-500 mt-1">データはすべてサンプルです</p></div></header>
    <main className="flex-1 overflow-y-auto p-4 sm:p-7 pb-24"><div className="max-w-7xl mx-auto space-y-6">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="font-black text-2xl">{tab==='dashboard'?'サロンの今を、ひと目で。':activeTitle}</h1><p className="text-xs text-slate-500 mt-2">{DEMO_STORE} ／ デモ基準日：2026年9月30日</p></div><div className="flex gap-2">{['dashboard','sales','staff','analysis','expenses'].includes(tab)&&<select aria-label="集計月" value={month} onChange={e=>setMonth(e.target.value)} className="border bg-white rounded-lg p-2 text-sm">{months.map(m=><option key={m} value={m}>{m.replace('-','年')}月</option>)}</select>}<Button variant="outline" onClick={()=>setEditor({kind:'csv'})}><Upload size={15}/>CSV取込み</Button></div></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="font-black text-2xl">{tab==='dashboard'?'サロンの今を、ひと目で。':activeTitle}</h1><p className="text-xs text-slate-500 mt-2">{DEMO_STORE} ／ デモ基準日：2026年9月30日</p></div><div className="flex gap-2">{['dashboard','sales','staff','analysis','expenses','payroll'].includes(tab)&&<select aria-label="集計月" value={month} onChange={e=>setMonth(e.target.value)} className="border bg-white rounded-lg p-2 text-sm">{months.map(m=><option key={m} value={m}>{m.replace('-','年')}月</option>)}</select>}<Button variant="outline" onClick={()=>setEditor({kind:'csv'})}><Upload size={15}/>CSV取込み</Button></div></div>
     {notice&&<div role="status" className="flex justify-between items-center bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-sm">{notice}<button aria-label="通知を閉じる" onClick={()=>setNotice('')}><X size={16}/></button></div>}
     {tab==='dashboard'&&<>
      <ExecutiveSummary monthlyTotal={summary.revenue} regularVisits={summary.visits} minimoVisits={0} profit={summary.profit} projection={summary.revenue} storeStats={[{name:'DEMO 神戸店',current:summary.revenue,target:DEMO_TARGET}]}/>
@@ -68,7 +70,9 @@ export default function DemoApp() {
     </>}
     {tab==='sales'&&<><MetricCards entries={[['売上',money(summary.revenue)],['来店数',`${summary.visits}件`],['客単価',money(summary.average)],['目標達成率',`${(summary.revenue/DEMO_TARGET*100).toFixed(1)}%`]]}/><DataTable headings={['日付','顧客','メニュー','担当','売上']} rows={current.slice(-30).reverse().map(r=>[r.date,r.customerName,r.menu,dataset.staff.find(s=>s.id===r.staffId)?.name||'',money(r.amount)])}/><p className="text-xs text-slate-500">選択月の直近30件を表示。月間集計は全件を対象としています。</p></>}
     {tab==='staff'&&<><div className="flex justify-end"><Button onClick={()=>setEditor({kind:'staff'})}><Plus size={15}/>スタッフ登録</Button></div><div className="grid md:grid-cols-3 gap-4">{staffStats.map(s=><Card key={s.id}><CardHeader><CardTitle>{s.name}</CardTitle><p className="text-sm text-slate-500">{s.role}</p></CardHeader><CardContent className="space-y-3"><p className="text-3xl font-black">{money(s.revenue)}</p><p>担当件数：{s.count}件</p><p>客単価：{money(s.count?s.revenue/s.count:0)}</p><div className="h-2 bg-slate-100 rounded-full"><div className="h-2 rounded-full" style={{width:`${Math.min(100,s.revenue/900000*100)}%`,background:s.color}}/></div><p className="text-xs text-slate-500">個人目標 ¥900,000</p></CardContent></Card>)}</div></>}
-    {tab==='analysis'&&<><MetricCards entries={[['新規来店',`${summary.newVisits}件`],['再来来店',`${summary.repeatVisits}件`],['再来客の割合',`${(summary.repeatVisits/Math.max(1,summary.visits)*100).toFixed(1)}%`],['30日以内再来率','34%（9月シナリオ）']]}/><div className="grid xl:grid-cols-2 gap-5"><Chart title="メニュー別売上"><BarChart data={menuStats} layout="vertical"><XAxis type="number" tickFormatter={v=>`${Number(v)/10000}万`}/><YAxis type="category" dataKey="name" width={130} tick={{fontSize:11}}/><Tooltip formatter={v=>money(Number(v))}/><Bar dataKey="revenue" name="売上" fill="#6366f1"/></BarChart></Chart><Chart title="曜日別の来店数"><BarChart data={weekday}><XAxis dataKey="name"/><YAxis/><Tooltip/><Bar dataKey="count" name="来店数" fill="#10b981" radius={[6,6,0,0]}/></BarChart></Chart></div><Card><CardContent className="p-5 flex flex-wrap gap-4 items-center justify-between"><div><p className="font-bold">新規客の30日以内再来率：42% → 34%</p><p className="text-sm text-slate-500 mt-1">8月・9月の固定分析シナリオ。実際のAI推論は行いません。</p></div><Button onClick={()=>ask('再来率を改善するには？')}><Sparkles size={16}/>改善策をAIに聞く</Button></CardContent></Card></>}
+    {tab==='analysis'&&<DemoAnalytics dataset={dataset} month={month} onAsk={ask}/>}
+    <div hidden={tab!=='evaluations'}><DemoEvaluations key={resetVersion} staff={dataset.staff}/></div>
+    <div hidden={tab!=='payroll'}><DemoPayroll key={resetVersion} staff={dataset.staff} month={month}/></div>
     {tab==='expenses'&&<><MetricCards entries={[['月間経費',money(summary.cost)],['売上−経費',money(summary.profit)],['経費率',`${(summary.cost/Math.max(1,summary.revenue)*100).toFixed(1)}%`]]}/><Button onClick={()=>setEditor({kind:'expense'})}><Plus size={15}/>経費を追加</Button><DataTable headings={['日付','カテゴリ','摘要','金額']} rows={dataset.expenses.filter(e=>e.date.startsWith(month)).map(e=>[e.date,e.category,e.memo,money(e.amount)])}/></>}
     {tab==='settings'&&<div className="grid md:grid-cols-2 gap-5">{['店舗・業種設定','LINE連携','会計ソフト連携','スタッフ名の紐づけ'].map(label=><Card key={label}><CardHeader><CardTitle>{label}</CardTitle></CardHeader><CardContent><p className="text-sm text-slate-500 mb-4">設定・連携の操作イメージを確認できます。</p><Button variant="outline" onClick={()=>setEditor({kind:label==='LINE連携'?'line':'settings'})}>設定を開く</Button></CardContent></Card>)}</div>}
    </div></main>
