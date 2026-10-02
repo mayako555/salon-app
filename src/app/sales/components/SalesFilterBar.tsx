@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Search, FileSpreadsheet, Download } from "lucide-react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { format, subMonths, addMonths } from "date-fns";
 import { ja } from "date-fns/locale";
 import CSVUploadButton from "../CSVUploadButton";
@@ -35,6 +36,14 @@ export default React.memo(function SalesFilterBar({
   onExportCsv,
   onExportExcel
 }: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const monthHref = (month: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("month", month);
+    return `${pathname}?${params.toString()}`;
+  };
   const prevMonthStr = format(subMonths(currentDate, 1), "yyyy-MM");
   const nextMonthStr = format(addMonths(currentDate, 1), "yyyy-MM");
   const currentMonthDisplay = format(currentDate, "yyyy年MM月", { locale: ja });
@@ -45,21 +54,31 @@ export default React.memo(function SalesFilterBar({
         {/* Left Side: Month & Stores */}
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
-            <Link href={`/sales?month=${prevMonthStr}`}>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md hover:bg-white text-slate-500 shadow-sm">
+            <Link href={monthHref(prevMonthStr)} aria-label="前の月" scroll={false}>
+              <span className="flex items-center justify-center h-8 w-8 rounded-md hover:bg-white text-slate-500 shadow-sm">
                 <ChevronLeft className="h-4 w-4" />
-              </Button>
+              </span>
             </Link>
             <span className="text-sm font-black text-slate-700 min-w-[80px] text-center tracking-wider">
               {currentMonthDisplay}
             </span>
-            <Link href={`/sales?month=${nextMonthStr}`}>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md hover:bg-white text-slate-500 shadow-sm">
+            <Link href={monthHref(nextMonthStr)} aria-label="次の月" scroll={false}>
+              <span className="flex items-center justify-center h-8 w-8 rounded-md hover:bg-white text-slate-500 shadow-sm">
                 <ChevronRight className="h-4 w-4" />
-              </Button>
+              </span>
             </Link>
           </div>
 
+          <input
+            type="month"
+            aria-label="表示する売上月"
+            value={format(currentDate, "yyyy-MM")}
+            onChange={(event) => {
+              const value = event.target.value;
+              if (/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) router.push(monthHref(value), { scroll: false });
+            }}
+            className="h-9 rounded-lg border border-slate-300 px-3 text-sm"
+          />
           <div className="flex items-center bg-slate-100 p-1 rounded-lg">
             <Button
               variant="ghost"

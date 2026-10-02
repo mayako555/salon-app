@@ -1,3 +1,4 @@
+import {cleanCustomerNameParts,joinedCustomerName} from './customer-name';
 import { cleanFormAnswers, type FormTemplate } from './industry-forms';
 import type { ServiceType } from './counseling-model';
 export const INTAKE_TTL = 24 * 60 * 60 * 1000;
@@ -19,12 +20,17 @@ export function validateIntakeSubmission(template: FormTemplate, data: { name: s
   if (template.legacy && (!data.services?.length || data.services.some(s => !services.includes(s)))) throw new Error('施術を選択してください');
   if (data.signature && (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(data.signature) || data.signature.length > 250000)) throw new Error('署名が無効です');
   if (template.legacy && !data.signature) throw new Error('署名を入力してください');
-  const profileLabels = ['name_kana', 'postal_code', 'address', 'email', 'birthday', 'blood_type', 'occupation', 'referral_name', 'referral_source', 'photo_permission', 'sns_permission', 'sns_permission_scope', 'email_marketing_allowed', 'dm_allowed', 'is_minimo'];
+  const profileLabels = ['last_name','first_name','last_name_kana','first_name_kana','name_kana', 'postal_code', 'address', 'email', 'birthday', 'blood_type', 'occupation', 'referral_name', 'referral_source', 'photo_permission', 'sns_permission', 'sns_permission_scope', 'email_marketing_allowed', 'dm_allowed', 'is_minimo'];
   const profile = Object.fromEntries(profileLabels.filter(key => data.profile?.[key] !== undefined).map(key => {
     const raw = data.profile![key];
     const value = typeof raw === 'boolean' ? (raw ? 'yes' : 'no') : Array.isArray(raw) && raw.every(v => typeof v === 'string') ? raw.join('、') : raw;
     if (typeof value !== 'string' || value.length > 2000) throw new Error('基本情報が無効か長すぎます');
     return [key, value];
   }));
+  if(data.profile && ['last_name','first_name','last_name_kana','first_name_kana'].some(key=>key in data.profile!)) {
+    const parts=cleanCustomerNameParts(data.profile);
+    Object.assign(profile,parts,joinedCustomerName(parts));
+    data={...data,name:joinedCustomerName(parts).name};
+  }
   return { submitted_profile: profile, respondent: { name: data.name.trim(), phone: data.phone.trim() }, answers, service_types: template.legacy ? data.services! : [], signature_url: data.signature || '' };
 }

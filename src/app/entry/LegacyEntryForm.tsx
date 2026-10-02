@@ -1,5 +1,8 @@
 "use client";
 
+import BirthdaySelect from "@/components/forms/BirthdaySelect";
+import CustomerNameFields from "@/components/forms/CustomerNameFields";
+import {emptyCustomerName,joinedCustomerName} from "@/lib/customer-name";
 import { useState, useRef, useEffect, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -106,7 +109,7 @@ const SignaturePad = ({ onSave }: { onSave: (url: string) => void }) => {
 
 // --- Main Component ---
 
-export default function LegacyEntryForm({ token }: { token: string }) {
+export default function LegacyEntryForm({ token, salonName }: { token: string; salonName: string }) {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -114,6 +117,7 @@ export default function LegacyEntryForm({ token }: { token: string }) {
   const [selectedServices, setSelectedServices] = useState<ServiceType[]>([]);
   const [formData, setFormData] = useState<any>({
     // Basic Info
+    ...emptyCustomerName,
     name: "",
     name_kana: "",
     gender: "female",
@@ -158,7 +162,7 @@ export default function LegacyEntryForm({ token }: { token: string }) {
   const prevStep = () => setStep((s) => s - 1);
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.phone) {
+    if (!formData.last_name.trim() || !formData.first_name.trim() || !formData.last_name_kana.trim() || !formData.first_name_kana.trim() || !formData.phone) {
       toast.error("名前と電話番号は必須です");
       return;
     }
@@ -257,7 +261,7 @@ export default function LegacyEntryForm({ token }: { token: string }) {
             <div className="bg-gradient-to-br from-rose-400 to-rose-600 p-1.5 rounded-lg text-white shadow-md">
               <Scissors size={18} />
             </div>
-            <span className="font-extrabold text-slate-900 tracking-tighter text-xl">当サロン</span>
+            <span className="font-extrabold text-slate-900 tracking-tighter text-xl break-words">{salonName}</span>
           </div>
           <div className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Counseling System</div>
         </div>
@@ -337,14 +341,7 @@ export default function LegacyEntryForm({ token }: { token: string }) {
               {renderStepHeader("基本情報", "お客様の情報を教えてください")}
               <Card className="p-6 rounded-3xl border-none shadow-sm space-y-5">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="text-xs font-bold text-slate-400 mb-1.5 block ml-1">お名前（フリガナ） <span className="text-rose-500">*</span></label>
-                    <Input placeholder="ヤマダ ハナコ" className="h-12 rounded-xl bg-slate-50 border-none font-bold" value={formData.name_kana} onChange={(e) => setFormData({ ...formData, name_kana: e.target.value })} />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="text-xs font-bold text-slate-400 mb-1.5 block ml-1">お名前（漢字） <span className="text-rose-500">*</span></label>
-                    <Input placeholder="山田 花子" className="h-12 rounded-xl bg-slate-50 border-none font-bold" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
-                  </div>
+                  <div className="col-span-2"><CustomerNameFields requireKana value={formData} onChange={parts=>setFormData({...formData,...parts,...joinedCustomerName(parts)})}/></div>
                   <div className="col-span-2">
                     <label className="text-xs font-bold text-slate-400 mb-1.5 block ml-1">電話番号 <span className="text-rose-500">*</span></label>
                     <Input type="tel" placeholder="09012345678" className="h-12 rounded-xl bg-slate-50 border-none font-bold" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
@@ -352,8 +349,7 @@ export default function LegacyEntryForm({ token }: { token: string }) {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-bold text-slate-400 mb-1.5 block ml-1">生年月日</label>
-                    <Input type="date" className="h-12 rounded-xl bg-slate-50 border-none font-bold" value={formData.birthday} onChange={(e) => setFormData({ ...formData, birthday: e.target.value })} />
+                    <BirthdaySelect value={formData.birthday} onChange={birthday=>setFormData({...formData,birthday})}/>
                   </div>
                   <div>
                     <label className="text-xs font-bold text-slate-400 mb-1.5 block ml-1">血液型</label>
@@ -416,7 +412,7 @@ export default function LegacyEntryForm({ token }: { token: string }) {
                 <Button 
                   className="flex-1 h-16 rounded-2xl text-lg font-extrabold shadow-xl shadow-rose-200 bg-rose-600 hover:bg-rose-700" 
                   onClick={nextStep}
-                  disabled={!formData.name || !formData.phone}
+                  disabled={!formData.last_name.trim() || !formData.first_name.trim() || !formData.last_name_kana.trim() || !formData.first_name_kana.trim() || !formData.phone}
                 >
                   次へ進む <ChevronRight className="ml-2" />
                 </Button>

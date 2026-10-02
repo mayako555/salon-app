@@ -1,4 +1,5 @@
 "use server";
+import {cleanCustomerNameParts,joinedCustomerName} from "@/lib/customer-name";
 import { addTenantOwnedDoc } from "@/lib/tenant-ownership";
 
 import { db } from "@/lib/firestore-admin-wrapper";
@@ -289,6 +290,7 @@ export async function registerScannedCustomer(
 }
 
 export async function registerManualCustomer(formData: {
+  last_name?: string; first_name?: string; last_name_kana?: string; first_name_kana?: string;
   customer_no: string;
   name: string;
   name_kana: string;
@@ -296,8 +298,10 @@ export async function registerManualCustomer(formData: {
   store_name: string;
 }) {
   try {
+    const parts = formData.last_name !== undefined || formData.first_name !== undefined ? cleanCustomerNameParts(formData) : null;
     const res = await addCustomer({
       ...formData,
+      ...(parts ? {...parts,...joinedCustomerName(parts)} : {}),
       is_active: true,
       has_allergy: false,
       risk_level: 'none',

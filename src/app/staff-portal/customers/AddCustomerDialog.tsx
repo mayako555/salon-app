@@ -1,5 +1,7 @@
 "use client";
 
+import CustomerNameFields from "@/components/forms/CustomerNameFields";
+import {emptyCustomerName,joinedCustomerName} from "@/lib/customer-name";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -18,6 +20,7 @@ export default function AddCustomerDialog({ isOpen, onClose, onSuccess }: AddCus
   const { availableStores, selectedStore } = useAuth();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
+    ...emptyCustomerName,
     customer_no: "",
     name: "",
     name_kana: "",
@@ -27,7 +30,7 @@ export default function AddCustomerDialog({ isOpen, onClose, onSuccess }: AddCus
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.phone) {
+    if (!form.last_name.trim() || !form.first_name.trim() || !form.phone) {
       toast.error("名前と電話番号は必須です");
       return;
     }
@@ -38,7 +41,7 @@ export default function AddCustomerDialog({ isOpen, onClose, onSuccess }: AddCus
 
     if (res.success) {
       toast.success("顧客を登録しました");
-      setForm({ customer_no: "", name: "", name_kana: "", phone: "", store_name: selectedStore || (availableStores.length > 0 ? availableStores[0] : "未設定") });
+      setForm({ ...emptyCustomerName, customer_no: "", name: "", name_kana: "", phone: "", store_name: selectedStore || (availableStores.length > 0 ? availableStores[0] : "未設定") });
       onSuccess();
       onClose();
     } else {
@@ -84,25 +87,7 @@ export default function AddCustomerDialog({ isOpen, onClose, onSuccess }: AddCus
               className="h-11 rounded-xl bg-slate-50 border-none font-bold"
             />
           </div>
-          <div className="space-y-1">
-            <label htmlFor="name" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">お名前 (漢字)</label>
-            <Input 
-              id="name" 
-              placeholder="山田 花子" 
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="h-11 rounded-xl bg-slate-50 border-none font-bold"
-            />
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="name_kana" className="text-sm font-bold text-slate-700">フリガナ</label>
-            <Input 
-              id="name_kana" 
-              placeholder="ヤマダ ハナコ" 
-              value={form.name_kana}
-              onChange={(e) => setForm({ ...form, name_kana: e.target.value })}
-            />
-          </div>
+          <CustomerNameFields value={form} onChange={parts=>setForm({...form,...parts,...joinedCustomerName(parts)})}/>
           <div className="space-y-2">
             <label htmlFor="phone" className="text-sm font-bold text-slate-700">電話番号</label>
             <Input 
