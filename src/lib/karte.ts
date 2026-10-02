@@ -3,8 +3,8 @@ import { cleanKartePatch } from "./karte-validation";
 import { adminDb as untypedDb } from './firebase-admin';
 const adminDb = untypedDb as import("firebase-admin/firestore").Firestore;
 import { requireCustomerAccess, serializeRecord } from './customer-record-access';
-import { getIndustryFormSettings } from './industry-form-actions';
-import { templateById, cleanFormAnswers, type FormTemplate } from './industry-forms';
+import { customerStoreForms } from './store-industry-forms';
+import { selectedFormTemplate, cleanFormAnswers, type FormTemplate } from './industry-forms';
 export type KarteRecord = {
   drawing_document?: import("./drawing-document").DrawingDocument;
   form_snapshot?: FormTemplate;
@@ -69,12 +69,12 @@ export type KarteRecord = {
 
 export async function addKarteRecord(data: Omit<KarteRecord, 'id' | 'created_at' | 'edit_history'>) {
   try {
-    const { ctx } = await requireCustomerAccess(data.customer_id);
-    const settings = await getIndustryFormSettings();
-    const template = templateById(settings.karteTemplateId, 'karte');
+    const { ctx, customer } = await requireCustomerAccess(data.customer_id);
+    const { settings,storeId } = await customerStoreForms(ctx,customer.data()!);
+    const template = selectedFormTemplate(settings, 'karte', data.form_snapshot?.id || 'eyelash-karte-v1');
     if (data.form_snapshot?.id !== template.id && !(template.legacy && !data.form_snapshot)) throw new Error('シート設定が変更されました。画面を開き直してください');
     const { form_snapshot, form_answers, ...rest } = data;
-    const doc = await adminDb.collection('karte_records').add({ ...cleanKartePatch(rest), customer_id: data.customer_id, companyId: ctx.companyId,
+    const doc = await adminDb.collection('karte_records').add({ ...cleanKartePatch(rest), customer_id: data.customer_id, companyId: ctx.companyId, store_id: storeId,
       form_snapshot: template, form_answers: template.legacy ? {} : cleanFormAnswers(template, form_answers),
       created_at: new Date(), edit_history: [] });
     return { success: true, id: doc.id };

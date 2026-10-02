@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { auth, db } from "./firebase";
-import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import type { DocumentData, Query, QuerySnapshot } from "firebase/firestore";
 import { StaffProfile, StaffRole } from "@/app/staff/actions";
 import { SalesMasterItem, AttendancePolicy, FeatureKey, FeatureSettings, ensureFeatureDefaults } from "@/types/master";
@@ -98,8 +98,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = "/admin/master/system/tenants";
   };
 
+  const featureCompanyId = impersonatingCompanyId || profile?.companyId;
+  useEffect(() => {
+    if (!user || !featureCompanyId || isPublicAuthPath(pathname)) return;
+    let live=true;
+    const unsubscribe=onSnapshot(doc(db,'companies',featureCompanyId),snapshot=>{
+      if(!live)return;
+      if(!snapshot.exists()){setFeatures({});return;}
+      const data=snapshot.data();
+      setFeatures(ensureFeatureDefaults(data.features,data.companyType==='system_owner'));
+    },()=>{if(live)setFeatures({});});
+    return()=>{live=false;unsubscribe();};
+  },[user,featureCompanyId,pathname]);
+
   const hasFeature = (feature: FeatureKey) => {
-    if (profile?.role === "systemOwner") return true;
+    if (profile?.role === "systemOwner" && !impersonatingCompanyId && !profile.companyId) return true;
     return !!features[feature];
   };
   const [loading, setLoading] = useState(true);

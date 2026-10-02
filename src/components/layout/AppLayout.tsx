@@ -10,6 +10,11 @@ import { FeatureDenied } from "./FeatureDenied";
 import { TenantInactive } from "./TenantInactive";
 import { getFeatureForPathname } from "@/lib/tenant-access";
 
+const ROLE_LABELS: Record<string, string> = {
+  systemOwner: "システムオーナー", companyOwner: "会社オーナー", admin: "管理者",
+  manager: "マネージャー", storeManager: "店長", staff: "スタッフ", accountant: "経理担当", guest: "閲覧のみ",
+};
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, profile, loading, logout, isSystemOwner, isCompanyActive, hasFeature, impersonatingCompanyId, stopImpersonating } = useAuth();
@@ -71,7 +76,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
             <form className="flex w-full ml-2 md:ml-0" action="#" method="GET">
-              <label htmlFor="search-field" className="sr-only">Search</label>
+              <label htmlFor="search-field" className="sr-only">検索</label>
               <div className="relative w-full text-slate-400 focus-within:text-slate-600">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center">
                   <Search className="h-5 w-5" aria-hidden="true" />
@@ -89,7 +94,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="ml-4 flex items-center md:ml-6 gap-4">
             <div className="hidden md:flex flex-col items-end mr-2">
               <span className="text-xs font-bold text-slate-700">{profile?.name || user?.email || "ゲスト"}</span>
-              <span className="text-[10px] text-slate-500 uppercase tracking-wider">{profile?.role || "閲覧のみ"}</span>
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider">{ROLE_LABELS[profile?.role || "guest"] || "閲覧のみ"}</span>
             </div>
             
             <button

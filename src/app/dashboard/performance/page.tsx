@@ -142,7 +142,7 @@ export default function PerformancePage() {
                       <div>
                         <h2 className="text-xl font-black text-slate-900">{staff.staffName}</h2>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full uppercase tracking-wider">Monthly Target</span>
+                          <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full uppercase tracking-wider">月間売上目標</span>
                           <span className="text-sm font-bold text-slate-700">¥{staff.target.toLocaleString()}</span>
                         </div>
                       </div>
@@ -150,11 +150,11 @@ export default function PerformancePage() {
                     
                     <div className="grid grid-cols-2 sm:flex gap-4 w-full md:w-auto">
                       <div className="bg-emerald-50 p-4 rounded-2xl flex-1 md:min-w-[140px]">
-                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Current Sales</p>
+                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">現在の売上</p>
                         <p className="text-lg font-black text-emerald-700">¥{staff.currentTotal.toLocaleString()}</p>
                       </div>
                       <div className="bg-rose-50 p-4 rounded-2xl flex-1 md:min-w-[140px]">
-                        <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Remaining</p>
+                        <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">目標までの残額</p>
                         <p className="text-lg font-black text-rose-700">¥{staff.remaining.toLocaleString()}</p>
                       </div>
                     </div>
@@ -162,9 +162,9 @@ export default function PerformancePage() {
 
                   <div className="space-y-2 mb-8">
                     <div className="flex justify-between text-xs font-black uppercase tracking-widest text-slate-400">
-                      <span>Progress</span>
+                      <span>目標達成率</span>
                       <span className={progress >= 100 ? "text-emerald-500" : "text-slate-600"}>
-                        {progress.toFixed(1)}% {progress >= 100 && "COMPLETED"}
+                        {progress.toFixed(1)}% {progress >= 100 && "目標達成"}
                       </span>
                     </div>
                     <Progress value={progress} className="h-3 rounded-full bg-slate-100" />
@@ -202,7 +202,7 @@ export default function PerformancePage() {
                         <p className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-1">1日あたりの必要売上平均</p>
                         <div className="flex items-baseline gap-2">
                           <p className="text-xl font-black text-white">¥{staff.requiredDailyAvg.toLocaleString()}</p>
-                          <span className="text-[10px] font-bold text-white/40">/ day</span>
+                          <span className="text-[10px] font-bold text-white/40">/ 日</span>
                         </div>
                       </div>
                     </div>
@@ -216,7 +216,7 @@ export default function PerformancePage() {
         {stats.length === 0 && (
           <Card className="p-12 text-center rounded-[3rem] border-dashed border-2 border-slate-200 bg-transparent">
             <Users className="mx-auto text-slate-200 mb-4" size={48} />
-            <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No staff targets set</p>
+            <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">スタッフの売上目標が未設定です</p>
             <p className="text-slate-300 text-[10px] mt-1">スタッフ管理画面から月間目標額を設定してください。</p>
           </Card>
         )}

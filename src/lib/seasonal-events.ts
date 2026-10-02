@@ -43,3 +43,8 @@ export function isSalonEvent(dateInput: Date | string): boolean {
 
   return false;
 }
+
+/** カレンダーで赤く表示する土曜・日曜・日本の祝日。 */
+export function isRedCalendarDay(date: Date): boolean {
+  return date.getDay() === 0 || date.getDay() === 6 || isNationalHoliday(date);
+}

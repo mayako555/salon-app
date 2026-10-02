@@ -1,5 +1,6 @@
 "use client";
 
+import IndustryFormSettings from "@/components/forms/IndustryFormSettings";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
@@ -14,6 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const steps = [
   { id: "storeInfo", label: "店舗情報", icon: Store, desc: "店舗名や住所の登録" },
+  { id: "industryForms", label: "業種・カルテ", icon: BookOpen, desc: "店舗ごとの業種と使用するシートを複数選択" },
   { id: "businessHours", label: "営業時間", icon: Clock, desc: "営業時間と休日の設定" },
   { id: "menu", label: "メニュー", icon: BookOpen, desc: "提供するメニューと料金" },
   { id: "staff", label: "スタッフ", icon: Users, desc: "所属スタッフの登録" },
@@ -36,12 +38,8 @@ export default function SetupWizardPage() {
         
         // Find first incomplete step
         const p = res.data.progress;
-        if (!p.storeInfo) setCurrentStep(0);
-        else if (!p.businessHours) setCurrentStep(1);
-        else if (!p.menu) setCurrentStep(2);
-        else if (!p.staff) setCurrentStep(3);
-        else if (!p.payroll) setCurrentStep(4);
-        else setCurrentStep(5); // all done
+        const next = steps.findIndex(step=>!p[step.id as keyof AdoptionProgress]);
+        setCurrentStep(next < 0 ? steps.length : next);
       }
       setLoading(false);
     }
@@ -61,7 +59,7 @@ export default function SetupWizardPage() {
         setCurrentStep(prev => prev + 1);
       }
     } else {
-      toast.error("保存に失敗しました");
+      toast.error(res.error || "保存に失敗しました");
     }
   };
 
@@ -135,10 +133,11 @@ export default function SetupWizardPage() {
                     <div>
                       <h2 className="text-xl font-black">STEP {currentStep + 1}: {steps[currentStep].label}</h2>
                       <p className="text-indigo-100 text-sm mt-1">{steps[currentStep].desc}</p>
+                      <Link className="text-indigo-600 underline font-bold" target="_blank" rel="noopener noreferrer" href={steps[currentStep].id === "staff" ? "/staff" : steps[currentStep].id === "payroll" ? "/payroll" : "/admin/master/operations"}>設定画面を開く</Link>
                     </div>
                   </div>
                   <CardContent className="p-8">
-                    <div className="min-h-[200px] flex flex-col items-center justify-center text-center space-y-4">
+                    {steps[currentStep].id === "industryForms" ? <IndustryFormSettings/> : <div className="min-h-[200px] flex flex-col items-center justify-center text-center space-y-4">
                       <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-2">
                         {(() => {
                           const Icon = steps[currentStep].icon;
@@ -149,11 +148,12 @@ export default function SetupWizardPage() {
                         {steps[currentStep].label}の設定画面を開きますか？
                       </h3>
                       <p className="text-slate-500 text-sm max-w-sm">
-                        現在はウィザードのデモ版です。<br/>
-                        本来はここに専用の入力フォームが表示されるか、設定ページへ遷移します。
+                        設定画面を別タブで開きます。保存後、この画面に戻って完了してください。
                       </p>
+                      <Link className="text-indigo-600 underline font-bold" target="_blank" rel="noopener noreferrer" href={steps[currentStep].id === "staff" ? "/staff" : steps[currentStep].id === "payroll" ? "/payroll" : "/admin/master/operations"}>設定画面を開く</Link>
                     </div>
                     
+                    }
                     <div className="flex justify-between items-center mt-8 pt-6 border-t border-slate-100">
                       <Button 
                         variant="ghost" 

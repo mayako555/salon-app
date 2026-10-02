@@ -1,14 +1,15 @@
 'use client';
-import {useEffect,useState} from 'react';
+import {useEffect,useState,useRef} from 'react';
 import Link from 'next/link';
 import {getMappings,saveStaffAlias,applyStaffAlias} from './actions';
 export default function Page() {
  const [data,setData]=useState<Awaited<ReturnType<typeof getMappings>>|null>(null),[error,setError]=useState(''),[name,setName]=useState(''),[staff,setStaff]=useState(''),[busy,setBusy]=useState(false);
  const [cursors,setCursors]=useState<Record<string,Partial<Record<'sales'|'reservations',string|null>>>>({});
- const load=()=>getMappings().then(setData).catch(()=>setError('設定を取得できません。管理者でログインしてください。'));
- useEffect(()=>{void load();},[]);
+ const request=useRef(0);
+ const load=async()=>{const version=++request.current;setError('');let timer:ReturnType<typeof setTimeout>|undefined;try{const result=await Promise.race([getMappings(),new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new Error('timeout')),20000);})]);if(version===request.current)setData(result);}catch{if(version===request.current)setError('設定を取得できませんでした。会社に所属するオーナー・管理者で確認してください。代理ログインからは変更できません。');}finally{clearTimeout(timer);}};
+ useEffect(()=>{void load();return()=>{request.current++;};},[]);
  async function save() {setBusy(true);setError('');try {await saveStaffAlias(name,staff);await load();setName('');setStaff('');}catch {setError('保存できませんでした。入力内容と権限を確認してください。');}finally {setBusy(false);}}
- return <main className="max-w-3xl mx-auto space-y-5"><Link href="/admin/settings">← 設定</Link><h1 className="text-2xl font-bold">外部スタッフ名の紐づけ</h1><p>HOT PEPPER Beautyの「RUMI」などの別名を、SALON AGENTのスタッフに登録します。次回の取込みから自動適用されます。</p>{error&&<p role="alert">{error}</p>}{!data ? <p>読み込み中…</p> : <>
+ return <main className="max-w-3xl mx-auto space-y-5"><Link href="/admin/settings">← 設定</Link><h1 className="text-2xl font-bold">外部スタッフ名の紐づけ</h1><p>HOT PEPPER Beautyの「RUMI」などの別名を、SALON AGENTのスタッフに登録します。次回の取込みから自動適用されます。</p>{error&&<p role="alert">{error}</p>}{!data ? error ? <button className="border rounded px-4 py-2" onClick={()=>void load()}>再読み込み</button> : <p role="status">読み込み中…</p> : <>
  {data.limited&&<p>確認対象が多いため、一部のデータを表示しています。</p>}
  <section className="border rounded-xl p-5 bg-white space-y-3"><h2 className="font-bold">未紐づけ {data.unmatched.length}名</h2>{data.unmatched.map(n=><button key={n.name} disabled={busy} className="block text-blue-700" onClick={()=>setName(n.name)}>{n.name}（{n.count}件）を設定</button>)}
  <label className="block">外部サービスのスタッフ名<input className="block border rounded p-2 w-full" maxLength={100} value={name} onChange={e=>setName(e.target.value)} disabled={busy}/></label><label className="block">SALON AGENTのスタッフ<select className="block border rounded p-2 w-full" value={staff} onChange={e=>setStaff(e.target.value)} disabled={busy}><option value="">選択してください</option>{data.staff.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><button disabled={busy||!name.trim()||!staff} className="bg-blue-700 text-white rounded px-4 py-2 disabled:opacity-50" onClick={save}>紐づけを保存</button></section>

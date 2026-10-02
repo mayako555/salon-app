@@ -9,8 +9,11 @@ const db=adminDb as Firestore;
 export const aliasKey=(name:string)=>createHash('sha256').update(normalizedExternalName(name)).digest('hex');
 export async function mappingScope() {
  const ctx=await getCurrentUserContext();
- if(!ctx.companyId || !ctx.uid || ctx.isImpersonating || !['companyOwner','admin'].includes(ctx.role)) throw new Error('店舗オーナーまたは管理者で操作してください。');
- return {ctx,companyId:ctx.companyId,root:db.collection('companies').doc(ctx.companyId)};
+ if(!ctx.companyId || !ctx.uid || ctx.isImpersonating || !['companyOwner','admin','systemOwner'].includes(ctx.role)) throw new Error('店舗オーナーまたは管理者で操作してください。');
+ const root=db.collection('companies').doc(ctx.companyId);
+ const company=await root.get();
+ if(!company.exists || company.data()?.status==='inactive') throw new Error('会社を確認してください。');
+ return {ctx,companyId:ctx.companyId,root};
 }
 export async function loadStaffAliases(companyId:string):Promise<StaffAlias[]> {
  const snap=await db.collection('companies').doc(companyId).collection('staff_aliases').get();

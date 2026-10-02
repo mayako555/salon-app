@@ -19,6 +19,7 @@ import { revalidatePath } from "next/cache";
 import { getAdvancedAnalytics } from "@/app/dashboard/actions";
 import { addAuditLog } from "@/app/audit/actions";
 import * as Papa from "papaparse";
+import { decodeAccountingText, parseYayoiImport } from "@/lib/yayoi-import";
 import * as crypto from "crypto";
 import { duplicateExpense } from "@/lib/accounting/model";
 import { updateTenantOwnedDoc, deleteTenantOwnedDoc , addTenantOwnedDoc, setTenantOwnedDoc } from "@/lib/tenant-ownership";
@@ -37,6 +38,7 @@ export type ExpenseRecord = {
   paymentMethod?: string;
   counterparty?: string;
   receiptId?: string | null;
+  import_key?: string;
   is_imported?: boolean;
   created_at?: string;
 };
@@ -104,6 +106,12 @@ export async function addExpense(data: Omit<ExpenseRecord, 'id' | 'created_at'>)
 export async function addExpensesBatch(expenses: Omit<ExpenseRecord, 'id' | 'created_at'>[], confirmDuplicates = false) {
   try {
     if (expenses.length === 0) return { success: true, count: 0, skipped: 0 };
+    if (expenses.length > 450) throw new Error('1回の取込みは450件以内に分けてください。');
+    if (expenses.some(e => /\uFFFD/.test(e.category + e.description))) throw new Error('文字化けがあるため登録を中止しました。元のファイルを再アップロードしてください。');
+    const yayoiBatch = expenses.every(e => e.source === 'yayoi');
+    if (expenses.some(e => e.source === 'yayoi') && !yayoiBatch) throw new Error('弥生の取込みは他の形式と分けてください。');
+    if (expenses.some(e => !/^\d{4}-\d{2}-\d{2}$/.test(e.date) || !Number.isSafeInteger(e.amount) || e.amount <= 0 || !e.category?.trim() || !e.store_name?.trim())) throw new Error('日付・金額・科目・店舗を確認してください。');
+    if (yayoiBatch && expenses.some(e => !e.import_key || !/^[a-f0-9]{64}_\d+$/.test(e.import_key))) throw new Error('取込み情報が古いため、ファイルを再アップロードしてください。');
 
     // Find date range
     const dates = expenses.map(e => e.date);
@@ -122,7 +130,7 @@ export async function addExpensesBatch(expenses: Omit<ExpenseRecord, 'id' | 'cre
 
     // Similar records are candidates, never silently removed or merged.
     const duplicateCount = expenses.filter((row, index) =>
-      existingRecords.some(existing => duplicateExpense(row, existing)) ||
+      existingRecords.some(existing => !(row.import_key && row.import_key === existing.import_key) && duplicateExpense(row, existing)) ||
       expenses.slice(0, index).some(existing => duplicateExpense(row, existing))
     ).length;
     if (duplicateCount && !confirmDuplicates) {
@@ -131,11 +139,37 @@ export async function addExpensesBatch(expenses: Omit<ExpenseRecord, 'id' | 'cre
     }
     const newExpenses = expenses;
 
+    if (yayoiBatch) {
+      const { getCurrentUserContext } = await import('@/lib/auth-server');
+      const { requireFeature } = await import('@/lib/feature-utils');
+      const { adminDb: rawDb } = await import('@/lib/firebase-admin');
+      const ctx = await getCurrentUserContext();
+      if (!ctx.companyId || !['systemOwner','companyOwner','admin','manager','storeManager'].includes(ctx.role)) throw new Error('経費取込みの権限がありません');
+      await requireFeature(ctx.companyId,'expenses');
+      const { formStores } = await import('@/lib/store-industry-forms');
+      const allowed = await formStores(ctx);
+      if (expenses.some(e=>!allowed.some(s=>s.data().name===e.store_name))) throw new Error('取込先の店舗を確認してください');
+      const admin = rawDb as import('firebase-admin/firestore').Firestore;
+      const refs = expenses.map(e=>admin.collection(EXPENSES_COLLECTION).doc('yayoi_'+crypto.createHash('sha256').update(ctx.companyId+'|'+e.import_key).digest('hex')));
+      const count = await admin.runTransaction(async tx=>{
+        const snapshots = await Promise.all(refs.map(ref=>tx.get(ref)));
+        let added=0; const seen=new Set<string>();
+        expenses.forEach((data,i)=>{
+          if(snapshots[i].exists || seen.has(refs[i].id)) return;
+          seen.add(refs[i].id);
+          tx.create(refs[i],{...data,companyId:ctx.companyId,source:'yayoi',is_imported:true,created_at:new Date()}); added++;
+        });
+        if(added) tx.create(admin.collection('audit_logs').doc(),{companyId:ctx.companyId,action:'YAYOI_EXPENSE_IMPORT',userId:ctx.uid,count:added,created_at:new Date()});
+        return added;
+      });
+      revalidatePath('/admin/expenses'); revalidatePath('/staff-portal/expenses');
+      return {success:true,count,skipped:expenses.length-count};
+    }
     // Insert new expenses
     await Promise.all(newExpenses.map(async (data) => {
       await addTenantOwnedDoc(colRef, {
         ...data,
-        source: "csv",
+        source: data.source === "yayoi" ? "yayoi" : "csv",
         is_imported: true, // Flag as imported via CSV
         created_at: serverTimestamp()
       });
@@ -601,33 +635,15 @@ export async function getAnnualPnLData() {
 
 export async function parseYayoiPdfAction(base64File: string, mimeType: string) {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is not configured in environment variables.");
-    }
-
     const cleanBase64 = base64File.includes(",") ? base64File.split(",")[1] : base64File;
 
     if (mimeType === "text/csv" || mimeType === "text/plain" || mimeType === "text/rtf") {
       const buffer = Buffer.from(cleanBase64, 'base64');
-      const jschardet = await import('jschardet');
-      const iconv = await import('iconv-lite');
-      const detected = jschardet.detect(buffer);
-      // jschardet can sometimes return null for short/ambiguous Shift_JIS strings.
-      // If the buffer looks like a CSV and has Shift_JIS byte patterns or is undetected, default to Shift_JIS.
-      let encoding = 'utf8';
-      if (detected.encoding === 'Shift_JIS' || detected.encoding === 'windows-1252' || detected.encoding?.includes('ISO') || !detected.encoding) {
-        encoding = 'Shift_JIS';
-      }
-      
-      const decodedText = iconv.decode(buffer, encoding);
-      // If it decoded as Shift_JIS but looks completely garbled (lots of replacement characters), fallback to utf8
-      if (decodedText.includes('') && encoding === 'Shift_JIS' && !decodedText.includes('弥生')) {
-          return parseYayoiTextAction(iconv.decode(buffer, 'utf8'));
-      }
-      
-      return parseYayoiTextAction(decodedText);
+      return parseYayoiTextAction(decodeAccountingText(buffer));
     }
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("GEMINI_API_KEY is not configured in environment variables.");
+
 
     const prompt = `
 あなたは優秀な美容サロン専門の税理士・会計コンサルタントです。
@@ -765,73 +781,23 @@ export async function parseYayoiTextAction(textContent: string, columnMapping?: 
   let stats = { total: 0, ai: 0, rule: 0, excluded: 0, expense: 0, timeMs: 0 };
 
   try {
-    const lines = textContent.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-    const isYayoi = lines.some(l => l.startsWith('"2000"') || l.includes('弥生'));
-    
+    const yayoiRows = parseYayoiImport(textContent);
+    if (yayoiRows) {
+      stats.total = yayoiRows.length;
+      stats.rule = yayoiRows.length;
+      stats.expense = yayoiRows.filter(row => row.classification === '経費').length;
+      stats.excluded = yayoiRows.filter(row => row.classification === '対象外').length;
+      const review = yayoiRows.filter(row => row.classification === '要確認').length;
+      stats.timeMs = Date.now() - startTime;
+      return { success: true, dataStr: JSON.stringify(yayoiRows), stats: { ...stats, review } };
+    }
     const parsed = Papa.parse(textContent, { skipEmptyLines: true, header: false });
+    if (parsed.errors.length) return { success: false, error: "CSVの列数・引用符を確認してください。" };
     const data = parsed.data as any[][];
     if (data.length === 0) return { success: false, error: "データが空です" };
-    
     const hasHeader = isNaN(Number(data[0][0]?.replace(/,/g, ''))) && data.length > 1;
     const startIndex = hasHeader ? 1 : 0;
-    
     let results: any[] = [];
-    
-    if (isYayoi) {
-      console.log("[Parser] Detected Yayoi CSV. Skipping AI.");
-      let no = 1;
-      for (let i = startIndex; i < data.length; i++) {
-        const row = data[i];
-        if (row.length < 17) continue;
-        
-        const date = row[3] ? row[3].replace(/\//g, "-") : "";
-        const debitAccount = row[4] || "";
-        const creditAccount = row[10] || "";
-        const amountStr = row[8] || row[14] || "0";
-        const amount = parseInt(amountStr.replace(/,/g, ''), 10) || 0;
-        const description = row[16] || "";
-
-        if (!date || amount === 0) continue;
-        stats.total++;
-
-        const exclusions = ["売上", "売掛金", "普通預金", "事業主貸", "事業主借", "現金"]; 
-        if (exclusions.includes(debitAccount)) {
-          stats.excluded++;
-          continue; 
-        }
-
-        let classification = "経費";
-        let category = debitAccount;
-
-        const debtAccounts = ["借入金", "長期借入金", "短期借入金"];
-        const taxAccounts = ["租税公課", "法人税等", "所得税", "住民税", "消費税"];
-        const salaryAccounts = ["給料手当", "法定福利費", "福利厚生費"];
-        const rentAccounts = ["地代家賃"];
-
-        if (debtAccounts.includes(category)) {
-          category = "借入金・返済";
-          classification = "財務・税務";
-        } else if (taxAccounts.includes(category)) {
-          category = "税金";
-          classification = "財務・税務";
-        } else if (salaryAccounts.includes(category)) {
-          category = "人件費";
-        } else if (rentAccounts.includes(category)) {
-          category = "固定費";
-        }
-        
-        stats.rule++;
-        stats.expense++;
-
-        results.push({
-          no: no++, date, classification, category, description,
-          payment_method: "", amount, is_duplicate_sales: false, is_transfer: false,
-          reason: "弥生自動マッピング"
-        });
-      }
-      stats.timeMs = Date.now() - startTime;
-      return { success: true, dataStr: JSON.stringify(results), stats };
-    }
 
     console.log("[Parser] Detected Generic CSV.");
     

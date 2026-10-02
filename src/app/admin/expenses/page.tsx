@@ -444,6 +444,9 @@ export default function AdminExpensesDashboard() {
       return;
     }
 
+    if (!window.confirm(`${validExpenses.length}件の取込み候補を登録します。要確認・対象外の行は登録しません。よろしいですか？`)) return;
+    if (store === "すべて" && availableStores.length !== 1) { toast.error('取込先の店舗を選択してください'); return; }
+    if (!availableStores.length) { toast.error('先に店舗を登録してください'); return; }
     setIsParsingPdf(true); // Re-use parsing loading state for saving
 
     try {
@@ -452,6 +455,8 @@ export default function AdminExpensesDashboard() {
         store_name: store === "すべて" ? (availableStores[0] || "メイン店舗") : store, // fallback if needed
         date: tx.date,
         category: tx.category,
+        source: tx.source === "yayoi" ? "yayoi" as const : "csv" as const,
+        ...(tx.source === "yayoi" ? {import_key:tx.import_key, paymentMethod:tx.payment_method || ""} : {}),
         amount: tx.amount,
         description: tx.description,
         staff_name: profile?.name || "管理者",
@@ -1098,9 +1103,9 @@ export default function AdminExpensesDashboard() {
                  <div>
                     <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
                       <Brain className="text-emerald-600 w-5 h-5" />
-                      弥生取引帳PDF・画像インポート（AI解析）
+                      弥生の取引データを取り込む
                     </h3>
-                    <p className="text-[10px] text-slate-500">PDFや画像から取引データを一瞬で抽出し、売上重複をチェックします。</p>
+                    <p className="text-[10px] text-slate-500">弥生オンラインの「取引データ」で出力したTXT・CSVをそのまま選択できます。PDF・画像にも対応しています。</p>
                  </div>
                  <button 
                    onClick={() => {
@@ -1254,8 +1259,9 @@ export default function AdminExpensesDashboard() {
                           <div><span className="text-slate-400">総読み込み行数:</span> {importStats.total}件</div>
                           <div><span className="text-slate-400">ルール処理・キャッシュ:</span> <span className="text-emerald-300 font-bold">{importStats.rule}件</span></div>
                           <div><span className="text-slate-400">AIが推測した未知の行:</span> <span className="text-amber-300 font-bold">{importStats.ai}件</span></div>
-                          <div><span className="text-slate-400">重複・対象外の除外:</span> {importStats.excluded}件</div>
-                          <div><span className="text-slate-400">経費として反映可能:</span> {importStats.expense}件</div>
+                          <div><span className="text-slate-400">対象外等:</span> {importStats.excluded}件</div>
+                          <div><span className="text-slate-400">経費の取込み候補:</span> {importStats.expense}件</div>
+                          <div><span className="text-slate-400">要確認（登録しません）:</span> {parsedTransactions.filter(tx => tx.classification === "要確認").length}件</div>
                           <div><span className="text-slate-400">処理時間:</span> {importStats.timeMs}ms</div>
                         </div>
                       </div>
@@ -1265,7 +1271,7 @@ export default function AdminExpensesDashboard() {
                       <div>
                         <span className="text-[10px] font-bold text-emerald-800 block">🎉 取引抽出が完了しました！</span>
                         <span className="text-[9px] text-emerald-600 block mt-0.5">
-                          全 {parsedTransactions.length} 件の取引データを検出。売上重複を除外した経費のみをP&Lに反映できます。
+                          全 {parsedTransactions.length} 件を表示しています。要確認・対象外の行は登録しません。登録時に既存経費との重複候補を確認します。
                         </span>
                       </div>
                       <button 
@@ -1284,7 +1290,7 @@ export default function AdminExpensesDashboard() {
                             <th className="px-3 py-2.5">科目</th>
                             <th className="px-3 py-2.5">摘要</th>
                             <th className="px-3 py-2.5 text-right">金額</th>
-                            <th className="px-3 py-2.5 text-center">AIチェック状況</th>
+                            <th className="px-3 py-2.5 text-center">取込み確認</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -1306,11 +1312,11 @@ export default function AdminExpensesDashboard() {
                                   </span>
                                 ) : tx.classification === "経費" ? (
                                   <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-block">
-                                    経費（反映対象）
+                                    経費候補
                                   </span>
                                 ) : (
                                   <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-slate-100 text-slate-500 border border-slate-200 inline-block">
-                                    対象外 ({tx.classification || "振替"})
+                                    {tx.classification === "要確認" ? "要確認（登録しません）" : `対象外 (${tx.classification || "振替"})`}
                                   </span>
                                 )}
                               </td>
@@ -1343,7 +1349,7 @@ export default function AdminExpensesDashboard() {
                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 text-xs rounded-lg px-4 gap-1.5 shadow-sm"
                   >
                     {isParsingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles size={12} className="text-amber-300" />}
-                    データベースに一括登録する
+                    確認した取込み候補を登録する
                   </Button>
                 )}
               </div>

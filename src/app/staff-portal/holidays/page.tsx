@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { isRedCalendarDay } from "@/lib/seasonal-events";
 import { CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, addMonths } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -201,7 +202,7 @@ export default function StaffPortalHolidaysPage() {
           <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50">
             {["月", "火", "水", "木", "金", "土", "日"].map((day, i) => (
               <div key={day} className={`py-2 text-center text-[10px] font-bold ${
-                i === 5 ? "text-blue-600" : i === 6 ? "text-rose-600" : "text-slate-500"
+                i >= 5 ? "text-rose-600" : "text-slate-500"
               }`}>
                 {day}
               </div>
@@ -237,7 +238,7 @@ export default function StaffPortalHolidaysPage() {
                     ${!isSelected ? 'bg-white text-slate-700 hover:bg-slate-100' : ''}
                   `}
                 >
-                  <span className={`text-sm font-semibold ${!isSelected && (day.getDay()===0 ? 'text-rose-500' : day.getDay()===6 ? 'text-blue-500' : '')}`}>
+                  <span className={`text-sm font-semibold ${isRedCalendarDay(day) ? 'text-rose-700 bg-rose-50 rounded px-1' : ''}`}>
                     {format(day, "d")}
                   </span>
                   {isSelectedRegular && (

@@ -2,6 +2,7 @@
 
 export interface AdoptionProgress {
   storeInfo: boolean;
+  industryForms: boolean;
   businessHours: boolean;
   menu: boolean;
   staff: boolean;
@@ -13,6 +14,7 @@ export interface AdoptionProgress {
 
 export const defaultAdoptionProgress: AdoptionProgress = {
   storeInfo: false,
+  industryForms: false,
   businessHours: false,
   menu: false,
   staff: false,
