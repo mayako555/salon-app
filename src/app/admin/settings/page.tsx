@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import IndustryFormSettings from "@/components/forms/IndustryFormSettings";
 
 import { useEffect, useState } from "react";
@@ -64,7 +65,10 @@ export default function SystemSettingsPage() {
   }
 
   if (loading || !settings) {
-    return <div className="p-6 max-w-4xl mx-auto space-y-6"><h1 className="text-3xl font-bold">システム設定</h1><IndustryFormSettings key={profile?.companyId} /><p role="status">{loading ? "その他の設定を読み込み中…" : "その他の設定を読み込めませんでした。ページを開き直してください。"}</p></div>;
+    return <div className="p-6 max-w-4xl mx-auto space-y-6"><h1 className="text-3xl font-bold">システム設定</h1><Link href="/admin/settings/integrations" className="block rounded-2xl border bg-white p-5 text-blue-700 font-bold">外部サービス連携 → 会計ソフト</Link>
+      <Link href="/admin/settings/availability" className="block rounded-2xl border bg-white p-5 text-blue-700 font-bold">お客様向けの空き状況リンク</Link>
+      <Link href="/admin/settings/mappings" className="block rounded-2xl border bg-white p-5 text-blue-700 font-bold">外部スタッフ名の紐づけ</Link>
+      <IndustryFormSettings key={profile?.companyId} /><p role="status">{loading ? "その他の設定を読み込み中…" : "その他の設定を読み込めませんでした。ページを開き直してください。"}</p></div>;
   }
 
   const handleStoreChange = (store: string, field: "startHour" | "endHour" | "slotDuration", value: number) => {
@@ -160,6 +164,9 @@ export default function SystemSettingsPage() {
         </Button>
       </div>
 
+      <Link href="/admin/settings/integrations" className="block rounded-2xl border bg-white p-5 text-blue-700 font-bold">外部サービス連携 → 会計ソフト</Link>
+      <Link href="/admin/settings/availability" className="block rounded-2xl border bg-white p-5 text-blue-700 font-bold">お客様向けの空き状況リンク</Link>
+      <Link href="/admin/settings/mappings" className="block rounded-2xl border bg-white p-5 text-blue-700 font-bold">外部スタッフ名の紐づけ</Link>
       <IndustryFormSettings key={profile?.companyId} />
 
       {isSystemOwnerCompany && (

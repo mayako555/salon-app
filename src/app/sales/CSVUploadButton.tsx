@@ -25,7 +25,8 @@ export default function CSVUploadButton() {
       const result = await importHotPepperCsv(formData);
       
       if (result.success) {
-        alert(`CSVの取り込みに成功しました。\n${result.count}件の売上データを登録しました。\n（うち ${result.merged || 0} 件は手打ちデータと統合・上書きされました）`);
+        const mappingNotice = result.unmatchedStaff?.length ? `\n未紐づけのスタッフ名が${result.unmatchedStaff.length}件あります。設定 → 外部スタッフ名の紐づけで確認してください。` : '';
+        alert(`CSVの取り込みに成功しました。\n${result.count}件の売上データを登録しました。\n（うち ${result.merged || 0} 件は手打ちデータと統合・上書きされました）${mappingNotice}${result.mappingWarning ? `\n${result.mappingWarning}` : ''}`);
         // Force refresh to show new data
         window.location.reload();
       } else {

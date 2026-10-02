@@ -1,5 +1,7 @@
 "use server";
 
+import { loadStaffAliases, reportUnmatchedStaff } from "@/lib/external-mapping/service";
+import { resolveExternalStaff } from "@/lib/external-mapping/model";
 import Papa from "papaparse";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/firestore-admin-wrapper";
@@ -391,6 +393,7 @@ export async function importHotPepperCsv(formData: FormData) {
     const ctx = await getCurrentUserContext();
   if (ctx.companyId) await requireFeature(ctx.companyId, "sales");
     const companyId = ctx.companyId;
+    if (!companyId) throw new Error("会社情報がありません。");
 
     if (!file) return { success: false, error: "ファイルが選択されていません。" };
 
@@ -463,6 +466,8 @@ export async function importHotPepperCsv(formData: FormData) {
 
     const { getStaffList } = await import("../staff/actions");
     const staffs = await getStaffList({ includeResigned: true });
+    const staffAliases = await loadStaffAliases(companyId);
+    const unmatchedStaff = new Set<string>();
 
     // Step 3: Process each group
     let currentBatch = writeBatch(db);
@@ -480,10 +485,12 @@ export async function importHotPepperCsv(formData: FormData) {
     for (const groupRows of Object.values(groups)) {
       const firstRow = groupRows[0];
       const importMetadata = extractCouponImportMetadata(groupRows);
-      const rawStaffName = groupRows.find(r => r["スタッフ"] || r["担当スタッフ"] || r["スタッフ名"])?.["スタッフ"] || "フリー";
+      const staffRow = groupRows.find(r => r["スタッフ"] || r["担当スタッフ"] || r["スタッフ名"]);
+      const rawStaffName = staffRow?.["スタッフ"] || staffRow?.["担当スタッフ"] || staffRow?.["スタッフ名"] || "フリー";
       const staffName = String(rawStaffName).replace(/\s+/g, "");
       
-      const staffMatch = staffs.find(s => s.name.replace(/\s+/g, "") === staffName);
+      const staffMatch = resolveExternalStaff(staffName, staffs, staffAliases);
+      if (!staffMatch) unmatchedStaff.add(staffName);
       const staffId = staffMatch ? staffMatch.id : "unknown";
 
       const { rawDate, rawTime } = extractSalesDateTime(firstRow);
@@ -571,7 +578,8 @@ export async function importHotPepperCsv(formData: FormData) {
       currentBatch.set(docRef, {
         companyId: companyId || "company_default",
         staff_id: staffId,
-        staff_name: staffName,
+        staff_name: staffMatch?.name || staffName,
+        external_staff_name: staffName,
         store_name: storeName,
         date: dateFormatted,
         time: timeFormatted,
@@ -645,7 +653,8 @@ export async function importHotPepperCsv(formData: FormData) {
           companyId: companyId || "company_default",
           store_name: storeName,
           staff_id: staffId,
-          staff_name: staffName,
+          staff_name: staffMatch?.name || staffName,
+        external_staff_name: staffName,
           type: "reservation",
           customer_name: customerName,
           date: dateFormatted,
@@ -675,8 +684,15 @@ export async function importHotPepperCsv(formData: FormData) {
 
     commitCurrentBatch();
     await Promise.all(commitPromises);
+    let mappingWarning = '';
+    try {
+      await reportUnmatchedStaff(companyId, [...unmatchedStaff]);
+    } catch {
+      // Sales are already committed. Do not encourage a duplicate import.
+      mappingWarning = 'スタッフ紐づけの通知を作成できませんでした。設定の「外部スタッフ名の紐づけ」で確認してください。';
+    }
     revalidatePath("/staff-portal/sales");
-    return { success: true, count: importCount, skipped: skipCount, merged: 0 };
+    return { success: true, count: importCount, skipped: skipCount, merged: 0, unmatchedStaff: [...unmatchedStaff], mappingWarning };
   } catch (error: any) {
     console.error("Error importing CSV:", error);
     return { success: false, error: error.message };

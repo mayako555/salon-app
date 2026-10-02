@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Geist } from "next/font/google";
 import "./globals.css";
-import { AppLayout } from "@/components/layout/AppLayout";
+import RuntimeShell from "@/components/layout/RuntimeShell";
 import { cn } from "@/lib/utils";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
@@ -30,12 +30,6 @@ export const metadata: Metadata = {
   },
 };
 
-import { AuthProvider } from "@/lib/auth-context";
-import { Toaster } from "sonner";
-import { TrackingProvider } from "@/components/layout/TrackingProvider";
-import { TestPlanFeedbackModal } from "@/components/layout/TestPlanFeedbackModal";
-import AIChatWidget from "@/components/AIChatWidget";
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -47,14 +41,7 @@ export default function RootLayout({
         className={`${inter.variable} font-sans antialiased bg-slate-50`}
         suppressHydrationWarning
       >
-        <AuthProvider>
-          <TrackingProvider>
-            <AppLayout>{children}</AppLayout>
-            <TestPlanFeedbackModal />
-            <AIChatWidget />
-          </TrackingProvider>
-          <Toaster position="top-center" richColors />
-        </AuthProvider>
+        <RuntimeShell>{children}</RuntimeShell>
       </body>
     </html>
   );

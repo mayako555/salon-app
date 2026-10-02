@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { Loader2, MessageSquare } from "lucide-react";
 const SNOOZE_KEY = "test_feedback_snoozed_until";
 
 export function TestPlanFeedbackModal() {
+  const pathname = usePathname();
   const { user, profile, tenantPlan } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -28,7 +30,7 @@ export function TestPlanFeedbackModal() {
 
   useEffect(() => {
     const checkStatus = async () => {
-      if (!user || !profile?.companyId || tenantPlan !== "Test") {
+      if (pathname.startsWith("/availability/") || !user || !profile?.companyId || tenantPlan !== "Test") {
         setChecking(false);
         return;
       }
@@ -54,7 +56,7 @@ export function TestPlanFeedbackModal() {
     };
 
     checkStatus();
-  }, [user, profile, tenantPlan]);
+  }, [user, profile, tenantPlan, pathname]);
 
   const handleSubmit = async () => {
     if (!profile?.companyId || !user) return;
@@ -77,7 +79,7 @@ export function TestPlanFeedbackModal() {
     setIsOpen(false);
   };
 
-  if (checking) return null;
+  if (checking || pathname.startsWith("/availability/")) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {

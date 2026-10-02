@@ -10,6 +10,8 @@ type StoreProgress = {
 
 type ExecutiveSummaryProps = {
   monthlyTotal: number;
+  profit?: number;
+  projection?: number;
   regularVisits: number;
   minimoVisits: number;
   storeStats?: StoreProgress[];
@@ -19,6 +21,8 @@ const money = (value: number) => `¥${Math.round(value).toLocaleString()}`;
 
 export default function ExecutiveSummary({
   monthlyTotal,
+  profit,
+  projection,
   regularVisits,
   minimoVisits,
   storeStats = [],
@@ -91,8 +95,8 @@ export default function ExecutiveSummary({
               <TrendingUp size={18} aria-hidden="true" />
             </div>
             <div>
-              <p className="text-xl font-black text-slate-700">準備中</p>
-              <Badge variant="secondary" className="mt-2 text-[10px]">Phase 3で算出</Badge>
+              <p className="text-xl font-black text-slate-700">{projection == null ? "準備中" : money(projection)}</p>
+              <Badge variant="secondary" className="mt-2 text-[10px]">{projection == null ? "Phase 3で算出" : "デモシナリオ"}</Badge>
             </div>
           </CardContent>
         </Card>
@@ -104,8 +108,8 @@ export default function ExecutiveSummary({
               <Gauge size={18} aria-hidden="true" />
             </div>
             <div>
-              <p className="text-xl font-black text-slate-700">算出待ち</p>
-              <p className="mt-2 text-[10px] leading-relaxed text-slate-400">経費データの会社分離後に表示</p>
+              <p className="text-xl font-black text-slate-700">{profit == null ? "算出待ち" : money(profit)}</p>
+              <p className="mt-2 text-[10px] leading-relaxed text-slate-400">{profit == null ? "経費データの会社分離後に表示" : "売上 − 経費（概算）"}</p>
             </div>
           </CardContent>
         </Card>

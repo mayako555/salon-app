@@ -94,6 +94,7 @@ export type ExistingImportedSale = {
   time?: string;
   customer_name?: string;
   staff_name?: string;
+  external_staff_name?: string;
   tech_sales?: number;
   product_sales?: number;
   nomination_fee?: number;
@@ -114,6 +115,7 @@ export type ExistingImportedReservation = {
   companyId?: string;
   store_name?: string;
   staff_name?: string;
+  external_staff_name?: string;
   customer_name?: string;
   date?: string;
   end_time?: string;
@@ -145,7 +147,7 @@ export function isDuplicateImportedSale(
       sale.date === candidate.date &&
       sale.time === candidate.time &&
       existingTotal === candidate.total &&
-      (sale.customer_name === candidate.customerName || sale.staff_name === candidate.staffName);
+      (sale.customer_name === candidate.customerName || (sale.external_staff_name || sale.staff_name) === candidate.staffName);
   });
 }
 
@@ -160,7 +162,7 @@ export function isDuplicateImportedReservation(
 
     return reservation.companyId === candidate.companyId &&
       reservation.store_name === candidate.storeName &&
-      reservation.staff_name === candidate.staffName &&
+      (reservation.external_staff_name || reservation.staff_name) === candidate.staffName &&
       reservation.customer_name === candidate.customerName &&
       reservation.date === candidate.date &&
       reservation.end_time === candidate.endTime &&

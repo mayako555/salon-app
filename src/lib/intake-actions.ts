@@ -25,9 +25,16 @@ export async function getPublicIntakeInfo(token: string) {
   try {
     const session = (await sessionRef(token).get()).data();
     if (!validIntakeSession(session, Date.now())) throw new Error('expired');
-    const company = await adminDb.collection('companies').doc(session!.companyId).get();
-    if (!company.exists || company.data()?.status === 'inactive') throw new Error('inactive');
-    return { success: true as const, name: String(company.data()?.name || 'サロン'), template: session!.template as import('./industry-forms').FormTemplate, completed: !!session!.responseId };
+    const [company,customer,stores]=await Promise.all([
+      adminDb.collection('companies').doc(session!.companyId).get(),
+      adminDb.collection('customers').doc(session!.customerId).get(),
+      adminDb.collection('sales_master').where('companyId','==',session!.companyId).where('itemType','==','store').get()
+    ]);
+    if (!company.exists || company.data()?.status === 'inactive' || !customer.exists || customer.data()?.companyId !== session!.companyId) throw new Error('inactive');
+    const assignedStore=customer.data()?.store_name;
+    const store=stores.docs.find(d=>d.data().isActive!==false && (d.data().name===assignedStore || d.id===assignedStore));
+    const name=String(store?.data().name || company.data()?.name || 'サロン');
+    return { success: true as const, name, template: session!.template as import('./industry-forms').FormTemplate, completed: !!session!.responseId };
   } catch { return { success: false as const, error: 'このQRコードは無効か有効期限が切れています。スタッフに再発行を依頼してください。' }; }
 }
 export async function submitCounselingIntake(token: string, data: { name: string; phone: string; answers: unknown; services?: ServiceType[]; signature?: string; consent: boolean; gender?: string; profile?: Record<string, unknown> }) {

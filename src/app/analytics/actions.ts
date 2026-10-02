@@ -1,4 +1,6 @@
 "use server";
+import { loadStaffAliases } from "@/lib/external-mapping/service";
+import { resolveExternalStaff } from "@/lib/external-mapping/model";
 
 import { db } from "@/lib/firestore-admin-wrapper";
 import { isNationalHoliday, isSalonEvent } from "@/lib/seasonal-events";
@@ -1279,13 +1281,14 @@ export async function getStaffAnalytics(companyIdParam: string, storeId: string 
 
     // Fetch staff
     let staffQuery = adminDb.collection("staff_profiles").where("companyId", "==", companyId);
-    if (empType !== "all") {
-      staffQuery = staffQuery.where("employment_type", "==", empType);
-    }
     const staffSnap = await staffQuery.get();
+    const staffAliases = await loadStaffAliases(companyId);
+    const allStaff = staffSnap.docs.map((d: any) => ({id:d.id,name:d.data().name}));
+    let unmatchedSales = 0;
     const staffMap = new Map();
     staffSnap.docs.forEach((d: any) => {
       const data = d.data();
+      if (empType !== "all" && data.employment_type !== empType) return;
       staffMap.set(d.id, { 
         id: d.id, 
         name: data.name, 
@@ -1311,7 +1314,8 @@ export async function getStaffAnalytics(companyIdParam: string, storeId: string 
     salesSnap.docs.forEach((d: any) => {
       const data = d.data();
       if (storeId && storeId !== "全店舗" && getNormalizedStoreName(data.store_name || "") !== getNormalizedStoreName(storeId)) return;
-      const sId = data.staff_id;
+      const sId = resolveExternalStaff(data.external_staff_name || data.staff_name || "", allStaff, staffAliases, data.staff_id)?.id;
+      if (!sId) unmatchedSales++;
       if (sId && staffMap.has(sId)) {
         const staff = staffMap.get(sId);
         staff.sales += (data.tech_sales || 0) + (data.product_sales || 0) - (data.discount || 0);
@@ -1334,7 +1338,7 @@ export async function getStaffAnalytics(companyIdParam: string, storeId: string 
     attendanceSnap.docs.forEach((d: any) => {
       const data = d.data();
       if (storeId && storeId !== "全店舗" && data.store !== storeId && data.store !== undefined) return;
-      const sId = data.staff_id;
+      const sId = resolveExternalStaff(data.external_staff_name || data.staff_name || "", allStaff, staffAliases, data.staff_id)?.id;
       if (sId && staffMap.has(sId)) {
         // Calculate minutes
         if (data.clock_in && data.clock_out) {
@@ -1364,7 +1368,7 @@ export async function getStaffAnalytics(companyIdParam: string, storeId: string 
       };
     }).filter(s => s.customers > 0 || s.workMinutes > 0);
 
-    return { success: true, data: result };
+    return { success: true, data: result, unmatchedSales, emptyReason: staffMap.size === 0 ? "登録スタッフがいないか、雇用形態の条件に一致していません。" : unmatchedSales ? "スタッフの紐づけが必要な売上があります。" : "選択した期間に売上・勤務実績がありません。" };
   } catch (error: any) {
     console.error("Failed to get staff analytics:", error);
     return { success: false, error: error.message };

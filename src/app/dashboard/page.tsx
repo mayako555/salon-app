@@ -247,9 +247,9 @@ export default function DashboardPage() {
                             <div className="flex justify-between items-start mb-3">
                               <div className="flex flex-col gap-1">
                                 <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest self-start ${isMyTask ? 'bg-rose-500 text-white' : 'bg-slate-400 text-white'}`}>
-                                  {task.type === 'booking_change_request' ? '予約変更依頼' : 'お問い合わせ'}
+                                  {task.type === 'staff_mapping' ? 'スタッフ紐づけ' : task.type === 'booking_change_request' ? '予約変更依頼' : 'お問い合わせ'}
                                 </span>
-                                {!isMyTask && (
+                                {!isMyTask && task.type !== 'staff_mapping' && (
                                   <div className="flex items-center gap-1.5 mt-1">
                                     <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500">
                                       {task.staff_name[0]}
@@ -258,22 +258,22 @@ export default function DashboardPage() {
                                   </div>
                                 )}
                               </div>
-                              <span className="text-[10px] text-slate-300 font-bold">LINE経由</span>
+                              <span className="text-[10px] text-slate-300 font-bold">{task.type === 'staff_mapping' ? 'CSV取込み' : 'LINE経由'}</span>
                             </div>
                             
-                            <p className="text-sm font-black text-slate-800 mb-1">{task.customer_name}様</p>
+                            <p className="text-sm font-black text-slate-800 mb-1">{task.type === 'staff_mapping' ? 'スタッフの確認が必要です' : `${task.customer_name}様`}</p>
                             <p className="text-xs text-slate-600 line-clamp-2 mb-4 bg-white/50 p-2 rounded-lg italic border border-slate-100/50">
                               「{task.content}」
                             </p>
                             
-                            <Button 
+                            {task.type === 'staff_mapping' ? <Link href="/admin/settings/mappings" className="block text-center rounded-xl p-3 bg-white text-blue-700 font-bold text-sm border">スタッフを紐づける</Link> : <Button
                               size="sm" 
                               className={`w-full h-10 rounded-xl font-bold gap-2 shadow-sm ${isMyTask ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
                               onClick={() => handleGenerateReply(task)}
                             >
                               <Sparkles size={14} className={isMyTask ? "text-amber-400" : "text-amber-500"} />
                               {isMyTask ? '返信案を作成する' : '代わりに返信案を作る'}
-                            </Button>
+                            </Button>}
                           </div>
                         );
                       })

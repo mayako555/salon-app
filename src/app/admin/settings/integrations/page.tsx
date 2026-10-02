@@ -1,0 +1,2 @@
+import Link from 'next/link';
+export default function Integrations() { return <main className="max-w-4xl mx-auto p-6 space-y-6"><Link href="/admin/settings">← 設定</Link><h1 className="text-3xl font-bold">外部サービス連携</h1><Link className="block border rounded-2xl p-6 bg-white" href="/admin/settings/integrations/accounting"><h2 className="text-xl font-bold">会計ソフト</h2><p>freee・マネーフォワード・弥生の対応状況、科目設定、同期履歴</p></Link><Link className="block text-blue-600" href="/admin/expenses/entry">経費の管理方法・手入力・CSV取込</Link></main>; }

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { getStaffAnalytics } from "./actions";
@@ -13,6 +14,8 @@ export default function StaffAnalysis() {
   const [period, setPeriod] = useState("this_month");
   const [empType, setEmpType] = useState("all");
   const [data, setData] = useState<any[]>([]);
+  const [reason, setReason] = useState("");
+  const [unmatched, setUnmatched] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,7 +24,10 @@ export default function StaffAnalysis() {
       const res = await getStaffAnalytics(profile?.companyId!, undefined, period, empType);
       if (res.success) {
         setData(res.data || []);
+        setReason(res.emptyReason || "");
+        setUnmatched(res.unmatchedSales || 0);
       }
+      if (!res.success) { setData([]); setReason("分析データを取得できませんでした。再読み込みしてください。"); }
       setLoading(false);
     }
     load();
@@ -29,6 +35,7 @@ export default function StaffAnalysis() {
 
   return (
     <div className="space-y-6">
+      {unmatched > 0 && <p role="alert">未紐づけの売上が{unmatched}件あります。<Link href="/admin/settings/mappings" className="text-blue-700 underline">スタッフを紐づける</Link></p>}
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
         <div className="flex gap-4 w-full sm:w-auto">
           <Select value={period} onValueChange={setPeriod}>
@@ -63,7 +70,7 @@ export default function StaffAnalysis() {
         </div>
       ) : data.length === 0 ? (
         <div className="h-64 flex items-center justify-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100 shadow-sm">
-          対象データがありません
+          {reason || "対象データがありません"}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
