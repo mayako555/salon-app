@@ -6,7 +6,7 @@ export const INDUSTRIES = [
 export type Industry = typeof INDUSTRIES[number]['id'];
 export type FormField = { id: string; label: string; required?: boolean };
 export type FormTemplate = { id: string; name: string; industry: Industry; kind: 'karte' | 'counseling'; version: number; fields: FormField[]; legacy?: boolean };
-export type IndustryForms = { industry: Industry; karteTemplateId: string; counselingTemplateId: string };
+export type IndustryForms = { industry: Industry; karteTemplateId: string; counselingTemplateId: string; industries?: Industry[]; karteTemplateIds?: string[]; counselingTemplateIds?: string[] };
 const labels: Record<Industry, { karte: string[]; counseling: string[] }> = {
   eyelash: { karte: [], counseling: [] },
   hair: { karte: ['施術メニュー', '髪・頭皮の状態', 'カット・デザイン', '薬剤・配合・放置時間', '仕上がり・ホームケア'], counseling: ['ご希望のメニュー・スタイル', '髪・頭皮のお悩み', 'カラー・パーマ・縮毛矯正の施術歴', '薬剤などで気になった経験', '普段のお手入れ'] },
@@ -33,7 +33,22 @@ export function validateIndustryForms(value: unknown): IndustryForms {
   const v = value as IndustryForms;
   if (!INDUSTRIES.some(i => i.id === v.industry)) throw new Error('業種が無効です');
   templateById(v.karteTemplateId, 'karte'); templateById(v.counselingTemplateId, 'counseling');
-  return { industry: v.industry, karteTemplateId: v.karteTemplateId, counselingTemplateId: v.counselingTemplateId };
+  const result: IndustryForms = { industry: v.industry, karteTemplateId: v.karteTemplateId, counselingTemplateId: v.counselingTemplateId };
+  if (v.industries !== undefined) {
+    if (!Array.isArray(v.industries) || !v.industries.length || v.industries.length > INDUSTRIES.length || v.industries.some(id => !INDUSTRIES.some(i => i.id === id)) || !v.industries.includes(v.industry)) throw new Error('業種を1つ以上選択してください');
+    result.industries = [...new Set(v.industries)];
+  }
+  for (const kind of ['karte', 'counseling'] as const) {
+    const key = kind === 'karte' ? 'karteTemplateIds' : 'counselingTemplateIds';
+    const primary = kind === 'karte' ? v.karteTemplateId : v.counselingTemplateId;
+    if (v[key] !== undefined) {
+      const ids = v[key];
+      if (!Array.isArray(ids) || !ids.length || ids.length > FORM_TEMPLATES.length || !ids.includes(primary)) throw new Error('シートを1つ以上選択してください');
+      ids.forEach(id => templateById(id, kind));
+      result[key] = [...new Set(ids)];
+    }
+  }
+  return result;
 }
 export function readIndustryForms(value: unknown): IndustryForms {
   return value == null ? defaultIndustryForms() : validateIndustryForms(value);
@@ -47,4 +62,15 @@ export function cleanFormAnswers(template: FormTemplate, answers: unknown): Reco
     if (field.required && !value.trim()) throw new Error(`${field.label}を入力してください`);
     return [field.id, value.trim()];
   }));
+}
+
+export function enabledTemplateIds(settings: IndustryForms, kind: FormTemplate['kind']): string[] {
+  return kind === 'karte' ? settings.karteTemplateIds || [settings.karteTemplateId] : settings.counselingTemplateIds || [settings.counselingTemplateId];
+}
+export function selectedFormTemplate(settings: IndustryForms, kind: FormTemplate['kind'], id?: string): FormTemplate {
+  const ids = enabledTemplateIds(settings, kind);
+  if (!id && ids.length > 1) throw new Error('使用するシートを選択してください');
+  const selected = id || ids[0];
+  if (!ids.includes(selected)) throw new Error('この店舗では使用できないシートです');
+  return templateById(selected, kind);
 }

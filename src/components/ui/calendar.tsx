@@ -2,6 +2,9 @@
 
 import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ja } from "date-fns/locale";
+import { format } from "date-fns";
+import { isRedCalendarDay } from "@/lib/seasonal-events";
 import { DayPicker } from "react-day-picker";
 
 import { cn } from "@/lib/utils";
@@ -13,6 +16,10 @@ function Calendar({
   className,
   classNames,
   showOutsideDays = true,
+  modifiers,
+  modifiersClassNames,
+  labels,
+  formatters,
   ...props
 }: CalendarProps) {
   return (
@@ -58,6 +65,11 @@ function Calendar({
         IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
       } as any}
       {...props}
+      locale={ja}
+      formatters={{ ...formatters, formatCaption: date => format(date, "yyyy年M月", { locale: ja }), formatWeekdayName: date => format(date, "EEEEE", { locale: ja }) }}
+      labels={{ ...labels, labelPrevious: () => "前の月", labelNext: () => "次の月", labelDay: date => format(date, "yyyy年M月d日 EEEE", { locale: ja }), labelWeekday: date => format(date, "EEEE", { locale: ja }), labelMonthDropdown: () => "月を選択", labelYearDropdown: () => "年を選択" }}
+      modifiers={{ ...modifiers, redCalendarDay: isRedCalendarDay }}
+      modifiersClassNames={{ ...modifiersClassNames, redCalendarDay: "!text-rose-700 aria-selected:!bg-rose-100" }}
     />
   );
 }

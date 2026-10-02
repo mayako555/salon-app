@@ -1,4 +1,6 @@
 "use client";
+import {getCustomerIndustryFormSettings} from '@/lib/industry-form-actions';
+import {enabledTemplateIds,templateById} from '@/lib/industry-forms';
 import { createCounselingIntake } from "@/lib/intake-actions";
 
 import { useEffect, useState } from "react";
@@ -82,6 +84,9 @@ export default function CustomerDetailPage() {
   const [isEntryQrOpen, setIsEntryQrOpen] = useState(false); // New: Counseling QR
   const [linkUrl, setLinkUrl] = useState("");
   const [linkExpiresAt, setLinkExpiresAt] = useState(0);
+  const [entryTemplates,setEntryTemplates]=useState<{id:string;name:string}[]>([]);
+  const [entryTemplateId,setEntryTemplateId]=useState('');
+  const [entryBusy,setEntryBusy]=useState(false);
   const [entryUrl, setEntryUrl] = useState(""); // New: Entry URL
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const [linePublicSettings, setLinePublicSettings] = useState<Record<string, PublicLineStoreSettings>>({});
@@ -236,9 +241,9 @@ export default function CustomerDetailPage() {
   const handleShowEntryQr = async () => {
     if (typeof id !== 'string') return;
     try {
-      const result = await createCounselingIntake(id);
-      if (!result.success) { toast.error(result.error); return; }
-      setEntryUrl(`${window.location.origin}/entry?token=${result.token}`);
+      const {settings} = await getCustomerIndustryFormSettings(id);
+      const templates = enabledTemplateIds(settings,'counseling').map(t=>templateById(t,'counseling'));
+      setEntryTemplates(templates); setEntryTemplateId(templates[0].id); setEntryUrl('');
       setIsEntryQrOpen(true);
     } catch { toast.error('入力用QRを発行できませんでした'); }
   };
@@ -1111,7 +1116,9 @@ export default function CustomerDetailPage() {
             <DialogTitle className="text-xl font-black text-rose-600">お客様入力用QR</DialogTitle>
           </DialogHeader>
           <div className="py-6 flex flex-col items-center gap-6">
-            <div className="p-4 bg-white rounded-3xl shadow-xl border border-rose-100">
+            <label className="w-full text-left text-sm font-bold">使用するカウンセリングシート<select disabled={entryBusy} className="block w-full border rounded-xl p-3 mt-2" value={entryTemplateId} onChange={e=>{setEntryTemplateId(e.target.value);setEntryUrl('');}}>{entryTemplates.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+            <Button disabled={entryBusy || !entryTemplateId} onClick={async()=>{setEntryBusy(true);setEntryUrl('');try{const result=await createCounselingIntake(id as string,entryTemplateId);if(!result.success)throw new Error(result.error);setEntryUrl(`${window.location.origin}/entry?token=${result.token}`);}catch(e){toast.error(e instanceof Error?e.message:'QRを発行できませんでした');}finally{setEntryBusy(false);}}}>{entryBusy?'発行中…':'選択したシートのQRを発行'}</Button>
+            {entryUrl && <><div className="p-4 bg-white rounded-3xl shadow-xl border border-rose-100">
               <QRCodeSVG 
                 value={entryUrl} 
                 size={200}
@@ -1128,7 +1135,7 @@ export default function CustomerDetailPage() {
                 このお客様専用・発行から24時間・送信は1回です。
               </p>
             </div>
-          </div>
+          </>} </div>
           <Button variant="outline" onClick={() => setIsEntryQrOpen(false)} className="rounded-xl w-full border-rose-100 text-rose-400 hover:text-rose-600">
             閉じる
           </Button>

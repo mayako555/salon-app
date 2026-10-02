@@ -120,7 +120,7 @@ export function Sidebar() {
     }
   ];
 
-  if (schoolEnabled) {
+  if (schoolEnabled && hasFeature('school')) {
     managementCategories.push({
       title: "スクール管理",
       items: [

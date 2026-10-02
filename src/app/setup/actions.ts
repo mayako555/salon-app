@@ -50,6 +50,12 @@ export async function updateAdoptionProgress(field: keyof AdoptionProgress, valu
        return { success: false, error: "会社IDが指定されていません" };
     }
 
+    if (!Object.prototype.hasOwnProperty.call(defaultAdoptionProgress, field) || typeof value !== 'boolean') throw new Error('設定項目が無効です');
+    if (field === 'industryForms' && value) {
+      const {getStoreIndustryFormSettings} = await import('@/lib/industry-form-actions');
+      const stores = await getStoreIndustryFormSettings();
+      if (!stores.length || stores.some(store=>store.inherited)) return {success:false,error:'すべての店舗の業種・シート設定を保存してください。'};
+    }
     const companyRef = doc(db, "companies", ctx.companyId);
     const updateData: Record<string, any> = {
       [`adoptionProgress.${field}`]: value

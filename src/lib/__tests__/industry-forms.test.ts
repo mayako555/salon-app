@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { INDUSTRIES, readIndustryForms, defaultIndustryForms, validateIndustryForms, templateById, cleanFormAnswers } from '../industry-forms';
+import { selectedFormTemplate, enabledTemplateIds, INDUSTRIES, readIndustryForms, defaultIndustryForms, validateIndustryForms, templateById, cleanFormAnswers } from '../industry-forms';
 import { validateIntakeSubmission, validIntakeSession } from '../intake-validation';
 import { appendDrawingHistory, type DrawingMark } from '../drawing-document';
 test('existing tenants keep eyelash forms; every industry has separate record and intake forms', () => {
@@ -52,4 +52,13 @@ test('undo followed by a stroke discards redo branch and copies points', () => {
 test('submitted contact preferences survive without trusting client LINE identity', () => {
   const result = validateIntakeSubmission(templateById('hair-counseling-v1', 'counseling'), { name: 'Test', phone: '09012345678', consent: true, answers: {}, profile: { dm_allowed: false, referral_source: ['紹介'], line_user_id: 'fake' } });
   assert.deepEqual(result.submitted_profile, { referral_source: '紹介', dm_allowed: 'no' });
+});
+
+test('store templates allow multiple industries but reject unselected or ambiguous sheets', () => {
+ const settings=validateIndustryForms({...defaultIndustryForms(),industries:['eyelash','nail'],karteTemplateIds:['eyelash-karte-v1','nail-karte-v1'],counselingTemplateIds:['eyelash-counseling-v1','nail-counseling-v1']});
+ assert.equal(selectedFormTemplate(settings,'karte','nail-karte-v1').industry,'nail');
+ assert.throws(()=>selectedFormTemplate(settings,'karte'));
+ assert.throws(()=>selectedFormTemplate(settings,'karte','hair-karte-v1'));
+ assert.throws(()=>validateIndustryForms({...settings,karteTemplateIds:[]}));
+ assert.deepEqual(enabledTemplateIds(defaultIndustryForms(),'karte'),['eyelash-karte-v1']);
 });
