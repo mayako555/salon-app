@@ -14,7 +14,8 @@ import {
   Check, 
   X,
   Mail,
-  Briefcase
+  Briefcase,
+  Store
 } from "lucide-react";
 import StaffFormDialog from "./StaffFormDialog";
 import DeleteStaffButton from "./DeleteStaffButton";
@@ -59,6 +60,8 @@ function SortableStaffItem({
     isDragging
   } = useSortable({ id: staff.id });
 
+  const stores = [...new Set((staff.salonIds ?? []).filter(name => typeof name === "string" && name.trim()).map(name => name.trim()))];
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -93,7 +96,7 @@ function SortableStaffItem({
                   'bg-emerald-100 text-emerald-700'
                 )}>
                   {staff.employment_type === 'employee' ? '正社員' : 
-                   staff.employment_type === 'part_time' ? 'パート' : '業務委託'}
+                   staff.employment_type === 'part_time' ? 'パート' : staff.employment_type === 'outsourcing' ? '業務委託' : '雇用形態未設定'}
                 </span>
                 {staff.is_invoice_registered && (
                   <Badge variant="outline" className="text-[9px] font-bold border-emerald-200 text-emerald-600 h-5 whitespace-nowrap">インボイス登録</Badge>
@@ -109,6 +112,18 @@ function SortableStaffItem({
                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mb-0.5 leading-none truncate">{staff.name_kana}</p>
               )}
               <h3 className="font-black text-slate-800 truncate text-base sm:text-lg leading-tight">{staff.name}</h3>
+              <div className="mt-2 flex flex-wrap items-start gap-1.5" aria-label="所属店舗">
+                <span className="inline-flex items-center gap-1 py-1 text-xs font-bold text-slate-500 shrink-0">
+                  <Store size={13} aria-hidden="true" /> 所属店舗
+                </span>
+                {stores.length > 0 ? stores.map(store => (
+                  <span key={store} className="max-w-full rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-800 whitespace-normal break-words">
+                    {store}
+                  </span>
+                )) : (
+                  <span className="py-1 text-xs text-slate-500">未設定</span>
+                )}
+              </div>
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mt-1.5 sm:mt-1">
                 <p className="text-[10px] text-slate-400 flex items-center gap-1 min-w-0"><Mail size={10} className="shrink-0" /> <span className="truncate">{staff.email || "メール未設定"}</span></p>
                 <p className="text-[10px] text-slate-400 flex items-center gap-1 shrink-0"><Briefcase size={10} className="shrink-0" /> {staff.role}</p>
@@ -131,7 +146,7 @@ function SortableStaffItem({
 
           <div className="hidden md:flex flex-col items-end gap-1 px-4 border-l border-slate-50 min-w-[100px]">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">暗証番号 (PIN)</p>
-            <p className="text-sm font-black text-blue-600 bg-blue-50 border border-blue-100 rounded px-2.5 py-0.5 tracking-wider tabular-nums">{staff.passcode || "1234"}</p>
+            <p className="text-sm font-black text-blue-600 bg-blue-50 border border-blue-100 rounded px-2.5 py-0.5 tracking-wider tabular-nums">{staff.passcode || "未設定"}</p>
           </div>
 
           <div className="hidden md:flex flex-col items-end gap-1 px-4 border-l border-slate-50">

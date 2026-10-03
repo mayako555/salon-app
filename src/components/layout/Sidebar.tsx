@@ -1,4 +1,5 @@
 "use client";
+import SalonAgentLogo from "@/components/SalonAgentLogo";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -187,12 +188,7 @@ export function Sidebar() {
   return (
     <div className="flex h-full w-64 flex-col border-r border-slate-200 bg-white shadow-sm">
       <div className="flex h-16 items-center flex-shrink-0 px-6 border-b border-slate-200">
-        <div className="flex items-center gap-2">
-          <div className="bg-gradient-to-tr from-slate-800 to-slate-700 p-2 rounded-lg text-white shadow-md">
-            <Scissors size={20} />
-          </div>
-          <span className="font-black text-lg tracking-tight text-slate-900 italic">SALON AGENT</span>
-        </div>
+        <SalonAgentLogo className="w-full h-auto" />
       </div>
       
       <div className="flex flex-1 flex-col overflow-y-auto py-4">

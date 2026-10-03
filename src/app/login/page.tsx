@@ -1,4 +1,5 @@
 "use client";
+import SalonAgentLogo from "@/components/SalonAgentLogo";
 
 import { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
@@ -87,10 +88,7 @@ export default function LoginPage() {
         {isResetMode ? (
           <>
             <CardHeader className="space-y-2 text-center pb-8">
-              <div className="mx-auto w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center mb-4 border border-blue-500/30">
-                <Lock className="text-blue-400 w-8 h-8" />
-              </div>
-              <CardTitle className="text-3xl font-bold text-white tracking-tight">パスワード再設定</CardTitle>
+              <SalonAgentLogo className="w-full h-auto mx-auto mb-4" />
               <p className="text-slate-400 text-sm">登録したメールアドレスを入力してください</p>
             </CardHeader>
             <form onSubmit={handlePasswordReset}>

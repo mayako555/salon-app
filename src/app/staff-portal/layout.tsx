@@ -1,4 +1,5 @@
 "use client";
+import SalonAgentLogo from "@/components/SalonAgentLogo";
 
 import { useAuth } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
@@ -100,12 +101,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
       {/* Sidebar for Desktop */}
       <aside className="hidden lg:flex w-64 bg-slate-900 text-white flex-col sticky top-0 h-screen overflow-hidden">
         <div className="p-8 pb-4">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="bg-blue-600 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20">
-              <span className="text-xl font-black italic">S</span>
-            </div>
-            <h1 className="text-xl font-black tracking-tighter">SALON AGENT</h1>
-          </div>
+          <SalonAgentLogo className="w-full h-auto mb-8" />
 
           <div className="mb-4">
             {allowedStores.length > 1 ? (
@@ -185,12 +181,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
 
       {/* Mobile Header */}
       <header className="lg:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-40">
-        <div className="flex items-center gap-2">
-          <div className="bg-blue-600 w-8 h-8 rounded-lg flex items-center justify-center">
-            <span className="text-sm font-black italic">S</span>
-          </div>
-          <span className="text-sm font-black tracking-tighter">SALON AGENT</span>
-        </div>
+        <SalonAgentLogo className="w-44 h-auto shrink-0" />
         <div className="flex items-center gap-3">
           {allowedStores.length > 1 ? (
             <select 

@@ -1,4 +1,5 @@
 'use client';
+import SalonAgentLogo from "@/components/SalonAgentLogo";
 import {useMemo,useState} from 'react';
 import DemoEvaluations from './DemoEvaluations';
 import DemoAnalytics from './DemoAnalytics';
@@ -46,7 +47,7 @@ export default function DemoApp() {
  return <div className="flex h-dvh overflow-hidden bg-slate-50 text-slate-900">
   {mobile&&<button className="fixed inset-0 z-30 bg-black/30 lg:hidden" aria-label="メニューを閉じる" onClick={()=>setMobile(false)}/>}
   <aside className={`${mobile?'translate-x-0':'-translate-x-full'} lg:translate-x-0 fixed lg:relative inset-y-0 left-0 z-40 w-64 shrink-0 bg-slate-900 text-white flex flex-col transition-transform`}>
-   <div className="p-6 flex items-center gap-3"><span className="bg-blue-600 w-12 h-12 rounded-2xl grid place-items-center text-2xl font-black">S</span><span className="font-black text-lg tracking-tight">SALON AGENT</span></div>
+   <div className="p-6"><SalonAgentLogo className="w-full h-auto" /></div>
    <div className="mx-4 mb-5 p-3 rounded-2xl bg-white/10 text-sm"><p className="text-[10px] text-slate-400 mb-1">勤務店舗</p><span className="text-emerald-400 mr-2">●</span>DEMO 神戸店</div>
    <nav aria-label="デモ内メニュー" className="flex-1 overflow-y-auto px-3 space-y-1">{tabs.map(t=><button key={t.id} className={`flex items-center gap-3 w-full text-left rounded-xl px-4 py-3 text-sm font-bold ${tab===t.id?'bg-blue-600 text-white':'text-slate-400 hover:bg-white/5 hover:text-white'}`} onClick={()=>navigate(t.id)}><t.icon size={20}/>{t.name}</button>)}</nav>
    <div className="m-4 rounded-2xl bg-white/5 p-4 text-sm"><p className="font-bold">デモ オーナー</p><p className="mt-1 text-xs text-slate-400">ログイン不要・架空のサロン</p><button className="mt-4 text-xs flex items-center gap-2 text-slate-300" onClick={()=>{setDataset(createDemoData());setResetVersion(v=>v+1);setMonth(DEMO_MONTH);setDate(DEMO_DATE);navigate('dashboard');setMessages([{role:'ai',text:'デモを初期状態に戻しました。9月の売上低下について確認してみましょう。'}]);mock('初期データに戻しました');}}><RotateCcw size={14}/>デモをリセット</button></div>
