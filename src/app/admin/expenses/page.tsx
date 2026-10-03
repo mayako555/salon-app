@@ -166,6 +166,7 @@ export default function AdminExpensesDashboard() {
 
   // Yayoi PDF Import States
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importStore, setImportStore] = useState("");
   const [isParsingPdf, setIsParsingPdf] = useState(false);
   const [parsedTransactions, setParsedTransactions] = useState<any[]>([]);
   const [importError, setImportError] = useState<string | null>(null);
@@ -444,15 +445,15 @@ export default function AdminExpensesDashboard() {
       return;
     }
 
-    if (!window.confirm(`${validExpenses.length}件の取込み候補を登録します。要確認・対象外の行は登録しません。よろしいですか？`)) return;
-    if (store === "すべて" && availableStores.length !== 1) { toast.error('取込先の店舗を選択してください'); return; }
+    if (!availableStores.includes(importStore)) { toast.error('取込先の店舗を選択してください'); return; }
     if (!availableStores.length) { toast.error('先に店舗を登録してください'); return; }
+    if (!window.confirm(`${importStore || "未選択の店舗"}に${validExpenses.length}件の取込み候補を登録します。要確認・対象外の行は登録しません。よろしいですか？`)) return;
     setIsParsingPdf(true); // Re-use parsing loading state for saving
 
     try {
       // Map to ExpenseRecord format
       const expensesToSave = validExpenses.map(tx => ({
-        store_name: store === "すべて" ? (availableStores[0] || "メイン店舗") : store, // fallback if needed
+        store_name: importStore,
         date: tx.date,
         category: tx.category,
         source: tx.source === "yayoi" ? "yayoi" as const : "csv" as const,
@@ -606,7 +607,7 @@ export default function AdminExpensesDashboard() {
             </Select>
 
             <Button 
-              onClick={() => setIsImportModalOpen(true)}
+              onClick={() => { setImportStore(availableStores.includes(store) ? store : availableStores.length === 1 ? availableStores[0] : ""); setIsImportModalOpen(true); }}
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 rounded-xl px-4 gap-2 text-xs"
             >
               <Brain size={14} className="text-amber-300" />
@@ -1119,6 +1120,14 @@ export default function AdminExpensesDashboard() {
                  </button>
               </div>
 
+              <div className="px-5 py-3 border-b border-slate-100 space-y-1">
+                <label htmlFor="expense-import-store" className="block text-sm font-bold">取込先の店舗（必須）</label>
+                <select id="expense-import-store" value={importStore} onChange={e => setImportStore(e.target.value)} disabled={isParsingPdf} className="w-full border rounded-lg px-3 py-2 text-sm bg-white disabled:opacity-50">
+                  <option value="">店舗を選択してください</option>
+                  {availableStores.map(name => <option key={name} value={name}>{name}</option>)}
+                </select>
+                <p className="text-xs text-slate-500">今回の経費候補はすべて選択した店舗に登録されます。複数店舗分が混ざっている場合は、店舗ごとに分けて取り込んでください。</p>
+              </div>
               <div className="p-5 overflow-y-auto space-y-4 flex-1">
                 {/* Uploader Box */}
                 {!isParsingPdf && parsedTransactions.length === 0 && (
@@ -1345,7 +1354,7 @@ export default function AdminExpensesDashboard() {
                 {parsedTransactions.length > 0 && (
                   <Button 
                     onClick={handleApplyImportedExpenses}
-                    disabled={isParsingPdf}
+                    disabled={isParsingPdf || !availableStores.includes(importStore)}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 text-xs rounded-lg px-4 gap-1.5 shadow-sm"
                   >
                     {isParsingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles size={12} className="text-amber-300" />}
